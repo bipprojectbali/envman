@@ -11,6 +11,7 @@ FROM deps AS builder
 COPY . .
 RUN bunx prisma generate
 RUN bun run build
+RUN bun run build:cli
 
 # ── Runtime ───────────────────────────────────────────────────────────────────
 FROM base AS runner
