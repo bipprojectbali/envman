@@ -16,7 +16,7 @@ services:
       - MASTER_KEY=${MASTER_KEY}
       # App
       - PORT=${PORT:-3000}
-      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_ENV=production
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL}
       - AUDIT_LOG_RETENTION_DAYS=${AUDIT_LOG_RETENTION_DAYS:-90}
       # MCP
