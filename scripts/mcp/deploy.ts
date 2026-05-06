@@ -208,29 +208,33 @@ function ghEnv() {
 }
 
 function triggerPublish(version: string): string {
-  run(
+  const out = run(
     `gh workflow run publish.yml --ref ${STACK_ENV} -f stack_env=${STACK_ENV} -f tag=${version}`,
     { env: ghEnv() },
   )
-  // Get the run ID of the just-triggered workflow
-  const runId = tryRun(
+  // gh prints the run URL on success, extract ID from it
+  const urlMatch = out.match(/runs\/(\d+)/)
+  if (urlMatch) return urlMatch[1]
+  // Fallback: wait then fetch latest run
+  Bun.sleepSync(5_000)
+  return tryRun(
     `gh run list --workflow=publish.yml --branch=${STACK_ENV} --limit=1 --json databaseId --jq '.[0].databaseId'`,
     { env: ghEnv() },
   )
-  return runId
 }
 
 function triggerRePull(): string {
-  run(
+  const out = run(
     `gh workflow run re-pull.yml --ref ${STACK_ENV} -f stack_name=${STACK_NAME} -f stack_env=${STACK_ENV}`,
     { env: ghEnv() },
   )
-  Bun.sleepSync(3_000) // brief wait for GHA to register the run
-  const runId = tryRun(
+  const urlMatch = out.match(/runs\/(\d+)/)
+  if (urlMatch) return urlMatch[1]
+  Bun.sleepSync(5_000)
+  return tryRun(
     `gh run list --workflow=re-pull.yml --branch=${STACK_ENV} --limit=1 --json databaseId --jq '.[0].databaseId'`,
     { env: ghEnv() },
   )
-  return runId
 }
 
 async function waitForWorkflow(runId: string, timeoutMs = 600_000): Promise<'success' | 'failure' | 'timeout'> {
