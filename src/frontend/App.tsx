@@ -19,6 +19,8 @@ const queryClient = new QueryClient({
 const router = createRouter({
   routeTree,
   context: { queryClient },
+  defaultPreload: 'intent',
+  defaultPreloadStaleTime: 30_000,
 })
 
 declare module '@tanstack/react-router' {

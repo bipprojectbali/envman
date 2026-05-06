@@ -4,6 +4,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { Elysia } from 'elysia'
 import { createMcpServer, type McpScope } from '../scripts/mcp/server'
 import { appLog, clearAppLogs, getAppLogs } from './lib/applog'
+import { decryptSecret, encryptSecret, hasMasterKey } from './lib/crypto'
 import { prisma } from './lib/db'
 import { env } from './lib/env'
 import { addConnection, broadcastToAdmins, getOnlineUserIds, removeConnection } from './lib/presence'
@@ -34,8 +35,48 @@ async function requireAuth(request: Request): Promise<{ userId: string; role: st
     where: { token },
     include: { user: { select: { id: true, role: true, email: true, blocked: true } } },
   })
-  if (!session || session.expiresAt < new Date() || session.user.blocked) return null
+  if (!session || session.expiresAt < new Date()) return null
+  if (session.user.blocked) return null
   return { userId: session.user.id, role: session.user.role, email: session.user.email }
+}
+
+// Check if a token's scopes allow access to a specific project:env.
+// Empty scopes = access to all projects the user is member of.
+function tokenScopeAllows(scopes: string[], projectSlug: string, envName: string): boolean {
+  if (scopes.length === 0) return true
+  return scopes.some(s => {
+    const [p, e] = s.split(':')
+    return p === projectSlug && (e === '*' || e === envName)
+  })
+}
+
+async function requireEnvAuth(request: Request): Promise<{ userId: string; role: string; tokenName?: string; canWrite: boolean; scopes: string[] } | null> {
+  const auth = request.headers.get('authorization') ?? ''
+  const bearerToken = auth.startsWith('Bearer ') ? auth.slice(7) : null
+  if (bearerToken) {
+    const apiToken = await prisma.apiToken.findUnique({
+      where: { token: bearerToken },
+      include: { user: { select: { id: true, role: true, blocked: true } } },
+    })
+    if (!apiToken || apiToken.user.blocked) return null
+    if (apiToken.expiresAt && apiToken.expiresAt < new Date()) return null
+    prisma.apiToken.update({ where: { id: apiToken.id }, data: { lastUsedAt: new Date() } }).catch(() => {})
+
+    // canWrite capped by user's current membership (checked per-request in each endpoint)
+    return { userId: apiToken.userId, role: apiToken.user.role, tokenName: apiToken.name, canWrite: apiToken.canWrite, scopes: apiToken.scopes }
+  }
+  const session = await requireAuth(request)
+  if (!session) return null
+  return { userId: session.userId, role: session.role, canWrite: true, scopes: [] }
+}
+
+async function getProjectAccess(userId: string, role: string, projectSlug: string): Promise<'OWNER' | 'EDITOR' | 'VIEWER' | null> {
+  if (role === 'SUPER_ADMIN') return 'OWNER'
+  const project = await prisma.project.findUnique({ where: { slug: projectSlug }, include: { members: { where: { userId } } } })
+  if (!project) return null
+  const member = project.members[0]
+  if (!member) return null
+  return member.role as 'OWNER' | 'EDITOR' | 'VIEWER'
 }
 
 function getAllowedStatusTransitions(current: string, role: 'QC' | 'ADMIN' | 'SUPER_ADMIN'): string[] {
@@ -55,6 +96,82 @@ function getAllowedStatusTransitions(current: string, role: 'QC' | 'ADMIN' | 'SU
   if (isAdmin) for (const s of entry.admin) out.add(s)
   return [...out]
 }
+
+// Inject `env_file: - stack.env` into every Docker Compose service that lacks it.
+// Portainer writes Env[] to stack.env for variable substitution; without env_file in
+// the service definition those vars never reach the container environment.
+function injectEnvFileIntoCompose(content: string): string {
+  const lines = content.split('\n')
+  // Two-pass: first collect where to insert, then build result
+  const insertAfter = new Map<number, string[]>() // line index → lines to insert after it
+
+  let inServices = false
+  let serviceIndent = -1   // indent of service names (e.g. 2)
+  let propIndent = -1       // indent of service properties (e.g. 4)
+  let serviceHasEnvFile = false
+  let lastPropLine = -1     // last content line inside current service
+
+  const flushService = () => {
+    if (lastPropLine >= 0 && !serviceHasEnvFile && propIndent >= 0) {
+      const pad = ' '.repeat(propIndent)
+      insertAfter.set(lastPropLine, [`${pad}env_file:`, `${pad}  - stack.env`])
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const trimmed = line.trimStart()
+    const indent = line.length - trimmed.length
+
+    if (!trimmed || trimmed.startsWith('#')) continue
+
+    // Top-level key — detect entering/leaving services block
+    if (indent === 0) {
+      if (trimmed.startsWith('services:')) {
+        inServices = true
+        serviceIndent = -1
+        propIndent = -1
+      } else {
+        if (inServices) { flushService(); inServices = false }
+      }
+      continue
+    }
+
+    if (!inServices) continue
+
+    // First service name seen → establish service indent
+    if (serviceIndent === -1) serviceIndent = indent
+
+    if (indent === serviceIndent && trimmed.endsWith(':')) {
+      // New service starts — flush previous
+      flushService()
+      serviceHasEnvFile = false
+      propIndent = -1
+      lastPropLine = i
+    } else if (indent > serviceIndent) {
+      // Service property line
+      if (propIndent === -1) propIndent = indent
+      if (trimmed.startsWith('env_file:') || trimmed === 'env_file:') serviceHasEnvFile = true
+      lastPropLine = i
+    }
+  }
+
+  // Flush last service
+  if (inServices) flushService()
+
+  // Build output
+  const result: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    result.push(lines[i])
+    const extra = insertAfter.get(i)
+    if (extra) result.push(...extra)
+  }
+  return result.join('\n')
+}
+
+const cookieOpts = env.NODE_ENV === 'production'
+  ? 'Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=86400'
+  : 'Path=/; HttpOnly; SameSite=Lax; Max-Age=86400'
 
 export function createApp() {
   appLog('info', 'Server starting')
@@ -131,7 +248,7 @@ export function createApp() {
         const token = crypto.randomUUID()
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
         await prisma.session.create({ data: { token, userId: user.id, expiresAt } })
-        set.headers['set-cookie'] = `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`
+        set.headers['set-cookie'] = `session=${token}; ${cookieOpts}`
         audit(user.id, 'LOGIN', `via email`, ip)
         appLog('info', `Login: ${email} (${user.role})`, ip)
         return { user: { id: user.id, name: user.name, email: user.email, role: user.role } }
@@ -166,6 +283,8 @@ export function createApp() {
         })
         if (!session || session.expiresAt < new Date()) {
           if (session) await prisma.session.delete({ where: { id: session.id } })
+          // Clear the stale cookie so the next OAuth attempt starts clean
+          set.headers['set-cookie'] = 'session=; Path=/; HttpOnly; Max-Age=0'
           set.status = 401
           return { user: null }
         }
@@ -183,6 +302,10 @@ export function createApp() {
           access_type: 'offline',
           prompt: 'consent',
         })
+        // Clear any stale session cookie BEFORE going to Google.
+        // Chrome blocks overwriting SameSite=Lax cookies via cross-site chains,
+        // so the old cookie must be removed in a same-site context first.
+        set.headers['set-cookie'] = 'session=; Path=/; HttpOnly; Max-Age=0'
         set.status = 302
         set.headers.location = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
       })
@@ -213,7 +336,8 @@ export function createApp() {
         })
 
         if (!tokenRes.ok) {
-          appLog('warn', 'Google OAuth token exchange failed', ip)
+          const errBody = await tokenRes.text().catch(() => '(unreadable)')
+          appLog('warn', `Google OAuth token exchange failed: ${tokenRes.status} — ${errBody}`, ip)
           set.status = 302
           set.headers.location = '/login?error=google_failed'
           return
@@ -227,7 +351,8 @@ export function createApp() {
         })
 
         if (!userInfoRes.ok) {
-          appLog('warn', 'Google OAuth userinfo fetch failed', ip)
+          const errBody = await userInfoRes.text().catch(() => '(unreadable)')
+          appLog('warn', `Google OAuth userinfo fetch failed: ${userInfoRes.status} — ${errBody}`, ip)
           set.status = 302
           set.headers.location = '/login?error=google_failed'
           return
@@ -253,12 +378,32 @@ export function createApp() {
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
         await prisma.session.create({ data: { token, userId: user.id, expiresAt } })
 
-        set.headers['set-cookie'] = `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`
         audit(user.id, 'LOGIN', 'via Google OAuth', ip)
         appLog('info', `Login (Google): ${googleUser.email} (${user.role})`, ip)
         const defaultRoute = user.role === 'SUPER_ADMIN' ? '/dev' : user.role === 'ADMIN' ? '/dashboard' : '/profile'
+        // Redirect to a same-site finalize endpoint instead of setting cookie here.
+        // Chrome blocks Set-Cookie overwrite when the response arrives via a
+        // cross-site redirect chain (accounts.google.com → localhost). By doing
+        // one extra same-site redirect, the cookie is set in a trusted first-party context.
+        const finalizeUrl = `/api/auth/finalize?t=${encodeURIComponent(token)}&r=${encodeURIComponent(defaultRoute)}`
         set.status = 302
-        set.headers.location = defaultRoute
+        set.headers.location = finalizeUrl
+      })
+
+      // ─── OAuth Finalize — set cookie in same-site context ─
+      .get('/api/auth/finalize', async ({ request, set, query }) => {
+        const t = query.t as string | undefined
+        const r = (query.r as string | undefined) ?? '/login'
+        const safePaths = ['/dev', '/dashboard', '/envmanager', '/profile']
+        const target = safePaths.some(p => r.startsWith(p)) ? r : '/login'
+        if (!t) { set.status = 302; set.headers.location = '/login'; return }
+        const session = await prisma.session.findUnique({ where: { token: t } })
+        if (!session || session.expiresAt < new Date()) {
+          set.status = 302; set.headers.location = '/login'; return
+        }
+        set.headers['set-cookie'] = `session=${t}; ${cookieOpts}`
+        set.status = 302
+        set.headers.location = target
       })
 
       // ─── Dev Auth (development only) ─────────────────────
@@ -275,7 +420,7 @@ export function createApp() {
         const token = crypto.randomUUID()
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
         await prisma.session.create({ data: { token, userId: user.id, expiresAt } })
-        set.headers['set-cookie'] = `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`
+        set.headers['set-cookie'] = `session=${token}; ${cookieOpts}`
         appLog('info', `Dev-auth login: ${user.email} (${user.role})`, getIp(request))
         const redirect = (query as Record<string, string>).redirect
         if (redirect) {
@@ -1781,6 +1926,662 @@ export function createApp() {
         name: pkg.name,
         version: pkg.version,
       }))
+
+      // ══════════════════════════════════════════════════════
+      // ─── ENV MANAGER ──────────────────────────────────────
+      // ══════════════════════════════════════════════════════
+
+      // ─── Token Auth (CLI) ─────────────────────────────────
+      .get('/api/envman/status', async ({ request, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        return { encryptionEnabled: hasMasterKey() }
+      })
+
+      .get('/api/envman/whoami', async ({ request, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const user = await prisma.user.findUnique({ where: { id: caller.userId }, select: { id: true, name: true, email: true, role: true } })
+        return { user, tokenName: caller.tokenName }
+      })
+
+      // ─── User lookup (for invite) ─────────────────────────
+      .get('/api/envman/users', async ({ request, set }) => {
+        const auth = await requireAuth(request)
+        if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+        const q = new URL(request.url).searchParams.get('q')?.trim() ?? ''
+        const users = await prisma.user.findMany({
+          where: {
+            blocked: false,
+            id: { not: auth.userId },
+            role: { in: ['ADMIN', 'SUPER_ADMIN'] },
+            ...(q ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }] } : {}),
+          },
+          select: { id: true, name: true, email: true },
+          orderBy: { name: 'asc' },
+          take: 30,
+        })
+        return { users }
+      })
+
+      // ─── API Tokens ───────────────────────────────────────
+      .get('/api/envman/tokens', async ({ request, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const tokens = await prisma.apiToken.findMany({
+          where: { userId: caller.userId },
+          select: { id: true, name: true, scopes: true, canWrite: true, lastUsedAt: true, expiresAt: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        })
+        return { tokens }
+      })
+
+      .post('/api/envman/tokens', async ({ request, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const body = await request.json().catch(() => null)
+        if (!body?.name) { set.status = 400; return { error: 'name required' } }
+        const { name, scopes = [], canWrite = false, expiresAt } = body
+        // Validate each scope — user must have access to every project in scopes
+        for (const scope of scopes as string[]) {
+          const projectSlug = scope.split(':')[0]
+          const access = await getProjectAccess(caller.userId, caller.role, projectSlug)
+          if (!access) { set.status = 403; return { error: `No access to project: ${projectSlug}` } }
+          if (canWrite && access === 'VIEWER') { set.status = 403; return { error: `VIEWER cannot create write tokens for: ${projectSlug}` } }
+        }
+        const token = `em_${crypto.randomUUID().replace(/-/g, '')}`
+        const created = await prisma.apiToken.create({
+          data: { userId: caller.userId, name, token, scopes, canWrite, expiresAt: expiresAt ? new Date(expiresAt) : null },
+        })
+        return { id: created.id, name: created.name, token, canWrite, expiresAt: created.expiresAt }
+      })
+
+      .patch('/api/envman/tokens/:id', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const existing = await prisma.apiToken.findUnique({ where: { id: params.id } })
+        if (!existing || existing.userId !== caller.userId) { set.status = 404; return { error: 'Not found' } }
+        const body = await request.json().catch(() => null)
+        const { name, scopes, canWrite, expiresAt } = body ?? {}
+        // Validate scopes if provided
+        if (scopes) {
+          for (const scope of scopes as string[]) {
+            const projectSlug = scope.split(':')[0]
+            const access = await getProjectAccess(caller.userId, caller.role, projectSlug)
+            if (!access) { set.status = 403; return { error: `No access to project: ${projectSlug}` } }
+            const effectiveWrite = canWrite ?? existing.canWrite
+            if (effectiveWrite && access === 'VIEWER') { set.status = 403; return { error: `VIEWER cannot have write access to: ${projectSlug}` } }
+          }
+        }
+        const updated = await prisma.apiToken.update({
+          where: { id: params.id },
+          data: {
+            ...(name !== undefined && { name }),
+            ...(scopes !== undefined && { scopes }),
+            ...(canWrite !== undefined && { canWrite }),
+            ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
+          },
+        })
+        return { id: updated.id, name: updated.name, scopes: updated.scopes, canWrite: updated.canWrite, expiresAt: updated.expiresAt }
+      })
+
+      .delete('/api/envman/tokens/:id', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const existing = await prisma.apiToken.findUnique({ where: { id: params.id } })
+        if (!existing || existing.userId !== caller.userId) { set.status = 404; return { error: 'Not found' } }
+        await prisma.apiToken.delete({ where: { id: params.id } })
+        return { ok: true }
+      })
+
+      // ─── Projects ─────────────────────────────────────────
+      .get('/api/envman/projects', async ({ request, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const isSuperAdmin = caller.role === 'SUPER_ADMIN'
+        const include = {
+          members: { include: { user: { select: { id: true, name: true, email: true } } } },
+          environments: { select: { name: true }, orderBy: { name: 'asc' as const } },
+          _count: { select: { environments: true } },
+        }
+        const projects = isSuperAdmin
+          ? await prisma.project.findMany({ include, orderBy: { createdAt: 'desc' } })
+          : await prisma.project.findMany({ where: { members: { some: { userId: caller.userId } } }, include, orderBy: { createdAt: 'desc' } })
+        return { projects: projects.map(p => ({ ...p, myRole: isSuperAdmin ? 'OWNER' : p.members.find(m => m.userId === caller.userId)?.role ?? 'VIEWER' })) }
+      })
+
+      .post('/api/envman/projects', async ({ request, set }) => {
+        const auth = await requireAuth(request)
+        if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+        const body = await request.json().catch(() => null)
+        if (!body?.slug || !body?.name) { set.status = 400; return { error: 'slug and name required' } }
+        const slug = body.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+        const existing = await prisma.project.findUnique({ where: { slug } })
+        if (existing) { set.status = 409; return { error: 'Slug already taken' } }
+        const project = await prisma.project.create({
+          data: { slug, name: body.name, description: body.description ?? null, members: { create: { userId: auth.userId, role: 'OWNER' } } },
+        })
+        return { project }
+      })
+
+      .get('/api/envman/projects/:slug', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug }, include: { members: { include: { user: { select: { id: true, name: true, email: true } } } }, environments: { include: { _count: { select: { vars: true } } } } } })
+        if (!project) { set.status = 404; return { error: 'Not found' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access) { set.status = 403; return { error: 'No access' } }
+        return { project: { ...project, myRole: access } }
+      })
+
+      .patch('/api/envman/projects/:slug', async ({ request, params, set }) => {
+        const auth = await requireAuth(request)
+        if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+        if (!access || access === 'VIEWER' || access === 'EDITOR') { set.status = 403; return { error: 'Owner required' } }
+        const body = await request.json().catch(() => null)
+        const project = await prisma.project.update({ where: { slug: params.slug }, data: { name: body?.name, description: body?.description } })
+        return { project }
+      })
+
+      .delete('/api/envman/projects/:slug', async ({ request, params, set }) => {
+        const auth = await requireAuth(request)
+        if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+        if (!access || access !== 'OWNER') { set.status = 403; return { error: 'Owner required' } }
+        await prisma.project.delete({ where: { slug: params.slug } })
+        return { ok: true }
+      })
+
+      // ─── Project Members ──────────────────────────────────
+      .post('/api/envman/projects/:slug/members', async ({ request, params, set }) => {
+        const auth = await requireAuth(request)
+        if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+        if (!access || access === 'VIEWER' || access === 'EDITOR') { set.status = 403; return { error: 'Owner required' } }
+        const body = await request.json().catch(() => null)
+        if ((!body?.email && !body?.userId) || !body?.role) { set.status = 400; return { error: 'userId (or email) and role required' } }
+        if (!['OWNER', 'EDITOR', 'VIEWER'].includes(body.role)) { set.status = 400; return { error: 'Invalid role' } }
+        const user = body.userId
+          ? await prisma.user.findUnique({ where: { id: body.userId } })
+          : await prisma.user.findUnique({ where: { email: body.email } })
+        if (!user) { set.status = 404; return { error: 'User not found' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        const member = await prisma.projectMember.upsert({ where: { userId_projectId: { userId: user.id, projectId: project.id } }, update: { role: body.role }, create: { userId: user.id, projectId: project.id, role: body.role } })
+        return { member }
+      })
+
+      .patch('/api/envman/projects/:slug/members/:userId', async ({ request, params, set }) => {
+        const auth = await requireAuth(request)
+        if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+        if (!access || access !== 'OWNER') { set.status = 403; return { error: 'Owner required' } }
+        const body = await request.json().catch(() => null)
+        if (!body?.role || !['OWNER', 'EDITOR', 'VIEWER'].includes(body.role)) { set.status = 400; return { error: 'Invalid role' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        // Protect last owner — cannot demote if this is the only OWNER
+        if (body.role !== 'OWNER') {
+          const ownerCount = await prisma.projectMember.count({ where: { projectId: project.id, role: 'OWNER' } })
+          const targetMember = await prisma.projectMember.findUnique({ where: { userId_projectId: { userId: params.userId, projectId: project.id } } })
+          if (ownerCount === 1 && targetMember?.role === 'OWNER') {
+            set.status = 400; return { error: 'Tidak bisa menurunkan owner terakhir. Angkat owner lain terlebih dahulu.' }
+          }
+        }
+        const member = await prisma.projectMember.update({ where: { userId_projectId: { userId: params.userId, projectId: project.id } }, data: { role: body.role } })
+        return { member }
+      })
+
+      .delete('/api/envman/projects/:slug/members/:userId', async ({ request, params, set }) => {
+        const auth = await requireAuth(request)
+        if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+        if (!access || access !== 'OWNER') { set.status = 403; return { error: 'Owner required' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        // Protect last owner
+        const targetMember = await prisma.projectMember.findUnique({ where: { userId_projectId: { userId: params.userId, projectId: project.id } } })
+        if (targetMember?.role === 'OWNER') {
+          const ownerCount = await prisma.projectMember.count({ where: { projectId: project.id, role: 'OWNER' } })
+          if (ownerCount === 1) { set.status = 400; return { error: 'Tidak bisa menghapus owner terakhir.' } }
+        }
+        await prisma.projectMember.delete({ where: { userId_projectId: { userId: params.userId, projectId: project.id } } })
+        return { ok: true }
+      })
+
+      // ─── Environments ─────────────────────────────────────
+      .post('/api/envman/projects/:slug/environments', async ({ request, params, set }) => {
+        const auth = await requireAuth(request)
+        if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+        if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
+        const body = await request.json().catch(() => null)
+        if (!body?.name) { set.status = 400; return { error: 'name required' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        const envName = body.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+        const environment = await prisma.environment.create({ data: { name: envName, projectId: project.id } })
+        return { environment }
+      })
+
+      .delete('/api/envman/projects/:slug/environments/:envName', async ({ request, params, set }) => {
+        const auth = await requireAuth(request)
+        if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+        if (!access || access !== 'OWNER') { set.status = 403; return { error: 'Owner required' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        await prisma.environment.delete({ where: { projectId_name: { projectId: project.id, name: params.envName } } })
+        return { ok: true }
+      })
+
+      // ─── Env Vars ─────────────────────────────────────────
+      .get('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access) { set.status = 403; return { error: 'No access' } }
+        if (caller.scopes.length > 0 && !tokenScopeAllows(caller.scopes, params.slug, params.envName)) { set.status = 403; return { error: 'Token tidak memiliki akses ke project/env ini' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } }, include: { vars: { orderBy: { key: 'asc' } } } })
+        if (!environment) { set.status = 404; return { error: 'Environment not found' } }
+        const canReadSecrets = access === 'OWNER' || access === 'EDITOR'
+        const vars = environment.vars.map(v => ({
+          id: v.id, key: v.key, isSecret: v.isSecret, updatedAt: v.updatedAt,
+          value: v.isSecret
+            ? (canReadSecrets ? decryptSecret(v.value) : '***')
+            : v.value,
+        }))
+        return { vars }
+      })
+
+      .get('/api/envman/projects/:slug/environments/:envName/vars/export', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access) { set.status = 403; return { error: 'No access' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        if (caller.scopes.length > 0 && !tokenScopeAllows(caller.scopes, params.slug, params.envName)) { set.status = 403; return { error: 'Token tidak memiliki akses ke project/env ini' } }
+        const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } }, include: { vars: { orderBy: { key: 'asc' } } } })
+        if (!environment) { set.status = 404; return { error: 'Environment not found' } }
+        const vars = Object.fromEntries(environment.vars.map(v => [v.key, v.isSecret ? decryptSecret(v.value) : v.value]))
+        return { vars }
+      })
+
+      .put('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
+        if (!caller.canWrite) { set.status = 403; return { error: 'Token is read-only' } }
+        const body = await request.json().catch(() => null)
+        if (!body?.vars || typeof body.vars !== 'object') { set.status = 400; return { error: 'vars object required' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        if (caller.scopes.length > 0 && !tokenScopeAllows(caller.scopes, params.slug, params.envName)) { set.status = 403; return { error: 'Token tidak memiliki akses ke project/env ini' } }
+        let environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } } })
+        if (!environment) { environment = await prisma.environment.create({ data: { name: params.envName, projectId: project.id } }) }
+        const secretKeys: string[] = body.secrets ?? []
+        await Promise.all(
+          Object.entries(body.vars as Record<string, string>).map(([key, value]) => {
+            const secret = secretKeys.includes(key)
+            const stored = secret ? encryptSecret(value) : value
+            return prisma.envVar.upsert({
+              where: { environmentId_key: { environmentId: environment!.id, key } },
+              update: { value: stored, isSecret: secret },
+              create: { key, value: stored, isSecret: secret, environmentId: environment!.id },
+            })
+          })
+        )
+        return { ok: true, count: Object.keys(body.vars).length }
+      })
+
+      .post('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
+        if (!caller.canWrite) { set.status = 403; return { error: 'Token is read-only' } }
+        const body = await request.json().catch(() => null)
+        if (!body?.key || body.value === undefined) { set.status = 400; return { error: 'key and value required' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        let environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } } })
+        if (!environment) { environment = await prisma.environment.create({ data: { name: params.envName, projectId: project.id } }) }
+        const envVar = await prisma.envVar.upsert({
+          where: { environmentId_key: { environmentId: environment.id, key: body.key } },
+          update: { value: body.isSecret ? encryptSecret(body.value) : body.value, isSecret: body.isSecret ?? false },
+          create: { key: body.key, value: body.isSecret ? encryptSecret(body.value) : body.value, isSecret: body.isSecret ?? false, environmentId: environment.id },
+        })
+        return { envVar: { id: envVar.id, key: envVar.key, isSecret: envVar.isSecret } }
+      })
+
+      .delete('/api/envman/projects/:slug/environments/:envName/vars/:key', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
+        if (!caller.canWrite) { set.status = 403; return { error: 'Token is read-only' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } } })
+        if (!environment) { set.status = 404; return { error: 'Environment not found' } }
+        await prisma.envVar.delete({ where: { environmentId_key: { environmentId: environment.id, key: params.key } } }).catch(() => {})
+        return { ok: true }
+      })
+
+      .get('/api/envman/projects/:slug/diff/:env1/:env2', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access) { set.status = 403; return { error: 'No access' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        const [e1, e2] = await Promise.all([
+          prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.env1 } }, include: { vars: true } }),
+          prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.env2 } }, include: { vars: true } }),
+        ])
+        if (!e1) { set.status = 404; return { error: `Environment '${params.env1}' not found` } }
+        if (!e2) { set.status = 404; return { error: `Environment '${params.env2}' not found` } }
+        const map1 = Object.fromEntries(e1.vars.map(v => [v.key, v]))
+        const map2 = Object.fromEntries(e2.vars.map(v => [v.key, v]))
+        const allKeys = new Set([...Object.keys(map1), ...Object.keys(map2)])
+        const diff = [...allKeys].sort().map(key => {
+          if (!map1[key]) return { key, status: 'added' }
+          if (!map2[key]) return { key, status: 'removed' }
+          if (map1[key].value !== map2[key].value) return { key, status: 'changed' }
+          return { key, status: 'same' }
+        })
+        return { env1: params.env1, env2: params.env2, diff }
+      })
+
+      // ─── Portainer Connections (global) ──────────────────
+      .get('/api/envman/portainer/connections', async ({ request, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const connections = await prisma.portainerConnection.findMany({
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, name: true, portainerUrl: true, createdById: true, createdAt: true, _count: { select: { configs: true } } },
+        })
+        return { connections }
+      })
+
+      .post('/api/envman/portainer/connections', async ({ request, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const body = await request.json().catch(() => null)
+        if (!body?.name || !body?.portainerUrl || !body?.apiToken) { set.status = 400; return { error: 'name, portainerUrl, apiToken required' } }
+        const conn = await prisma.portainerConnection.create({
+          data: { name: body.name, portainerUrl: body.portainerUrl, apiToken: body.apiToken, createdById: caller.userId },
+        })
+        return { connection: { id: conn.id, name: conn.name, portainerUrl: conn.portainerUrl } }
+      })
+
+      .patch('/api/envman/portainer/connections/:id', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+        if (!conn) { set.status = 404; return { error: 'Not found' } }
+        if (conn.createdById !== caller.userId && caller.role !== 'SUPER_ADMIN') { set.status = 403; return { error: 'Forbidden' } }
+        const body = await request.json().catch(() => null)
+        const updated = await prisma.portainerConnection.update({
+          where: { id: params.id },
+          data: {
+            name: body?.name ?? conn.name,
+            portainerUrl: body?.portainerUrl ?? conn.portainerUrl,
+            ...(body?.apiToken ? { apiToken: body.apiToken } : {}),
+          },
+        })
+        return { connection: { id: updated.id, name: updated.name, portainerUrl: updated.portainerUrl } }
+      })
+
+      .delete('/api/envman/portainer/connections/:id', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+        if (!conn) { set.status = 404; return { error: 'Not found' } }
+        if (conn.createdById !== caller.userId && caller.role !== 'SUPER_ADMIN') { set.status = 403; return { error: 'Forbidden' } }
+        await prisma.portainerConnection.delete({ where: { id: params.id } })
+        return { ok: true }
+      })
+
+      // Probe stacks via connection ID (or legacy URL+token)
+      .post('/api/envman/portainer/connections/:id/probe', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+        if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+        const url = conn.portainerUrl.replace(/\/$/, '')
+        try {
+          const res = await fetch(`${url}/api/stacks`, { headers: { 'X-API-Key': conn.apiToken } })
+          if (!res.ok) { set.status = 400; return { error: `Portainer returned ${res.status}: ${await res.text()}` } }
+          const stacks = await res.json() as any[]
+          return { stacks: stacks.map(s => ({ id: s.Id, name: s.Name, endpointId: s.EndpointId })) }
+        } catch (e) {
+          set.status = 400
+          return { error: `Cannot reach Portainer: ${e instanceof Error ? e.message : String(e)}` }
+        }
+      })
+
+      // ─── Portainer Integration ────────────────────────────
+      .get('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access) { set.status = 403; return { error: 'No access' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        const cfg = await prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: project.id, envName: params.envName } } })
+        if (!cfg) return { config: null }
+        // Resolve connection details for response
+        const conn = cfg.connectionId ? await prisma.portainerConnection.findUnique({ where: { id: cfg.connectionId }, select: { id: true, name: true, portainerUrl: true } }) : null
+        return {
+          config: {
+            id: cfg.id, stackId: cfg.stackId, stackName: cfg.stackName, endpointId: cfg.endpointId,
+            lastSyncAt: cfg.lastSyncAt, lastSyncOk: cfg.lastSyncOk,
+            // New: connection ref
+            connectionId: cfg.connectionId, connectionName: conn?.name, portainerUrl: conn?.portainerUrl ?? cfg.portainerUrl,
+            // Legacy fallback
+            apiToken: '***',
+          }
+        }
+      })
+
+      .put('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
+        const body = await request.json().catch(() => null)
+        if (!body?.stackId || !body?.stackName) { set.status = 400; return { error: 'stackId and stackName required' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        const existing = await prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: project.id, envName: params.envName } } })
+
+        if (body.connectionId) {
+          // New flow: use global connection
+          const conn = await prisma.portainerConnection.findUnique({ where: { id: body.connectionId } })
+          if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+          const cfg = await prisma.portainerConfig.upsert({
+            where: { projectId_envName: { projectId: project.id, envName: params.envName } },
+            update: { connectionId: body.connectionId, stackId: body.stackId, stackName: body.stackName, endpointId: body.endpointId ?? 1, portainerUrl: null, apiToken: null },
+            create: { projectId: project.id, envName: params.envName, connectionId: body.connectionId, stackId: body.stackId, stackName: body.stackName, endpointId: body.endpointId ?? 1 },
+          })
+          return { config: { id: cfg.id, connectionId: conn.id, connectionName: conn.name, portainerUrl: conn.portainerUrl, stackId: cfg.stackId, stackName: cfg.stackName, endpointId: cfg.endpointId } }
+        }
+
+        // Legacy flow: direct URL + token
+        if (!body.portainerUrl) { set.status = 400; return { error: 'connectionId or portainerUrl required' } }
+        const apiToken = body.apiToken || existing?.apiToken
+        if (!apiToken) { set.status = 400; return { error: 'apiToken required for new configuration' } }
+        const cfg = await prisma.portainerConfig.upsert({
+          where: { projectId_envName: { projectId: project.id, envName: params.envName } },
+          update: { portainerUrl: body.portainerUrl, apiToken, stackId: body.stackId, stackName: body.stackName, endpointId: body.endpointId ?? 1, connectionId: null },
+          create: { projectId: project.id, envName: params.envName, portainerUrl: body.portainerUrl, apiToken, stackId: body.stackId, stackName: body.stackName, endpointId: body.endpointId ?? 1 },
+        })
+        return { config: { id: cfg.id, portainerUrl: cfg.portainerUrl, stackId: cfg.stackId, stackName: cfg.stackName, endpointId: cfg.endpointId } }
+      })
+
+      .delete('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access || access !== 'OWNER') { set.status = 403; return { error: 'Owner required' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        await prisma.portainerConfig.delete({ where: { projectId_envName: { projectId: project.id, envName: params.envName } } }).catch(() => {})
+        return { ok: true }
+      })
+
+      // Probe Portainer — list stacks (for setup wizard)
+      .post('/api/envman/portainer/probe', async ({ request, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const body = await request.json().catch(() => null)
+        if (!body?.portainerUrl) { set.status = 400; return { error: 'portainerUrl required' } }
+        // Allow probing with existing stored token (pass slug+envName to look it up)
+        let apiToken = body.apiToken
+        if (!apiToken && body.slug && body.envName) {
+          const proj = await prisma.project.findUnique({ where: { slug: body.slug } })
+          if (proj) {
+            const stored = await prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: proj.id, envName: body.envName } } })
+            apiToken = stored?.apiToken
+          }
+        }
+        if (!apiToken) { set.status = 400; return { error: 'apiToken required' } }
+        const url = body.portainerUrl.replace(/\/$/, '')
+        try {
+          const res = await fetch(`${url}/api/stacks`, { headers: { 'X-API-Key': apiToken } })
+          if (!res.ok) { set.status = 400; return { error: `Portainer returned ${res.status}: ${await res.text()}` } }
+          const stacks = await res.json() as any[]
+          return { stacks: stacks.map(s => ({ id: s.Id, name: s.Name, endpointId: s.EndpointId })) }
+        } catch (e) {
+          set.status = 400
+          return { error: `Cannot reach Portainer: ${e instanceof Error ? e.message : String(e)}` }
+        }
+      })
+
+      // Sync env vars to Portainer stack
+      .post('/api/envman/projects/:slug/environments/:envName/portainer/sync', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        const cfg = await prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: project.id, envName: params.envName } } })
+        if (!cfg) { set.status = 404; return { error: 'Portainer not configured for this environment' } }
+        const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } }, include: { vars: true } })
+        if (!environment) { set.status = 404; return { error: 'Environment not found' } }
+        // Resolve URL + token: prefer global connection, fall back to legacy direct fields
+        let portainerUrl: string, portainerToken: string
+        if (cfg.connectionId) {
+          const conn = await prisma.portainerConnection.findUnique({ where: { id: cfg.connectionId } })
+          if (!conn) { set.status = 400; return { error: 'Portainer connection not found — reconfigure' } }
+          portainerUrl = conn.portainerUrl
+          portainerToken = conn.apiToken
+        } else {
+          if (!cfg.portainerUrl || !cfg.apiToken) { set.status = 400; return { error: 'Portainer not configured' } }
+          portainerUrl = cfg.portainerUrl
+          portainerToken = cfg.apiToken
+        }
+        const url = portainerUrl.replace(/\/$/, '')
+        try {
+          // Get current stack file from Portainer
+          const fileRes = await fetch(`${url}/api/stacks/${cfg.stackId}/file`, { headers: { 'X-API-Key': portainerToken } })
+          if (!fileRes.ok) { set.status = 400; return { error: `Portainer stack file error: ${fileRes.status}` } }
+          const { StackFileContent: rawStackFile } = await fileRes.json() as { StackFileContent: string }
+          // Inject env_file: stack.env into each service that doesn't have it,
+          // so vars appear in container environment (not just compose substitution)
+          const stackFileContent = injectEnvFileIntoCompose(rawStackFile)
+          // Escape values for Docker Compose stack.env file format
+          const escapeEnvValue = (val: string) => val.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
+          const portainerEnv = environment.vars.map(v => ({
+            name: v.key,
+            value: escapeEnvValue(v.isSecret ? decryptSecret(v.value) : v.value),
+          }))
+          const syncRes = await fetch(`${url}/api/stacks/${cfg.stackId}?endpointId=${cfg.endpointId}`, {
+            method: 'PUT',
+            headers: { 'X-API-Key': portainerToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ StackFileContent: stackFileContent, Env: portainerEnv, Prune: false }),
+          })
+          if (!syncRes.ok) {
+            const errText = await syncRes.text()
+            await prisma.portainerConfig.update({ where: { id: cfg.id }, data: { lastSyncAt: new Date(), lastSyncOk: false } })
+            set.status = 400
+            return { error: `Portainer sync error ${syncRes.status}: ${errText}` }
+          }
+          await prisma.portainerConfig.update({ where: { id: cfg.id }, data: { lastSyncAt: new Date(), lastSyncOk: true } })
+          appLog('info', `Portainer sync: ${params.slug}:${params.envName} → stack ${cfg.stackName} (${environment.vars.length} vars)`)
+          return { ok: true, varsCount: environment.vars.length, stackName: cfg.stackName }
+        } catch (e) {
+          await prisma.portainerConfig.update({ where: { id: cfg.id }, data: { lastSyncAt: new Date(), lastSyncOk: false } }).catch(() => {})
+          set.status = 500
+          return { error: `Sync failed: ${e instanceof Error ? e.message : String(e)}` }
+        }
+      })
+
+      // ─── CLI Download ─────────────────────────────────────
+      .get('/install', ({ request }) => {
+        const origin = getPublicOrigin(request)
+        const script = `#!/bin/sh
+set -e
+
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+
+case "$ARCH" in
+  x86_64)  ARCH="x64" ;;
+  aarch64|arm64) ARCH="arm64" ;;
+  *) echo "Unsupported arch: $ARCH"; exit 1 ;;
+esac
+
+case "$OS" in
+  linux)  PLATFORM="linux-$ARCH" ;;
+  darwin) PLATFORM="darwin-$ARCH" ;;
+  *) echo "Unsupported OS: $OS"; exit 1 ;;
+esac
+
+URL="${origin}/download/cli/$PLATFORM"
+DEST="\${ENVMAN_DEST:-/usr/local/bin/envman}"
+
+echo "Downloading envman for $PLATFORM..."
+curl -fsSL "$URL" -o /tmp/envman-download
+chmod +x /tmp/envman-download
+
+if [ -w "$(dirname $DEST)" ]; then
+  mv /tmp/envman-download "$DEST"
+else
+  sudo mv /tmp/envman-download "$DEST"
+fi
+
+echo "Installed envman to $DEST"
+echo "Run: envman login ${origin} --token <your-token>"
+`
+        return new Response(script, { headers: { 'Content-Type': 'text/plain' } })
+      })
+
+      .get('/download/cli/:platform', async ({ params, set }) => {
+        const platforms: Record<string, string> = {
+          'linux-x64':    'envman-linux-x64',
+          'linux-arm64':  'envman-linux-arm64',
+          'darwin-x64':   'envman-darwin-x64',
+          'darwin-arm64': 'envman-darwin-arm64',
+          'windows-x64':  'envman-windows-x64.exe',
+        }
+        const filename = platforms[params.platform]
+        if (!filename) { set.status = 404; return new Response('Unknown platform', { status: 404 }) }
+        const filePath = `${process.cwd()}/dist/cli/${filename}`
+        const file = Bun.file(filePath)
+        if (!(await file.exists())) {
+          set.status = 404
+          return new Response('Binary not built yet. Run: bun run build:cli', { status: 404 })
+        }
+        return new Response(file, { headers: { 'Content-Disposition': `attachment; filename="${filename}"`, 'Content-Type': 'application/octet-stream' } })
+      })
 
       // ─── Example API ───────────────────────────────────
       .get('/api/hello', () => ({

@@ -23,4 +23,8 @@ export const env = {
   AUDIT_LOG_RETENTION_DAYS: parseInt(optional('AUDIT_LOG_RETENTION_DAYS', '90'), 10),
   MCP_SECRET: optional('MCP_SECRET', ''),
   MCP_SECRET_ADMIN: optional('MCP_SECRET_ADMIN', ''),
+  // Optional: 32-byte hex key for AES-256-GCM encryption of secret env vars.
+  // Generate: openssl rand -hex 32
+  // If unset, secret values are stored as plaintext (no at-rest protection).
+  MASTER_KEY: optional('MASTER_KEY', ''),
 } as const

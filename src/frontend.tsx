@@ -7,13 +7,11 @@ const InspectorWrapper = import.meta.env?.DEV
   ? (await import('./frontend/DevInspector')).DevInspector
   : ({ children }: { children: ReactNode }) => <>{children}</>
 
-// Remove splash screen after React mounts
-function removeSplash() {
-  const splash = document.getElementById('splash')
-  if (splash) {
-    splash.classList.add('fade-out')
-    setTimeout(() => splash.remove(), 300)
-  }
+function removeLoading() {
+  const el = document.getElementById('loading')
+  if (!el) return
+  el.classList.add('fade-out')
+  setTimeout(() => el.remove(), 250)
 }
 
 const elem = document.getElementById('root')!
@@ -31,4 +29,4 @@ if (import.meta.hot) {
   createRoot(elem).render(app)
 }
 
-removeSplash()
+removeLoading()

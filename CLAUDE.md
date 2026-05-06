@@ -26,7 +26,14 @@ PostgreSQL via Prisma v6. Client generated to `./generated/prisma` (gitignored).
   - `Ticket` (id, title, description, status, priority, route, reporterId, assigneeId, timestamps, closedAt)
   - `TicketComment` (id, ticketId, authorId, authorTag, body, createdAt)
   - `TicketEvidence` (id, ticketId, kind, url, note, createdAt)
-- Enums: `Role` = `USER | QC | ADMIN | SUPER_ADMIN` (default `USER`); `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`; `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`
+- Enums: `Role` = `USER | QC | ADMIN | SUPER_ADMIN` (default `USER`); `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`; `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`; `ProjectMemberRole` = `OWNER | EDITOR | VIEWER`
+  - `Project` (id, slug, name, description, timestamps)
+  - `Environment` (id, name, projectId, createdAt) — unique(projectId, name)
+  - `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
+  - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
+  - `ApiToken` (id, userId, name, token, projectId?, envName?, canWrite, lastUsedAt?, expiresAt?, createdAt)
+  - `PortainerConnection` (id, userId, name, portainerUrl, apiToken, createdAt) — global, reusable across projects
+  - `PortainerConfig` (id, projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?, timestamps) — `connectionId` FK preferred; legacy `portainerUrl`/`apiToken` nullable for backward compat
 - Client singleton: `src/lib/db.ts` — import `{ prisma }` from here
 - Seed: `prisma/seed.ts` — demo users (superadmin, admin, user) with `Bun.password.hash` bcrypt
 - Commands: `bun run db:migrate`, `bun run db:seed`, `bun run db:generate`
@@ -81,6 +88,93 @@ Role-gated ticket tracking. Status machine: `OPEN → IN_PROGRESS → READY_FOR_
 
 Frontend: `src/frontend/components/TicketsPanel.tsx` — shared between `/dev` and `/dashboard`. Filtered to QC scope when user is QC.
 
+## Envman CLI
+
+Standalone CLI for injecting env vars at runtime. Built with `bun build --compile` into self-contained binaries.
+
+- Entry: `src/cli.ts`
+- Build: `bun run build:cli` → `dist/cli/envman-{platform}` (linux-x64, linux-arm64, darwin-x64, darwin-arm64, windows-x64)
+- Install: served at `/download/cli/<platform>` (future), or copy binary to PATH as `envman`
+
+### Auth resolution (priority: highest → lowest)
+1. `ENVMAN_SERVER` + `ENVMAN_TOKEN` in a local `-e` file
+2. `ENVMAN_SERVER` + `ENVMAN_TOKEN` as system env vars (process.env / ~/.bashrc / CI)
+3. Config file at `~/.config/envman/config.json` (saved by `envman login`)
+
+### Unified `-e` flag
+- `-e project:env` (contains `:`) → fetch vars from server
+- `-e .env.local` (no `:`) → parse local file
+
+`ENVMAN_SERVER` and `ENVMAN_TOKEN` are always stripped from the child process env to avoid leaking credentials.
+
+### Commands
+```
+envman login <server-url> --token <token>   # Save to ~/.config/envman/config.json
+envman logout                                # Remove config file
+envman whoami                                # Show authenticated user
+envman [options] -- <command>               # Inject vars and run command
+```
+
+### Options
+```
+-e <project>:<env>   Fetch vars from server
+-e <file>            Load vars from local file
+--server-wins        System env overrides merged vars (default: merged wins)
+```
+
+### Multiple sources (later -e overrides earlier)
+```bash
+envman -e myapp:base -e myapp:production -- bun dev
+envman -e .env.local -e myapp:production -- bun dev     # local wins
+envman -e .env.local -e myapp:production -- bun dev     # auth from file if ENVMAN_SERVER/TOKEN in .env.local
+```
+
+## Secret Var Encryption
+
+Env vars marked as `isSecret` dienkripsi dengan **AES-256-GCM** sebelum disimpan ke DB.
+
+- `MASTER_KEY` — 64-char hex string (32 bytes). Generate: `openssl rand -hex 32`
+- Jika tidak di-set: secret tersimpan plaintext (backward compatible)
+- Format tersimpan di DB: `enc:<iv_hex>:<ciphertext_hex>:<auth_tag_hex>`
+- Enkripsi terjadi di: `src/lib/crypto.ts` (`encryptSecret`, `decryptSecret`)
+- VIEWER hanya bisa lihat `***` di UI, EDITOR/OWNER bisa reveal (decrypt server-side)
+- Export/CLI dan Portainer sync selalu decrypt otomatis
+
+## Envman API
+
+Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI). `requireEnvAuth()` middleware in `src/app.ts`.
+
+### Projects
+- `GET /api/envman/projects` — list projects (only ones you have access to)
+- `POST /api/envman/projects` — create project (ADMIN+)
+- `GET /api/envman/projects/:slug` — project detail + members + environments
+- `GET /api/envman/projects/:slug/environments/:env/vars` — list vars (VIEWER: secrets masked as `***`)
+- `GET /api/envman/projects/:slug/environments/:env/vars/export` — all vars decrypted (EDITOR+)
+- `POST /api/envman/projects/:slug/environments/:env/vars` — create/update var (EDITOR+)
+- `PUT /api/envman/projects/:slug/environments/:env/vars/:key` — update var (EDITOR+)
+- `DELETE /api/envman/projects/:slug/environments/:env/vars/:key` — delete var (EDITOR+)
+- `POST /api/envman/projects/:slug/environments` — add environment (EDITOR+)
+- `DELETE /api/envman/projects/:slug/environments/:env` — delete environment (OWNER+)
+- `PUT /api/envman/projects/:slug/members/:userId/role` — change member role (OWNER)
+- `DELETE /api/envman/projects/:slug/members/:userId` — remove member (OWNER)
+
+### Portainer
+- `GET /api/envman/portainer/connections` — list global connections
+- `POST /api/envman/portainer/connections` — create connection
+- `PUT /api/envman/portainer/connections/:id` — update connection
+- `DELETE /api/envman/portainer/connections/:id` — delete connection
+- `POST /api/envman/portainer/connections/:id/probe` — test + fetch stacks from Portainer
+- `GET /api/envman/projects/:slug/environments/:env/portainer` — get portainer config
+- `PUT /api/envman/projects/:slug/environments/:env/portainer` — save portainer config (connectionId + stackId)
+- `DELETE /api/envman/projects/:slug/environments/:env/portainer` — remove portainer config
+- `POST /api/envman/projects/:slug/environments/:env/portainer/sync` — push all vars to Portainer stack
+
+### Tokens
+- `GET /api/envman/tokens` — list your tokens
+- `POST /api/envman/tokens` — create token
+- `DELETE /api/envman/tokens/:id` — delete token
+- `GET /api/envman/whoami` — verify token, return user info
+
 ## MCP Server
 
 Local MCP server lets Claude drive the app remotely. `.mcp.json` registers `app-mcp` (runs `scripts/mcp/server.ts`) alongside `playwright`. Requires `MCP_SECRET`; `MCP_SECRET_ADMIN` unlocks write/dev tools.
@@ -102,18 +196,48 @@ Two log systems:
 - **Audit Logs** (DB `AuditLog` table) — Persistent user activity trail. Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`. Auto-cleanup of records older than `AUDIT_LOG_RETENTION_DAYS` (default 90) runs on startup + every 24h. Can be cleared manually.
 - **Pagination** — Dev Console App Logs and User Logs use client-side pagination (25 per page). Avoids rendering hundreds of rows while polling every 5s. Page resets on filter change.
 
+## Routing Rules (Ketetapan Mutlak)
+
+**Static routes wajib digunakan untuk semua navigasi yang merepresentasikan lokasi dalam hierarki data atau resource.** Ini adalah ketetapan tidak dapat dikecualikan.
+
+### Kapan pakai static route (`/path/:param`)
+- Navigasi antar resource yang berbeda (project → environment → vars)
+- URL yang harus bisa di-bookmark, di-share, dan di-reload tanpa kehilangan context
+- Setiap level hierarki data yang punya identitas sendiri
+- Section besar dengan sub-navigasi yang dalam
+
+### Kapan boleh pakai search params (`?key=value`)
+- **Hanya** untuk view state dalam satu halaman: tab aktif, filter, sort order
+- State yang sifatnya preferensi tampilan, bukan lokasi resource
+- Contoh yang benar: `?tab=environments` di `/envmanager/:slug` (dua view dari resource yang sama)
+- Contoh yang salah: `?em_project=myapp&em_env=production` (ini adalah lokasi, bukan view state)
+
+### Larangan keras
+- **Dilarang** menggunakan `useState` untuk navigasi antar halaman/resource
+- **Dilarang** menggunakan search params sebagai pengganti path params untuk resource hierarchy
+- **Dilarang** membuat "temporary routes" yang hilang saat reload
+
+### Pattern yang benar (contoh dari project ini)
+```
+/envmanager                    → project list
+/envmanager/tokens             → tokens page
+/envmanager/connections        → global Portainer connections
+/envmanager/:slug              → project detail (?tab=environments|members OK)
+/envmanager/:slug/:env         → vars page
+```
+
 ## Role-Based Routing
 
 | Role | Default Route | Can Access |
 |------|--------------|------------|
-| SUPER_ADMIN | `/dev` | `/dev`, `/dashboard`, `/profile` |
-| ADMIN | `/dashboard` | `/dashboard`, `/profile` |
+| SUPER_ADMIN | `/dev` | `/dev`, `/dashboard`, `/envmanager`, `/profile` |
+| ADMIN | `/dashboard` | `/dashboard`, `/envmanager`, `/profile` |
 | QC | `/dashboard` | `/dashboard` (QC-scoped tickets only), `/profile` |
 | USER | `/profile` | `/profile` |
 
 - `getDefaultRoute(role)` in `src/frontend/hooks/useAuth.ts` — centralized redirect logic
 - Blocked users are redirected to `/blocked` from all protected routes
-- Tab state persisted in URL search params (`?tab=`) for `/dev` and `/dashboard`
+- Tab state persisted in URL search params (`?tab=`) for `/dev` and `/dashboard` (flat panels, not resource hierarchy)
 
 ## Frontend
 
@@ -126,7 +250,14 @@ React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Rou
   - `index.tsx` — Landing page (theme toggle top-right)
   - `login.tsx` — Login page (email/password + Google OAuth, theme toggle top-right)
   - `dev.tsx` — Dev console with AppShell sidebar: Overview, Users, App Logs, User Logs, Database (React Flow ER diagram), Project (10 sub-views — all React Flow with auto-save), Settings (SUPER_ADMIN only)
-  - `dashboard.tsx` — Admin dashboard with AppShell sidebar: Dashboard, Analytics, Orders, Messages, Calendar, Settings (ADMIN+)
+  - `dashboard.tsx` — Admin dashboard with AppShell sidebar: Dashboard, Tickets, Analytics, Orders, Messages, Calendar, Settings (ADMIN+). Links to `/envmanager` and `/dev`.
+  - `envmanager.tsx` — Env Manager layout (AppShell sidebar, `<Outlet />`). Auth: ADMIN+
+  - `envmanager.index.tsx` — `/envmanager` project list
+  - `envmanager.tokens.tsx` — `/envmanager/tokens` API token management (read/write scope, expiry)
+  - `envmanager.connections.tsx` — `/envmanager/connections` global Portainer connection CRUD
+  - `envmanager.$slug.tsx` — `/envmanager/:slug` project detail (`?tab=environments|members`). Pure `<Outlet />` layout.
+  - `envmanager.$slug.index.tsx` — actual project detail content (environments + members tabs)
+  - `envmanager.$slug.$env.tsx` — `/envmanager/:slug/:env` env vars page
   - `profile.tsx` — User profile (all authenticated users, theme toggle in header)
   - `blocked.tsx` — Blocked user page with explanation (theme toggle top-right)
 - Components: `src/frontend/components/`

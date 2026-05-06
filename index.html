@@ -4,9 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Env Manager — manage environment variables across projects" />
     <base href="/" />
-    <link rel="icon" type="image/svg+xml" href="/src/logo.svg" />
-    <title>My App</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Env Manager</title>
     <script>
       // Resolve color scheme before first paint to prevent flash
       (function() {
@@ -14,7 +15,6 @@
         var scheme = stored || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.setAttribute('data-mantine-color-scheme', scheme);
         document.documentElement.style.colorScheme = scheme;
-        // Expose for CSS below
         window.__colorScheme = scheme;
       })();
     </script>
@@ -23,74 +23,63 @@
         margin: 0;
         padding: 0;
       }
-      html[data-mantine-color-scheme="dark"], html[data-mantine-color-scheme="dark"] body {
-        background-color: #242424;
+      html[data-mantine-color-scheme="dark"],
+      html[data-mantine-color-scheme="dark"] body {
+        background-color: #1a1b1e;
         color: #c1c2c5;
       }
-      html[data-mantine-color-scheme="light"], html[data-mantine-color-scheme="light"] body {
+      html[data-mantine-color-scheme="light"],
+      html[data-mantine-color-scheme="light"] body {
         background-color: #ffffff;
         color: #1a1b1e;
       }
 
-      /* Splash screen */
-      #splash {
+      /* ─── Loading overlay ───────────────────── */
+      #loading {
         position: fixed;
         inset: 0;
         z-index: 9999;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: opacity 0.3s ease;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        transition: opacity 0.25s ease;
       }
-      html[data-mantine-color-scheme="dark"] #splash {
-        background-color: #242424;
+      html[data-mantine-color-scheme="dark"] #loading {
+        background-color: rgba(26, 27, 30, 0.55);
       }
-      html[data-mantine-color-scheme="light"] #splash {
-        background-color: #ffffff;
+      html[data-mantine-color-scheme="light"] #loading {
+        background-color: rgba(255, 255, 255, 0.55);
       }
-      #splash.fade-out {
+      #loading.fade-out {
         opacity: 0;
         pointer-events: none;
       }
-      .splash-content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 24px;
-      }
-      .splash-spinner {
-        width: 40px;
-        height: 40px;
-        border: 3px solid;
+
+      .loading-spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid transparent;
         border-radius: 50%;
-        animation: spin 0.8s linear infinite;
+        animation: spin 0.7s linear infinite;
       }
-      html[data-mantine-color-scheme="dark"] .splash-spinner {
-        border-color: #3a3a3a;
-        border-top-color: #339af0;
+      html[data-mantine-color-scheme="dark"] .loading-spinner {
+        border-color: rgba(151, 117, 250, 0.2);
+        border-top-color: #9775fa;
       }
-      html[data-mantine-color-scheme="light"] .splash-spinner {
-        border-color: #e0e0e0;
-        border-top-color: #339af0;
+      html[data-mantine-color-scheme="light"] .loading-spinner {
+        border-color: rgba(121, 80, 242, 0.15);
+        border-top-color: #7950f2;
       }
-      .splash-text {
-        font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-        font-size: 14px;
-        color: #868e96;
-        letter-spacing: 0.5px;
-      }
+
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
     </style>
   </head>
   <body>
-    <div id="splash">
-      <div class="splash-content">
-        <div class="splash-spinner"></div>
-        <div class="splash-text">Loading...</div>
-      </div>
-    </div>
+    <div id="loading"><div class="loading-spinner"></div></div>
     <div id="root"></div>
     <script type="module" src="/src/frontend.tsx"></script>
   </body>

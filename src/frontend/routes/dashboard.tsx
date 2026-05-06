@@ -22,13 +22,14 @@ import {
 } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Outlet, redirect, useMatchRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import {
   TbActivity,
   TbArrowDownRight,
   TbArrowUpRight,
   TbBell,
+  TbBook,
   TbBug,
   TbCalendar,
   TbChevronRight,
@@ -44,6 +45,7 @@ import {
   TbSettings,
   TbUser,
   TbUsers,
+  TbVariable,
 } from 'react-icons/tb'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { TicketsPanel } from '@/frontend/components/TicketsPanel'
@@ -60,6 +62,7 @@ export const Route = createFileRoute('/dashboard')({
       const data = await context.queryClient.ensureQueryData({
         queryKey: ['auth', 'session'],
         queryFn: () => fetch('/api/auth/session', { credentials: 'include' }).then((r) => r.json()),
+        staleTime: 0,
       })
       if (!data?.user) throw redirect({ to: '/login' })
       if (data.user.blocked) throw redirect({ to: '/blocked' })
@@ -100,6 +103,8 @@ function DashboardPage() {
   const logout = useLogout()
   const user = data?.user
   const { tab: active } = Route.useSearch()
+  const matchRoute = useMatchRoute()
+  const isChildRoute = !!matchRoute({ to: '/dashboard/docs' })
   const isQcOnly = user?.role === 'QC'
   const navItems = navItemsAll.filter((item) => (isQcOnly ? !item.adminOnly : true))
   const navigate = useNavigate()
@@ -230,37 +235,58 @@ function DashboardPage() {
             ),
           )}
 
-          {user?.role === 'SUPER_ADMIN' &&
+          {!isQcOnly &&
             (collapsed ? (
-              <Tooltip label="Dev Console" position="right">
+              <Tooltip label="Env Manager" position="right">
                 <ActionIcon
                   variant="subtle"
                   color="gray"
                   size="lg"
                   component="a"
-                  href="/dev"
+                  href="/envmanager"
                   mt={8}
                   style={{ width: '100%' }}
                 >
-                  <TbCode size={18} />
+                  <TbVariable size={18} />
                 </ActionIcon>
               </Tooltip>
             ) : (
               <>
                 <Text size="xs" c="dimmed" fw={500} mt="md" mb={4} ml="sm">
-                  Super Admin
+                  Tools
                 </Text>
                 <NavLink
-                  label="Dev Console"
-                  leftSection={<TbCode size={18} />}
+                  label="Env Manager"
+                  leftSection={<TbVariable size={18} />}
                   rightSection={<TbChevronRight size={14} />}
                   component="a"
-                  href="/dev"
+                  href="/envmanager"
                   variant="light"
                   mb={4}
                 />
               </>
             ))}
+
+          {user?.role === 'SUPER_ADMIN' &&
+            (collapsed ? (
+              <Tooltip label="Dev Console" position="right">
+                <ActionIcon variant="subtle" color="gray" size="lg" component="a" href="/dev" mt={8} style={{ width: '100%' }}>
+                  <TbCode size={18} />
+                </ActionIcon>
+              </Tooltip>
+            ) : (
+              <NavLink label="Dev Console" leftSection={<TbCode size={18} />} rightSection={<TbChevronRight size={14} />} component="a" href="/dev" variant="light" mb={4} />
+            ))}
+
+          {collapsed ? (
+            <Tooltip label="Docs" position="right">
+              <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })} mt={8} style={{ width: '100%' }}>
+                <TbBook size={18} />
+              </ActionIcon>
+            </Tooltip>
+          ) : (
+            <NavLink label="Docs" leftSection={<TbBook size={18} />} rightSection={<TbChevronRight size={14} />} onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })} variant="light" mb={4} />
+          )}
         </AppShell.Section>
 
         <AppShell.Section>
@@ -319,18 +345,24 @@ function DashboardPage() {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        {active === 'dashboard' && !isQcOnly && <OverviewPanel />}
-        {active === 'tickets' && <TicketsPanel />}
-        {active === 'analytics' && !isQcOnly && <AnalyticsPanel />}
-        {active === 'orders' && !isQcOnly && <OrdersPanel />}
-        {active === 'messages' && !isQcOnly && (
-          <PlaceholderPanel title="Messages" desc="Kelola pesan dan notifikasi." icon={TbMessages} />
-        )}
-        {active === 'calendar' && !isQcOnly && (
-          <PlaceholderPanel title="Calendar" desc="Jadwal dan agenda kegiatan." icon={TbCalendar} />
-        )}
-        {active === 'settings' && !isQcOnly && (
-          <PlaceholderPanel title="Settings" desc="Pengaturan akun dan aplikasi." icon={TbSettings} />
+        {!isChildRoute ? (
+          <>
+            {active === 'dashboard' && !isQcOnly && <OverviewPanel />}
+            {active === 'tickets' && <TicketsPanel />}
+            {active === 'analytics' && !isQcOnly && <AnalyticsPanel />}
+            {active === 'orders' && !isQcOnly && <OrdersPanel />}
+            {active === 'messages' && !isQcOnly && (
+              <PlaceholderPanel title="Messages" desc="Kelola pesan dan notifikasi." icon={TbMessages} />
+            )}
+            {active === 'calendar' && !isQcOnly && (
+              <PlaceholderPanel title="Calendar" desc="Jadwal dan agenda kegiatan." icon={TbCalendar} />
+            )}
+            {active === 'settings' && !isQcOnly && (
+              <PlaceholderPanel title="Settings" desc="Pengaturan akun dan aplikasi." icon={TbSettings} />
+            )}
+          </>
+        ) : (
+          <Outlet />
         )}
       </AppShell.Main>
     </AppShell>

@@ -15,6 +15,12 @@ enum Role {
   SUPER_ADMIN
 }
 
+enum ProjectMemberRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
 enum TicketStatus {
   OPEN
   IN_PROGRESS
@@ -40,11 +46,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sessions      Session[]
-  auditLogs     AuditLog[]
-  reported      Ticket[]        @relation("TicketReporter")
-  assigned      Ticket[]        @relation("TicketAssignee")
-  comments      TicketComment[]
+  sessions              Session[]
+  auditLogs             AuditLog[]
+  reported              Ticket[]              @relation("TicketReporter")
+  assigned              Ticket[]              @relation("TicketAssignee")
+  portainerConnections  PortainerConnection[]
+  comments       TicketComment[]
+  projectMembers ProjectMember[]
+  apiTokens      ApiToken[]
 
   @@map("user")
 }
@@ -130,4 +139,122 @@ model TicketEvidence {
 
   @@index([ticketId])
   @@map("ticket_evidence")
+}
+
+// ─── Env Manager ──────────────────────────────────────────────────────────────
+
+model Project {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members           ProjectMember[]
+  environments      Environment[]
+  portainerConfigs  PortainerConfig[]
+
+  @@map("project")
+}
+
+model Environment {
+  id        String   @id @default(uuid())
+  name      String
+  projectId String
+  createdAt DateTime @default(now())
+
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  vars    EnvVar[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("environment")
+}
+
+model EnvVar {
+  id            String   @id @default(uuid())
+  key           String
+  value         String
+  isSecret      Boolean  @default(false)
+  environmentId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  environment Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@unique([environmentId, key])
+  @@index([environmentId])
+  @@map("env_var")
+}
+
+model ProjectMember {
+  id        String            @id @default(uuid())
+  userId    String
+  projectId String
+  role      ProjectMemberRole @default(VIEWER)
+  createdAt DateTime          @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@index([projectId])
+  @@map("project_member")
+}
+
+model ApiToken {
+  id         String    @id @default(uuid())
+  userId     String
+  name       String
+  token      String    @unique
+  scopes     String[]  @default([])
+  canWrite   Boolean   @default(false)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("api_token")
+}
+
+model PortainerConnection {
+  id           String    @id @default(uuid())
+  name         String
+  portainerUrl String
+  apiToken     String
+  createdById  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdBy User             @relation(fields: [createdById], references: [id])
+  configs   PortainerConfig[]
+
+  @@map("portainer_connection")
+}
+
+model PortainerConfig {
+  id           String    @id @default(uuid())
+  projectId    String
+  envName      String
+  connectionId String?   // New: reference to global connection
+  portainerUrl String?   // Legacy: kept for backward compat
+  apiToken     String?   // Legacy: kept for backward compat
+  stackId      Int
+  stackName    String
+  endpointId   Int       @default(1)
+  lastSyncAt   DateTime?
+  lastSyncOk   Boolean?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project    Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection PortainerConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, envName])
+  @@index([connectionId])
+  @@map("portainer_config")
 }

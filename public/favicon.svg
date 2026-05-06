@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7950f2"/>
+      <stop offset="100%" stop-color="#ae3ec9"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
+  <text
+    x="16"
+    y="22"
+    font-family="'Courier New', Courier, monospace"
+    font-size="14"
+    font-weight="700"
+    fill="white"
+    text-anchor="middle"
+    letter-spacing="-0.5"
+  >{x}</text>
+</svg>

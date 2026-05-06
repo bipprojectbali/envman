@@ -15,7 +15,7 @@ export const Route = createFileRoute('/login')({
     try {
       const data = await context.queryClient.ensureQueryData({
         queryKey: ['auth', 'session'],
-        queryFn: () => fetch('/api/auth/session', { credentials: 'include' }).then((r) => r.json()),
+        queryFn: () => fetch('/api/auth/session', { credentials: 'include' }).then((r) => r.ok ? r.json() : null),
       })
       if (data?.user) {
         throw redirect({ to: getDefaultRoute(data.user.role) })

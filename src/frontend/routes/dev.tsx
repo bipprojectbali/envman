@@ -23,7 +23,7 @@ import {
 } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Outlet, redirect, useMatchRoute, useNavigate } from '@tanstack/react-router'
 import {
   Background,
   Controls,
@@ -42,6 +42,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '@xyflow/react/dist/style.css'
 import { modals } from '@mantine/modals'
 import {
+  TbBook,
   TbBug,
   TbChevronRight,
   TbCircleFilled,
@@ -65,6 +66,7 @@ import {
   TbUser,
   TbUserSearch,
   TbUsers,
+  TbVariable,
   TbWifi,
 } from 'react-icons/tb'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
@@ -83,6 +85,7 @@ export const Route = createFileRoute('/dev')({
       const data = await context.queryClient.ensureQueryData({
         queryKey: ['auth', 'session'],
         queryFn: () => fetch('/api/auth/session', { credentials: 'include' }).then((r) => r.json()),
+        staleTime: 0,
       })
       if (!data?.user) throw redirect({ to: '/login' })
       if (data.user.blocked) throw redirect({ to: '/blocked' })
@@ -120,6 +123,8 @@ function DevPage() {
   const logout = useLogout()
   const user = data?.user
   const { tab: active } = Route.useSearch()
+  const matchRoute = useMatchRoute()
+  const isChildRoute = !!matchRoute({ to: '/dev/docs', search: { tab: 'overview' } })
   const navigate = useNavigate()
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false)
   const isMobile = useMediaQuery('(max-width: 48em)')
@@ -229,6 +234,55 @@ function DevPage() {
               />
             ),
           )}
+          {collapsed ? (
+            <>
+              <Tooltip label="Dashboard" position="right">
+                <ActionIcon variant="subtle" color="gray" size="lg" component="a" href="/dashboard" mt={4} style={{ width: '100%' }}>
+                  <TbLayoutDashboard size={18} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Env Manager" position="right">
+                <ActionIcon variant="subtle" color="gray" size="lg" component="a" href="/envmanager" mt={4} style={{ width: '100%' }}>
+                  <TbVariable size={18} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Docs" position="right">
+                <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => navigate({ to: '/dev/docs', search: { tab: 'overview' } })} mt={4} style={{ width: '100%' }}>
+                  <TbBook size={18} />
+                </ActionIcon>
+              </Tooltip>
+            </>
+          ) : (
+            <>
+              <Text size="xs" c="dimmed" fw={500} mt="md" mb={4} ml="sm">Tools</Text>
+              <NavLink
+                label="Dashboard"
+                leftSection={<TbLayoutDashboard size={18} />}
+                rightSection={<TbChevronRight size={14} />}
+                component="a"
+                href="/dashboard"
+                variant="light"
+                mb={4}
+              />
+              <NavLink
+                label="Env Manager"
+                leftSection={<TbVariable size={18} />}
+                rightSection={<TbChevronRight size={14} />}
+                component="a"
+                href="/envmanager"
+                variant="light"
+                mb={4}
+              />
+              <NavLink
+                label="Docs"
+                leftSection={<TbBook size={18} />}
+                rightSection={<TbChevronRight size={14} />}
+                onClick={() => navigate({ to: '/dev/docs', search: { tab: 'overview' } })}
+                variant="light"
+                mb={4}
+              />
+            </>
+          )}
         </AppShell.Section>
 
         <AppShell.Section>
@@ -277,15 +331,21 @@ function DevPage() {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        {active === 'overview' && <OverviewPanel />}
-        {active === 'users' && <UsersPanel />}
-        {active === 'tickets' && <TicketsPanel />}
-        {active === 'app-logs' && <AppLogsPanel />}
-        {active === 'user-logs' && <UserLogsPanel />}
-        {active === 'database' && <DatabasePanel />}
-        {active === 'project' && <ProjectPanel />}
-        {active === 'settings' && (
-          <PlaceholderPanel title="Settings" desc="System configuration akan ditampilkan di sini." icon={TbSettings} />
+        {!isChildRoute ? (
+          <>
+            {active === 'overview' && <OverviewPanel />}
+            {active === 'users' && <UsersPanel />}
+            {active === 'tickets' && <TicketsPanel />}
+            {active === 'app-logs' && <AppLogsPanel />}
+            {active === 'user-logs' && <UserLogsPanel />}
+            {active === 'database' && <DatabasePanel />}
+            {active === 'project' && <ProjectPanel />}
+            {active === 'settings' && (
+              <PlaceholderPanel title="Settings" desc="System configuration akan ditampilkan di sini." icon={TbSettings} />
+            )}
+          </>
+        ) : (
+          <Outlet />
         )}
       </AppShell.Main>
     </AppShell>
