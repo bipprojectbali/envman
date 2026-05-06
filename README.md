@@ -1,19 +1,18 @@
-# Base Template
+# envman
 
-Full-stack web application template built with Bun, Elysia, React 19, and Vite.
+Self-hosted environment variable manager with CLI injection, secret encryption, Portainer sync, and team access control. Built with Bun, Elysia, React 19, and Vite.
 
 ## Tech Stack
 
 - **Runtime**: [Bun](https://bun.com)
-- **Server**: [Elysia.js](https://elysiajs.com) with Vite middleware mode (dev) / static serving (prod)
-- **Frontend**: React 19 + [TanStack Router](https://tanstack.com/router) (file-based routing) + [TanStack Query](https://tanstack.com/query)
-- **UI**: [Mantine v8](https://mantine.dev) (dark/light mode, auto default) + [Mantine Modals](https://mantine.dev/x/modals/) + [react-icons](https://react-icons.github.io/react-icons/)
+- **Server**: [Elysia.js](https://elysiajs.com) — API routes + Vite middleware (dev) / static serving (prod)
+- **Frontend**: React 19 + [TanStack Router](https://tanstack.com/router) + [TanStack Query](https://tanstack.com/query)
+- **UI**: [Mantine v8](https://mantine.dev) (dark/light mode) + [react-icons](https://react-icons.github.io/react-icons/)
 - **Database**: PostgreSQL via [Prisma v6](https://www.prisma.io)
 - **Cache/Logs**: Redis via Bun native `Bun.RedisClient`
 - **Auth**: Session-based (bcrypt + HttpOnly cookies) + Google OAuth
 - **Real-time**: WebSocket presence (Bun native)
-- **Dev Tools**: Click-to-source inspector (Ctrl+Shift+Cmd+C), HMR, Biome linter
-- **MCP**: Local MCP server (`scripts/mcp/*`) — lets Claude drive the app (tickets, admin, db, logs, dev)
+- **MCP**: Local MCP server (`scripts/mcp/`) — lets Claude drive the app
 - **Testing**: bun:test (unit + integration)
 
 ## Prerequisites
@@ -25,14 +24,9 @@ Full-stack web application template built with Bun, Elysia, React 19, and Vite.
 ## Setup
 
 ```bash
-# Install dependencies
 bun install
-
-# Configure environment
 cp .env.example .env
 # Edit .env with your DATABASE_URL, REDIS_URL, Google OAuth credentials, etc.
-
-# Setup database
 bun run db:migrate
 bun run db:seed
 ```
@@ -45,108 +39,116 @@ bun run dev
 
 Server starts at `http://localhost:3000` (configurable via `PORT` in `.env`).
 
-Features in dev mode:
-
-- Hot Module Replacement (HMR) via Vite
-- Click-to-source inspector: `Ctrl+Shift+Cmd+C` to toggle, click any component to open in editor
-- Splash screen adapts to dark/light mode, prevents flash on reload
-
 ## Production
 
 ```bash
-bun run build    # Build frontend with Vite
-bun run start    # Start production server
+bun run build
+bun run start
 ```
 
 ## Scripts
 
-| Script                     | Description                                      |
-| -------------------------- | ------------------------------------------------ |
-| `bun run dev`              | Start dev server with HMR                        |
-| `bun run build`            | Build frontend for production                    |
-| `bun run start`            | Start production server                          |
-| `bun run test`             | Run all tests                                    |
-| `bun run test:unit`        | Run unit tests                                   |
-| `bun run test:integration` | Run integration tests                            |
-| `bun run typecheck`        | TypeScript type check                            |
-| `bun run lint`             | Lint with Biome                                  |
-| `bun run lint:fix`         | Lint and auto-fix                                |
-| `bun run db:migrate`       | Run Prisma migrations                            |
-| `bun run db:seed`          | Seed demo users                                  |
-| `bun run db:studio`        | Open Prisma Studio                               |
-| `bun run db:generate`      | Regenerate Prisma client                         |
-| `bun run db:push`          | Push schema to DB without migration              |
+| Script | Description |
+|--------|-------------|
+| `bun run dev` | Start dev server with HMR |
+| `bun run build` | Build frontend for production |
+| `bun run start` | Start production server |
+| `bun run build:cli` | Build CLI binaries (all platforms) |
+| `bun run test` | Run all tests |
+| `bun run test:unit` | Run unit tests |
+| `bun run test:integration` | Run integration tests |
+| `bun run typecheck` | TypeScript type check |
+| `bun run lint` | Lint with Biome |
+| `bun run lint:fix` | Lint and auto-fix |
+| `bun run db:migrate` | Run Prisma migrations |
+| `bun run db:seed` | Seed demo users |
+| `bun run db:studio` | Open Prisma Studio |
+| `bun run db:generate` | Regenerate Prisma client |
 
-## Project Structure
+## CLI
 
+The `envman` CLI injects environment variables at runtime from the server or local files.
+
+```bash
+# Install (copy binary to PATH)
+curl -sL https://your-server/download/cli/linux-x64 -o envman && chmod +x envman
+
+# Login
+envman login https://your-server --token <api-token>
+
+# Inject env vars and run a command
+envman -e myapp:production -- bun run start
+
+# Multiple sources (later -e overrides earlier)
+envman -e myapp:base -e myapp:production -- bun dev
+envman -e .env.local -e myapp:production -- bun dev
 ```
-src/
-  index.tsx          # Server entry — Vite middleware, frontend serving, audit log rotation
-  app.ts             # Elysia app — API routes (auth, admin, logs, presence, hello, health)
-  serve.ts           # Dev entry (workaround for Bun EADDRINUSE)
-  vite.ts            # Vite dev server config, inspector plugin, dedupe plugin
-  frontend.tsx       # React entry — root render, splash removal, HMR
-  lib/
-    db.ts            # Prisma client singleton
-    env.ts           # Environment variables
-    redis.ts         # Bun native Redis client singleton
-    applog.ts        # App log module (Redis-backed ring buffer)
-    presence.ts      # WebSocket presence tracker (in-memory)
-  frontend/
-    App.tsx           # Root component — MantineProvider, ModalsProvider, QueryClient, Router
-    DevInspector.tsx  # Click-to-source overlay (dev only)
-    components/
-      ThemeToggle.tsx # Shared dark/light mode toggle button
-      NotFound.tsx    # 404 page
-      ErrorPage.tsx   # Error boundary page
-    hooks/
-      useAuth.ts     # useSession, useLogin, useLogout, getDefaultRoute
-      usePresence.ts # WebSocket presence hook (real-time online status)
-    routes/
-      __root.tsx     # Root layout (Outlet only)
-      index.tsx      # Landing page
-      login.tsx      # Login page (email/password + Google OAuth)
-      dev.tsx        # Dev console — SUPER_ADMIN only (users, app logs, user logs, DB schema, project viz)
-      dashboard.tsx  # Admin dashboard — ADMIN & SUPER_ADMIN (stats, analytics, orders)
-      profile.tsx    # User profile — all authenticated users
-      blocked.tsx    # Blocked user info page
-prisma/
-  schema.prisma      # Database schema (User, Session, AuditLog, Role enum)
-  seed.ts            # Seed script (superadmin, admin, user with bcrypt)
-  migrations/        # Prisma migrations
-tests/
-  helpers.ts         # Test utilities (seedTestUser, createTestSession, cleanup)
-  unit/              # Unit tests (env, db, password)
-  integration/       # Integration tests (auth, health, hello API)
-```
+
+### Auth resolution (priority: highest → lowest)
+1. `ENVMAN_SERVER` + `ENVMAN_TOKEN` in a local `-e` file
+2. `ENVMAN_SERVER` + `ENVMAN_TOKEN` as system env vars
+3. Config file at `~/.config/envman/config.json` (saved by `envman login`)
+
+## Envman API
+
+Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/envman/projects` | List your projects |
+| `POST` | `/api/envman/projects` | Create project (ADMIN+) |
+| `GET` | `/api/envman/projects/:slug` | Project detail + members + environments |
+| `GET` | `/api/envman/projects/:slug/environments/:env/vars` | List vars (secrets masked for VIEWER) |
+| `GET` | `/api/envman/projects/:slug/environments/:env/vars/export` | Export all vars decrypted (EDITOR+) |
+| `POST` | `/api/envman/projects/:slug/environments/:env/vars` | Create/update var (EDITOR+) |
+| `PUT` | `/api/envman/projects/:slug/environments/:env/vars/:key` | Update var (EDITOR+) |
+| `DELETE` | `/api/envman/projects/:slug/environments/:env/vars/:key` | Delete var (EDITOR+) |
+| `POST` | `/api/envman/projects/:slug/environments` | Add environment (EDITOR+) |
+| `DELETE` | `/api/envman/projects/:slug/environments/:env` | Delete environment (OWNER+) |
+| `PUT` | `/api/envman/projects/:slug/members/:userId/role` | Change member role (OWNER) |
+| `DELETE` | `/api/envman/projects/:slug/members/:userId` | Remove member (OWNER) |
+| `GET` | `/api/envman/tokens` | List your API tokens |
+| `POST` | `/api/envman/tokens` | Create API token |
+| `DELETE` | `/api/envman/tokens/:id` | Delete token |
+| `GET` | `/api/envman/whoami` | Verify token, return user info |
+
+## Secret Encryption
+
+Vars marked as `isSecret` are encrypted with **AES-256-GCM** before storage.
+
+- Set `MASTER_KEY` to a 64-char hex string: `openssl rand -hex 32`
+- If unset, secrets are stored plaintext (backward compatible)
+- VIEWER sees `***` in UI; EDITOR/OWNER can reveal (server-side decrypt)
+- CLI and Portainer sync always decrypt automatically
+
+## Portainer Sync
+
+Push env vars directly to Portainer stacks.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/envman/portainer/connections` | List global connections |
+| `POST` | `/api/envman/portainer/connections` | Create connection |
+| `POST` | `/api/envman/portainer/connections/:id/probe` | Test + fetch stacks |
+| `PUT` | `/api/envman/projects/:slug/environments/:env/portainer` | Save portainer config |
+| `POST` | `/api/envman/projects/:slug/environments/:env/portainer/sync` | Push vars to stack |
 
 ## Roles & Routing
 
-Three roles with hierarchical access:
-
-| Role | Default Route | Can Access | Description |
-|------|--------------|------------|-------------|
-| `SUPER_ADMIN` | `/dev` | `/dev`, `/dashboard`, `/profile` | Full system access, user management, logs |
-| `ADMIN` | `/dashboard` | `/dashboard`, `/profile` | Dashboard access with analytics |
-| `QC` | `/dashboard` | `/dashboard` (QC-scoped tickets), `/profile` | Verifies tickets in `READY_FOR_QC` state |
-| `USER` | `/profile` | `/profile` | Profile only |
-
-- Default role for new users is `USER`
-- `SUPER_ADMIN` is assigned via seeder or `SUPER_ADMIN_EMAIL` env variable
-- Blocked users are redirected to `/blocked` and their sessions are invalidated
-- Tab state persisted in URL (`?tab=`) — survives page reload
+| Role | Default Route | Can Access |
+|------|--------------|------------|
+| `SUPER_ADMIN` | `/dev` | `/dev`, `/dashboard`, `/envmanager`, `/profile` |
+| `ADMIN` | `/dashboard` | `/dashboard`, `/envmanager`, `/profile` |
+| `QC` | `/dashboard` | `/dashboard` (QC-scoped tickets), `/profile` |
+| `USER` | `/profile` | `/profile` |
 
 ## Auth
 
-- **Email/password**: POST `/api/auth/login` — bcrypt verification, blocked check, creates DB session
-- **Google OAuth**: GET `/api/auth/google` — redirects to Google, callback at `/api/auth/callback/google`
-- **Session check**: GET `/api/auth/session` — returns current user (with role & blocked status) or 401
-- **Logout**: POST `/api/auth/logout` — deletes session from DB
-- **Dev-auth**: GET `/api/dev-auth/login-as/:email?redirect=/path` — development only, skips password/OAuth. For Playwright testing:
-  ```ts
-  // Playwright: login as superadmin and go to /dev
-  await page.goto('http://localhost:3111/api/dev-auth/login-as/superadmin@example.com?redirect=/dev')
-  ```
+- **Email/password**: `POST /api/auth/login`
+- **Google OAuth**: `GET /api/auth/google`
+- **Session check**: `GET /api/auth/session`
+- **Logout**: `POST /api/auth/logout`
+- **Dev-auth** (development only): `GET /api/dev-auth/login-as/:email?redirect=/path`
 
 Demo users (seeded):
 
@@ -156,154 +158,25 @@ Demo users (seeded):
 | `admin@example.com` | `admin123` | ADMIN |
 | `user@example.com` | `user123` | USER |
 
-## Admin API
-
-SUPER_ADMIN-only endpoints:
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/admin/users` | List all users |
-| `PUT` | `/api/admin/users/:id/role` | Change user role (USER/ADMIN) |
-| `PUT` | `/api/admin/users/:id/block` | Block/unblock user |
-| `GET` | `/api/admin/presence` | List online user IDs |
-| `GET` | `/api/admin/logs/app` | App logs (filter: level, limit, afterId) |
-| `GET` | `/api/admin/logs/audit` | Audit logs (filter: userId, action, limit) |
-| `DELETE` | `/api/admin/logs/app` | Clear all app logs |
-| `DELETE` | `/api/admin/logs/audit` | Clear all audit logs |
-| `GET` | `/api/admin/routes` | All routes metadata (method, path, auth, category) |
-| `GET` | `/api/admin/project-structure` | Project files, imports, exports, line counts |
-| `GET` | `/api/admin/env-map` | Environment variables map (status, usage, categories) |
-| `GET` | `/api/admin/test-coverage` | Test coverage mapping (source → test files) |
-| `GET` | `/api/admin/dependencies` | NPM packages graph (version, type, usage) |
-| `GET` | `/api/admin/migrations` | Prisma migration timeline (changes, SQL preview) |
-| `GET` | `/api/admin/sessions` | Active sessions with online status |
-
-## Tickets
-
-Role-gated ticket tracking with a status machine:
-
-```
-OPEN → IN_PROGRESS → READY_FOR_QC → CLOSED
-                           ↓
-                       REOPENED → IN_PROGRESS
-```
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/tickets` | List tickets (QC users see QC-scope only) |
-| `POST` | `/api/tickets` | Create new ticket |
-| `GET` | `/api/tickets/:id` | Ticket detail with comments + evidence |
-| `PATCH` | `/api/tickets/:id` | Update status/priority/assignee (role-gated transitions) |
-| `POST` | `/api/tickets/:id/comments` | Add comment |
-| `POST` | `/api/tickets/:id/evidence` | Attach evidence (url + kind) |
-
-Frontend `TicketsPanel` is shared between Dev Console and Dashboard, filtered to QC scope for QC users.
-
 ## MCP Server
 
-Local MCP server exposes the app to Claude Code for remote automation. Configured in `.mcp.json` (`app-mcp` + `playwright`).
-
-| Tool module | Purpose |
-|-------------|---------|
-| `tickets` | list, get, claim, comment, add_evidence, ready_for_qc, create, close, reopen, update |
-| `admin` | user management, presence, sessions |
-| `db` | Prisma query helpers |
-| `logs` | App + audit log access |
-| `code`, `project`, `dev` | Codebase introspection + editor integration |
-| `redis`, `presence`, `health` | Infra checks |
+Local MCP server lets Claude Code drive the app. Configured in `.mcp.json`.
 
 - `MCP_SECRET` — grants readonly tools
-- `MCP_SECRET_ADMIN` — grants write + dev automation tools
-- Both empty = HTTP endpoint disabled
-
-## WebSocket
-
-| Endpoint | Description |
-|----------|-------------|
-| `WS /ws/presence` | Real-time user presence. Auth via session cookie. Broadcasts online users to admin subscribers. |
-
-## Logging
-
-| Type | Storage | Rotation | Description |
-|------|---------|----------|-------------|
-| **App Logs** | Redis List | Max 500 entries (LTRIM) | API requests, errors, auth events |
-| **Audit Logs** | PostgreSQL | Auto-cleanup > 90 days | LOGIN, LOGOUT, LOGIN_FAILED, ROLE_CHANGED, BLOCKED, etc. |
-
-Both can be viewed and manually cleared from the Dev Console (`/dev`). Dev Console log views use client-side pagination (25 per page).
-
-## Database Schema Visualization
-
-The Dev Console (`/dev` → Database tab) includes an interactive ER diagram powered by React Flow (`@xyflow/react`):
-
-- Visual representation of all Prisma models, fields, enums, and relations
-- Drag nodes to rearrange the layout
-- Auto-save: node positions, zoom level, and pan position are persisted to `localStorage` and restored on reload
-- Relation edges show field mappings and delete rules
-
-## Project Structure Visualization
-
-The Dev Console (`/dev` → Project tab) provides 4 interactive views:
-
-| View | Description |
-|------|-------------|
-| **API Routes** | All endpoints (HTTP + WS + frontend pages) with method badges, auth levels, and flow edges showing login→redirect paths |
-| **File Structure** | Project files as nodes with import dependency edges. Filter by category (Frontend/Backend/Lib/Tests). Shows line counts and export counts |
-| **User Flow** | Navigation map showing role-based routing: login → auth check → blocked check → role check → destination page |
-| **Data Flow** | Request lifecycle: client → server → auth → handler → DB/Redis → response. Includes WebSocket and audit logging flows |
-
-All views use React Flow with auto-save positions and viewport per view.
-
-### DevOps Views
-
-| View | Description |
-|------|-------------|
-| **Env Variables** | All environment variables with set/unset status, required/optional badges, edges to consuming files |
-| **Test Coverage** | Source files (color-coded: green/yellow/red) with edges to test files. Filter by coverage status |
-| **Dependencies** | NPM packages grouped by category, edges to importing files. Filter runtime/dev |
-| **Migrations** | Horizontal timeline of Prisma migrations with SQL preview and change summaries |
-
-### Live Views
-
-| View | Description |
-|------|-------------|
-| **Sessions** | Active user sessions with online status, role mapping, auto-refresh 10s |
-| **Live Requests** | Real-time API request visualization via WebSocket. Hit counters, status colors, response times |
-
-## Sidebar
-
-- Collapsible sidebar on Dev Console and Dashboard (AppShell layout)
-- Expanded: 260px with icons, labels, chevrons, user info
-- Minimized: 60px icon-only bar with tooltips on hover
-- State persisted in `localStorage` (`dev:sidebar`, `dashboard:sidebar`)
-
-## Logout Confirmation
-
-- Logout button shows a confirm modal (`@mantine/modals`) before logging out
-- Applied on Dev Console, Dashboard, and Profile pages
-- Blocked page logs out directly (no confirm needed)
-
-## Dark/Light Mode
-
-- Default follows device preference (`prefers-color-scheme`)
-- Toggle integrated per-page: sidebar footer (dev/dashboard), top-right (landing/login/blocked), header bar (profile)
-- Shared `ThemeToggle` component (`src/frontend/components/ThemeToggle.tsx`)
-- Choice persisted in `localStorage` by Mantine
-- Flash-free reload: `index.html` reads `localStorage` before first paint
+- `MCP_SECRET_ADMIN` — grants write + dev tools
 
 ## Environment Variables
 
-| Variable                   | Required | Description                                    |
-| -------------------------- | -------- | ---------------------------------------------- |
-| `DATABASE_URL`             | Yes      | PostgreSQL connection string                   |
-| `DIRECT_URL`               | No       | Direct PostgreSQL URL (bypasses pooler)        |
-| `REDIS_URL`                | Yes      | Redis connection string                        |
-| `GOOGLE_CLIENT_ID`         | Yes      | Google OAuth client ID                         |
-| `GOOGLE_CLIENT_SECRET`     | Yes      | Google OAuth client secret                     |
-| `SUPER_ADMIN_EMAIL`        | No       | Comma-separated emails to auto-promote         |
-| `AUDIT_LOG_RETENTION_DAYS` | No       | Days to keep audit logs (default: 90)          |
-| `PORT`                     | No       | Server port (default: 3000)                    |
-| `REACT_EDITOR`             | No       | Editor for click-to-source (default: code)     |
-| `MCP_SECRET`               | No       | Grants readonly MCP tools (HTTP `POST /mcp`)   |
-| `MCP_SECRET_ADMIN`         | No       | Grants write + dev automation MCP tools        |
-| `TELEGRAM_NOTIFY_TOKEN`    | No       | Bot token for task-done notifications          |
-| `TELEGRAM_NOTIFY_CHAT_ID`  | No       | Chat ID for Telegram notifications             |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `REDIS_URL` | Yes | Redis connection string |
+| `MASTER_KEY` | No | 64-char hex key for AES-256-GCM secret encryption |
+| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret |
+| `SUPER_ADMIN_EMAIL` | No | Comma-separated emails to auto-promote to SUPER_ADMIN |
+| `AUDIT_LOG_RETENTION_DAYS` | No | Days to keep audit logs (default: 90) |
+| `PORT` | No | Server port (default: 3000) |
+| `REACT_EDITOR` | No | Editor for click-to-source (default: code) |
+| `MCP_SECRET` | No | Grants readonly MCP tools |
+| `MCP_SECRET_ADMIN` | No | Grants write + dev MCP tools |
