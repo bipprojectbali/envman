@@ -14,6 +14,7 @@ import {
   Modal,
   PasswordInput,
   ScrollArea,
+  Select,
   Stack,
   Table,
   Text,
@@ -52,6 +53,7 @@ import {
   TbTrash,
   TbVariable,
   TbX,
+  TbSortAscending,
 } from 'react-icons/tb'
 
 export const Route = createFileRoute('/envmanager/$slug/$env')({
@@ -97,6 +99,8 @@ function VarsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<FilterType>('all')
+  const [filterDisabled, setFilterDisabled] = useState<'all' | 'active' | 'disabled'>('all')
+  const [sort, setSort] = useState<'key-asc' | 'key-desc' | 'newest' | 'oldest'>('key-asc')
   const [copiedAll, setCopiedAll] = useState(false)
   const [copiedSelected, setCopiedSelected] = useState(false)
 
@@ -122,12 +126,18 @@ function VarsPage() {
   const vars: EnvVar[] = data?.vars ?? []
 
   const filteredVars = useMemo(() => {
-    let list = vars
-    if (search) list = list.filter(v => v.key.toLowerCase().includes(search.toLowerCase()))
+    let list = [...vars]
+    if (search) list = list.filter(v => v.key.toLowerCase().includes(search.toLowerCase()) || v.value.toLowerCase().includes(search.toLowerCase()))
     if (filterType === 'plain') list = list.filter(v => !v.isSecret)
     if (filterType === 'secret') list = list.filter(v => v.isSecret)
+    if (filterDisabled === 'active') list = list.filter(v => !v.isDisabled)
+    if (filterDisabled === 'disabled') list = list.filter(v => v.isDisabled)
+    if (sort === 'key-asc') list.sort((a, b) => a.key.localeCompare(b.key))
+    if (sort === 'key-desc') list.sort((a, b) => b.key.localeCompare(a.key))
+    if (sort === 'newest') list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    if (sort === 'oldest') list.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())
     return list
-  }, [vars, search, filterType])
+  }, [vars, search, filterType, filterDisabled, sort])
 
   const plainCount = vars.filter(v => !v.isSecret).length
   const secretCount = vars.filter(v => v.isSecret).length
@@ -326,6 +336,17 @@ function VarsPage() {
               >
                 {secretCount} secret
               </Badge>
+              {vars.some(v => v.isDisabled) && (
+                <Badge
+                  size="sm"
+                  variant={filterDisabled === 'disabled' ? 'filled' : 'dot'}
+                  color="gray"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setFilterDisabled(f => f === 'disabled' ? 'all' : 'disabled')}
+                >
+                  {vars.filter(v => v.isDisabled).length} disabled
+                </Badge>
+              )}
             </Group>
           </>
         )}
@@ -357,7 +378,7 @@ function VarsPage() {
         <Group gap="xs" style={{ flex: 1 }}>
           <TextInput
             size="xs"
-            placeholder="Search key..."
+            placeholder="Search key atau value..."
             leftSection={<TbSearch size={13} />}
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -366,18 +387,18 @@ function VarsPage() {
                 <TbX size={12} />
               </ActionIcon>
             ) : undefined}
-            style={{ maxWidth: 220 }}
+            style={{ minWidth: 180, maxWidth: 260 }}
           />
-          {(search || filterType !== 'all') && (
+          {(search || filterType !== 'all' || filterDisabled !== 'all') && (
             <Badge
               size="xs"
               variant="light"
               color="blue"
               rightSection={<TbX size={10} style={{ cursor: 'pointer' }} />}
               style={{ cursor: 'pointer' }}
-              onClick={() => { setSearch(''); setFilterType('all') }}
+              onClick={() => { setSearch(''); setFilterType('all'); setFilterDisabled('all') }}
             >
-              {filteredVars.length} hasil
+              {filteredVars.length}/{vars.length}
             </Badge>
           )}
         </Group>
@@ -415,6 +436,23 @@ function VarsPage() {
                 )}
               </Menu.Dropdown>
             </Menu>
+          )}
+
+          {vars.length > 0 && (
+            <Select
+              size="xs"
+              w={120}
+              leftSection={<TbSortAscending size={13} />}
+              value={sort}
+              onChange={v => setSort((v ?? 'key-asc') as typeof sort)}
+              data={[
+                { label: 'A → Z', value: 'key-asc' },
+                { label: 'Z → A', value: 'key-desc' },
+                { label: 'Terbaru', value: 'newest' },
+                { label: 'Terlama', value: 'oldest' },
+              ]}
+              allowDeselect={false}
+            />
           )}
 
           {canEdit && (

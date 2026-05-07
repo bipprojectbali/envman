@@ -9,27 +9,32 @@ import {
   Group,
   Modal,
   PasswordInput,
+  SimpleGrid,
   Stack,
   Text,
   TextInput,
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   TbAlertTriangle,
   TbCheck,
   TbExternalLink,
+  TbLayoutGrid,
+  TbLayoutList,
   TbPencil,
   TbPlus,
   TbPlugConnected,
   TbPlugConnectedX,
+  TbSearch,
   TbTrash,
+  TbX,
 } from 'react-icons/tb'
 
 export const Route = createFileRoute('/envmanager/connections')({
@@ -58,12 +63,20 @@ function ConnectionsPage() {
   const [editTarget, setEditTarget] = useState<Connection | null>(null)
   const [form, setForm] = useState({ name: '', portainerUrl: '', apiToken: '' })
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [search, setSearch] = useState('')
+  const [view, setView] = useLocalStorage<'grid' | 'list'>({ key: 'envman:connections:view', defaultValue: 'grid' })
 
   const { data, isLoading } = useQuery({
     queryKey: ['portainer', 'connections'],
     queryFn: () => apiFetch('/api/envman/portainer/connections'),
   })
   const connections: Connection[] = data?.connections ?? []
+
+  const filteredConnections = useMemo(() => {
+    if (!search.trim()) return connections
+    const q = search.toLowerCase()
+    return connections.filter(c => c.name.toLowerCase().includes(q) || c.portainerUrl.toLowerCase().includes(q))
+  }, [connections, search])
 
   const openCreate = () => {
     setEditTarget(null)
@@ -155,9 +168,16 @@ function ConnectionsPage() {
             </Text>
           </Box>
         </Group>
-        <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
-          Add Connection
-        </Button>
+        <Group gap="xs">
+          <Tooltip label={view === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setView(v => v === 'grid' ? 'list' : 'grid')}>
+              {view === 'grid' ? <TbLayoutList size={15} /> : <TbLayoutGrid size={15} />}
+            </ActionIcon>
+          </Tooltip>
+          <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
+            Add Connection
+          </Button>
+        </Group>
       </Group>
 
       <Alert color="gray" p="xs" mb="md" icon={<TbPlugConnected size={14} />}>
@@ -166,6 +186,18 @@ function ConnectionsPage() {
           Set sekali, pakai berulang — tidak perlu input URL dan token di setiap environment.
         </Text>
       </Alert>
+
+      {connections.length > 0 && (
+        <TextInput
+          size="xs"
+          mb="sm"
+          placeholder="Cari nama atau URL..."
+          leftSection={<TbSearch size={13} />}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
+        />
+      )}
 
       {!isLoading && connections.length === 0 ? (
         <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
@@ -180,9 +212,46 @@ function ConnectionsPage() {
             Add Connection
           </Button>
         </Card>
+      ) : filteredConnections.length === 0 ? (
+        <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
+          <Text size="sm" c="dimmed">Tidak ada connection yang cocok.</Text>
+          <Button size="xs" variant="subtle" mt="xs" onClick={() => setSearch('')}>Reset</Button>
+        </Card>
+      ) : view === 'grid' ? (
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
+          {filteredConnections.map(c => (
+            <Card key={c.id} withBorder p="md">
+              <Group justify="space-between" mb="xs">
+                <ThemeIcon size={36} radius="md" variant="light" color="violet">
+                  <TbPlugConnected size={18} />
+                </ThemeIcon>
+                <Group gap={4}>
+                  <Tooltip label="Edit">
+                    <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => openEdit(c)}><TbPencil size={12} /></ActionIcon>
+                  </Tooltip>
+                  <Tooltip label="Hapus">
+                    <ActionIcon size="xs" variant="subtle" color="red" onClick={() => deleteConnection(c.id, c.name, c._count.configs)}><TbTrash size={12} /></ActionIcon>
+                  </Tooltip>
+                </Group>
+              </Group>
+              <Text fw={700} size="sm" mb={2}>{c.name}</Text>
+              <Group gap="xs" mb="xs">
+                <Badge size="xs" variant="outline" color="gray">{c._count.configs} env</Badge>
+              </Group>
+              <Group gap="xs">
+                <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.portainerUrl.replace(/^https?:\/\//, '')}
+                </Text>
+                <ActionIcon size="xs" variant="subtle" color="gray" component="a" href={c.portainerUrl} target="_blank" rel="noreferrer">
+                  <TbExternalLink size={11} />
+                </ActionIcon>
+              </Group>
+            </Card>
+          ))}
+        </SimpleGrid>
       ) : (
         <Stack gap="xs">
-          {connections.map(c => (
+          {filteredConnections.map(c => (
             <Card key={c.id} withBorder p="sm">
               <Group justify="space-between" wrap="nowrap">
                 <Group gap="sm">
@@ -199,22 +268,13 @@ function ConnectionsPage() {
                         {c.portainerUrl.replace(/^https?:\/\//, '')}
                       </Text>
                       <Tooltip label="Buka Portainer">
-                        <ActionIcon
-                          size="xs"
-                          variant="subtle"
-                          color="gray"
-                          component="a"
-                          href={c.portainerUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
+                        <ActionIcon size="xs" variant="subtle" color="gray" component="a" href={c.portainerUrl} target="_blank" rel="noreferrer">
                           <TbExternalLink size={11} />
                         </ActionIcon>
                       </Tooltip>
                     </Group>
                   </Box>
                 </Group>
-
                 <Group gap="xs" wrap="nowrap">
                   <Tooltip label="Edit">
                     <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEdit(c)}>

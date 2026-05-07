@@ -13,17 +13,20 @@ import {
   Group,
   Modal,
   MultiSelect,
+  SegmentedControl,
+  Select,
+  SimpleGrid,
   Stack,
   Text,
   TextInput,
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   TbAlertTriangle,
@@ -32,11 +35,15 @@ import {
   TbClock,
   TbCopy,
   TbKey,
+  TbLayoutGrid,
+  TbLayoutList,
   TbLock,
   TbLockOpen,
   TbPencil,
   TbPlus,
+  TbSearch,
   TbShieldCheck,
+  TbSortAscending,
   TbTerminal,
   TbToggleLeft,
   TbToggleRight,
@@ -113,6 +120,10 @@ function TokensPage() {
   const [form, setForm] = useState(emptyForm)
   const [editForm, setEditForm] = useState(emptyForm)
   const [expandedUsage, setExpandedUsage] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState('semua')
+  const [sort, setSort] = useState('terbaru')
+  const [view, setView] = useLocalStorage<'grid' | 'list'>({ key: 'envman:tokens:view', defaultValue: 'list' })
 
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'tokens'],
@@ -132,8 +143,25 @@ function TokensPage() {
   const scopeOptions = buildScopeOptions(projects)
 
   const tokens: ApiToken[] = data?.tokens ?? []
-  const activeTokens = tokens.filter(t => expiryStatus(t.expiresAt) !== 'expired')
+  const activeTokens = tokens.filter(t => expiryStatus(t.expiresAt) !== 'expired' && !t.isDisabled)
   const expiredTokens = tokens.filter(t => expiryStatus(t.expiresAt) === 'expired')
+  const disabledTokens = tokens.filter(t => t.isDisabled)
+
+  const filteredTokens = useMemo(() => {
+    let list = [...tokens]
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(t => t.name.toLowerCase().includes(q) || t.scopes.some(s => s.toLowerCase().includes(q)))
+    }
+    if (filterStatus === 'aktif') list = list.filter(t => !t.isDisabled && expiryStatus(t.expiresAt) !== 'expired')
+    if (filterStatus === 'expired') list = list.filter(t => expiryStatus(t.expiresAt) === 'expired')
+    if (filterStatus === 'disabled') list = list.filter(t => t.isDisabled)
+    if (sort === 'nama') list.sort((a, b) => a.name.localeCompare(b.name))
+    if (sort === 'terlama') list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    if (sort === 'last_used') list.sort((a, b) => (b.lastUsedAt ?? '').localeCompare(a.lastUsedAt ?? ''))
+    // default 'terbaru': already sorted by server desc
+    return list
+  }, [tokens, search, filterStatus, sort])
 
   const createToken = useMutation({
     mutationFn: (body: typeof form) =>
@@ -253,14 +281,61 @@ function TokensPage() {
           <Box>
             <Text fw={700} size="sm">API Tokens</Text>
             <Text size="xs" c="dimmed">
-              {isLoading ? '...' : `${activeTokens.length} aktif${expiredTokens.length > 0 ? ` · ${expiredTokens.length} expired` : ''}`}
+              {isLoading ? '...' : `${activeTokens.length} aktif${expiredTokens.length > 0 ? ` · ${expiredTokens.length} expired` : ''}${disabledTokens.length > 0 ? ` · ${disabledTokens.length} disabled` : ''}`}
             </Text>
           </Box>
         </Group>
-        <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
-          Buat Token
-        </Button>
+        <Group gap="xs">
+          <Tooltip label={view === 'list' ? 'Tampilan grid' : 'Tampilan list'}>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setView(v => v === 'list' ? 'grid' : 'list')}>
+              {view === 'list' ? <TbLayoutGrid size={15} /> : <TbLayoutList size={15} />}
+            </ActionIcon>
+          </Tooltip>
+          <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
+            Buat Token
+          </Button>
+        </Group>
       </Group>
+
+      {/* ─── Toolbar ────────────────────────── */}
+      {tokens.length > 0 && (
+        <Group mb="sm" gap="xs" wrap="wrap">
+          <TextInput
+            size="xs"
+            placeholder="Cari nama atau scope..."
+            leftSection={<TbSearch size={13} />}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
+            style={{ flex: 1, minWidth: 160 }}
+          />
+          <SegmentedControl
+            size="xs"
+            value={filterStatus}
+            onChange={setFilterStatus}
+            data={[
+              { label: 'Semua', value: 'semua' },
+              { label: 'Aktif', value: 'aktif' },
+              { label: 'Expired', value: 'expired' },
+              { label: 'Disabled', value: 'disabled' },
+            ]}
+          />
+          <Select
+            size="xs"
+            w={130}
+            leftSection={<TbSortAscending size={13} />}
+            value={sort}
+            onChange={v => setSort(v ?? 'terbaru')}
+            data={[
+              { label: 'Terbaru', value: 'terbaru' },
+              { label: 'Terlama', value: 'terlama' },
+              { label: 'Nama A-Z', value: 'nama' },
+              { label: 'Last used', value: 'last_used' },
+            ]}
+            allowDeselect={false}
+          />
+        </Group>
+      )}
 
       <Alert color="gray" p="xs" mb="md" icon={<TbShieldCheck size={14} />}>
         <Text size="xs" c="dimmed">
@@ -329,9 +404,53 @@ function TokensPage() {
           <Text size="sm" c="dimmed" mb="md">Buat token untuk login CLI tanpa password.</Text>
           <Button size="xs" leftSection={<TbPlus size={13} />} onClick={openCreate}>Buat Token Pertama</Button>
         </Card>
+      ) : filteredTokens.length === 0 ? (
+        <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
+          <Text size="sm" c="dimmed">Tidak ada token yang cocok dengan filter.</Text>
+          <Button size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setFilterStatus('semua') }}>Reset filter</Button>
+        </Card>
+      ) : view === 'grid' ? (
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          {filteredTokens.map((t) => {
+            const expiry = expiryStatus(t.expiresAt)
+            const isExpired = expiry === 'expired'
+            return (
+              <Card key={t.id} withBorder p="sm" style={{
+                opacity: t.isDisabled ? 0.5 : isExpired ? 0.6 : 1,
+                borderColor: t.isDisabled ? 'var(--mantine-color-gray-5)' : isExpired ? 'var(--mantine-color-red-3)' : undefined,
+              }}>
+                <Group justify="space-between" mb="xs" wrap="nowrap">
+                  <ThemeIcon size={32} radius="md" variant="light" color={t.canWrite ? 'orange' : 'blue'}>
+                    {t.canWrite ? <TbLockOpen size={15} /> : <TbLock size={15} />}
+                  </ThemeIcon>
+                  <Group gap={4}>
+                    <Tooltip label={t.isDisabled ? 'Aktifkan' : 'Nonaktifkan'}>
+                      <ActionIcon size="xs" variant="subtle" color={t.isDisabled ? 'gray' : 'teal'} onClick={() => toggleToken.mutate(t.id)}>
+                        {t.isDisabled ? <TbToggleLeft size={13} /> : <TbToggleRight size={13} />}
+                      </ActionIcon>
+                    </Tooltip>
+                    <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => openEditModal(t)}><TbPencil size={12} /></ActionIcon>
+                    <ActionIcon size="xs" variant="subtle" color="red" onClick={() => revokeToken(t.id, t.name)}><TbTrash size={12} /></ActionIcon>
+                  </Group>
+                </Group>
+                <Text fw={600} size="sm" mb={2} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</Text>
+                <Group gap="xs" mb="xs" wrap="wrap">
+                  <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light">{t.canWrite ? 'read-write' : 'read-only'}</Badge>
+                  {t.isDisabled && <Badge size="xs" color="gray" variant="filled">disabled</Badge>}
+                  {isExpired && <Badge size="xs" color="red" variant="filled">expired</Badge>}
+                  {expiry === 'soon' && <Badge size="xs" color="yellow" variant="light">expires soon</Badge>}
+                </Group>
+                <Text size="xs" c="dimmed" mb={4}>
+                  {t.scopes.length === 0 ? 'semua project' : t.scopes.join(', ')}
+                </Text>
+                <Text size="xs" c="dimmed">Digunakan: {t.lastUsedAt ? relativeTime(t.lastUsedAt) : 'belum pernah'}</Text>
+              </Card>
+            )
+          })}
+        </SimpleGrid>
       ) : (
         <Stack gap="xs">
-          {tokens.map((t) => {
+          {filteredTokens.map((t) => {
             const expiry = expiryStatus(t.expiresAt)
             const isExpired = expiry === 'expired'
             return (

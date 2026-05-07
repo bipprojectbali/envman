@@ -17,6 +17,7 @@ import {
   Stack,
   Table,
   Text,
+  TextInput,
   ThemeIcon,
   Title,
   Tooltip,
@@ -38,7 +39,7 @@ import {
   useNodesState,
   useReactFlow,
 } from '@xyflow/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import '@xyflow/react/dist/style.css'
 import { modals } from '@mantine/modals'
@@ -60,8 +61,10 @@ import {
   TbRefresh,
   TbServer,
   TbSettings,
+  TbSearch,
   TbShieldCheck,
   TbShieldOff,
+  TbX,
   TbSitemap,
   TbTrash,
   TbUser,
@@ -449,6 +452,20 @@ function UsersPanel() {
   })
 
   const users = data?.users ?? []
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'online' | 'offline' | 'blocked'>('all')
+
+  const filteredUsers = useMemo(() => {
+    let list = [...users]
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+    }
+    if (filterStatus === 'online') list = list.filter(u => !u.blocked && onlineUserIds.includes(u.id))
+    if (filterStatus === 'offline') list = list.filter(u => !u.blocked && !onlineUserIds.includes(u.id))
+    if (filterStatus === 'blocked') list = list.filter(u => u.blocked)
+    return list
+  }, [users, search, filterStatus, onlineUserIds])
 
   return (
     <Container size="lg">
@@ -456,8 +473,31 @@ function UsersPanel() {
         <Group justify="space-between">
           <Title order={3}>User Management</Title>
           <Badge variant="light" size="lg">
-            {users.length} users
+            {filteredUsers.length}{filteredUsers.length !== users.length ? `/${users.length}` : ''} users
           </Badge>
+        </Group>
+
+        <Group gap="xs">
+          <TextInput
+            size="xs"
+            placeholder="Cari nama atau email..."
+            leftSection={<TbSearch size={13} />}
+            value={search}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+            rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
+            style={{ flex: 1 }}
+          />
+          <SegmentedControl
+            size="xs"
+            value={filterStatus}
+            onChange={v => setFilterStatus(v as typeof filterStatus)}
+            data={[
+              { label: 'Semua', value: 'all' },
+              { label: 'Online', value: 'online' },
+              { label: 'Offline', value: 'offline' },
+              { label: 'Blocked', value: 'blocked' },
+            ]}
+          />
         </Group>
 
         <Card withBorder radius="md" p={0}>
@@ -480,7 +520,14 @@ function UsersPanel() {
                   </Table.Td>
                 </Table.Tr>
               )}
-              {users.map((u) => {
+              {filteredUsers.length === 0 && !isLoading && (
+                <Table.Tr>
+                  <Table.Td colSpan={4}>
+                    <Text ta="center" c="dimmed" py="md" size="sm">Tidak ada user yang cocok.</Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+              {filteredUsers.map((u) => {
                 const isSelf = u.id === currentUserId
                 const badge = roleBadge[u.role] ?? roleBadge.USER
                 const isOnline = onlineUserIds.includes(u.id)

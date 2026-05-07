@@ -25,18 +25,21 @@ import { useDebouncedValue } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSession } from '@/frontend/hooks/useAuth'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   TbChevronRight,
   TbChevronDown,
   TbPlus,
+  TbSearch,
   TbShieldCheck,
+  TbSortAscending,
   TbTrash,
   TbUserPlus,
   TbUsers,
   TbVariable,
+  TbX,
 } from 'react-icons/tb'
 
 export const Route = createFileRoute('/envmanager/$slug/')({
@@ -84,6 +87,9 @@ function ProjectDetailPage() {
   const { data: sessionData } = useSession()
   const myUserId = sessionData?.user?.id
   const [newEnvName, setNewEnvName] = useState('')
+  const [envSearch, setEnvSearch] = useState('')
+  const [envSort, setEnvSort] = useState<'name' | 'vars'>('name')
+  const [memberSearch, setMemberSearch] = useState('')
   const [inviteUserId, setInviteUserId] = useState<string | null>(null)
   const [inviteSearch, setInviteSearch] = useState('')
   const [inviteRole, setInviteRole] = useState<string>('VIEWER')
@@ -102,6 +108,20 @@ function ProjectDetailPage() {
   const project = data?.project
   const envs: Environment[] = project?.environments ?? []
   const members: Member[] = project?.members ?? []
+
+  const filteredEnvs = useMemo(() => {
+    let list = [...envs]
+    if (envSearch.trim()) list = list.filter(e => e.name.toLowerCase().includes(envSearch.toLowerCase()))
+    if (envSort === 'name') list.sort((a, b) => a.name.localeCompare(b.name))
+    if (envSort === 'vars') list.sort((a, b) => (b._count?.vars ?? 0) - (a._count?.vars ?? 0))
+    return list
+  }, [envs, envSearch, envSort])
+
+  const filteredMembers = useMemo(() => {
+    if (!memberSearch.trim()) return members
+    const q = memberSearch.toLowerCase()
+    return members.filter(m => m.user.name.toLowerCase().includes(q) || m.user.email.toLowerCase().includes(q))
+  }, [members, memberSearch])
   const myRole: string = project?.myRole ?? 'VIEWER'
   const canEdit = myRole === 'OWNER' || myRole === 'EDITOR'
   const isOwner = myRole === 'OWNER'
@@ -262,8 +282,39 @@ function ProjectDetailPage() {
               )}
             </Card>
           ) : (
-            <Stack gap="xs">
-              {envs.map(e => {
+            <>
+              {envs.length > 3 && (
+                <Group mb="sm" gap="xs">
+                  <TextInput
+                    size="xs"
+                    placeholder="Cari environment..."
+                    leftSection={<TbSearch size={13} />}
+                    value={envSearch}
+                    onChange={e => setEnvSearch(e.target.value)}
+                    rightSection={envSearch ? <ActionIcon size="xs" variant="subtle" onClick={() => setEnvSearch('')}><TbX size={11} /></ActionIcon> : undefined}
+                    style={{ flex: 1 }}
+                  />
+                  <Select
+                    size="xs"
+                    w={130}
+                    leftSection={<TbSortAscending size={13} />}
+                    value={envSort}
+                    onChange={v => setEnvSort((v ?? 'name') as typeof envSort)}
+                    data={[
+                      { label: 'Nama A-Z', value: 'name' },
+                      { label: 'Terbanyak vars', value: 'vars' },
+                    ]}
+                    allowDeselect={false}
+                  />
+                </Group>
+              )}
+              <Stack gap="xs">
+              {filteredEnvs.length === 0 ? (
+                <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
+                  <Text size="sm" c="dimmed">Tidak ada environment yang cocok.</Text>
+                  <Button size="xs" variant="subtle" mt="xs" onClick={() => setEnvSearch('')}>Reset</Button>
+                </Card>
+              ) : filteredEnvs.map(e => {
                 const color = getEnvColor(e.name)
                 return (
                   <Card
@@ -315,7 +366,8 @@ function ProjectDetailPage() {
                   </Card>
                 )
               })}
-            </Stack>
+              </Stack>
+            </>
           )}
 
           {canEdit && (
@@ -366,6 +418,17 @@ function ProjectDetailPage() {
                 </Group>
               </Card>
 
+              {members.length > 0 && (
+                <TextInput
+                  size="xs"
+                  placeholder="Cari member..."
+                  leftSection={<TbSearch size={13} />}
+                  value={memberSearch}
+                  onChange={e => setMemberSearch(e.target.value)}
+                  rightSection={memberSearch ? <ActionIcon size="xs" variant="subtle" onClick={() => setMemberSearch('')}><TbX size={11} /></ActionIcon> : undefined}
+                />
+              )}
+
               {members.length === 0 ? (
                 <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
                   <ThemeIcon size={36} radius="xl" variant="light" color="gray" mx="auto" mb="xs">
@@ -373,8 +436,13 @@ function ProjectDetailPage() {
                   </ThemeIcon>
                   <Text size="sm" c="dimmed">Belum ada member lain.</Text>
                 </Card>
+              ) : filteredMembers.length === 0 ? (
+                <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
+                  <Text size="sm" c="dimmed">Tidak ada member yang cocok.</Text>
+                  <Button size="xs" variant="subtle" mt="xs" onClick={() => setMemberSearch('')}>Reset</Button>
+                </Card>
               ) : (
-                members.map(m => (
+                filteredMembers.map(m => (
                   <Group
                     key={m.id}
                     justify="space-between"
