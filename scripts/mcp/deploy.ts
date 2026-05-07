@@ -207,33 +207,40 @@ function ghEnv() {
   return { ...process.env, GH_TOKEN }
 }
 
-function triggerPublish(version: string): string {
-  const out = run(
-    `gh workflow run publish.yml --ref ${STACK_ENV} -f stack_env=${STACK_ENV} -f tag=${version}`,
-    { env: ghEnv() },
-  )
-  // gh prints the run URL on success, extract ID from it
-  const urlMatch = out.match(/runs\/(\d+)/)
-  if (urlMatch) return urlMatch[1]
-  // Fallback: wait then fetch latest run
-  Bun.sleepSync(5_000)
+function getLatestRunId(workflow: string): string {
   return tryRun(
-    `gh run list --workflow=publish.yml --branch=${STACK_ENV} --limit=1 --json databaseId --jq '.[0].databaseId'`,
+    `gh run list --workflow=${workflow} --branch=${STACK_ENV} --limit=1 --json databaseId --jq '.[0].databaseId'`,
     { env: ghEnv() },
   )
 }
 
-function triggerRePull(): string {
-  const out = run(
-    `gh workflow run re-pull.yml --ref ${STACK_ENV} -f stack_name=${STACK_NAME} -f stack_env=${STACK_ENV}`,
-    { env: ghEnv() },
+function triggerAndGetRunId(workflow: string, args: string): string {
+  // Snapshot run ID before triggering — new run must be different
+  const prevRunId = getLatestRunId(workflow)
+
+  run(`gh workflow run ${workflow} --ref ${STACK_ENV} ${args}`, { env: ghEnv() })
+
+  // Poll until a NEW run ID appears (up to 30s)
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    Bun.sleepSync(3_000)
+    const newRunId = getLatestRunId(workflow)
+    if (newRunId && newRunId !== prevRunId) return newRunId
+  }
+  return ''
+}
+
+function triggerPublish(version: string): string {
+  return triggerAndGetRunId(
+    'publish.yml',
+    `-f stack_env=${STACK_ENV} -f tag=${version}`,
   )
-  const urlMatch = out.match(/runs\/(\d+)/)
-  if (urlMatch) return urlMatch[1]
-  Bun.sleepSync(5_000)
-  return tryRun(
-    `gh run list --workflow=re-pull.yml --branch=${STACK_ENV} --limit=1 --json databaseId --jq '.[0].databaseId'`,
-    { env: ghEnv() },
+}
+
+function triggerRePull(): string {
+  return triggerAndGetRunId(
+    're-pull.yml',
+    `-f stack_name=${STACK_NAME} -f stack_env=${STACK_ENV}`,
   )
 }
 
