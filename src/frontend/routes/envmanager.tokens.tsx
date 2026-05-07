@@ -12,11 +12,12 @@ import {
   Divider,
   Group,
   Modal,
-  MultiSelect,
+  Paper,
   SegmentedControl,
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   TextInput,
   ThemeIcon,
@@ -30,10 +31,13 @@ import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   TbAlertTriangle,
+  TbCalendar,
   TbCheck,
   TbChevronDown,
+  TbChevronRight,
   TbClock,
   TbCopy,
+  TbInfoCircle,
   TbKey,
   TbLayoutGrid,
   TbLayoutList,
@@ -48,6 +52,7 @@ import {
   TbToggleLeft,
   TbToggleRight,
   TbTrash,
+  TbVariable,
   TbX,
 } from 'react-icons/tb'
 
@@ -99,14 +104,122 @@ function expiryStatus(expiresAt: string | null): 'none' | 'active' | 'soon' | 'e
   return 'active'
 }
 
-function buildScopeOptions(projects: ProjectOption[]) {
-  return projects.map(p => ({
-    group: p.name,
-    items: [
-      { value: `${p.slug}:*`, label: `${p.slug}:* — semua env` },
-      ...p.environments.map(e => ({ value: `${p.slug}:${e.name}`, label: `${p.slug}:${e.name}` })),
-    ],
-  }))
+// ── Scope Selector ──────────────────────────────────────────────────────────
+
+interface ScopeSelectorProps {
+  projects: ProjectOption[]
+  value: string[]
+  onChange: (v: string[]) => void
+}
+
+function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
+  const allAccess = value.length === 0
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  const toggleExpand = (slug: string) => setExpanded(prev => {
+    const s = new Set(prev)
+    s.has(slug) ? s.delete(slug) : s.add(slug)
+    return s
+  })
+
+  const toggleScope = (scope: string) => {
+    if (value.includes(scope)) onChange(value.filter(s => s !== scope))
+    else onChange([...value, scope])
+  }
+
+  const toggleProject = (p: ProjectOption) => {
+    const projectScopes = p.environments.map(e => `${p.slug}:${e.name}`)
+    const allSelected = projectScopes.every(s => value.includes(s))
+    if (allSelected) onChange(value.filter(s => !projectScopes.includes(s)))
+    else onChange([...value.filter(s => !projectScopes.includes(s)), ...projectScopes])
+  }
+
+  if (projects.length === 0) return (
+    <Text size="xs" c="dimmed">Belum ada project — token akan punya akses global.</Text>
+  )
+
+  return (
+    <Stack gap={4}>
+      {/* All access toggle */}
+      <Paper withBorder p="xs" style={{ borderColor: allAccess ? 'var(--mantine-color-violet-5)' : undefined, background: allAccess ? 'var(--mantine-color-violet-light)' : undefined }}>
+        <Group gap="xs" style={{ cursor: 'pointer' }} onClick={() => onChange([])}>
+          <Checkbox size="xs" checked={allAccess} onChange={() => onChange([])} onClick={e => e.stopPropagation()} />
+          <Box>
+            <Text size="xs" fw={600}>Semua project</Text>
+            <Text size="xs" c="dimmed">Token punya akses ke semua project yang kamu miliki (tidak dibatasi)</Text>
+          </Box>
+        </Group>
+      </Paper>
+
+      {/* Per-project selector */}
+      {!allAccess && projects.map(p => {
+        const projectScopes = p.environments.map(e => `${p.slug}:${e.name}`)
+        const selectedCount = projectScopes.filter(s => value.includes(s)).length
+        const allSelected = selectedCount === projectScopes.length
+        const someSelected = selectedCount > 0 && !allSelected
+        const isOpen = expanded.has(p.slug)
+
+        return (
+          <Paper key={p.slug} withBorder p={0} style={{ overflow: 'hidden' }}>
+            <Group
+              gap="xs" p="xs"
+              style={{ cursor: 'pointer', background: someSelected || allSelected ? 'var(--mantine-color-violet-light)' : undefined }}
+              onClick={() => toggleExpand(p.slug)}
+            >
+              <Checkbox
+                size="xs"
+                checked={allSelected}
+                indeterminate={someSelected}
+                onChange={() => toggleProject(p)}
+                onClick={e => e.stopPropagation()}
+              />
+              <TbVariable size={13} style={{ color: 'var(--mantine-color-violet-6)' }} />
+              <Text size="xs" fw={600} style={{ flex: 1 }}>{p.name}</Text>
+              <Code fz="xs" c="dimmed">{p.slug}</Code>
+              {selectedCount > 0 && <Badge size="xs" color="violet" variant="filled">{selectedCount}/{projectScopes.length}</Badge>}
+              {isOpen ? <TbChevronDown size={13} /> : <TbChevronRight size={13} />}
+            </Group>
+
+            <Collapse in={isOpen}>
+              <Stack gap={0} style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
+                {p.environments.map(e => {
+                  const scope = `${p.slug}:${e.name}`
+                  const checked = value.includes(scope)
+                  return (
+                    <Group
+                      key={e.name} gap="xs" px="sm" py={6}
+                      style={{ cursor: 'pointer', background: checked ? 'var(--mantine-color-violet-light)' : undefined }}
+                      onClick={() => toggleScope(scope)}
+                    >
+                      <Checkbox size="xs" checked={checked} onChange={() => toggleScope(scope)} onClick={e => e.stopPropagation()} />
+                      <Code fz="xs">{e.name}</Code>
+                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>{scope}</Text>
+                    </Group>
+                  )
+                })}
+                {p.environments.length === 0 && (
+                  <Text size="xs" c="dimmed" px="sm" py={6}>Belum ada environment</Text>
+                )}
+              </Stack>
+            </Collapse>
+          </Paper>
+        )
+      })}
+
+      {!allAccess && (
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">
+            {value.length === 0 ? 'Pilih minimal satu environment, atau aktifkan "Semua project".' : `${value.length} scope dipilih`}
+          </Text>
+          {value.length > 0 && (
+            <Button size="compact-xs" variant="subtle" color="gray" onClick={() => onChange([])}>
+              Semua project
+            </Button>
+          )}
+        </Group>
+      )}
+    </Stack>
+  )
 }
 
 const emptyForm = { name: '', canWrite: false, expiresAt: '', scopes: [] as string[] }
@@ -140,7 +253,6 @@ function TokensPage() {
     name: p.name,
     environments: p.environments ?? [],
   }))
-  const scopeOptions = buildScopeOptions(projects)
 
   const tokens: ApiToken[] = data?.tokens ?? []
   const activeTokens = tokens.filter(t => expiryStatus(t.expiresAt) !== 'expired' && !t.isDisabled)
@@ -224,49 +336,106 @@ function TokensPage() {
     })
 
   const tokenForm = (f: typeof form, setF: typeof setForm) => (
-    <Stack gap="md">
-      <TextInput
-        label="Nama token"
-        placeholder="laptop-dev, ci-github, server-prod"
-        description="Untuk memudahkan identifikasi sumber penggunaan"
-        value={f.name}
-        autoFocus
-        onChange={e => setF(x => ({ ...x, name: e.target.value }))}
-      />
+    <Stack gap="lg">
 
-      <Checkbox
-        size="xs"
-        label={
-          <Box>
-            <Text size="xs" fw={500}>Read-Write <Text span size="xs" c="dimmed">(advanced)</Text></Text>
-            <Text size="xs" c="dimmed">Aktifkan hanya jika token ini perlu push vars ke server via automation/script.</Text>
-          </Box>
-        }
-        checked={f.canWrite}
-        onChange={e => setF(x => ({ ...x, canWrite: e.target.checked }))}
-      />
+      {/* ── Identitas ── */}
+      <Stack gap="xs">
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Identitas</Text>
+        <TextInput
+          label="Nama token"
+          placeholder="ci-github, laptop-bip, deploy-script"
+          description="Gunakan nama yang menggambarkan dari mana token ini dipakai"
+          value={f.name}
+          autoFocus
+          onChange={e => setF(x => ({ ...x, name: e.target.value }))}
+        />
+      </Stack>
 
-      <MultiSelect
-        label="Scopes"
-        description="Kosong = akses ke semua project yang kamu miliki"
-        placeholder={f.scopes.length === 0 ? 'Semua project (tidak dibatasi)' : undefined}
-        data={scopeOptions}
-        value={f.scopes}
-        onChange={v => setF(x => ({ ...x, scopes: v }))}
-        searchable
-        clearable
-        nothingFoundMessage="Tidak ada project/env"
-        maxDropdownHeight={220}
-      />
+      {/* ── Izin akses ── */}
+      <Stack gap="xs">
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Izin Akses</Text>
+        <Paper withBorder p="sm" style={{ background: f.canWrite ? 'var(--mantine-color-orange-light)' : undefined, borderColor: f.canWrite ? 'var(--mantine-color-orange-5)' : undefined }}>
+          <Group justify="space-between" wrap="nowrap">
+            <Box style={{ flex: 1 }}>
+              <Group gap="xs" mb={2}>
+                <Text size="xs" fw={600}>{f.canWrite ? 'Read-Write' : 'Read-Only'}</Text>
+                {!f.canWrite && <Badge size="xs" color="blue" variant="light">Recommended</Badge>}
+                {f.canWrite && <Badge size="xs" color="orange" variant="light">Advanced</Badge>}
+              </Group>
+              <Text size="xs" c="dimmed">
+                {f.canWrite
+                  ? 'Token dapat membaca DAN menulis vars — gunakan hanya untuk automation/deploy script.'
+                  : 'Token hanya dapat membaca vars — aman untuk CLI lokal dan CI/CD pipeline.'}
+              </Text>
+            </Box>
+            <Switch
+              checked={f.canWrite}
+              onChange={e => setF(x => ({ ...x, canWrite: e.target.checked }))}
+              color="orange"
+            />
+          </Group>
+        </Paper>
+      </Stack>
 
-      <TextInput
-        type="date"
-        label="Kedaluwarsa"
-        description="Opsional — kosongkan untuk tidak ada batas waktu"
-        min={new Date().toISOString().split('T')[0]}
-        value={f.expiresAt}
-        onChange={e => setF(x => ({ ...x, expiresAt: e.target.value }))}
-      />
+      {/* ── Scope ── */}
+      <Stack gap="xs">
+        <Group gap="xs">
+          <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Scope Akses</Text>
+          <Tooltip label="Batasi token hanya ke project/environment tertentu untuk keamanan lebih baik">
+            <TbInfoCircle size={13} style={{ color: 'var(--mantine-color-dimmed)' }} />
+          </Tooltip>
+        </Group>
+        <ScopeSelector
+          projects={projects}
+          value={f.scopes}
+          onChange={v => setF(x => ({ ...x, scopes: v }))}
+        />
+      </Stack>
+
+      {/* ── Kedaluwarsa ── */}
+      <Stack gap="xs">
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Kedaluwarsa</Text>
+        <Stack gap="xs">
+          <Group gap="xs" wrap="wrap">
+            {[
+              { label: '7 hari', days: 7 },
+              { label: '30 hari', days: 30 },
+              { label: '90 hari', days: 90 },
+              { label: '1 tahun', days: 365 },
+            ].map(({ label, days }) => {
+              const d = new Date(); d.setDate(d.getDate() + days)
+              const val = d.toISOString().split('T')[0]
+              return (
+                <Button
+                  key={days}
+                  size="compact-xs"
+                  variant={f.expiresAt === val ? 'filled' : 'default'}
+                  color="violet"
+                  leftSection={<TbCalendar size={11} />}
+                  onClick={() => setF(x => ({ ...x, expiresAt: x.expiresAt === val ? '' : val }))}
+                >
+                  {label}
+                </Button>
+              )
+            })}
+            {f.expiresAt && (
+              <Button size="compact-xs" variant="subtle" color="red" onClick={() => setF(x => ({ ...x, expiresAt: '' }))}>
+                Hapus batas
+              </Button>
+            )}
+          </Group>
+          <TextInput
+            type="date"
+            placeholder="Atau pilih tanggal custom..."
+            leftSection={<TbCalendar size={13} />}
+            min={new Date().toISOString().split('T')[0]}
+            value={f.expiresAt}
+            onChange={e => setF(x => ({ ...x, expiresAt: e.target.value }))}
+            description={!f.expiresAt ? 'Kosong = tidak ada batas waktu (tidak direkomendasikan untuk CI/CD)' : undefined}
+          />
+        </Stack>
+      </Stack>
+
     </Stack>
   )
 
@@ -571,13 +740,48 @@ function TokensPage() {
       <Modal
         opened={createOpen}
         onClose={() => { closeCreate(); setForm(emptyForm) }}
-        title={<Group gap="xs"><ThemeIcon size="sm" variant="light" color="violet" radius="md"><TbKey size={13} /></ThemeIcon><Text fw={600} size="sm">Buat API Token</Text></Group>}
+        size="lg"
+        title={
+          <Group gap="xs">
+            <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+              <TbKey size={15} />
+            </ThemeIcon>
+            <Box>
+              <Text fw={700} size="sm">Buat API Token</Text>
+              <Text size="xs" c="dimmed">Token untuk CLI, CI/CD, atau automation script</Text>
+            </Box>
+          </Group>
+        }
       >
         <Stack gap="md">
           {tokenForm(form, setForm)}
           <Divider />
-          <Button fullWidth leftSection={<TbKey size={14} />} onClick={() => createToken.mutate(form)} loading={createToken.isPending} disabled={!form.name}>
-            Buat Token
+          {/* Summary */}
+          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+            <Text size="xs" fw={600} mb={4}>Ringkasan token:</Text>
+            <Group gap="xs" wrap="wrap">
+              <Badge size="xs" color={form.canWrite ? 'orange' : 'blue'} variant="light" leftSection={form.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
+                {form.canWrite ? 'read-write' : 'read-only'}
+              </Badge>
+              <Badge size="xs" color="violet" variant="light">
+                {form.scopes.length === 0 ? 'semua project' : `${form.scopes.length} scope`}
+              </Badge>
+              <Badge size="xs" color={form.expiresAt ? 'teal' : 'gray'} variant="light" leftSection={<TbCalendar size={9} />}>
+                {form.expiresAt ? `exp: ${new Date(form.expiresAt).toLocaleDateString('id-ID')}` : 'tidak ada expiry'}
+              </Badge>
+            </Group>
+          </Paper>
+          <Button
+            fullWidth
+            size="md"
+            leftSection={<TbKey size={16} />}
+            variant="gradient"
+            gradient={{ from: 'violet', to: 'grape' }}
+            onClick={() => createToken.mutate(form)}
+            loading={createToken.isPending}
+            disabled={!form.name || (form.scopes.length === 0 ? false : form.scopes.length === 0)}
+          >
+            {form.name ? `Buat token "${form.name}"` : 'Buat Token'}
           </Button>
           {createToken.isError && <Text size="xs" c="red">{(createToken.error as Error).message}</Text>}
         </Stack>
@@ -587,11 +791,36 @@ function TokensPage() {
       <Modal
         opened={editOpen}
         onClose={() => { closeEdit(); setEditingToken(null) }}
-        title={<Group gap="xs"><ThemeIcon size="sm" variant="light" color="violet" radius="md"><TbPencil size={13} /></ThemeIcon><Text fw={600} size="sm">Edit Token</Text></Group>}
+        size="lg"
+        title={
+          <Group gap="xs">
+            <ThemeIcon size={28} variant="light" color="violet" radius="md">
+              <TbPencil size={15} />
+            </ThemeIcon>
+            <Box>
+              <Text fw={700} size="sm">Edit Token</Text>
+              <Text size="xs" c="dimmed">{editingToken?.name}</Text>
+            </Box>
+          </Group>
+        }
       >
         <Stack gap="md">
           {tokenForm(editForm, setEditForm)}
           <Divider />
+          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+            <Text size="xs" fw={600} mb={4}>Ringkasan token:</Text>
+            <Group gap="xs" wrap="wrap">
+              <Badge size="xs" color={editForm.canWrite ? 'orange' : 'blue'} variant="light" leftSection={editForm.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
+                {editForm.canWrite ? 'read-write' : 'read-only'}
+              </Badge>
+              <Badge size="xs" color="violet" variant="light">
+                {editForm.scopes.length === 0 ? 'semua project' : `${editForm.scopes.length} scope`}
+              </Badge>
+              <Badge size="xs" color={editForm.expiresAt ? 'teal' : 'gray'} variant="light" leftSection={<TbCalendar size={9} />}>
+                {editForm.expiresAt ? `exp: ${new Date(editForm.expiresAt).toLocaleDateString('id-ID')}` : 'tidak ada expiry'}
+              </Badge>
+            </Group>
+          </Paper>
           <Button fullWidth leftSection={<TbCheck size={14} />} onClick={() => editToken.mutate(editForm)} loading={editToken.isPending} disabled={!editForm.name}>
             Simpan Perubahan
           </Button>
