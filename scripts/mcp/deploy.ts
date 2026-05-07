@@ -442,39 +442,51 @@ async function runDeploy(bump: 'patch' | 'minor' | 'major', skipCommit: boolean)
     }
   }
 
-  // 7. Trigger re-pull — wait 20s for GHCR to fully propagate the new image
-  let repullRunId = ''
-  try {
-    await sleep(20_000)
-    repullRunId = triggerRePull()
-    steps.push({ step: 'trigger_repull', status: 'ok', detail: `run_id: ${repullRunId}` })
-  } catch (e) {
-    steps.push({ step: 'trigger_repull', status: 'failed', detail: String(e) })
-    return { success: false, blocked_by: 'repull_trigger_failed', hint: String(e), steps }
-  }
-
-  // 8. Wait for re-pull
-  const repullResult = await waitForWorkflow(repullRunId, 300_000)
-  steps.push({ step: 'repull_workflow', status: repullResult === 'success' ? 'ok' : 'failed', detail: repullResult })
-  if (repullResult !== 'success') {
-    return {
-      success: false,
-      blocked_by: 'repull_failed',
-      hint: `re-pull.yml ${repullResult}. Check: gh run view ${repullRunId}`,
-      steps,
+  // Helper: trigger re-pull and wait for it to complete
+  const doRePull = async (label: string): Promise<boolean> => {
+    let runId = ''
+    try {
+      await sleep(45_000) // wait for GHCR to fully propagate the new image
+      runId = triggerRePull()
+      steps.push({ step: label, status: 'ok', detail: `run_id: ${runId}` })
+    } catch (e) {
+      steps.push({ step: label, status: 'failed', detail: String(e) })
+      return false
     }
+    const result = await waitForWorkflow(runId, 300_000)
+    steps.push({ step: `${label}_workflow`, status: result === 'success' ? 'ok' : 'failed', detail: result })
+    return result === 'success'
   }
 
-  // 9. Verify version live
-  const verified = await waitForVersion(version, 600_000)
+  // 7. Trigger re-pull (first attempt)
+  const repull1ok = await doRePull('trigger_repull')
+  if (!repull1ok) {
+    return { success: false, blocked_by: 'repull_failed', hint: 're-pull.yml failed. Check GitHub Actions.', steps }
+  }
+
+  // 8. Verify version live (7 min window)
+  const verified = await waitForVersion(version, 420_000)
+  if (verified) {
+    steps.push({ step: 'verify', status: 'ok', detail: `${BASE_URL} → ${version}` })
+    return { success: true, version, target_url: BASE_URL, steps }
+  }
+
+  // 9. Verify failed — auto-retry re-pull once (Portainer may have pulled old image)
+  steps.push({ step: 'verify', status: 'failed', detail: `Timeout — retrying re-pull once` })
+  const repull2ok = await doRePull('trigger_repull_retry')
+  if (!repull2ok) {
+    return { success: false, blocked_by: 'repull_retry_failed', hint: 're-pull retry failed.', steps }
+  }
+
+  const verified2 = await waitForVersion(version, 420_000)
   steps.push({
-    step: 'verify',
-    status: verified ? 'ok' : 'failed',
-    detail: verified ? `${BASE_URL} → ${version}` : `Timeout waiting for v${version}`,
+    step: 'verify_retry',
+    status: verified2 ? 'ok' : 'failed',
+    detail: verified2 ? `${BASE_URL} → ${version}` : `Timeout waiting for v${version} after retry`,
   })
 
   return {
-    success: verified,
+    success: verified2,
     version,
     target_url: BASE_URL,
     steps,
