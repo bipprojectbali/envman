@@ -122,13 +122,20 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
     return s
   })
 
+  // When in all-access mode, clicking a scope switches to specific mode with just that scope
   const toggleScope = (scope: string) => {
-    if (value.includes(scope)) onChange(value.filter(s => s !== scope))
-    else onChange([...value, scope])
+    if (allAccess) { onChange([scope]); return }
+    if (value.includes(scope)) {
+      const next = value.filter(s => s !== scope)
+      onChange(next) // if empty after removal, stays specific (user can click "Semua project" to reset)
+    } else {
+      onChange([...value, scope])
+    }
   }
 
   const toggleProject = (p: ProjectOption) => {
     const projectScopes = p.environments.map(e => `${p.slug}:${e.name}`)
+    if (allAccess) { onChange(projectScopes); return }
     const allSelected = projectScopes.every(s => value.includes(s))
     if (allSelected) onChange(value.filter(s => !projectScopes.includes(s)))
     else onChange([...value.filter(s => !projectScopes.includes(s)), ...projectScopes])
@@ -141,50 +148,59 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
   return (
     <Stack gap={4}>
       {/* All access toggle */}
-      <Paper withBorder p="xs" style={{ borderColor: allAccess ? 'var(--mantine-color-violet-5)' : undefined, background: allAccess ? 'var(--mantine-color-violet-light)' : undefined }}>
-        <Group gap="xs" style={{ cursor: 'pointer' }} onClick={() => onChange([])}>
-          <Checkbox size="xs" checked={allAccess} onChange={() => onChange([])} onClick={e => e.stopPropagation()} />
-          <Box>
+      <Paper
+        withBorder p="xs"
+        style={{
+          cursor: allAccess ? 'default' : 'pointer',
+          borderColor: allAccess ? 'var(--mantine-color-violet-5)' : undefined,
+          background: allAccess ? 'var(--mantine-color-violet-light)' : undefined,
+        }}
+        onClick={() => { if (!allAccess) onChange([]) }}
+      >
+        <Group gap="xs">
+          <Checkbox size="xs" readOnly checked={allAccess} />
+          <Box style={{ flex: 1 }}>
             <Text size="xs" fw={600}>Semua project</Text>
-            <Text size="xs" c="dimmed">Token punya akses ke semua project yang kamu miliki (tidak dibatasi)</Text>
+            <Text size="xs" c="dimmed">Akses ke semua project yang kamu miliki — tidak dibatasi</Text>
           </Box>
+          {!allAccess && <Badge size="xs" color="gray" variant="outline">klik untuk reset</Badge>}
         </Group>
       </Paper>
 
-      {/* Per-project selector */}
-      {!allAccess && projects.map(p => {
+      {/* Per-project selector — always visible */}
+      {projects.map(p => {
         const projectScopes = p.environments.map(e => `${p.slug}:${e.name}`)
-        const selectedCount = projectScopes.filter(s => value.includes(s)).length
-        const allSelected = selectedCount === projectScopes.length
-        const someSelected = selectedCount > 0 && !allSelected
+        const selectedCount = allAccess ? 0 : projectScopes.filter(s => value.includes(s)).length
+        const allSelected = !allAccess && selectedCount === projectScopes.length && projectScopes.length > 0
+        const someSelected = !allAccess && selectedCount > 0 && !allSelected
         const isOpen = expanded.has(p.slug)
 
         return (
-          <Paper key={p.slug} withBorder p={0} style={{ overflow: 'hidden' }}>
+          <Paper key={p.slug} withBorder p={0} style={{ overflow: 'hidden', opacity: allAccess ? 0.55 : 1 }}>
             <Group
               gap="xs" p="xs"
               style={{ cursor: 'pointer', background: someSelected || allSelected ? 'var(--mantine-color-violet-light)' : undefined }}
-              onClick={() => toggleExpand(p.slug)}
+              onClick={() => { if (p.environments.length > 0) toggleExpand(p.slug) }}
             >
               <Checkbox
                 size="xs"
                 checked={allSelected}
                 indeterminate={someSelected}
                 onChange={() => toggleProject(p)}
-                onClick={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); toggleProject(p) }}
               />
               <TbVariable size={13} style={{ color: 'var(--mantine-color-violet-6)' }} />
               <Text size="xs" fw={600} style={{ flex: 1 }}>{p.name}</Text>
               <Code fz="xs" c="dimmed">{p.slug}</Code>
               {selectedCount > 0 && <Badge size="xs" color="violet" variant="filled">{selectedCount}/{projectScopes.length}</Badge>}
-              {isOpen ? <TbChevronDown size={13} /> : <TbChevronRight size={13} />}
+              {p.environments.length > 0 && (isOpen ? <TbChevronDown size={13} /> : <TbChevronRight size={13} />)}
             </Group>
 
             <Collapse in={isOpen}>
               <Stack gap={0} style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
                 {p.environments.map(e => {
                   const scope = `${p.slug}:${e.name}`
-                  const checked = value.includes(scope)
+                  const checked = !allAccess && value.includes(scope)
                   return (
                     <Group
                       key={e.name} gap="xs" px="sm" py={6}
@@ -209,7 +225,7 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
       {!allAccess && (
         <Group gap="xs">
           <Text size="xs" c="dimmed">
-            {value.length === 0 ? 'Pilih minimal satu environment, atau aktifkan "Semua project".' : `${value.length} scope dipilih`}
+            {value.length === 0 ? 'Pilih minimal satu environment, atau klik "Semua project" di atas.' : `${value.length} scope dipilih`}
           </Text>
           {value.length > 0 && (
             <Button size="compact-xs" variant="subtle" color="gray" onClick={() => onChange([])}>
