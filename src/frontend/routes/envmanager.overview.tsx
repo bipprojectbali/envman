@@ -78,19 +78,28 @@ function StatCard({
   onClick?: () => void
 }) {
   return (
-    <Card withBorder p="md" style={{ cursor: onClick ? 'pointer' : undefined }} onClick={onClick}>
-      <Group justify="space-between" mb="xs">
-        <ThemeIcon size={36} radius="md" variant="light" color={color}>
-          <Icon size={18} />
+    <Card
+      withBorder p="md" radius="md"
+      style={{
+        cursor: onClick ? 'pointer' : undefined,
+        transition: 'box-shadow 0.15s, transform 0.15s',
+        borderLeft: `3px solid var(--mantine-color-${color}-5)`,
+      }}
+      onClick={onClick}
+      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--mantine-shadow-sm)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' } }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = ''; (e.currentTarget as HTMLElement).style.transform = '' }}
+    >
+      <Group justify="space-between" align="flex-start" mb="sm">
+        <ThemeIcon size={40} radius="md" variant="light" color={color}>
+          <Icon size={20} />
         </ThemeIcon>
-        {onClick && <TbChevronRight size={14} style={{ color: 'var(--mantine-color-dimmed)' }} />}
+        {loading ? (
+          <Skeleton height={32} width={48} />
+        ) : (
+          <Text fw={800} size="xl" lh={1}>{value}</Text>
+        )}
       </Group>
-      {loading ? (
-        <Skeleton height={28} mb={4} />
-      ) : (
-        <Text fw={800} size="xl" lh={1}>{value}</Text>
-      )}
-      <Text size="xs" fw={600} mt={4}>{label}</Text>
+      <Text size="sm" fw={600}>{label}</Text>
       {sub && <Text size="xs" c="dimmed" mt={2}>{sub}</Text>}
     </Card>
   )

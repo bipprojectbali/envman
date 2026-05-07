@@ -2,6 +2,7 @@ import {
   ActionIcon,
   AppShell,
   Avatar,
+  Badge,
   Box,
   Burger,
   Divider,
@@ -11,6 +12,7 @@ import {
   Text,
   ThemeIcon,
   Tooltip,
+  UnstyledButton,
 } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
@@ -18,7 +20,6 @@ import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from '
 import { useState } from 'react'
 import {
   TbBook,
-  TbChevronRight,
   TbCode,
   TbHome,
   TbKey,
@@ -181,26 +182,38 @@ function EnvManagerLayout() {
                   </ActionIcon>
                 </Tooltip>
               ) : (
-                <NavLink
+                <UnstyledButton
                   key={item.href}
-                  label={item.label}
-                  description={item.description}
-                  leftSection={
-                    <ThemeIcon size="sm" variant={item.active ? 'light' : 'subtle'} color={item.active ? 'violet' : 'gray'} radius="sm">
-                      <item.icon size={14} />
-                    </ThemeIcon>
-                  }
-                  rightSection={<TbChevronRight size={12} style={{ opacity: 0.4 }} />}
-                  active={item.active}
                   onClick={() => { navigate({ to: item.href }); closeMobile() }}
-                  variant="light"
-                  color="violet"
-                />
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: item.active ? 'var(--mantine-color-violet-light)' : undefined,
+                    borderLeft: item.active ? '3px solid var(--mantine-color-violet-5)' : '3px solid transparent',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
+                  onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                >
+                  <ThemeIcon size={30} variant={item.active ? 'light' : 'subtle'} color={item.active ? 'violet' : 'gray'} radius="md">
+                    <item.icon size={15} />
+                  </ThemeIcon>
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Text size="sm" fw={item.active ? 600 : 500} c={item.active ? 'violet' : undefined} lh={1.2}>
+                      {item.label}
+                    </Text>
+                    <Text size="xs" c="dimmed" lh={1.2} mt={1}>{item.description}</Text>
+                  </Box>
+                </UnstyledButton>
               )
             )}
 
-
-            <Divider my="xs" label={collapsed ? undefined : 'Other'} labelPosition="left" />
+            <Divider my="xs" label={collapsed ? undefined : (
+              <Text size="xs" c="dimmed" fw={500} tt="uppercase" style={{ letterSpacing: '0.06em' }}>Other</Text>
+            )} />
 
             {otherNav.map(item =>
               collapsed ? (
@@ -216,20 +229,26 @@ function EnvManagerLayout() {
                   </ActionIcon>
                 </Tooltip>
               ) : (
-                <NavLink
+                <UnstyledButton
                   key={item.href}
-                  label={item.label}
-                  leftSection={
-                    <ThemeIcon size="sm" variant={item.active ? 'light' : 'subtle'} color={item.active ? 'violet' : 'gray'} radius="sm">
-                      <item.icon size={14} />
-                    </ThemeIcon>
-                  }
-                  rightSection={<TbChevronRight size={12} style={{ opacity: 0.4 }} />}
-                  active={item.active}
                   onClick={() => { navigate({ to: item.href }); closeMobile() }}
-                  variant="subtle"
-                  color="gray"
-                />
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '7px 10px',
+                    borderRadius: 8,
+                    background: item.active ? 'var(--mantine-color-violet-light)' : undefined,
+                    borderLeft: item.active ? '3px solid var(--mantine-color-violet-5)' : '3px solid transparent',
+                  }}
+                  onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
+                  onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                >
+                  <ThemeIcon size={28} variant={item.active ? 'light' : 'subtle'} color={item.active ? 'violet' : 'gray'} radius="md">
+                    <item.icon size={14} />
+                  </ThemeIcon>
+                  <Text size="sm" fw={500} c={item.active ? 'violet' : 'dimmed'}>{item.label}</Text>
+                </UnstyledButton>
               )
             )}
           </Stack>
@@ -237,11 +256,18 @@ function EnvManagerLayout() {
 
         {/* User section */}
         <AppShell.Section>
-          <Divider mb="xs" />
+          <Divider mb="sm" />
           {collapsed ? (
-            <Stack align="center" gap={6}>
+            <Stack align="center" gap="xs">
               <Tooltip label={`${user?.name} · ${roleLabel[user?.role ?? ''] ?? user?.role}`} position="right">
-                <Avatar color="violet" radius="xl" size="sm" style={{ cursor: 'default' }}>
+                <Avatar
+                  color="violet"
+                  radius="xl"
+                  size="md"
+                  variant="gradient"
+                  gradient={{ from: 'violet', to: 'grape' }}
+                  style={{ cursor: 'default' }}
+                >
                   {user?.name?.charAt(0).toUpperCase()}
                 </Avatar>
               </Tooltip>
@@ -258,19 +284,27 @@ function EnvManagerLayout() {
               </Tooltip>
             </Stack>
           ) : (
-            <Group justify="space-between" wrap="nowrap">
-              <Group gap="xs" style={{ minWidth: 0 }}>
-                <Avatar color="violet" radius="xl" size="sm">
+            <Box>
+              <Group gap="xs" mb="xs" wrap="nowrap">
+                <Avatar
+                  color="violet"
+                  radius="xl"
+                  size="md"
+                  variant="gradient"
+                  gradient={{ from: 'violet', to: 'grape' }}
+                >
                   {user?.name?.charAt(0).toUpperCase()}
                 </Avatar>
-                <Box style={{ minWidth: 0 }}>
-                  <Text size="xs" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Box style={{ flex: 1, minWidth: 0 }}>
+                  <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {user?.name}
                   </Text>
-                  <Text size="xs" c="dimmed">{roleLabel[user?.role ?? ''] ?? user?.role}</Text>
+                  <Badge size="xs" variant="dot" color="violet">
+                    {roleLabel[user?.role ?? ''] ?? user?.role}
+                  </Badge>
                 </Box>
               </Group>
-              <Group gap={2} wrap="nowrap">
+              <Group gap="xs" justify="flex-end">
                 <ThemeToggle size="sm" />
                 <Tooltip label="Profile">
                   <ActionIcon variant="subtle" color="gray" size="sm" component="a" href="/profile">
@@ -283,7 +317,7 @@ function EnvManagerLayout() {
                   </ActionIcon>
                 </Tooltip>
               </Group>
-            </Group>
+            </Box>
           )}
         </AppShell.Section>
       </AppShell.Navbar>
