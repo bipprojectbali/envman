@@ -39,6 +39,7 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import '@xyflow/react/dist/style.css'
 import { modals } from '@mantine/modals'
 import {
@@ -431,7 +432,8 @@ function UsersPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role }),
       }).then((r) => r.json()),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
+    onSuccess: (_: unknown, { role }: { id: string; role: string }) => { queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }); notifyOk(`Role diubah ke ${role}`) },
+    onError: (e) => notifyErr(e),
   })
 
   const toggleBlock = useMutation({
@@ -442,7 +444,8 @@ function UsersPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blocked }),
       }).then((r) => r.json()),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
+    onSuccess: (_: unknown, { blocked }: { id: string; blocked: boolean }) => { queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }); notifyOk(blocked ? 'User diblokir' : 'Blokir user dicabut') },
+    onError: (e) => notifyErr(e),
   })
 
   const users = data?.users ?? []
@@ -645,7 +648,8 @@ function AppLogsPanel() {
 
   const clearLogs = useMutation({
     mutationFn: () => fetch('/api/admin/logs/app', { method: 'DELETE', credentials: 'include' }).then((r) => r.json()),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'logs', 'app'] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'logs', 'app'] }); notifyOk('App logs dihapus') },
+    onError: (e) => notifyErr(e),
   })
 
   const logs = data?.logs ?? []
@@ -822,7 +826,8 @@ function UserLogsPanel() {
   const clearLogs = useMutation({
     mutationFn: () =>
       fetch('/api/admin/logs/audit', { method: 'DELETE', credentials: 'include' }).then((r) => r.json()),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'logs', 'audit'] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'logs', 'audit'] }); notifyOk('Audit logs dihapus') },
+    onError: (e) => notifyErr(e),
   })
 
   const logs = data?.logs ?? []

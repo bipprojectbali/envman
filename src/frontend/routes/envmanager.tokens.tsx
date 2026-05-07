@@ -24,6 +24,7 @@ import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   TbAlertTriangle,
   TbCheck,
@@ -145,7 +146,9 @@ function TokensPage() {
       setNewToken(data.token)
       closeCreate()
       setForm(emptyForm)
+      notifyOk('Token berhasil dibuat — salin nilainya sekarang!')
     },
+    onError: (e) => notifyErr(e),
   })
 
   const editToken = useMutation({
@@ -158,7 +161,9 @@ function TokensPage() {
       qc.invalidateQueries({ queryKey: ['envman', 'tokens'] })
       closeEdit()
       setEditingToken(null)
+      notifyOk('Token diperbarui')
     },
+    onError: (e) => notifyErr(e),
   })
 
   const openEditModal = (t: ApiToken) => {
@@ -174,7 +179,8 @@ function TokensPage() {
 
   const toggleToken = useMutation({
     mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/toggle`, { method: 'PATCH' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['envman', 'tokens'] }),
+    onSuccess: (data: { isDisabled: boolean }) => { qc.invalidateQueries({ queryKey: ['envman', 'tokens'] }); notifyOk(data.isDisabled ? 'Token dinonaktifkan' : 'Token diaktifkan') },
+    onError: (e) => notifyErr(e),
   })
 
   const revokeToken = (id: string, name: string) =>
@@ -184,9 +190,9 @@ function TokensPage() {
       labels: { confirm: 'Revoke', cancel: 'Batal' },
       confirmProps: { color: 'red' },
       onConfirm: () =>
-        apiFetch(`/api/envman/tokens/${id}`, { method: 'DELETE' }).then(() =>
-          qc.invalidateQueries({ queryKey: ['envman', 'tokens'] }),
-        ),
+        apiFetch(`/api/envman/tokens/${id}`, { method: 'DELETE' })
+          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'tokens'] }); notifyOk(`Token "${name}" direvoke`) })
+          .catch(notifyErr),
     })
 
   const tokenForm = (f: typeof form, setF: typeof setForm) => (

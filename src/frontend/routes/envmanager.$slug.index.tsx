@@ -27,6 +27,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useSession } from '@/frontend/hooks/useAuth'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   TbChevronRight,
   TbChevronDown,
@@ -125,8 +126,10 @@ function ProjectDetailPage() {
     onSuccess: (_, name) => {
       qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
       setNewEnvName('')
+      notifyOk(`Environment "${name}" ditambahkan`)
       navigate({ to: '/envmanager/$slug/$env', params: { slug, env: name } })
     },
+    onError: (e) => notifyErr(e),
   })
 
   const deleteEnv = (name: string) =>
@@ -140,9 +143,9 @@ function ProjectDetailPage() {
       labels: { confirm: 'Hapus', cancel: 'Batal' },
       confirmProps: { color: 'red' },
       onConfirm: () =>
-        apiFetch(`/api/envman/projects/${slug}/environments/${name}`, { method: 'DELETE' }).then(() =>
-          qc.invalidateQueries({ queryKey: ['envman', 'project', slug] }),
-        ),
+        apiFetch(`/api/envman/projects/${slug}/environments/${name}`, { method: 'DELETE' })
+          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'project', slug] }); notifyOk(`Environment "${name}" dihapus`) })
+          .catch(notifyErr),
     })
 
   const addMember = useMutation({
@@ -155,7 +158,9 @@ function ProjectDetailPage() {
       qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
       setInviteUserId(null)
       setInviteSearch('')
+      notifyOk('Member ditambahkan ke project')
     },
+    onError: (e) => notifyErr(e),
   })
 
   const updateMemberRole = useMutation({
@@ -164,7 +169,8 @@ function ProjectDetailPage() {
         method: 'PATCH',
         body: JSON.stringify({ role }),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['envman', 'project', slug] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'project', slug] }); notifyOk('Role member diperbarui') },
+    onError: (e) => notifyErr(e),
   })
 
   const removeMember = (userId: string, name: string) =>
@@ -174,9 +180,9 @@ function ProjectDetailPage() {
       labels: { confirm: 'Hapus', cancel: 'Batal' },
       confirmProps: { color: 'red' },
       onConfirm: () =>
-        apiFetch(`/api/envman/projects/${slug}/members/${userId}`, { method: 'DELETE' }).then(() =>
-          qc.invalidateQueries({ queryKey: ['envman', 'project', slug] }),
-        ),
+        apiFetch(`/api/envman/projects/${slug}/members/${userId}`, { method: 'DELETE' })
+          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'project', slug] }); notifyOk(`${name} dihapus dari project`) })
+          .catch(notifyErr),
     })
 
   return (

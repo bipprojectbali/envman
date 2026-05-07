@@ -27,6 +27,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { PortainerSync } from '@/frontend/components/PortainerSync'
 import { useMemo, useState } from 'react'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   TbAlertTriangle,
   TbCheck,
@@ -160,7 +161,8 @@ function VarsPage() {
   const addVar = useMutation({
     mutationFn: (body: typeof form) =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); closeAdd(); setForm({ key: '', value: '', isSecret: false }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); closeAdd(); setForm({ key: '', value: '', isSecret: false }); notifyOk('Variabel ditambahkan') },
+    onError: (e) => notifyErr(e),
   })
 
   const deleteVar = (key: string) =>
@@ -170,25 +172,29 @@ function VarsPage() {
       labels: { confirm: 'Delete', cancel: 'Batal' },
       confirmProps: { color: 'red' },
       onConfirm: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars/${key}`, { method: 'DELETE' })
-        .then(() => qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })),
+        .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); notifyOk(`${key} dihapus`) })
+        .catch(notifyErr),
     })
 
   const updateVar = useMutation({
     mutationFn: ({ key, value, isSecret }: { key: string; value: string; isSecret: boolean }) =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, { method: 'POST', body: JSON.stringify({ key, value, isSecret }) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); setEditingId(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); setEditingId(null); notifyOk('Variabel diperbarui') },
+    onError: (e) => notifyErr(e),
   })
 
   const toggleDisabled = useMutation({
     mutationFn: (key: string) =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars/${key}/toggle`, { method: 'PATCH' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }),
+    onSuccess: (data: { isDisabled: boolean }) => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); notifyOk(data.isDisabled ? 'Variabel dinonaktifkan' : 'Variabel diaktifkan') },
+    onError: (e) => notifyErr(e),
   })
 
   const clearAll = useMutation({
     mutationFn: () => Promise.all(vars.map(v =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars/${v.key}`, { method: 'DELETE' }))),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); notifyOk('Semua variabel dihapus') },
+    onError: (e) => notifyErr(e),
   })
 
   const bulkToggleType = useMutation({
@@ -197,7 +203,8 @@ function VarsPage() {
         apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
           method: 'POST', body: JSON.stringify({ key: v.key, value: v.value, isSecret: targetSecret }),
         }))),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }),
+    onSuccess: (_: unknown, targetSecret: boolean) => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); notifyOk(targetSecret ? 'Semua variabel ditandai secret' : 'Semua variabel ditandai plain') },
+    onError: (e) => notifyErr(e),
   })
 
   const bulkImport = useMutation({
@@ -208,7 +215,8 @@ function VarsPage() {
         secrets: bulkAllSecret ? parsedBulk.map(({ key }) => key) : [],
       }),
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); closeBulk(); setBulkText(''); setBulkAllSecret(false) },
+    onSuccess: (data: { count: number }) => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); closeBulk(); setBulkText(''); setBulkAllSecret(false); notifyOk(`${data.count} variabel berhasil diimpor`) },
+    onError: (e) => notifyErr(e),
   })
 
   const parsedBulk = useMemo(() => {

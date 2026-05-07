@@ -20,6 +20,7 @@ import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   TbAlertTriangle,
   TbCheck,
@@ -114,7 +115,9 @@ function ConnectionsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['portainer', 'connections'] })
       handleClose()
+      notifyOk(editTarget ? 'Connection diperbarui' : 'Connection berhasil ditambahkan')
     },
+    onError: (e) => notifyErr(e),
   })
 
   const deleteConnection = (id: string, name: string, usedBy: number) =>
@@ -133,9 +136,9 @@ function ConnectionsPage() {
       labels: { confirm: 'Hapus', cancel: 'Batal' },
       confirmProps: { color: 'red' },
       onConfirm: () =>
-        apiFetch(`/api/envman/portainer/connections/${id}`, { method: 'DELETE' }).then(() =>
-          qc.invalidateQueries({ queryKey: ['portainer', 'connections'] }),
-        ),
+        apiFetch(`/api/envman/portainer/connections/${id}`, { method: 'DELETE' })
+          .then(() => { qc.invalidateQueries({ queryKey: ['portainer', 'connections'] }); notifyOk(`Connection "${name}" dihapus`) })
+          .catch(notifyErr),
     })
 
   return (

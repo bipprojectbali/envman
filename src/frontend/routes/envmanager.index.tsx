@@ -21,6 +21,7 @@ import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   TbChevronRight,
   TbFolders,
@@ -73,8 +74,10 @@ function ProjectListPage() {
       closeCreate()
       setForm({ slug: '', name: '', description: '' })
       setSlugManual(false)
+      notifyOk('Project berhasil dibuat')
       navigate({ to: '/envmanager/$slug', params: { slug: res.project.slug }, search: { tab: 'environments' } })
     },
+    onError: (e) => notifyErr(e),
   })
 
   const deleteProject = (slug: string, name: string) =>
@@ -89,9 +92,9 @@ function ProjectListPage() {
       labels: { confirm: 'Hapus', cancel: 'Batal' },
       confirmProps: { color: 'red' },
       onConfirm: () =>
-        apiFetch(`/api/envman/projects/${slug}`, { method: 'DELETE' }).then(() =>
-          qc.invalidateQueries({ queryKey: ['envman', 'projects'] }),
-        ),
+        apiFetch(`/api/envman/projects/${slug}`, { method: 'DELETE' })
+          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'projects'] }); notifyOk(`Project "${name}" dihapus`) })
+          .catch(notifyErr),
     })
 
   const projects: Project[] = data?.projects ?? []
