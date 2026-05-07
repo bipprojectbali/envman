@@ -7,6 +7,7 @@ import {
   Card,
   Checkbox,
   Code,
+  Collapse,
   CopyButton,
   Divider,
   Group,
@@ -26,6 +27,7 @@ import { useState } from 'react'
 import {
   TbAlertTriangle,
   TbCheck,
+  TbChevronDown,
   TbClock,
   TbCopy,
   TbKey,
@@ -34,6 +36,7 @@ import {
   TbPencil,
   TbPlus,
   TbShieldCheck,
+  TbTerminal,
   TbTrash,
   TbX,
 } from 'react-icons/tb'
@@ -105,6 +108,7 @@ function TokensPage() {
   const [newToken, setNewToken] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [editForm, setEditForm] = useState(emptyForm)
+  const [expandedUsage, setExpandedUsage] = useState<Set<string>>(new Set())
 
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'tokens'],
@@ -351,6 +355,18 @@ function TokensPage() {
                     </Box>
                   </Group>
                   <Group gap="xs" wrap="nowrap">
+                    <Tooltip label="Lihat cara penggunaan">
+                      <ActionIcon
+                        size="sm" variant="subtle" color="gray"
+                        onClick={() => setExpandedUsage(prev => {
+                          const s = new Set(prev)
+                          s.has(t.id) ? s.delete(t.id) : s.add(t.id)
+                          return s
+                        })}
+                      >
+                        <TbTerminal size={13} />
+                      </ActionIcon>
+                    </Tooltip>
                     <Tooltip label="Edit token">
                       <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEditModal(t)}>
                         <TbPencil size={13} />
@@ -363,6 +379,41 @@ function TokensPage() {
                     </Tooltip>
                   </Group>
                 </Group>
+
+                <Collapse in={expandedUsage.has(t.id)}>
+                  <Divider my="xs" />
+                  <Stack gap={6}>
+                    {(() => {
+                      const origin = window.location.origin
+                      const scope = t.scopes.length > 0 ? t.scopes[0] : 'myapp:production'
+                      const [scopeProject, scopeEnv] = scope.includes(':') ? scope.split(':') : [scope, 'production']
+                      return [
+                        { label: 'Login & simpan config', cmd: `envman login ${origin} --token <TOKEN>` },
+                        { label: `Inject vars (${scopeProject}:${scopeEnv})`, cmd: `envman -e ${scopeProject}:${scopeEnv} -- bun start` },
+                        { label: 'CI/CD tanpa login', cmd: `ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<TOKEN> envman -e ${scopeProject}:${scopeEnv} -- bun start` },
+                      ].map(({ label, cmd }) => (
+                        <Box key={label}>
+                          <Text size="xs" c="dimmed" mb={2}>{label}</Text>
+                          <Group gap={4} align="center">
+                            <Code fz="xs" style={{ flex: 1, wordBreak: 'break-all', userSelect: 'all' }}>{cmd}</Code>
+                            <CopyButton value={cmd}>
+                              {({ copied, copy }) => (
+                                <Tooltip label={copied ? 'Copied!' : 'Copy'}>
+                                  <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                                    {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
+                                  </ActionIcon>
+                                </Tooltip>
+                              )}
+                            </CopyButton>
+                          </Group>
+                        </Box>
+                      ))
+                    })()}
+                    {t.scopes.length === 0 && (
+                      <Text size="xs" c="dimmed">Token ini punya akses ke semua project. Ganti <Code fz="xs">myapp:production</Code> dengan project:env yang sesuai.</Text>
+                    )}
+                  </Stack>
+                </Collapse>
               </Card>
             )
           })}
