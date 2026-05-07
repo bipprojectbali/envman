@@ -92,8 +92,9 @@ const steps = [
   },
 ]
 
-const CLI_DEMO = `# Login sekali, simpan ke ~/.config/envman/config.json
-envman login https://envman.example.com --token em_abc123
+function cliDemo(origin: string) {
+  return `# Login sekali, simpan ke ~/.config/envman/config.json
+envman login ${origin} --token em_abc123
 
 # Inject vars lalu jalankan command
 envman -e myapp:production -- bun start
@@ -105,9 +106,10 @@ envman -e myapp:base -e myapp:production -- bun dev
 envman -e myapp:production -e .env.local -- bun dev
 
 # CI/CD — auth dari env vars, tanpa login
-ENVMAN_SERVER=https://envman.example.com \\
+ENVMAN_SERVER=${origin} \\
 ENVMAN_TOKEN=em_xxx \\
   envman -e myapp:production -- bun start`
+}
 
 function HomePage() {
   return (
@@ -250,7 +252,7 @@ function HomePage() {
                 whiteSpace: 'pre',
               }}
             >
-              {CLI_DEMO}
+              {cliDemo(window.location.origin)}
             </pre>
             <Text size="xs" c="dimmed">
               Binary standalone — tidak perlu Node.js atau npm. Download untuk Linux, macOS, dan Windows.
