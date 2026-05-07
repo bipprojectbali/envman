@@ -281,6 +281,18 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
               </Text>
             </Stack>
 
+            {/* One-liner */}
+            <Stack gap="xs">
+              <Text size="sm" fw={600}>Linux &amp; macOS — satu command, auto-detect platform:</Text>
+              <CodeBlock code={`curl -fsSL ${origin}/install | bash`} />
+              <Text size="xs" c="dimmed">
+                Script otomatis deteksi OS dan arsitektur, download binary yang tepat, install ke <Code fz="xs">/usr/local/bin/envman</Code>.
+                Butuh <Code fz="xs">sudo</Code>? Script akan memintanya otomatis jika diperlukan.
+              </Text>
+            </Stack>
+
+            <Divider label="atau pilih platform manual" labelPosition="center" />
+
             <Tabs defaultValue="linux-x64" variant="pills" radius="md">
               <Tabs.List mb="md">
                 <Tabs.Tab value="linux-x64" leftSection={<TbTerminal size={13} />}>Linux x64</Tabs.Tab>
