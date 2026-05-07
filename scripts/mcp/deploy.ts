@@ -466,7 +466,7 @@ async function runDeploy(bump: 'patch' | 'minor' | 'major', skipCommit: boolean)
   }
 
   // 9. Verify version live
-  const verified = await waitForVersion(version, 300_000)
+  const verified = await waitForVersion(version, 600_000)
   steps.push({
     step: 'verify',
     status: verified ? 'ok' : 'failed',
