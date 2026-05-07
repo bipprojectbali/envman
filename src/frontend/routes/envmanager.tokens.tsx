@@ -37,6 +37,8 @@ import {
   TbPlus,
   TbShieldCheck,
   TbTerminal,
+  TbToggleLeft,
+  TbToggleRight,
   TbTrash,
   TbX,
 } from 'react-icons/tb'
@@ -57,6 +59,7 @@ interface ApiToken {
   name: string
   scopes: string[]
   canWrite: boolean
+  isDisabled: boolean
   lastUsedAt: string | null
   expiresAt: string | null
   createdAt: string
@@ -168,6 +171,11 @@ function TokensPage() {
     })
     openEdit()
   }
+
+  const toggleToken = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/toggle`, { method: 'PATCH' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['envman', 'tokens'] }),
+  })
 
   const revokeToken = (id: string, name: string) =>
     modals.openConfirmModal({
@@ -321,7 +329,10 @@ function TokensPage() {
             const expiry = expiryStatus(t.expiresAt)
             const isExpired = expiry === 'expired'
             return (
-              <Card key={t.id} withBorder p="sm" style={{ opacity: isExpired ? 0.6 : 1, borderColor: isExpired ? 'var(--mantine-color-red-3)' : undefined }}>
+              <Card key={t.id} withBorder p="sm" style={{
+                opacity: t.isDisabled ? 0.5 : isExpired ? 0.6 : 1,
+                borderColor: t.isDisabled ? 'var(--mantine-color-gray-5)' : isExpired ? 'var(--mantine-color-red-3)' : undefined,
+              }}>
                 <Group justify="space-between" wrap="nowrap">
                   <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
                     <ThemeIcon size={30} radius="md" variant="light" color={t.canWrite ? 'orange' : 'blue'}>
@@ -331,6 +342,7 @@ function TokensPage() {
                       <Group gap="xs" mb={2}>
                         <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</Text>
                         <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light">{t.canWrite ? 'read-write' : 'read-only'}</Badge>
+                        {t.isDisabled && <Badge size="xs" color="gray" variant="filled">disabled</Badge>}
                         {expiry === 'expired' && <Badge size="xs" color="red" variant="filled">expired</Badge>}
                         {expiry === 'soon' && <Badge size="xs" color="yellow" variant="light" leftSection={<TbClock size={9} />}>expires soon</Badge>}
                       </Group>
@@ -355,6 +367,16 @@ function TokensPage() {
                     </Box>
                   </Group>
                   <Group gap="xs" wrap="nowrap">
+                    <Tooltip label={t.isDisabled ? 'Aktifkan token' : 'Nonaktifkan token'}>
+                      <ActionIcon
+                        size="sm" variant="subtle"
+                        color={t.isDisabled ? 'gray' : 'teal'}
+                        loading={toggleToken.isPending}
+                        onClick={() => toggleToken.mutate(t.id)}
+                      >
+                        {t.isDisabled ? <TbToggleLeft size={15} /> : <TbToggleRight size={15} />}
+                      </ActionIcon>
+                    </Tooltip>
                     <Tooltip label="Lihat cara penggunaan">
                       <ActionIcon
                         size="sm" variant="subtle" color="gray"

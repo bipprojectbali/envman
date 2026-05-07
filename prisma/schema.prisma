@@ -211,6 +211,7 @@ model ApiToken {
   token      String    @unique
   scopes     String[]  @default([])
   canWrite   Boolean   @default(false)
+  isDisabled Boolean   @default(false)
   lastUsedAt DateTime?
   expiresAt  DateTime?
   createdAt  DateTime  @default(now())

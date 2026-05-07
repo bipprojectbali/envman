@@ -59,6 +59,7 @@ async function requireEnvAuth(request: Request): Promise<{ userId: string; role:
       include: { user: { select: { id: true, role: true, blocked: true } } },
     })
     if (!apiToken || apiToken.user.blocked) return null
+    if (apiToken.isDisabled) return null
     if (apiToken.expiresAt && apiToken.expiresAt < new Date()) return null
     prisma.apiToken.update({ where: { id: apiToken.id }, data: { lastUsedAt: new Date() } }).catch(() => {})
 
@@ -1970,7 +1971,7 @@ export function createApp() {
         if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
         const tokens = await prisma.apiToken.findMany({
           where: { userId: caller.userId },
-          select: { id: true, name: true, scopes: true, canWrite: true, lastUsedAt: true, expiresAt: true, createdAt: true },
+          select: { id: true, name: true, scopes: true, canWrite: true, isDisabled: true, lastUsedAt: true, expiresAt: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
         })
         return { tokens }
@@ -2023,6 +2024,18 @@ export function createApp() {
           },
         })
         return { id: updated.id, name: updated.name, scopes: updated.scopes, canWrite: updated.canWrite, expiresAt: updated.expiresAt }
+      })
+
+      .patch('/api/envman/tokens/:id/toggle', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const existing = await prisma.apiToken.findUnique({ where: { id: params.id } })
+        if (!existing || existing.userId !== caller.userId) { set.status = 404; return { error: 'Not found' } }
+        const updated = await prisma.apiToken.update({
+          where: { id: params.id },
+          data: { isDisabled: !existing.isDisabled },
+        })
+        return { id: updated.id, isDisabled: updated.isDisabled }
       })
 
       .delete('/api/envman/tokens/:id', async ({ request, params, set }) => {
