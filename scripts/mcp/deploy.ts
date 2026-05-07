@@ -442,10 +442,10 @@ async function runDeploy(bump: 'patch' | 'minor' | 'major', skipCommit: boolean)
     }
   }
 
-  // 7. Trigger re-pull
+  // 7. Trigger re-pull — wait 20s for GHCR to fully propagate the new image
   let repullRunId = ''
   try {
-    await sleep(2_000)
+    await sleep(20_000)
     repullRunId = triggerRePull()
     steps.push({ step: 'trigger_repull', status: 'ok', detail: `run_id: ${repullRunId}` })
   } catch (e) {
