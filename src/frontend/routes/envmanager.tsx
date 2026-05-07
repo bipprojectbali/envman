@@ -20,6 +20,7 @@ import {
   TbBook,
   TbChevronRight,
   TbCode,
+  TbHome,
   TbKey,
   TbLayoutDashboard,
   TbLayoutSidebarLeftCollapse,
@@ -84,12 +85,14 @@ function EnvManagerLayout() {
       onConfirm: () => logout.mutate(),
     })
 
+  const isOverview = pathname === '/envmanager/overview'
   const isTokens = pathname.startsWith('/envmanager/tokens')
   const isConnections = pathname.startsWith('/envmanager/connections')
   const isReadme = pathname.startsWith('/envmanager/docs')
-  const isProjectsActive = !isTokens && !isConnections && !isReadme
+  const isProjectsActive = !isOverview && !isTokens && !isConnections && !isReadme
 
   const mainNav = [
+    { label: 'Overview', description: 'Ringkasan semua resources', icon: TbHome, href: '/envmanager/overview', active: isOverview },
     { label: 'Projects', description: 'Kelola environment vars', icon: TbVariable, href: '/envmanager', active: isProjectsActive },
     { label: 'Tokens', description: 'API token untuk CLI', icon: TbKey, href: '/envmanager/tokens', active: isTokens },
     { label: 'Connections', description: 'Portainer instances', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections },
