@@ -7,10 +7,10 @@ import { env } from './lib/env'
 const isProduction = env.NODE_ENV === 'production'
 
 // ─── Route Classification ──────────────────────────────
-const API_PREFIXES = ['/api/', '/webhook/', '/ws/', '/health']
+const API_PREFIXES = ['/api/', '/webhook/', '/ws/', '/health', '/download/', '/install']
 
 function isApiRoute(pathname: string): boolean {
-  return API_PREFIXES.some((p) => pathname.startsWith(p)) || pathname === '/health'
+  return API_PREFIXES.some((p) => pathname.startsWith(p)) || pathname === '/health' || pathname === '/install'
 }
 
 // ─── Vite Dev Server (dev only) ────────────────────────
