@@ -247,12 +247,26 @@ function triggerRePull(): string {
 async function waitForWorkflow(runId: string, timeoutMs = 600_000): Promise<'success' | 'failure' | 'timeout'> {
   if (!runId) return 'failure'
   const deadline = Date.now() + timeoutMs
+  let seenActive = false // must see queued/in_progress before accepting completed
+
   while (Date.now() < deadline) {
     await sleep(8_000)
-    const out = tryRun(`gh run view ${runId} --json status,conclusion --jq '[.status,.conclusion]'`, { env: ghEnv() })
+    const out = tryRun(
+      `gh run view ${runId} --json status,conclusion,createdAt --jq '[.status,.conclusion,.createdAt]'`,
+      { env: ghEnv() },
+    )
     try {
-      const [status, conclusion] = JSON.parse(out) as [string, string]
-      if (status === 'completed') return conclusion === 'success' ? 'success' : 'failure'
+      const [status, conclusion, createdAt] = JSON.parse(out) as [string, string, string]
+
+      // Reject stale run IDs — run must have been created within last 10 minutes
+      const ageMs = Date.now() - new Date(createdAt).getTime()
+      if (ageMs > 10 * 60 * 1000) return 'failure'
+
+      if (status === 'queued' || status === 'in_progress') seenActive = true
+      if (status === 'completed') {
+        if (!seenActive) return 'failure' // got a stale completed run, not ours
+        return conclusion === 'success' ? 'success' : 'failure'
+      }
     } catch {}
   }
   return 'timeout'
