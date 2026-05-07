@@ -278,17 +278,28 @@ function TokensPage() {
             </CopyButton>
           </Group>
           <Divider mb="xs" />
-          <Text size="xs" c="dimmed" mb={4}>Login dengan token ini:</Text>
-          <Group gap="xs">
-            <Code fz="xs" style={{ flex: 1 }}>envman login {'<server-url>'} --token {newToken}</Code>
-            <CopyButton value={`envman login <server-url> --token ${newToken}`}>
-              {({ copied, copy }) => (
-                <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
-                  {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
-                </ActionIcon>
-              )}
-            </CopyButton>
-          </Group>
+          <Text size="xs" c="dimmed" mb={6}>Cara penggunaan:</Text>
+          <Stack gap={6}>
+            {[
+              { label: 'Login & simpan config', cmd: `envman login ${window.location.origin} --token ${newToken}` },
+              { label: 'Inject vars ke command', cmd: `envman -e myapp:production -- bun start` },
+              { label: 'CI/CD (tanpa login)', cmd: `ENVMAN_SERVER=${window.location.origin} ENVMAN_TOKEN=${newToken} envman -e myapp:production -- bun start` },
+            ].map(({ label, cmd }) => (
+              <Box key={label}>
+                <Text size="xs" c="dimmed" mb={2}>{label}</Text>
+                <Group gap="xs">
+                  <Code fz="xs" style={{ flex: 1, wordBreak: 'break-all', userSelect: 'all' }}>{cmd}</Code>
+                  <CopyButton value={cmd}>
+                    {({ copied, copy }) => (
+                      <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                        {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
+                      </ActionIcon>
+                    )}
+                  </CopyButton>
+                </Group>
+              </Box>
+            ))}
+          </Stack>
         </Card>
       )}
 

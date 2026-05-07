@@ -177,6 +177,7 @@ model EnvVar {
   key           String
   value         String
   isSecret      Boolean  @default(false)
+  isDisabled    Boolean  @default(false)
   environmentId String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

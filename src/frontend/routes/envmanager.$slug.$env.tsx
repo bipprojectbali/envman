@@ -46,6 +46,8 @@ import {
   TbSearch,
   TbSquare,
   TbSquareCheckFilled,
+  TbToggleLeft,
+  TbToggleRight,
   TbTrash,
   TbVariable,
   TbX,
@@ -67,6 +69,7 @@ interface EnvVar {
   key: string
   value: string
   isSecret: boolean
+  isDisabled: boolean
   updatedAt: string
 }
 
@@ -174,6 +177,12 @@ function VarsPage() {
     mutationFn: ({ key, value, isSecret }: { key: string; value: string; isSecret: boolean }) =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, { method: 'POST', body: JSON.stringify({ key, value, isSecret }) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); setEditingId(null) },
+  })
+
+  const toggleDisabled = useMutation({
+    mutationFn: (key: string) =>
+      apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars/${key}/toggle`, { method: 'PATCH' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }),
   })
 
   const clearAll = useMutation({
@@ -576,7 +585,7 @@ function VarsPage() {
               }
 
               return (
-                <Table.Tr key={v.id} style={selectedIds.has(v.id) ? { background: 'var(--mantine-color-blue-light)' } : undefined}>
+                <Table.Tr key={v.id} style={{ opacity: v.isDisabled ? 0.4 : 1, ...(selectedIds.has(v.id) ? { background: 'var(--mantine-color-blue-light)' } : {}) }}>
                   <Table.Td>
                     <ActionIcon size="xs" variant="subtle" color={selectedIds.has(v.id) ? 'blue' : 'gray'} onClick={() => toggleSelect(v.id)}>
                       {selectedIds.has(v.id) ? <TbSquareCheckFilled size={14} /> : <TbSquare size={14} />}
@@ -635,6 +644,16 @@ function VarsPage() {
                       </CopyButton>
                       {canEdit && (
                         <>
+                          <Tooltip label={v.isDisabled ? 'Aktifkan' : 'Nonaktifkan'}>
+                            <ActionIcon
+                              size="sm" variant="subtle"
+                              color={v.isDisabled ? 'gray' : 'teal'}
+                              loading={toggleDisabled.isPending}
+                              onClick={() => toggleDisabled.mutate(v.key)}
+                            >
+                              {v.isDisabled ? <TbToggleLeft size={15} /> : <TbToggleRight size={15} />}
+                            </ActionIcon>
+                          </Tooltip>
                           <Tooltip label="Edit">
                             <ActionIcon size="sm" variant="subtle" color="violet" onClick={() => startEdit(v)}>
                               <TbPencil size={13} />

@@ -2189,7 +2189,7 @@ export function createApp() {
         if (!environment) { set.status = 404; return { error: 'Environment not found' } }
         const canReadSecrets = access === 'OWNER' || access === 'EDITOR'
         const vars = environment.vars.map(v => ({
-          id: v.id, key: v.key, isSecret: v.isSecret, updatedAt: v.updatedAt,
+          id: v.id, key: v.key, isSecret: v.isSecret, isDisabled: v.isDisabled, updatedAt: v.updatedAt,
           value: v.isSecret
             ? (canReadSecrets ? decryptSecret(v.value) : '***')
             : v.value,
@@ -2207,7 +2207,9 @@ export function createApp() {
         if (caller.scopes.length > 0 && !tokenScopeAllows(caller.scopes, params.slug, params.envName)) { set.status = 403; return { error: 'Token tidak memiliki akses ke project/env ini' } }
         const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } }, include: { vars: { orderBy: { key: 'asc' } } } })
         if (!environment) { set.status = 404; return { error: 'Environment not found' } }
-        const vars = Object.fromEntries(environment.vars.map(v => [v.key, v.isSecret ? decryptSecret(v.value) : v.value]))
+        const vars = Object.fromEntries(
+          environment.vars.filter(v => !v.isDisabled).map(v => [v.key, v.isSecret ? decryptSecret(v.value) : v.value])
+        )
         return { vars }
       })
 
@@ -2271,6 +2273,25 @@ export function createApp() {
         if (!environment) { set.status = 404; return { error: 'Environment not found' } }
         await prisma.envVar.delete({ where: { environmentId_key: { environmentId: environment.id, key: params.key } } }).catch(() => {})
         return { ok: true }
+      })
+
+      .patch('/api/envman/projects/:slug/environments/:envName/vars/:key/toggle', async ({ request, params, set }) => {
+        const caller = await requireEnvAuth(request)
+        if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+        const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+        if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
+        if (!caller.canWrite) { set.status = 403; return { error: 'Token is read-only' } }
+        const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+        if (!project) { set.status = 404; return { error: 'Project not found' } }
+        const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } } })
+        if (!environment) { set.status = 404; return { error: 'Environment not found' } }
+        const existing = await prisma.envVar.findUnique({ where: { environmentId_key: { environmentId: environment.id, key: params.key } } })
+        if (!existing) { set.status = 404; return { error: 'Var not found' } }
+        const updated = await prisma.envVar.update({
+          where: { environmentId_key: { environmentId: environment.id, key: params.key } },
+          data: { isDisabled: !existing.isDisabled },
+        })
+        return { key: updated.key, isDisabled: updated.isDisabled }
       })
 
       .get('/api/envman/projects/:slug/diff/:env1/:env2', async ({ request, params, set }) => {
@@ -2499,7 +2520,7 @@ export function createApp() {
           const stackFileContent = injectEnvFileIntoCompose(rawStackFile)
           // Escape values for Docker Compose stack.env file format
           const escapeEnvValue = (val: string) => val.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
-          const portainerEnv = environment.vars.map(v => ({
+          const portainerEnv = environment.vars.filter(v => !v.isDisabled).map(v => ({
             name: v.key,
             value: escapeEnvValue(v.isSecret ? decryptSecret(v.value) : v.value),
           }))
