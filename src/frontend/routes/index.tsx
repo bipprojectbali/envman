@@ -5,21 +5,32 @@ import {
   Card,
   Code,
   Container,
+  CopyButton,
+  Divider,
   Group,
   SimpleGrid,
   Stack,
+  Tabs,
   Text,
   ThemeIcon,
+  Timeline,
   Title,
+  Tooltip,
 } from '@mantine/core'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   TbBrandDocker,
+  TbBrandWindows,
+  TbCheck,
   TbCode,
+  TbCopy,
+  TbDownload,
   TbKey,
   TbLogin,
+  TbPlayerPlay,
   TbServer,
   TbShield,
+  TbTerminal,
   TbUsers,
   TbVariable,
 } from 'react-icons/tb'
@@ -74,44 +85,77 @@ const features = [
   },
 ]
 
-const steps = [
-  {
-    n: '1',
-    title: 'Tambah project & vars',
-    desc: 'Buat project, tambah environment (production, staging, dev), isi vars. Tandai yang sensitif sebagai secret.',
-  },
-  {
-    n: '2',
-    title: 'Generate API token',
-    desc: 'Buat token untuk CLI, CI/CD, atau tim. Bisa di-scope ke project:env tertentu dengan hak akses terpisah.',
-  },
-  {
-    n: '3',
-    title: 'Inject ke runtime',
-    desc: 'Jalankan envman -e project:env -- command. Vars ter-inject langsung tanpa menyentuh .env files.',
-  },
-]
-
-function cliDemo(origin: string) {
-  return `# Login sekali, simpan ke ~/.config/envman/config.json
-envman login ${origin} --token em_abc123
-
-# Inject vars lalu jalankan command
-envman -e myapp:production -- bun start
-
-# Gabungkan beberapa env (later overrides earlier)
-envman -e myapp:base -e myapp:production -- bun dev
-
-# Mix server + local file (local wins)
-envman -e myapp:production -e .env.local -- bun dev
-
-# CI/CD — auth dari env vars, tanpa login
-ENVMAN_SERVER=${origin} \\
-ENVMAN_TOKEN=em_xxx \\
-  envman -e myapp:production -- bun start`
+function CodeBlock({ code, label }: { code: string; label?: string }) {
+  return (
+    <Box>
+      {label && <Text size="xs" c="dimmed" mb={4}>{label}</Text>}
+      <Group gap={6} align="flex-start">
+        <Box
+          style={{
+            flex: 1,
+            background: '#0d0d0d',
+            border: '1px solid #2a2a2a',
+            borderRadius: 6,
+            padding: '10px 14px',
+            fontFamily: "'Courier New', Courier, monospace",
+            fontSize: 12,
+            lineHeight: 1.7,
+            color: '#c9d1d9',
+            overflowX: 'auto',
+            whiteSpace: 'pre',
+          }}
+        >
+          {code}
+        </Box>
+        <CopyButton value={code}>
+          {({ copied, copy }) => (
+            <Tooltip label={copied ? 'Copied!' : 'Copy'}>
+              <Button
+                size="compact-xs"
+                variant="subtle"
+                color={copied ? 'teal' : 'gray'}
+                onClick={copy}
+                mt={6}
+                px={6}
+              >
+                {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
+              </Button>
+            </Tooltip>
+          )}
+        </CopyButton>
+      </Group>
+    </Box>
+  )
 }
 
 function HomePage() {
+  const origin = window.location.origin
+
+  const installCmds = {
+    'linux-x64': `curl -sL ${origin}/download/cli/linux-x64 -o envman
+chmod +x envman
+sudo mv envman /usr/local/bin/
+envman --version`,
+    'linux-arm64': `curl -sL ${origin}/download/cli/linux-arm64 -o envman
+chmod +x envman
+sudo mv envman /usr/local/bin/
+envman --version`,
+    'darwin-arm64': `curl -sL ${origin}/download/cli/darwin-arm64 -o envman
+chmod +x envman
+sudo mv envman /usr/local/bin/
+envman --version`,
+    'darwin-x64': `curl -sL ${origin}/download/cli/darwin-x64 -o envman
+chmod +x envman
+sudo mv envman /usr/local/bin/
+envman --version`,
+    'windows-x64': `# PowerShell
+Invoke-WebRequest -Uri "${origin}/download/cli/windows-x64" \`
+  -OutFile "envman.exe"
+
+# Atau dengan curl (Windows 10+)
+curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
+  }
+
   return (
     <Box>
       {/* ─── Navbar ─────────────────────────────────────────────────── */}
@@ -194,16 +238,15 @@ function HomePage() {
             </Button>
             <Button
               component="a"
-              href="#cli"
+              href="#install"
               size="md"
               variant="default"
-              leftSection={<TbCode size={17} />}
+              leftSection={<TbDownload size={17} />}
             >
-              Lihat CLI
+              Install CLI
             </Button>
           </Group>
 
-          {/* Mini stats */}
           <Group gap="xl" mt="md">
             {[
               { label: 'AES-256-GCM', sub: 'enkripsi secret' },
@@ -219,7 +262,195 @@ function HomePage() {
         </Stack>
       </Container>
 
-      {/* ─── CLI Demo ────────────────────────────────────────────────── */}
+      {/* ─── Install ─────────────────────────────────────────────────── */}
+      <Box
+        id="install"
+        style={{ borderTop: '1px solid var(--mantine-color-default-border)', borderBottom: '1px solid var(--mantine-color-default-border)' }}
+        py={{ base: 48, md: 64 }}
+      >
+        <Container size="md">
+          <Stack gap="xl">
+            <Stack align="center" gap="xs">
+              <ThemeIcon size={44} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+                <TbDownload size={22} />
+              </ThemeIcon>
+              <Title order={2} ta="center" fw={700}>Install CLI</Title>
+              <Text c="dimmed" ta="center" maw={480}>
+                Binary standalone — tidak perlu Node.js, npm, atau runtime apapun.
+                Satu file, langsung jalan.
+              </Text>
+            </Stack>
+
+            <Tabs defaultValue="linux-x64" variant="pills" radius="md">
+              <Tabs.List mb="md">
+                <Tabs.Tab value="linux-x64" leftSection={<TbTerminal size={13} />}>Linux x64</Tabs.Tab>
+                <Tabs.Tab value="linux-arm64" leftSection={<TbTerminal size={13} />}>Linux ARM64</Tabs.Tab>
+                <Tabs.Tab value="darwin-arm64" leftSection={<TbTerminal size={13} />}>macOS Apple Silicon</Tabs.Tab>
+                <Tabs.Tab value="darwin-x64" leftSection={<TbTerminal size={13} />}>macOS Intel</Tabs.Tab>
+                <Tabs.Tab value="windows-x64" leftSection={<TbBrandWindows size={13} />}>Windows</Tabs.Tab>
+              </Tabs.List>
+
+              {(Object.entries(installCmds) as [string, string][]).map(([platform, cmd]) => (
+                <Tabs.Panel key={platform} value={platform}>
+                  <Stack gap="sm">
+                    <CodeBlock code={cmd} />
+                    <Group gap="xs">
+                      <Button
+                        component="a"
+                        href={`${origin}/download/cli/${platform}`}
+                        size="xs"
+                        variant="light"
+                        color="violet"
+                        leftSection={<TbDownload size={13} />}
+                        download
+                      >
+                        Download binary langsung
+                      </Button>
+                    </Group>
+                  </Stack>
+                </Tabs.Panel>
+              ))}
+            </Tabs>
+          </Stack>
+        </Container>
+      </Box>
+
+      {/* ─── Panduan Penggunaan ───────────────────────────────────────── */}
+      <Container size="md" py={{ base: 48, md: 64 }} id="guide">
+        <Stack gap="xl">
+          <Stack align="center" gap="xs">
+            <ThemeIcon size={44} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+              <TbPlayerPlay size={22} />
+            </ThemeIcon>
+            <Title order={2} ta="center" fw={700}>Panduan Penggunaan</Title>
+            <Text c="dimmed" ta="center" maw={480}>
+              Dari install sampai inject ke production — semua ada di sini.
+            </Text>
+          </Stack>
+
+          <Timeline active={-1} bulletSize={32} lineWidth={2} color="violet">
+            {/* Step 1 */}
+            <Timeline.Item
+              bullet={<Text fw={800} size="sm" c="white">1</Text>}
+              title={<Text fw={700} size="sm">Login ke server</Text>}
+            >
+              <Text size="sm" c="dimmed" mb="sm" mt={4}>
+                Setelah install CLI, login sekali untuk menyimpan credentials ke config lokal.
+                Token bisa dibuat di dashboard → Tokens.
+              </Text>
+              <Stack gap="xs">
+                <CodeBlock
+                  label="Login dan simpan config ke ~/.config/envman/config.json"
+                  code={`envman login ${origin} --token <API_TOKEN>`}
+                />
+                <CodeBlock
+                  label="Verifikasi login berhasil"
+                  code={`envman whoami
+# → Logged in as user@example.com (ADMIN) at ${origin}`}
+                />
+              </Stack>
+            </Timeline.Item>
+
+            {/* Step 2 */}
+            <Timeline.Item
+              bullet={<Text fw={800} size="sm" c="white">2</Text>}
+              title={<Text fw={700} size="sm">Inject vars ke command</Text>}
+            >
+              <Text size="sm" c="dimmed" mb="sm" mt={4}>
+                Gunakan flag <Code fz="xs">-e project:environment</Code> untuk fetch vars dari server,
+                lalu jalankan command apapun. Vars hanya ada di memori process — tidak ditulis ke file.
+              </Text>
+              <Stack gap="xs">
+                <CodeBlock
+                  label="Inject ke satu environment"
+                  code={`envman -e myapp:production -- bun start`}
+                />
+                <CodeBlock
+                  label="Gabungkan beberapa env (later overrides earlier)"
+                  code={`envman -e myapp:base -e myapp:production -- bun dev`}
+                />
+                <CodeBlock
+                  label="Mix server + local file (.env.local override production)"
+                  code={`envman -e myapp:production -e .env.local -- bun dev`}
+                />
+                <CodeBlock
+                  label="Server vars kalah dari system env (--server-wins membaliknya)"
+                  code={`PORT=8080 envman -e myapp:production -- bun start
+# PORT=8080 (system wins by default)
+
+envman --server-wins -e myapp:production -- bun start
+# PORT dari server (server wins)`}
+                />
+              </Stack>
+            </Timeline.Item>
+
+            {/* Step 3 */}
+            <Timeline.Item
+              bullet={<Text fw={800} size="sm" c="white">3</Text>}
+              title={<Text fw={700} size="sm">CI/CD tanpa login interaktif</Text>}
+            >
+              <Text size="sm" c="dimmed" mb="sm" mt={4}>
+                Di CI/CD, set <Code fz="xs">ENVMAN_SERVER</Code> dan <Code fz="xs">ENVMAN_TOKEN</Code> sebagai
+                environment secrets. Tidak perlu <Code fz="xs">envman login</Code>.
+              </Text>
+              <Stack gap="xs">
+                <CodeBlock
+                  label="GitHub Actions"
+                  code={`- name: Deploy
+  env:
+    ENVMAN_SERVER: ${origin}
+    ENVMAN_TOKEN: \${{ secrets.ENVMAN_TOKEN }}
+  run: envman -e myapp:production -- bun start`}
+                />
+                <CodeBlock
+                  label="Shell / Docker"
+                  code={`ENVMAN_SERVER=${origin} \\
+ENVMAN_TOKEN=<TOKEN> \\
+  envman -e myapp:production -- bun start`}
+                />
+              </Stack>
+            </Timeline.Item>
+
+            {/* Step 4 */}
+            <Timeline.Item
+              bullet={<Text fw={800} size="sm" c="white">4</Text>}
+              title={<Text fw={700} size="sm">Auth dari local file</Text>}
+            >
+              <Text size="sm" c="dimmed" mb="sm" mt={4}>
+                Jika kamu punya file <Code fz="xs">-e</Code> yang juga berisi <Code fz="xs">ENVMAN_SERVER</Code> dan{' '}
+                <Code fz="xs">ENVMAN_TOKEN</Code>, tidak perlu login sama sekali. Berguna untuk monorepo dengan
+                auth berbeda per direktori.
+              </Text>
+              <Stack gap="xs">
+                <CodeBlock
+                  label="Isi .env.local (tidak perlu di-commit)"
+                  code={`ENVMAN_SERVER=${origin}
+ENVMAN_TOKEN=<TOKEN>
+# vars lokal lainnya...
+DEBUG=true`}
+                />
+                <CodeBlock
+                  label="Jalankan — auth diambil dari .env.local"
+                  code={`envman -e .env.local -e myapp:production -- bun dev`}
+                />
+              </Stack>
+            </Timeline.Item>
+
+            {/* Step 5 */}
+            <Timeline.Item
+              bullet={<Text fw={800} size="sm" c="white">5</Text>}
+              title={<Text fw={700} size="sm">Logout</Text>}
+            >
+              <Text size="sm" c="dimmed" mb="sm" mt={4}>
+                Menghapus config tersimpan di <Code fz="xs">~/.config/envman/config.json</Code>.
+              </Text>
+              <CodeBlock code={`envman logout`} />
+            </Timeline.Item>
+          </Timeline>
+        </Stack>
+      </Container>
+
+      {/* ─── CLI Cheatsheet ───────────────────────────────────────────── */}
       <Box
         id="cli"
         style={{
@@ -235,7 +466,7 @@ function HomePage() {
               <ThemeIcon size={22} variant="light" color="violet" radius="sm">
                 <TbCode size={12} />
               </ThemeIcon>
-              <Text fw={600} size="sm" c="gray.3">CLI Usage</Text>
+              <Text fw={600} size="sm" c="gray.3">CLI Cheatsheet</Text>
             </Group>
             <pre
               style={{
@@ -252,11 +483,27 @@ function HomePage() {
                 whiteSpace: 'pre',
               }}
             >
-              {cliDemo(window.location.origin)}
+              {`# Auth
+envman login ${origin} --token <TOKEN>   # simpan config
+envman logout                             # hapus config
+envman whoami                             # cek status login
+
+# Inject (single source)
+envman -e myapp:production -- <command>
+
+# Inject (multiple sources, later overrides earlier)
+envman -e myapp:base -e myapp:production -- <command>
+
+# Mix remote + local file
+envman -e myapp:production -e .env.local -- <command>
+
+# CI/CD (tanpa login, auth dari env vars)
+ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<TOKEN> \\
+  envman -e myapp:production -- <command>
+
+# Flag
+--server-wins    system env menang vs merged vars (default: merged wins)`}
             </pre>
-            <Text size="xs" c="dimmed">
-              Binary standalone — tidak perlu Node.js atau npm. Download untuk Linux, macOS, dan Windows.
-            </Text>
           </Stack>
         </Container>
       </Box>
@@ -275,7 +522,7 @@ function HomePage() {
 
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
             {features.map(f => (
-              <Card key={f.title} withBorder p="md" radius="md" style={{ transition: 'border-color 0.15s' }}>
+              <Card key={f.title} withBorder p="md" radius="md">
                 <Group gap="sm" mb="xs">
                   <ThemeIcon size={36} variant="light" color={f.color} radius="md">
                     <f.icon size={18} />
@@ -288,43 +535,6 @@ function HomePage() {
           </SimpleGrid>
         </Stack>
       </Container>
-
-      {/* ─── How it works ────────────────────────────────────────────── */}
-      <Box
-        style={{
-          background: 'linear-gradient(135deg, var(--mantine-color-violet-light) 0%, var(--mantine-color-grape-light) 100%)',
-          borderTop: '1px solid var(--mantine-color-violet-light-hover)',
-          borderBottom: '1px solid var(--mantine-color-violet-light-hover)',
-        }}
-        py={{ base: 60, md: 80 }}
-      >
-        <Container size="md">
-          <Stack gap="xl" align="center">
-            <Stack align="center" gap="xs">
-              <Title order={2} ta="center" fw={700}>Cara kerjanya</Title>
-              <Text c="dimmed" ta="center">Mulai dalam 3 langkah.</Text>
-            </Stack>
-
-            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xl" w="100%">
-              {steps.map(step => (
-                <Stack key={step.n} align="center" gap="sm">
-                  <ThemeIcon
-                    size={52}
-                    variant="gradient"
-                    gradient={{ from: 'violet', to: 'grape' }}
-                    radius="xl"
-                    style={{ boxShadow: '0 4px 20px rgba(121, 80, 242, 0.3)' }}
-                  >
-                    <Text fw={800} size="xl" c="white">{step.n}</Text>
-                  </ThemeIcon>
-                  <Text fw={600} ta="center" size="sm">{step.title}</Text>
-                  <Text size="sm" c="dimmed" ta="center" lh={1.65}>{step.desc}</Text>
-                </Stack>
-              ))}
-            </SimpleGrid>
-          </Stack>
-        </Container>
-      </Box>
 
       {/* ─── CTA ─────────────────────────────────────────────────────── */}
       <Container size="sm" py={{ base: 60, md: 80 }}>
@@ -352,17 +562,27 @@ function HomePage() {
             <Text c="dimmed" maw={360}>
               Login dan mulai kelola environment variables-mu dengan aman sekarang juga.
             </Text>
-            <Button
-              component={Link}
-              to="/login"
-              size="md"
-              variant="gradient"
-              gradient={{ from: 'violet', to: 'grape' }}
-              leftSection={<TbLogin size={17} />}
-              mt="xs"
-            >
-              Masuk ke Dashboard
-            </Button>
+            <Group gap="sm" mt="xs">
+              <Button
+                component={Link}
+                to="/login"
+                size="md"
+                variant="gradient"
+                gradient={{ from: 'violet', to: 'grape' }}
+                leftSection={<TbLogin size={17} />}
+              >
+                Masuk ke Dashboard
+              </Button>
+              <Button
+                component="a"
+                href="#install"
+                size="md"
+                variant="default"
+                leftSection={<TbDownload size={17} />}
+              >
+                Install CLI
+              </Button>
+            </Group>
           </Stack>
         </Card>
       </Container>
