@@ -11,11 +11,17 @@ import {
   Group,
   InputBase,
   Menu,
+  Modal,
+  MultiSelect,
+  Paper,
+  ScrollArea,
+  SegmentedControl,
   Select,
   Skeleton,
   Stack,
   Tabs,
   Text,
+  Textarea,
   TextInput,
   ThemeIcon,
   Tooltip,
@@ -26,16 +32,25 @@ import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useSession } from '@/frontend/hooks/useAuth'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
 import {
+  TbBookmark,
+  TbBookmarkFilled,
   TbChevronRight,
   TbChevronDown,
+  TbEdit,
+  TbEye,
+  TbFileText,
+  TbNote,
   TbPlus,
   TbSearch,
   TbShieldCheck,
   TbSortAscending,
+  TbTag,
   TbTrash,
   TbUserPlus,
   TbUsers,
@@ -45,8 +60,8 @@ import {
 
 export const Route = createFileRoute('/envmanager/$slug/')({
   validateSearch: (search: Record<string, unknown>) => ({
-    tab: ['environments', 'members'].includes(search.tab as string)
-      ? (search.tab as 'environments' | 'members')
+    tab: ['environments', 'members', 'notes'].includes(search.tab as string)
+      ? (search.tab as 'environments' | 'members' | 'notes')
       : 'environments',
   }),
   component: ProjectDetailPage,
@@ -92,7 +107,7 @@ function ProjectDetailPage() {
   const combobox = useCombobox({ onDropdownClose: () => combobox.resetSelectedOption() })
 
   const setTab = (t: string) =>
-    navigate({ to: '/envmanager/$slug', params: { slug }, search: prev => ({ ...prev, tab: t as 'environments' | 'members' }) })
+    navigate({ to: '/envmanager/$slug', params: { slug }, search: prev => ({ ...prev, tab: t as 'environments' | 'members' | 'notes' }) })
 
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'project', slug],
@@ -241,6 +256,9 @@ function ProjectDetailPage() {
             ) : undefined}
           >
             Members
+          </Tabs.Tab>
+          <Tabs.Tab value="notes" leftSection={<TbNote size={14} />}>
+            Notes
           </Tabs.Tab>
         </Tabs.List>
 
@@ -611,7 +629,422 @@ function ProjectDetailPage() {
             </Stack>
           )}
         </Tabs.Panel>
+        {/* ── Notes tab ────────────────────── */}
+        <Tabs.Panel value="notes">
+          <NotesPanel slug={slug} canEdit={canEdit} isOwner={isOwner} myUserId={myUserId ?? ''} />
+        </Tabs.Panel>
       </Tabs>
     </Box>
+  )
+}
+
+// ─── Notes types ──────────────────────────────────────────────────────────────
+
+interface Note {
+  id: string
+  title: string
+  body: string
+  pinned: boolean
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+  author: { id: string; name: string }
+}
+
+// ─── NoteForm modal ───────────────────────────────────────────────────────────
+
+function NoteForm({
+  slug,
+  note,
+  onClose,
+}: {
+  slug: string
+  note?: Note
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const [title, setTitle] = useState(note?.title ?? '')
+  const [body, setBody] = useState(note?.body ?? '')
+  const [tags, setTags] = useState<string[]>(note?.tags ?? [])
+  const [preview, setPreview] = useState<'write' | 'preview'>('write')
+  const [tagInput, setTagInput] = useState('')
+
+  const save = useMutation({
+    mutationFn: () => {
+      if (note) {
+        return apiFetch(`/api/envman/projects/${slug}/notes/${note.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ title, body, tags }),
+        })
+      }
+      return apiFetch(`/api/envman/projects/${slug}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ title, body, tags }),
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['envman', 'notes', slug] })
+      notifyOk(note ? 'Note diperbarui' : 'Note dibuat')
+      onClose()
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  const allTags = [...new Set([...tags, ...(tagInput.trim() ? [tagInput.trim()] : [])])]
+
+  return (
+    <Stack gap="sm">
+      <TextInput
+        label="Judul"
+        placeholder="Judul note..."
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        required
+        autoFocus
+      />
+
+      <Box>
+        <Group justify="space-between" mb={4}>
+          <Text size="sm" fw={500}>Konten</Text>
+          <SegmentedControl
+            size="xs"
+            value={preview}
+            onChange={v => setPreview(v as 'write' | 'preview')}
+            data={[
+              { label: <Group gap={4}><TbEdit size={12} /><span>Write</span></Group>, value: 'write' },
+              { label: <Group gap={4}><TbEye size={12} /><span>Preview</span></Group>, value: 'preview' },
+            ]}
+          />
+        </Group>
+        {preview === 'write' ? (
+          <Textarea
+            placeholder="Tulis catatan dalam format Markdown..."
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            minRows={12}
+            maxRows={20}
+            autosize
+            styles={{ input: { fontFamily: 'monospace', fontSize: 13 } }}
+          />
+        ) : (
+          <Paper withBorder p="md" mih={200} style={{ overflow: 'auto' }}>
+            {body ? (
+              <div className="markdown-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
+              </div>
+            ) : (
+              <Text size="sm" c="dimmed">Tidak ada konten.</Text>
+            )}
+          </Paper>
+        )}
+      </Box>
+
+      <MultiSelect
+        label="Tags"
+        placeholder="Ketik lalu tekan Enter untuk tambah tag baru..."
+        data={[...new Set([...tags, ...(tagInput ? [tagInput] : [])])]}
+        value={tags}
+        onChange={setTags}
+        searchable
+        searchValue={tagInput}
+        onSearchChange={setTagInput}
+        onKeyDown={e => {
+          if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+            e.preventDefault()
+            const t = tagInput.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-')
+            if (t && !tags.includes(t)) setTags(prev => [...prev, t])
+            setTagInput('')
+          }
+        }}
+        leftSection={<TbTag size={13} />}
+        clearable
+      />
+
+      <Group justify="flex-end" gap="xs" mt="xs">
+        <Button variant="subtle" color="gray" onClick={onClose}>Batal</Button>
+        <Button
+          leftSection={<TbFileText size={14} />}
+          onClick={() => save.mutate()}
+          loading={save.isPending}
+          disabled={!title.trim()}
+        >
+          {note ? 'Simpan' : 'Buat Note'}
+        </Button>
+      </Group>
+    </Stack>
+  )
+}
+
+// ─── NotesPanel ───────────────────────────────────────────────────────────────
+
+function NotesPanel({ slug, canEdit, isOwner, myUserId }: { slug: string; canEdit: boolean; isOwner: boolean; myUserId: string }) {
+  const qc = useQueryClient()
+  const [search, setSearch] = useState('')
+  const [tagFilter, setTagFilter] = useState<string[]>([])
+  const [sort, setSort] = useState<'updated' | 'created' | 'title'>('updated')
+  const [openNote, setOpenNote] = useState<Note | null | 'new'>(null)
+  const [viewNote, setViewNote] = useState<Note | null>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['envman', 'notes', slug],
+    queryFn: () => apiFetch<{ notes: Note[] }>(`/api/envman/projects/${slug}/notes`),
+    refetchInterval: 30000,
+  })
+  const notes: Note[] = data?.notes ?? []
+
+  const allTags = useMemo(() => [...new Set(notes.flatMap(n => n.tags))].sort(), [notes])
+
+  const filtered = useMemo(() => {
+    let list = [...notes]
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(n => n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q) || n.tags.some(t => t.toLowerCase().includes(q)))
+    }
+    if (tagFilter.length > 0) {
+      list = list.filter(n => tagFilter.every(t => n.tags.includes(t)))
+    }
+    list.sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+      if (sort === 'title') return a.title.localeCompare(b.title)
+      if (sort === 'created') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    })
+    return list
+  }, [notes, search, tagFilter, sort])
+
+  const togglePin = (note: Note) =>
+    apiFetch(`/api/envman/projects/${slug}/notes/${note.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ pinned: !note.pinned }),
+    })
+      .then(() => qc.invalidateQueries({ queryKey: ['envman', 'notes', slug] }))
+      .catch(notifyErr)
+
+  const deleteNote = (note: Note) =>
+    modals.openConfirmModal({
+      title: 'Hapus note',
+      children: <Text size="sm">Hapus note <strong>{note.title}</strong>?</Text>,
+      labels: { confirm: 'Hapus', cancel: 'Batal' },
+      confirmProps: { color: 'red' },
+      onConfirm: () =>
+        apiFetch(`/api/envman/projects/${slug}/notes/${note.id}`, { method: 'DELETE' })
+          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'notes', slug] }); if (viewNote?.id === note.id) setViewNote(null); notifyOk('Note dihapus') })
+          .catch(notifyErr),
+    })
+
+  const canEditNote = (note: Note) => isOwner || (canEdit && note.author.id === myUserId)
+
+  function relTime(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime()
+    const m = Math.floor(diff / 60000)
+    if (m < 1) return 'baru saja'
+    if (m < 60) return `${m}m lalu`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}j lalu`
+    const d = Math.floor(h / 24)
+    if (d < 30) return `${d}h lalu`
+    return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  return (
+    <>
+      {/* ─── Form modal ─────────────────────── */}
+      <Modal
+        opened={openNote !== null}
+        onClose={() => setOpenNote(null)}
+        title={openNote === 'new' ? 'Buat Note Baru' : 'Edit Note'}
+        size="xl"
+        styles={{ body: { paddingTop: 8 } }}
+      >
+        {openNote !== null && (
+          <NoteForm
+            slug={slug}
+            note={openNote === 'new' ? undefined : openNote}
+            onClose={() => setOpenNote(null)}
+          />
+        )}
+      </Modal>
+
+      {/* ─── View modal ─────────────────────── */}
+      <Modal
+        opened={viewNote !== null}
+        onClose={() => setViewNote(null)}
+        title={
+          <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+            {viewNote?.pinned && <TbBookmarkFilled size={16} color="var(--mantine-color-yellow-5)" />}
+            <Text fw={700} size="md" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {viewNote?.title}
+            </Text>
+          </Group>
+        }
+        size="xl"
+      >
+        {viewNote && (
+          <Stack gap="sm">
+            <Group gap="xs" wrap="wrap">
+              {viewNote.tags.map(t => (
+                <Badge key={t} size="xs" variant="outline" color="violet" leftSection={<TbTag size={10} />}>{t}</Badge>
+              ))}
+              <Text size="xs" c="dimmed" ml="auto">
+                oleh {viewNote.author.name} · diperbarui {relTime(viewNote.updatedAt)}
+              </Text>
+            </Group>
+            <ScrollArea mah={500}>
+              <Paper withBorder p="md">
+                <div className="markdown-body" style={{ fontSize: 14 }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewNote.body || '_Tidak ada konten._'}</ReactMarkdown>
+                </div>
+              </Paper>
+            </ScrollArea>
+            {canEditNote(viewNote) && (
+              <Group justify="flex-end" gap="xs">
+                <Button size="xs" variant="subtle" color="red" leftSection={<TbTrash size={13} />} onClick={() => { setViewNote(null); deleteNote(viewNote) }}>
+                  Hapus
+                </Button>
+                <Button size="xs" leftSection={<TbEdit size={13} />} onClick={() => { setOpenNote(viewNote); setViewNote(null) }}>
+                  Edit
+                </Button>
+              </Group>
+            )}
+          </Stack>
+        )}
+      </Modal>
+
+      {/* ─── Toolbar ────────────────────────── */}
+      <Stack gap="sm">
+        <Group gap="xs">
+          <TextInput
+            size="xs"
+            placeholder="Cari notes..."
+            leftSection={<TbSearch size={13} />}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
+            style={{ flex: 1 }}
+          />
+          {allTags.length > 0 && (
+            <MultiSelect
+              size="xs"
+              placeholder="Filter tag..."
+              data={allTags}
+              value={tagFilter}
+              onChange={setTagFilter}
+              leftSection={<TbTag size={13} />}
+              clearable
+              w={180}
+            />
+          )}
+          <Select
+            size="xs"
+            w={130}
+            leftSection={<TbSortAscending size={13} />}
+            value={sort}
+            onChange={v => setSort((v ?? 'updated') as typeof sort)}
+            data={[
+              { label: 'Terbaru edit', value: 'updated' },
+              { label: 'Terbaru buat', value: 'created' },
+              { label: 'Judul A-Z', value: 'title' },
+            ]}
+            allowDeselect={false}
+          />
+          {canEdit && (
+            <Button size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenNote('new')}>
+              New Note
+            </Button>
+          )}
+        </Group>
+
+        {/* ─── Note list ───────────────────── */}
+        {isLoading ? (
+          <Stack gap="xs">
+            {[1, 2, 3].map(i => <Skeleton key={i} height={72} radius="md" />)}
+          </Stack>
+        ) : notes.length === 0 ? (
+          <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+            <ThemeIcon size={40} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
+              <TbNote size={20} />
+            </ThemeIcon>
+            <Text fw={500} mb={4}>Belum ada notes</Text>
+            <Text size="sm" c="dimmed" mb="md">Buat catatan dalam Markdown untuk project ini.</Text>
+            {canEdit && (
+              <Button size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenNote('new')}>
+                Buat Note Pertama
+              </Button>
+            )}
+          </Card>
+        ) : filtered.length === 0 ? (
+          <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
+            <Text size="sm" c="dimmed">Tidak ada note yang cocok.</Text>
+            <Button size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setTagFilter([]) }}>Reset Filter</Button>
+          </Card>
+        ) : (
+          <Stack gap="xs">
+            {filtered.map(note => (
+              <Card
+                key={note.id}
+                withBorder
+                p="sm"
+                style={{ cursor: 'pointer', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
+                onClick={() => setViewNote(note)}
+              >
+                <Group justify="space-between" wrap="nowrap" gap="xs">
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Group gap="xs" mb={2} wrap="nowrap">
+                      {note.pinned && <TbBookmarkFilled size={14} color="var(--mantine-color-yellow-5)" style={{ flexShrink: 0 }} />}
+                      <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {note.title}
+                      </Text>
+                    </Group>
+                    <Text size="xs" c="dimmed" lineClamp={1} style={{ fontFamily: 'monospace' }}>
+                      {note.body.replace(/#{1,6}\s|[*_`>-]/g, '').slice(0, 120) || '—'}
+                    </Text>
+                    <Group gap={4} mt={4} wrap="wrap">
+                      {note.tags.map(t => (
+                        <Badge key={t} size="xs" variant="outline" color="violet">{t}</Badge>
+                      ))}
+                      <Text size="xs" c="dimmed">
+                        {note.author.name} · {relTime(note.updatedAt)}
+                      </Text>
+                    </Group>
+                  </Box>
+
+                  <Group gap={4} wrap="nowrap" onClick={e => e.stopPropagation()}>
+                    {(isOwner || (canEdit && note.author.id === myUserId)) && (
+                      <Tooltip label={note.pinned ? 'Unpin' : 'Pin'} position="left">
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          color={note.pinned ? 'yellow' : 'gray'}
+                          onClick={e => { e.stopPropagation(); togglePin(note) }}
+                        >
+                          {note.pinned ? <TbBookmarkFilled size={13} /> : <TbBookmark size={13} />}
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                    {canEditNote(note) && (
+                      <>
+                        <Tooltip label="Edit" position="left">
+                          <ActionIcon size="sm" variant="subtle" color="blue" onClick={e => { e.stopPropagation(); setOpenNote(note) }}>
+                            <TbEdit size={13} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label="Hapus" position="left">
+                          <ActionIcon size="sm" variant="subtle" color="red" onClick={e => { e.stopPropagation(); deleteNote(note) }}>
+                            <TbTrash size={13} />
+                          </ActionIcon>
+                        </Tooltip>
+                      </>
+                    )}
+                    <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); setViewNote(note) }}>
+                      <TbChevronRight size={13} />
+                    </ActionIcon>
+                  </Group>
+                </Group>
+              </Card>
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    </>
   )
 }
