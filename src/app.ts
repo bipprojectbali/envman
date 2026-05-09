@@ -337,22 +337,24 @@ export function createApp() {
       })
 
       // ─── Backward-compat: GET /api/auth/google ──────────
-      // better-auth signInSocial adalah POST dengan body JSON.
-      // Wrapper ini memanggil auth.api.signInSocial dan forward redirect response ke browser.
-      .get('/api/auth/google', async ({ request, set }) => {
+      // signInSocial menghasilkan state cookie + redirect URL ke Google.
+      // Kita harus forward SEMUA set-cookie (termasuk state cookie) ke browser,
+      // karena state cookie dibutuhkan saat Google callback untuk verifikasi.
+      .get('/api/auth/google', async ({ request }) => {
         const baRes = await auth.api.signInSocial({
           body: { provider: 'google', callbackURL: `${getPublicOrigin(request)}/api/auth/google-callback` },
           headers: request.headers,
           asResponse: true,
         })
         const location = baRes.headers.get('location')
-        if (location) {
-          set.status = 302
-          set.headers.location = location
-          return
+        if (!location) return new Response(JSON.stringify({ error: 'OAuth redirect failed' }), { status: 500 })
+
+        // Forward semua headers dari better-auth (termasuk set-cookie state) ke browser
+        const headers = new Headers({ location })
+        for (const [key, val] of baRes.headers.entries()) {
+          if (key.toLowerCase() === 'set-cookie') headers.append('set-cookie', val)
         }
-        set.status = 500
-        return { error: 'OAuth redirect failed' }
+        return new Response(null, { status: 302, headers })
       })
 
       // ─── Post-Google-OAuth callback redirect ─────────────
