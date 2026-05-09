@@ -28,6 +28,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { useSession } from '@/frontend/hooks/useAuth'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { apiFetch } from '@/frontend/lib/api'
 import {
   TbChevronRight,
   TbChevronDown,
@@ -51,12 +52,6 @@ export const Route = createFileRoute('/envmanager/$slug/')({
   component: ProjectDetailPage,
 })
 
-const apiFetch = (url: string, opts?: RequestInit) =>
-  fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts }).then(async (r) => {
-    const body = await r.json()
-    if (!r.ok) throw new Error(body.error ?? 'Request failed')
-    return body
-  })
 
 interface Environment {
   id: string

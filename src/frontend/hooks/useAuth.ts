@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { apiFetch } from '@/frontend/lib/api'
 
 export type Role = 'USER' | 'QC' | 'ADMIN' | 'SUPER_ADMIN'
 
@@ -24,21 +25,14 @@ export function getDefaultRoute(role: Role): string {
   }
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { credentials: 'include', ...init })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
-}
-
 export function useSession() {
   return useQuery({
     queryKey: ['auth', 'session'],
     queryFn: () => apiFetch<{ user: User | null }>('/api/auth/session'),
     retry: false,
     staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   })
 }
 

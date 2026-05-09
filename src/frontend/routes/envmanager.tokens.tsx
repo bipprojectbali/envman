@@ -29,6 +29,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { apiFetch } from '@/frontend/lib/api'
 import {
   TbAlertTriangle,
   TbCalendar,
@@ -60,12 +61,6 @@ export const Route = createFileRoute('/envmanager/tokens')({
   component: TokensPage,
 })
 
-const apiFetch = (url: string, opts?: RequestInit) =>
-  fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts }).then(async (r) => {
-    const body = await r.json()
-    if (!r.ok) throw new Error(body.error ?? 'Request failed')
-    return body
-  })
 
 interface ApiToken {
   id: string

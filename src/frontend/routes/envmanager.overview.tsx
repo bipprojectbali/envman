@@ -29,17 +29,11 @@ import {
   TbShieldCheck,
   TbVariable,
 } from 'react-icons/tb'
+import { apiFetch } from '@/frontend/lib/api'
 
 export const Route = createFileRoute('/envmanager/overview')({
   component: OverviewPage,
 })
-
-const apiFetch = (url: string) =>
-  fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json' } }).then(async (r) => {
-    const b = await r.json()
-    if (!r.ok) throw new Error(b.error ?? 'Request failed')
-    return b
-  })
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()

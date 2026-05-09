@@ -22,6 +22,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { apiFetch } from '@/frontend/lib/api'
 import {
   TbChevronRight,
   TbFolders,
@@ -37,12 +38,6 @@ export const Route = createFileRoute('/envmanager/')({
   component: ProjectListPage,
 })
 
-const apiFetch = (url: string, opts?: RequestInit) =>
-  fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts }).then(async (r) => {
-    const body = await r.json()
-    if (!r.ok) throw new Error(body.error ?? 'Request failed')
-    return body
-  })
 
 interface Project {
   slug: string

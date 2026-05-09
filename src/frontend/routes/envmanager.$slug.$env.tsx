@@ -29,6 +29,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { PortainerSync } from '@/frontend/components/PortainerSync'
 import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { apiFetch } from '@/frontend/lib/api'
 import {
   TbAlertTriangle,
   TbCheck,
@@ -60,12 +61,6 @@ export const Route = createFileRoute('/envmanager/$slug/$env')({
   component: VarsPage,
 })
 
-const apiFetch = (url: string, opts?: RequestInit) =>
-  fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts }).then(async (r) => {
-    const body = await r.json()
-    if (!r.ok) throw new Error(body.error ?? 'Request failed')
-    return body
-  })
 
 interface EnvVar {
   id: string
