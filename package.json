@@ -34,6 +34,7 @@
     "@tanstack/react-router": "^1.168.10",
     "@types/bun": "^1.3.13",
     "@xyflow/react": "^12.10.2",
+    "better-auth": "^1.6.9",
     "elkjs": "^0.11.1",
     "elysia": "^1.4.28",
     "github-markdown-css": "^5.9.0",

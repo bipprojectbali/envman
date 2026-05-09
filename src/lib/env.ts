@@ -27,4 +27,7 @@ export const env = {
   // Generate: openssl rand -hex 32
   // If unset, secret values are stored as plaintext (no at-rest protection).
   MASTER_KEY: optional('MASTER_KEY', ''),
+  // Better-auth
+  BETTER_AUTH_SECRET: required('BETTER_AUTH_SECRET'),
+  BETTER_AUTH_URL: optional('BETTER_AUTH_URL', 'http://localhost:3000'),
 } as const

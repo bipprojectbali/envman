@@ -4,6 +4,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { Elysia } from 'elysia'
 import { createMcpServer, type McpScope } from '../scripts/mcp/server'
 import { appLog, clearAppLogs, getAppLogs } from './lib/applog'
+import { auth } from './lib/auth'
 import { decryptSecret, encryptSecret, hasMasterKey } from './lib/crypto'
 import { prisma } from './lib/db'
 import { env } from './lib/env'
@@ -28,14 +29,33 @@ function audit(userId: string | null, action: string, detail: string | null, ip:
 }
 
 async function requireAuth(request: Request): Promise<{ userId: string; role: string; email: string } | null> {
+  // Try better-auth first (handles signed tokens from browser login)
+  try {
+    const sessionData = await auth.api.getSession({ headers: request.headers })
+    if (sessionData?.user) {
+      const user = sessionData.user as { id: string; role: string; email: string; blocked?: boolean }
+      if (user.blocked) return null
+      // Fetch fresh role from DB (better-auth user object may not have custom fields)
+      const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true, blocked: true, email: true } })
+      if (!dbUser || dbUser.blocked) return null
+      return { userId: user.id, role: dbUser.role, email: dbUser.email }
+    }
+  } catch {
+    // fall through to UUID fallback
+  }
+
+  // Fallback: direct DB lookup for UUID tokens (dev-auth endpoint, test sessions)
   const cookie = request.headers.get('cookie') ?? ''
-  const token = cookie.match(/session=([^;]+)/)?.[1]
+  const token = cookie.match(/(?:^|;\s*)session=([^;]+)/)?.[1]
   if (!token) return null
   const session = await prisma.session.findUnique({
     where: { token },
     include: { user: { select: { id: true, role: true, email: true, blocked: true } } },
   })
-  if (!session || session.expiresAt < new Date()) return null
+  if (!session || session.expiresAt < new Date()) {
+    if (session) await prisma.session.delete({ where: { id: session.id } }).catch(() => {})
+    return null
+  }
   if (session.user.blocked) return null
   return { userId: session.user.id, role: session.user.role, email: session.user.email }
 }
@@ -170,9 +190,9 @@ function injectEnvFileIntoCompose(content: string): string {
   return result.join('\n')
 }
 
-const cookieOpts = env.NODE_ENV === 'production'
-  ? 'Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=86400'
-  : 'Path=/; HttpOnly; SameSite=Lax; Max-Age=86400'
+const devCookieOpts = 'Path=/; HttpOnly; SameSite=Lax; Max-Age=86400'
+const prodCookieOpts = 'Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=86400'
+const cookieOpts = env.NODE_ENV === 'production' ? prodCookieOpts : devCookieOpts
 
 export function createApp() {
   appLog('info', 'Server starting')
@@ -225,40 +245,84 @@ export function createApp() {
       // API routes
       .get('/health', () => ({ status: 'ok' }))
 
-      // ─── Auth API ──────────────────────────────────────
+      // ─── Better-Auth handler (handles /api/auth/* routes) ─
+      .mount(auth.handler)
+
+      // ─── Backward-compat: POST /api/auth/login ──────────
+      // Frontend pakai endpoint ini; better-auth menggunakan /api/auth/sign-in/email.
+      // Wrapper ini menerima {email, password}, forward ke better-auth, return {user} format lama.
       .post('/api/auth/login', async ({ request, set }) => {
         const ip = getIp(request)
         const { email, password } = (await request.json()) as { email: string; password: string }
-        let user = await prisma.user.findUnique({ where: { email } })
-        if (!user || !(await Bun.password.verify(password, user.password))) {
-          audit(user?.id ?? null, 'LOGIN_FAILED', `email: ${email}`, ip)
-          appLog('warn', `Login failed: ${email}`, ip)
-          set.status = 401
-          return { error: 'Email atau password salah' }
-        }
-        if (user.blocked) {
-          audit(user.id, 'LOGIN_BLOCKED', null, ip)
+
+        // Cek blocked sebelum login
+        const dbUser = await prisma.user.findUnique({ where: { email }, select: { id: true, blocked: true } })
+        if (dbUser?.blocked) {
+          audit(dbUser.id, 'LOGIN_BLOCKED', null, ip)
           appLog('warn', `Login blocked: ${email}`, ip)
           set.status = 403
           return { error: 'Akun Anda telah diblokir. Hubungi administrator.' }
         }
-        // Auto-promote super admin from env
-        if (env.SUPER_ADMIN_EMAILS.includes(user.email) && user.role !== 'SUPER_ADMIN') {
-          user = await prisma.user.update({ where: { id: user.id }, data: { role: 'SUPER_ADMIN' } })
+
+        // Forward ke better-auth sign-in endpoint
+        const baRes = await auth.api.signInEmail({
+          body: { email, password },
+          headers: request.headers,
+          asResponse: true,
+        })
+
+        if (!baRes.ok) {
+          await baRes.body?.cancel()
+          audit(dbUser?.id ?? null, 'LOGIN_FAILED', `email: ${email}`, ip)
+          appLog('warn', `Login failed: ${email}`, ip)
+          set.status = 401
+          return { error: 'Email atau password salah' }
         }
-        const token = crypto.randomUUID()
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-        await prisma.session.create({ data: { token, userId: user.id, expiresAt } })
-        set.headers['set-cookie'] = `session=${token}; ${cookieOpts}`
-        audit(user.id, 'LOGIN', `via email`, ip)
-        appLog('info', `Login: ${email} (${user.role})`, ip)
-        return { user: { id: user.id, name: user.name, email: user.email, role: user.role } }
+
+        // Ambil session cookie dari better-auth dan forward ke client
+        const setCookie = baRes.headers.get('set-cookie')
+        if (setCookie) set.headers['set-cookie'] = setCookie
+
+        const baBody = await baRes.json() as { user: Record<string, unknown> }
+        const user = await prisma.user.findUnique({
+          where: { email },
+          select: { id: true, name: true, email: true, role: true },
+        })
+        appLog('info', `Login: ${email} (${user?.role})`, ip)
+        return { user }
       })
 
+      // ─── Backward-compat: GET /api/auth/session ──────────
+      // Frontend menggunakan endpoint ini — return { user } format yang sama.
+      .get('/api/auth/session', async ({ request, set }) => {
+        const authResult = await requireAuth(request)
+        if (!authResult) {
+          set.status = 401
+          return { user: null }
+        }
+        const dbUser = await prisma.user.findUnique({
+          where: { id: authResult.userId },
+          select: { id: true, name: true, email: true, role: true, blocked: true },
+        })
+        if (!dbUser || dbUser.blocked) {
+          set.status = 401
+          return { user: null }
+        }
+        return { user: dbUser }
+      })
+
+      // ─── Backward-compat: POST /api/auth/logout ──────────
+      // Frontend pakai endpoint ini; better-auth pakai /api/auth/sign-out.
       .post('/api/auth/logout', async ({ request, set }) => {
         const ip = getIp(request)
+        // Logout via better-auth (menghapus signed session)
+        const baRes = await auth.api.signOut({ headers: request.headers, asResponse: true })
+        const setCookie = baRes?.headers.get('set-cookie')
+        if (setCookie) set.headers['set-cookie'] = setCookie
+
+        // Juga hapus UUID session jika ada (dev-auth / test sessions)
         const cookie = request.headers.get('cookie') ?? ''
-        const token = cookie.match(/session=([^;]+)/)?.[1]
+        const token = cookie.match(/(?:^|;\s*)session=([^;]+)/)?.[1]
         if (token) {
           const session = await prisma.session.findUnique({ where: { token }, select: { userId: true } })
           if (session) {
@@ -267,144 +331,37 @@ export function createApp() {
           }
           await prisma.session.deleteMany({ where: { token } })
         }
-        set.headers['set-cookie'] = 'session=; Path=/; HttpOnly; Max-Age=0'
+
+        if (!setCookie) set.headers['set-cookie'] = 'session=; Path=/; HttpOnly; Max-Age=0'
         return { ok: true }
       })
 
-      .get('/api/auth/session', async ({ request, set }) => {
-        const cookie = request.headers.get('cookie') ?? ''
-        const token = cookie.match(/session=([^;]+)/)?.[1]
-        if (!token) {
-          set.status = 401
-          return { user: null }
-        }
-        const session = await prisma.session.findUnique({
-          where: { token },
-          include: { user: { select: { id: true, name: true, email: true, role: true, blocked: true } } },
-        })
-        if (!session || session.expiresAt < new Date()) {
-          if (session) await prisma.session.delete({ where: { id: session.id } })
-          // Clear the stale cookie so the next OAuth attempt starts clean
-          set.headers['set-cookie'] = 'session=; Path=/; HttpOnly; Max-Age=0'
-          set.status = 401
-          return { user: null }
-        }
-        return { user: session.user }
-      })
-
-      // ─── Google OAuth ──────────────────────────────────
-      .get('/api/auth/google', ({ request, set }) => {
-        const origin = getPublicOrigin(request)
-        const params = new URLSearchParams({
-          client_id: env.GOOGLE_CLIENT_ID,
-          redirect_uri: `${origin}/api/auth/callback/google`,
-          response_type: 'code',
-          scope: 'openid email profile',
-          access_type: 'offline',
-          prompt: 'consent',
-        })
-        // Clear any stale session cookie BEFORE going to Google.
-        // Chrome blocks overwriting SameSite=Lax cookies via cross-site chains,
-        // so the old cookie must be removed in a same-site context first.
-        set.headers['set-cookie'] = 'session=; Path=/; HttpOnly; Max-Age=0'
+      // ─── Backward-compat: GET /api/auth/google ──────────
+      // Better-auth menyediakan /api/auth/sign-in/social?provider=google.
+      // Redirect dari /api/auth/google ke endpoint better-auth.
+      .get('/api/auth/google', ({ set }) => {
         set.status = 302
-        set.headers.location = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+        set.headers.location = '/api/auth/sign-in/social?provider=google&callbackURL=/api/auth/google-callback'
       })
 
-      .get('/api/auth/callback/google', async ({ request, set }) => {
-        const ip = getIp(request)
-        const url = new URL(request.url)
-        const code = url.searchParams.get('code')
-        const origin = getPublicOrigin(request)
-
-        if (!code) {
+      // ─── Post-Google-OAuth callback redirect ─────────────
+      // Setelah better-auth selesai OAuth, redirect ke role-based page.
+      .get('/api/auth/google-callback', async ({ request, set }) => {
+        const sessionData = await auth.api.getSession({ headers: request.headers })
+        if (!sessionData?.user) {
           set.status = 302
           set.headers.location = '/login?error=google_failed'
           return
         }
-
-        // Exchange code for tokens
-        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            code,
-            client_id: env.GOOGLE_CLIENT_ID,
-            client_secret: env.GOOGLE_CLIENT_SECRET,
-            redirect_uri: `${origin}/api/auth/callback/google`,
-            grant_type: 'authorization_code',
-          }),
+        const userId = (sessionData.user as { id: string }).id
+        const dbUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { role: true, email: true },
         })
-
-        if (!tokenRes.ok) {
-          const errBody = await tokenRes.text().catch(() => '(unreadable)')
-          appLog('warn', `Google OAuth token exchange failed: ${tokenRes.status} — ${errBody}`, ip)
-          set.status = 302
-          set.headers.location = '/login?error=google_failed'
-          return
-        }
-
-        const tokens = (await tokenRes.json()) as { access_token: string }
-
-        // Get user info
-        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { Authorization: `Bearer ${tokens.access_token}` },
-        })
-
-        if (!userInfoRes.ok) {
-          const errBody = await userInfoRes.text().catch(() => '(unreadable)')
-          appLog('warn', `Google OAuth userinfo fetch failed: ${userInfoRes.status} — ${errBody}`, ip)
-          set.status = 302
-          set.headers.location = '/login?error=google_failed'
-          return
-        }
-
-        const googleUser = (await userInfoRes.json()) as { email: string; name: string }
-
-        // Upsert user (no password for Google users)
-        const isSuperAdmin = env.SUPER_ADMIN_EMAILS.includes(googleUser.email)
-        const user = await prisma.user.upsert({
-          where: { email: googleUser.email },
-          update: { name: googleUser.name, ...(isSuperAdmin ? { role: 'SUPER_ADMIN' } : {}) },
-          create: {
-            email: googleUser.email,
-            name: googleUser.name,
-            password: '',
-            role: isSuperAdmin ? 'SUPER_ADMIN' : 'USER',
-          },
-        })
-
-        // Create session
-        const token = crypto.randomUUID()
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
-        await prisma.session.create({ data: { token, userId: user.id, expiresAt } })
-
-        audit(user.id, 'LOGIN', 'via Google OAuth', ip)
-        appLog('info', `Login (Google): ${googleUser.email} (${user.role})`, ip)
-        const defaultRoute = user.role === 'SUPER_ADMIN' ? '/dev' : user.role === 'ADMIN' ? '/dashboard' : '/profile'
-        // Redirect to a same-site finalize endpoint instead of setting cookie here.
-        // Chrome blocks Set-Cookie overwrite when the response arrives via a
-        // cross-site redirect chain (accounts.google.com → localhost). By doing
-        // one extra same-site redirect, the cookie is set in a trusted first-party context.
-        const finalizeUrl = `/api/auth/finalize?t=${encodeURIComponent(token)}&r=${encodeURIComponent(defaultRoute)}`
+        appLog('info', `Login (Google): ${dbUser?.email} (${dbUser?.role})`, getIp(request))
+        const defaultRoute = dbUser?.role === 'SUPER_ADMIN' ? '/dev' : dbUser?.role === 'ADMIN' ? '/dashboard' : '/profile'
         set.status = 302
-        set.headers.location = finalizeUrl
-      })
-
-      // ─── OAuth Finalize — set cookie in same-site context ─
-      .get('/api/auth/finalize', async ({ request, set, query }) => {
-        const t = query.t as string | undefined
-        const r = (query.r as string | undefined) ?? '/login'
-        const safePaths = ['/dev', '/dashboard', '/envmanager', '/profile']
-        const target = safePaths.some(p => r.startsWith(p)) ? r : '/login'
-        if (!t) { set.status = 302; set.headers.location = '/login'; return }
-        const session = await prisma.session.findUnique({ where: { token: t } })
-        if (!session || session.expiresAt < new Date()) {
-          set.status = 302; set.headers.location = '/login'; return
-        }
-        set.headers['set-cookie'] = `session=${t}; ${cookieOpts}`
-        set.status = 302
-        set.headers.location = target
+        set.headers.location = defaultRoute
       })
 
       // ─── Dev Auth (development only) ─────────────────────
@@ -420,7 +377,7 @@ export function createApp() {
         }
         const token = crypto.randomUUID()
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
-        await prisma.session.create({ data: { token, userId: user.id, expiresAt } })
+        await prisma.session.create({ data: { token, userId: user.id, expiresAt, updatedAt: new Date() } })
         set.headers['set-cookie'] = `session=${token}; ${cookieOpts}`
         appLog('info', `Dev-auth login: ${user.email} (${user.role})`, getIp(request))
         const redirect = (query as Record<string, string>).redirect
