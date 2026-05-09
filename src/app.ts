@@ -337,11 +337,22 @@ export function createApp() {
       })
 
       // ─── Backward-compat: GET /api/auth/google ──────────
-      // Better-auth menyediakan /api/auth/sign-in/social?provider=google.
-      // Redirect dari /api/auth/google ke endpoint better-auth.
-      .get('/api/auth/google', ({ set }) => {
-        set.status = 302
-        set.headers.location = '/api/auth/sign-in/social?provider=google&callbackURL=/api/auth/google-callback'
+      // better-auth signInSocial adalah POST dengan body JSON.
+      // Wrapper ini memanggil auth.api.signInSocial dan forward redirect response ke browser.
+      .get('/api/auth/google', async ({ request, set }) => {
+        const baRes = await auth.api.signInSocial({
+          body: { provider: 'google', callbackURL: `${getPublicOrigin(request)}/api/auth/google-callback` },
+          headers: request.headers,
+          asResponse: true,
+        })
+        const location = baRes.headers.get('location')
+        if (location) {
+          set.status = 302
+          set.headers.location = location
+          return
+        }
+        set.status = 500
+        return { error: 'OAuth redirect failed' }
       })
 
       // ─── Post-Google-OAuth callback redirect ─────────────

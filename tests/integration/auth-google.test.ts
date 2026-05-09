@@ -9,14 +9,16 @@ afterAll(async () => {
 })
 
 describe('GET /api/auth/google', () => {
-  test('redirects to better-auth social sign-in endpoint', async () => {
+  test('redirects to Google OAuth', async () => {
     const res = await app.handle(new Request('http://localhost/api/auth/google'))
 
     expect(res.status).toBe(302)
     const location = res.headers.get('location')
-    // /api/auth/google now redirects to better-auth social sign-in handler
-    expect(location).toContain('/api/auth/sign-in/social')
-    expect(location).toContain('provider=google')
+    // better-auth generates the Google OAuth URL directly
+    expect(location).toContain('accounts.google.com/o/oauth2/v2/auth')
+    expect(location).toContain('client_id=')
+    expect(location).toContain('redirect_uri=')
+    expect(location).toContain('scope=')
   })
 })
 
