@@ -37,16 +37,17 @@ enum TicketPriority {
 }
 
 model User {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   name          String
-  email         String   @unique
-  emailVerified Boolean  @default(false)
+  email         String    @unique
+  emailVerified Boolean   @default(false)
   password      String?
   image         String?
-  role          Role     @default(USER)
-  blocked       Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  role          Role      @default(USER)
+  blocked       Boolean   @default(false)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   sessions              Session[]
   accounts              Account[]
@@ -223,18 +224,20 @@ model ProjectNote {
 }
 
 model Project {
-  id          String   @id @default(uuid())
-  slug        String   @unique
+  id          String    @id @default(uuid())
+  slug        String    @unique
   name        String
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   members           ProjectMember[]
   environments      Environment[]
   portainerConfigs  PortainerConfig[]
   notes             ProjectNote[]
 
+  @@index([deletedAt])
   @@map("project")
 }
 

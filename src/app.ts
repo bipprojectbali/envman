@@ -14,6 +14,7 @@ import { getIp, getPublicOrigin } from './lib/request'
 import { adminRouter } from './routes/admin/index'
 import { ticketsRouter } from './routes/tickets'
 import { envmanRouter } from './routes/envman/index'
+import { v1Router } from './routes/v1/index'
 import pkg from '../package.json'
 
 
@@ -305,6 +306,7 @@ export function createApp() {
       .use(adminRouter)
       .use(ticketsRouter)
       .use(envmanRouter)
+      .use(v1Router)       // Versioned API — /api/v1/*
 
       // ─── MCP over HTTP ────────────────────────────────
       .all('/mcp', async ({ request }) => {
