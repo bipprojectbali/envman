@@ -373,6 +373,10 @@ TicketPriority:    LOW | MEDIUM | HIGH | CRITICAL
 `
 }
 
+// Bridge antara beforeHandle dan open() pada WS presence — satu Request hanya hidup
+// selama handshake, jadi WeakMap aman dan auto-GC.
+const presenceAuth = new WeakMap<Request, { userId: string; role: string }>()
+
 export function createApp() {
   appLog('info', 'Server starting')
 
@@ -586,6 +590,31 @@ export function createApp() {
       .use(ticketsRouter)
       .use(envmanRouter)
       .use(v1Router)       // Versioned API — /api/v1/*
+
+      // ─── WebSocket: presence ─────────────────────────
+      // Auth via session cookie pada handshake. Admin (ADMIN/SUPER_ADMIN) menerima
+      // broadcast list online; user biasa tetap diregister supaya muncul di list.
+      .ws('/ws/presence', {
+        async beforeHandle({ request, set }) {
+          const caller = await requireAuth(request)
+          if (!caller) { set.status = 401; return 'Unauthorized' }
+          // Pass caller ke open() lewat WeakMap (di-keyed oleh request)
+          presenceAuth.set(request, caller)
+        },
+        open(ws) {
+          const req = (ws.data as { request: Request }).request
+          const caller = presenceAuth.get(req)
+          presenceAuth.delete(req)
+          if (!caller) { ws.close(); return }
+          const isAdmin = caller.role === 'ADMIN' || caller.role === 'SUPER_ADMIN'
+          ;(ws.data as { userId?: string }).userId = caller.userId
+          addConnection(ws, caller.userId, isAdmin)
+        },
+        close(ws) {
+          const userId = (ws.data as { userId?: string }).userId
+          if (userId) removeConnection(ws, userId)
+        },
+      })
 
       // ─── MCP over HTTP ────────────────────────────────
       .all('/mcp', async ({ request }) => {
