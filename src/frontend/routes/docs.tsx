@@ -1059,20 +1059,24 @@ function DocsPage() {
           }}
         >
           <style>{`
+            /* ── Reset background github-markdown-css agar ikut Mantine ── */
             .markdown-body {
               color-scheme: light dark;
-            }
-            html[data-mantine-color-scheme="dark"] .markdown-body {
               --color-canvas-default: transparent;
-              --color-canvas-subtle: #161b22;
-              --color-border-default: #30363d;
-              --color-border-muted: #21262d;
-              --color-neutral-muted: rgba(110,118,129,0.4);
+              --color-canvas-subtle: var(--mantine-color-default-hover);
+              --color-border-default: var(--mantine-color-default-border);
+              --color-border-muted: var(--mantine-color-default-border);
+              --color-fg-default: var(--mantine-color-text);
+              --color-fg-muted: var(--mantine-color-dimmed);
+              --color-fg-subtle: var(--mantine-color-dimmed);
+              --color-accent-fg: var(--mantine-color-blue-6);
+              --color-neutral-muted: var(--mantine-color-default-hover);
+            }
+
+            /* ── Dark mode overrides (syntax highlighting) ── */
+            html[data-mantine-color-scheme="dark"] .markdown-body {
               --color-accent-fg: #58a6ff;
               --color-accent-emphasis: #1f6feb;
-              --color-fg-default: #e6edf3;
-              --color-fg-muted: #8b949e;
-              --color-fg-subtle: #6e7681;
               --color-prettylights-syntax-comment: #8b949e;
               --color-prettylights-syntax-constant: #79c0ff;
               --color-prettylights-syntax-entity: #d2a8ff;
