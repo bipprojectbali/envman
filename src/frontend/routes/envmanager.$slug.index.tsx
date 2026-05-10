@@ -28,7 +28,7 @@ import {
   Tooltip,
   useCombobox,
 } from '@mantine/core'
-import { useDebouncedValue } from '@mantine/hooks'
+import { useDebouncedValue, useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
@@ -949,7 +949,7 @@ function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpenModal,
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState<string[]>([])
   const [sort, setSort] = useState<'updated' | 'created' | 'title'>('updated')
-  const [view, setView] = useState<'list' | 'grid'>('list')
+  const [view, setView] = useLocalStorage<'list' | 'grid'>({ key: 'envman:notes:view', defaultValue: 'list' })
 
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'notes', slug],
