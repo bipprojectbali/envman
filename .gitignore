@@ -39,3 +39,4 @@ src/frontend/routeTree.gen.ts
 .playwright-mcp/
 .claude/scheduled_tasks.lock
 /*.png
+.playwright-screenshots/
