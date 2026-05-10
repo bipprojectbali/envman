@@ -18,7 +18,7 @@ import {
 } from '@mantine/core'
 import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -68,6 +68,19 @@ function ConnectionsPage() {
     queryFn: () => apiFetch('/api/envman/portainer/connections'),
   })
   const connections: Connection[] = data?.connections ?? []
+
+  // Health badge per connection
+  const healthQueries = useQueries({
+    queries: connections.map(c => ({
+      queryKey: ['portainer', 'connection-health', c.id],
+      queryFn: () => apiFetch(`/api/envman/portainer/connections/${c.id}/health`),
+      staleTime: 60000,
+      retry: false,
+    })),
+  })
+  const healthMap = Object.fromEntries(
+    connections.map((c, i) => [c.id, healthQueries[i]?.data as { totalStacks: number; activeStacks: number; inactiveStacks: number } | undefined])
+  )
 
   const filteredConnections = useMemo(() => {
     if (!search.trim()) return connections
@@ -235,6 +248,16 @@ function ConnectionsPage() {
               <Text fw={700} size="sm" mb={2}>{c.name}</Text>
               <Group gap="xs" mb="xs">
                 <Badge size="xs" variant="outline" color="gray">{c._count.configs} env</Badge>
+                {(() => {
+                  const h = healthMap[c.id]
+                  if (!h) return null
+                  const color = h.inactiveStacks === 0 ? 'teal' : h.activeStacks === 0 ? 'red' : 'orange'
+                  return (
+                    <Badge size="xs" variant="light" color={color}>
+                      {h.activeStacks}/{h.totalStacks} active
+                    </Badge>
+                  )
+                })()}
               </Group>
               <Group gap="xs">
                 <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -264,6 +287,12 @@ function ConnectionsPage() {
                     <Group gap="xs" mb={2}>
                       <Text fw={600} size="sm">{c.name}</Text>
                       <Badge size="xs" variant="outline" color="gray">{c._count.configs} env</Badge>
+                      {(() => {
+                        const h = healthMap[c.id]
+                        if (!h) return null
+                        const color = h.inactiveStacks === 0 ? 'teal' : h.activeStacks === 0 ? 'red' : 'orange'
+                        return <Badge size="xs" variant="light" color={color}>{h.activeStacks}/{h.totalStacks} active</Badge>
+                      })()}
                     </Group>
                     <Group gap="xs">
                       <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace' }}>

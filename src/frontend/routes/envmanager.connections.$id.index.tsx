@@ -13,19 +13,25 @@ import {
   Modal,
   NumberInput,
   Paper,
+  Pagination,
   ScrollArea,
+  Select,
+  SimpleGrid,
   Stack,
   Switch,
   Table,
+  Tabs,
   Text,
+  Textarea,
+  TextInput,
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure, useMediaQuery } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
 import {
@@ -33,6 +39,13 @@ import {
   TbCheck,
   TbChevronLeft,
   TbChevronRight,
+  TbFilter,
+  TbFileCode,
+  TbLayoutGrid,
+  TbLayoutList,
+  TbPencil,
+  TbSearch,
+  TbTool,
   TbCopy,
   TbDownload,
   TbExternalLink,
@@ -112,23 +125,46 @@ function ConnectionDetailPage() {
   const qc = useQueryClient()
   const isMobile = useMediaQuery('(max-width: 48em)')
 
-  // Stack status modal state
-  const [statusStack, setStatusStack] = useState<StackInfo | null>(null)
-  const [statusOpen, { open: openStatus, close: closeStatus }] = useDisclosure(false)
+  const [activeTab, setActiveTab] = useLocalStorage<string>({
+    key: `envman:connection-detail:${id}:tab`,
+    defaultValue: 'stacks',
+  })
+
+  const [stackView, setStackView] = useLocalStorage<'grid' | 'list'>({
+    key: `envman:connection-detail:${id}:view`,
+    defaultValue: 'list',
+  })
+
+  // Search / filter / pagination
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<string | null>(null)
+  const [filterType, setFilterType] = useState<string | null>(null)
+  const [filterLinked, setFilterLinked] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
+
+  // Compose modal state
+  const [composeStack, setComposeStack] = useState<StackInfo | null>(null)
+  const [composeOpen, { open: openCompose, close: closeCompose }] = useDisclosure(false)
+  const [composeEditing, setComposeEditing] = useState(false)
+  const [composeContent, setComposeContent] = useState('')
 
   // Logs modal state
   const [logsStack, setLogsStack] = useState<StackInfo | null>(null)
   const [logsOpen, { open: openLogs, close: closeLogs }] = useDisclosure(false)
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null)
+
   const [logTail, setLogTail] = useState(200)
   const [showStdout, setShowStdout] = useState(true)
   const [showStderr, setShowStderr] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
   const logViewportRef = useRef<HTMLDivElement>(null)
+  const [liveLines, setLiveLines] = useState<{ stream: 'stdout' | 'stderr'; timestamp: string | null; message: string }[]>([])
+  const lastLogTimestamp = useRef<string | null>(null)
 
-  // Cleanup state
-  const [cleanupEndpointId, setCleanupEndpointId] = useState(1)
+  // Cleanup state — endpointId diambil dari stacks setelah load
+  const [cleanupEndpointId, setCleanupEndpointId] = useState<number | null>(null)
 
   // ─── Queries ──────────────────────────────────────────────────────────────
   const { data, isLoading, refetch, isFetching } = useQuery({
@@ -137,42 +173,137 @@ function ConnectionDetailPage() {
     refetchInterval: 30000,
   })
 
-  const { data: statusData, isFetching: statusFetching, refetch: refetchStatus } = useQuery({
-    queryKey: ['portainer', 'stack-status', id, statusStack?.id],
-    queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/stacks/${statusStack!.id}/status`),
-    enabled: statusOpen && !!statusStack,
-    refetchInterval: statusOpen ? 10000 : false,
+  const { data: composeData, isFetching: composeFetching } = useQuery({
+    queryKey: ['portainer', 'compose-file', id, composeStack?.id],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/stacks/${composeStack!.id}/file`),
+    enabled: composeOpen && !!composeStack,
+    staleTime: 0,
   })
+
+  // Sync compose content ke state saat data tiba
+  useEffect(() => {
+    if (composeData?.content !== undefined && !composeEditing) {
+      setComposeContent(composeData.content)
+    }
+  }, [composeData, composeEditing])
 
   const { data: logsData, isFetching: logsFetching, refetch: refetchLogs } = useQuery({
     queryKey: ['portainer', 'container-logs', id, logsStack?.id, selectedContainerId, logTail, showStdout, showStderr],
-    queryFn: () => {
+    queryFn: async () => {
       const qs = new URLSearchParams({ tail: String(logTail), stdout: showStdout ? '1' : '0', stderr: showStderr ? '1' : '0', timestamps: '1' })
-      return apiFetch(`/api/envman/portainer/connections/${id}/stacks/${logsStack!.id}/logs/${selectedContainerId}?${qs}`)
+      const result = await apiFetch(`/api/envman/portainer/connections/${id}/stacks/${logsStack!.id}/logs/${selectedContainerId}?${qs}`)
+      // Full load — reset liveLines
+      setLiveLines(result.lines ?? [])
+      const last = (result.lines ?? []).findLast?.((l: any) => l.timestamp)
+      if (last?.timestamp) lastLogTimestamp.current = last.timestamp
+      return result
     },
     enabled: logsOpen && !!logsStack && !!selectedContainerId,
-    refetchInterval: autoRefresh ? 5000 : false,
     staleTime: 0,
+    refetchOnWindowFocus: false,
   })
+
+  // Incremental fetch saat auto-refresh aktif
+  useEffect(() => {
+    if (!autoRefresh || !logsOpen || !logsStack || !selectedContainerId) return
+    const interval = setInterval(async () => {
+      try {
+        const qs = new URLSearchParams({ stdout: showStdout ? '1' : '0', stderr: showStderr ? '1' : '0', timestamps: '1', tail: '100' })
+        if (lastLogTimestamp.current) qs.set('since', lastLogTimestamp.current)
+        const result = await apiFetch(`/api/envman/portainer/connections/${id}/stacks/${logsStack.id}/logs/${selectedContainerId}?${qs}`)
+        const newLines = (result.lines ?? []) as typeof liveLines
+        if (newLines.length > 0) {
+          setLiveLines(prev => [...prev, ...newLines].slice(-2000)) // max 2000 baris
+          const last = newLines.findLast?.((l: any) => l.timestamp)
+          if (last?.timestamp) lastLogTimestamp.current = last.timestamp
+        }
+      } catch {}
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [autoRefresh, logsOpen, logsStack, selectedContainerId, showStdout, showStderr, id])
 
   const { data: imagesData, isFetching: imagesFetching, refetch: refetchImages } = useQuery({
     queryKey: ['portainer', 'dangling-images', id, cleanupEndpointId],
     queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/images/dangling?endpointId=${cleanupEndpointId}`),
+    enabled: cleanupEndpointId !== null,
     staleTime: 30000,
   })
 
   const connection = data?.connection
   const stacks: StackInfo[] = data?.stacks ?? []
-  const logLines: LogLine[] = logsData?.lines ?? []
-  const containers: ContainerInfo[] = statusData?.containers ?? []
-  const logsContainers: ContainerInfo[] = statusData?.containers ?? []
+  const logLines: LogLine[] = liveLines
 
-  // Auto-select container saat status data tiba untuk logs
+  // Set default endpointId dari stack pertama setelah data tiba
   useEffect(() => {
-    if (logsOpen && logsContainers.length > 0 && !selectedContainerId) {
-      setSelectedContainerId(logsContainers[0].id)
+    if (stacks.length > 0 && cleanupEndpointId === null) {
+      setCleanupEndpointId(stacks[0].endpointId)
     }
-  }, [logsContainers, logsOpen, selectedContainerId])
+  }, [stacks, cleanupEndpointId])
+
+  // Unique endpoint IDs dari semua stacks
+  const endpointIds = [...new Set(stacks.map(s => s.endpointId))].sort()
+
+  const filteredStacks = useMemo(() => {
+    let list = [...stacks]
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(s => s.name.toLowerCase().includes(q))
+    }
+    if (filterStatus === 'active') list = list.filter(s => s.status === 1)
+    if (filterStatus === 'inactive') list = list.filter(s => s.status !== 1)
+    if (filterType === 'compose') list = list.filter(s => s.type === 2)
+    if (filterType === 'swarm') list = list.filter(s => s.type !== 2)
+    if (filterLinked === 'linked') list = list.filter(s => s.linkedEnvs.length > 0)
+    if (filterLinked === 'unlinked') list = list.filter(s => s.linkedEnvs.length === 0)
+    return list
+  }, [stacks, search, filterStatus, filterType, filterLinked])
+
+  const totalPages = Math.max(1, Math.ceil(filteredStacks.length / PAGE_SIZE))
+  const pagedStacks = filteredStacks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const hasFilter = !!search.trim() || !!filterStatus || !!filterType || !!filterLinked
+
+  // Reset ke page 1 saat filter berubah
+  useEffect(() => { setPage(1) }, [search, filterStatus, filterType, filterLinked])
+
+  // Query status per stack — langsung aktif, tampil di card tanpa klik apapun
+  const stackStatusQueries = useQueries({
+    queries: stacks.map(stack => ({
+      queryKey: ['portainer', 'stack-status', id, stack.id],
+      queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/stacks/${stack.id}/status`),
+      enabled: stacks.length > 0,
+      refetchInterval: 30000,
+      staleTime: 20000,
+    })),
+  })
+  const stackStatusMap = Object.fromEntries(
+    stacks.map((stack, i) => [stack.id, {
+      containers: (stackStatusQueries[i]?.data?.containers ?? []) as ContainerInfo[],
+      isFetching: stackStatusQueries[i]?.isFetching ?? false,
+    }])
+  )
+
+  // Flatten all containers with their stack info for stats queries
+  const allContainersFlat = stacks.flatMap(stack =>
+    (stackStatusMap[stack.id]?.containers ?? []).map(c => ({ stackId: stack.id, containerId: c.id }))
+  )
+
+  // Container stats — enabled only on Stacks tab, refetch every 10s
+  const containerStatsQueries = useQueries({
+    queries: allContainersFlat.map(({ stackId, containerId }) => ({
+      queryKey: ['portainer', 'container-stats', id, stackId, containerId],
+      queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/stacks/${stackId}/containers/${containerId}/stats`),
+      enabled: activeTab === 'stacks' && allContainersFlat.length > 0,
+      refetchInterval: 10000,
+      staleTime: 8000,
+      retry: false,
+    })),
+  })
+  const containerStatsMap = Object.fromEntries(
+    allContainersFlat.map(({ containerId }, i) => [containerId, containerStatsQueries[i]?.data as {
+      cpuPercent: number; memUsageMB: number; memLimitMB: number; memPercent: number; netRxMB: number; netTxMB: number
+    } | undefined])
+  )
 
   // Auto-scroll logs
   useEffect(() => {
@@ -182,6 +313,60 @@ function ConnectionDetailPage() {
   }, [logLines, autoScroll])
 
   // ─── Mutations ────────────────────────────────────────────────────────────
+  const saveCompose = useMutation({
+    mutationFn: () => apiFetch(`/api/envman/portainer/connections/${id}/stacks/${composeStack!.id}/file`, {
+      method: 'PUT', body: JSON.stringify({ content: composeContent }),
+    }),
+    onSuccess: () => {
+      notifyOk('Compose file berhasil disimpan')
+      setComposeEditing(false)
+      qc.invalidateQueries({ queryKey: ['portainer', 'compose-file', id, composeStack?.id] })
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  const restartContainer = useMutation({
+    mutationFn: ({ stackId, containerId }: { stackId: number; containerId: string }) =>
+      apiFetch(`/api/envman/portainer/connections/${id}/stacks/${stackId}/containers/${containerId}/restart`, { method: 'POST' }),
+    onSuccess: (_, { stackId }) => {
+      notifyOk('Container berhasil di-restart')
+      qc.invalidateQueries({ queryKey: ['portainer', 'stack-status', id, stackId] })
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  const confirmRestartContainer = (stack: StackInfo, containerId: string, containerName: string) =>
+    modals.openConfirmModal({
+      title: 'Restart Container',
+      children: (
+        <Stack gap="xs">
+          <Text size="sm">Restart container <strong>{containerName}</strong>?</Text>
+          <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
+            <Text size="xs">Container akan stop sebentar lalu start kembali. Request yang sedang berjalan akan terputus.</Text>
+          </Alert>
+        </Stack>
+      ),
+      labels: { confirm: 'Restart', cancel: 'Batal' },
+      confirmProps: { color: 'orange' },
+      onConfirm: () => restartContainer.mutate({ stackId: stack.id, containerId }),
+    })
+
+  const confirmSaveCompose = () =>
+    modals.openConfirmModal({
+      title: 'Simpan Compose File',
+      children: (
+        <Stack gap="xs">
+          <Text size="sm">Simpan perubahan ke stack <strong>{composeStack?.name}</strong>?</Text>
+          <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
+            <Text size="xs">Perubahan langsung diterapkan ke Portainer. Container mungkin tidak otomatis restart — gunakan Recreate jika diperlukan.</Text>
+          </Alert>
+        </Stack>
+      ),
+      labels: { confirm: 'Simpan', cancel: 'Batal' },
+      confirmProps: { color: 'blue' },
+      onConfirm: () => saveCompose.mutate(),
+    })
+
   const repull = useMutation({
     mutationFn: (stackId: number) => apiFetch(`/api/envman/portainer/connections/${id}/stacks/${stackId}/repull`, { method: 'POST' }),
     onSuccess: (_, stackId) => { notifyOk('Repull berhasil — container restart dengan image terbaru'); qc.invalidateQueries({ queryKey: ['portainer', 'stack-status', id, stackId] }) },
@@ -196,7 +381,16 @@ function ConnectionDetailPage() {
 
   const pruneImages = useMutation({
     mutationFn: () => apiFetch(`/api/envman/portainer/connections/${id}/prune/images?endpointId=${cleanupEndpointId}`, { method: 'POST' }),
-    onSuccess: (d: any) => { notifyOk(`${d.deletedCount} image dihapus — ${d.reclaimedMB} MB dibebaskan`); refetchImages() },
+    onSuccess: (d: any) => {
+      if (d.remaining > 0 && d.stuckByContainers > 0) {
+        notifyOk(`${d.deletedCount} image dihapus — ${d.reclaimedMB} MB dibebaskan. ${d.stuckByContainers} image tidak bisa dihapus karena masih direferensi container (termasuk yang stopped).`)
+      } else if (d.remaining > 0) {
+        notifyOk(`${d.deletedCount} image dihapus — ${d.reclaimedMB} MB dibebaskan. ${d.remaining} image tersisa.`)
+      } else {
+        notifyOk(`${d.deletedCount} image dihapus — ${d.reclaimedMB} MB dibebaskan`)
+      }
+      refetchImages()
+    },
     onError: (e) => notifyErr(e),
   })
 
@@ -307,126 +501,402 @@ function ConnectionDetailPage() {
         </ActionIcon>
       </Group>
 
-      {/* ─── Stacks ─────────────────────────────────────── */}
-      <Text fw={600} size="sm" mb="sm">Stacks ({stacks.length})</Text>
+      {/* ─── Tabs ───────────────────────────────────────── */}
+      <Tabs value={activeTab} onChange={v => setActiveTab(v ?? 'stacks')} mb="sm">
+        <Tabs.List>
+          <Tabs.Tab value="stacks" leftSection={<TbServer size={14} />}>
+            Stacks
+            {stacks.length > 0 && <Badge size="xs" variant="light" color="violet" ml="xs">{stacks.length}</Badge>}
+          </Tabs.Tab>
+          <Tabs.Tab value="maintenance" leftSection={<TbTool size={14} />}>
+            Maintenance
+          </Tabs.Tab>
+        </Tabs.List>
+      </Tabs>
+
+      {/* ─── Tab: Stacks ────────────────────────────────── */}
+      {activeTab === 'stacks' && <>
+
+      {/* ─── Stacks header ──────────────────────────────── */}
+      <Group justify="space-between" mb="sm" wrap="wrap" gap="xs">
+        <Group gap="xs">
+          <Text fw={600} size="sm">Stacks</Text>
+          <Badge size="sm" variant="light" color="gray">{filteredStacks.length}{filteredStacks.length !== stacks.length ? `/${stacks.length}` : ''}</Badge>
+        </Group>
+        {stacks.length > 0 && (
+          <Tooltip label={stackView === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setStackView(v => v === 'grid' ? 'list' : 'grid')}>
+              {stackView === 'grid' ? <TbLayoutList size={15} /> : <TbLayoutGrid size={15} />}
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
+
+      {/* Search + filter toolbar */}
+      {stacks.length > 0 && (
+        <Group mb="sm" gap="xs" wrap="wrap">
+          <TextInput
+            size="xs"
+            placeholder="Cari nama stack..."
+            leftSection={<TbSearch size={13} />}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            rightSection={search ? <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
+            style={{ flex: 1, minWidth: 140 }}
+          />
+          <Select
+            size="xs" w={120} placeholder="Status"
+            leftSection={<TbFilter size={12} />}
+            data={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+            value={filterStatus} onChange={setFilterStatus}
+            clearable
+          />
+          <Select
+            size="xs" w={120} placeholder="Type"
+            leftSection={<TbFilter size={12} />}
+            data={[{ value: 'compose', label: 'Compose' }, { value: 'swarm', label: 'Swarm' }]}
+            value={filterType} onChange={setFilterType}
+            clearable
+          />
+          <Select
+            size="xs" w={130} placeholder="Linked envman"
+            leftSection={<TbFilter size={12} />}
+            data={[{ value: 'linked', label: 'Terhubung' }, { value: 'unlinked', label: 'Tidak terhubung' }]}
+            value={filterLinked} onChange={setFilterLinked}
+            clearable
+          />
+          {hasFilter && (
+            <Tooltip label="Reset semua filter">
+              <Badge size="sm" variant="light" color="blue" rightSection={<TbX size={10} />}
+                style={{ cursor: 'pointer' }}
+                onClick={() => { setSearch(''); setFilterStatus(null); setFilterType(null); setFilterLinked(null) }}>
+                Reset
+              </Badge>
+            </Tooltip>
+          )}
+        </Group>
+      )}
 
       {stacks.length === 0 ? (
         <Alert color="gray" icon={<TbServer size={14} />} p="xs">
           <Text size="xs">Tidak ada stack ditemukan di Portainer instance ini.</Text>
         </Alert>
-      ) : (
-        <Stack gap="sm" mb="xl">
-          {stacks.map(stack => {
-            const runningCount = (statusData?.containers as ContainerInfo[] | undefined)?.filter(c => c.state === 'running').length
+      ) : filteredStacks.length === 0 ? (
+        <Paper withBorder p="lg" radius="md" ta="center" mb="xl">
+          <TbSearch size={28} style={{ opacity: 0.2, margin: '0 auto 8px' }} />
+          <Text size="sm" fw={500} mb={4}>Tidak ada stack yang cocok</Text>
+          <Text size="xs" c="dimmed" mb="sm">Coba ubah kata kunci atau reset filter.</Text>
+          <Button size="xs" variant="subtle" leftSection={<TbX size={12} />}
+            onClick={() => { setSearch(''); setFilterStatus(null); setFilterType(null); setFilterLinked(null) }}>
+            Reset filter
+          </Button>
+        </Paper>
+      ) : stackView === 'grid' ? (
+        <>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb={totalPages > 1 ? 'sm' : 'xl'}>
+          {pagedStacks.map(stack => {
+            const { containers: stackContainers, isFetching: stackFetching } = stackStatusMap[stack.id] ?? { containers: [], isFetching: false }
+            const runningCount = stackContainers.filter(c => c.state === 'running').length
+            const totalCount = stackContainers.length
             return (
-              <Paper key={stack.id} withBorder p="md" radius="md">
-                {/* Stack header */}
-                <Group justify="space-between" mb="sm" wrap="wrap" gap="xs">
-                  <Group gap="sm" style={{ minWidth: 0 }}>
-                    <ThemeIcon
-                      size={32} radius="md" variant="light"
-                      color={stack.status === 1 ? 'teal' : 'red'}
-                    >
-                      <TbServer size={16} />
-                    </ThemeIcon>
-                    <Box style={{ minWidth: 0 }}>
-                      <Group gap="xs" mb={2}>
-                        <Text fw={600} size="sm">{stack.name}</Text>
-                        <Badge size="xs" color={stack.status === 1 ? 'teal' : 'red'} variant="light">
-                          {stack.status === 1 ? 'active' : 'inactive'}
-                        </Badge>
-                        <Badge size="xs" variant="outline" color="gray">
-                          {stack.type === 2 ? 'compose' : 'swarm'}
-                        </Badge>
-                        <Badge size="xs" variant="dot" color="gray">ep#{stack.endpointId}</Badge>
-                      </Group>
-                      <Text size="xs" c="dimmed">Diperbarui {relTime(stack.updatedAt)}</Text>
-                    </Box>
-                  </Group>
+              <Paper key={stack.id} withBorder radius="md" style={{ overflow: 'hidden' }}>
 
-                  {/* Action buttons */}
-                  <Group gap="xs" wrap="nowrap">
-                    <Tooltip label="Status containers">
-                      <Button size="xs" variant="subtle" color="gray"
-                        leftSection={<TbServer size={13} />}
-                        onClick={() => { setStatusStack(stack); openStatus(); refetchStatus() }}
-                      >
-                        Status
-                      </Button>
-                    </Tooltip>
-                    <Tooltip label="Lihat logs container">
-                      <Button size="xs" variant="subtle" color="gray"
-                        leftSection={<TbFileText size={13} />}
-                        onClick={() => {
-                          setLogsStack(stack)
-                          setSelectedContainerId(null)
-                          openLogs()
-                          // Trigger status query untuk dapat container list
-                          setStatusStack(stack)
-                        }}
-                      >
-                        Logs
-                      </Button>
-                    </Tooltip>
-                    <Tooltip label="Pull image terbaru & restart">
-                      <Button size="xs" variant="light" color="blue"
-                        leftSection={<TbRefreshDot size={13} />}
-                        loading={repull.isPending && (repull.variables as number) === stack.id}
-                        onClick={() => confirmRepull(stack)}
-                      >
-                        Repull
-                      </Button>
-                    </Tooltip>
-                    <Tooltip label="Force recreate (stop→start)">
-                      <Button size="xs" variant="light" color="orange"
-                        leftSection={<TbRefresh size={13} />}
-                        loading={recreate.isPending && (recreate.variables as number) === stack.id}
-                        onClick={() => confirmRecreate(stack)}
-                      >
-                        Recreate
-                      </Button>
-                    </Tooltip>
-                  </Group>
-                </Group>
-
-                {/* Linked envman environments */}
-                {stack.linkedEnvs.length > 0 && (
-                  <Box>
-                    <Divider mb="xs" />
-                    <Text size="xs" c="dimmed" mb="xs" fw={500}>Terhubung ke envman:</Text>
-                    <Group gap="xs" wrap="wrap">
-                      {stack.linkedEnvs.map(env => (
-                        <Anchor
-                          key={`${env.slug}:${env.envName}`}
-                          size="xs"
-                          component={Link}
-                          to="/envmanager/$slug/$env"
-                          params={{ slug: env.slug, env: env.envName } as any}
-                        >
-                          <Badge
-                            size="sm" variant="light"
-                            color={env.lastSyncOk === true ? 'teal' : env.lastSyncOk === false ? 'red' : 'gray'}
-                            leftSection={
-                              env.lastSyncOk === true ? <TbCheck size={9} /> :
-                              env.lastSyncOk === false ? <TbX size={9} /> : undefined
-                            }
-                            rightSection={<TbChevronRight size={9} />}
-                            style={{ cursor: 'pointer' }}
-                          >
-                            {env.projectName}:{env.envName}
+                {/* ── Stack header ─────────────────────────── */}
+                <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
+                  <Group justify="space-between" wrap="wrap" gap="xs">
+                    <Group gap="sm" style={{ minWidth: 0 }}>
+                      <ThemeIcon size={40} radius="md" variant="light" color={stack.status === 1 ? 'teal' : 'red'}>
+                        <TbServer size={20} />
+                      </ThemeIcon>
+                      <Box style={{ minWidth: 0 }}>
+                        <Group gap="xs" mb={4} wrap="nowrap">
+                          <Text fw={700} size="md" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {stack.name}
+                          </Text>
+                          <Badge size="xs" color={stack.status === 1 ? 'teal' : 'red'} variant="light">
+                            {stack.status === 1 ? 'active' : 'inactive'}
                           </Badge>
-                        </Anchor>
-                      ))}
+                          <Badge size="xs" variant="outline" color="gray">{stack.type === 2 ? 'compose' : 'swarm'}</Badge>
+                          <Badge size="xs" variant="dot" color="gray">ep#{stack.endpointId}</Badge>
+                        </Group>
+                        <Group gap="xs">
+                          <Text size="xs" c="dimmed">Diperbarui {relTime(stack.updatedAt)}</Text>
+                          {!stackFetching && totalCount > 0 && (
+                            <Badge size="xs" variant="light" color={runningCount === totalCount ? 'teal' : runningCount > 0 ? 'yellow' : 'red'}>
+                              {runningCount}/{totalCount} running
+                            </Badge>
+                          )}
+                          {stackFetching && <Loader size={10} />}
+                        </Group>
+                      </Box>
                     </Group>
-                  </Box>
-                )}
+
+                    {/* Stack-level actions */}
+                    <Group gap="xs" wrap="nowrap">
+                      <Tooltip label="Lihat & edit compose file">
+                        <Button size="xs" variant="subtle" color="gray"
+                          leftSection={<TbFileCode size={13} />}
+                          onClick={() => { setComposeStack(stack); setComposeEditing(false); openCompose() }}
+                        >
+                          Compose
+                        </Button>
+                      </Tooltip>
+                      <Tooltip label="Pull image terbaru & restart">
+                        <Button size="xs" variant="light" color="blue"
+                          leftSection={<TbRefreshDot size={13} />}
+                          loading={repull.isPending && (repull.variables as number) === stack.id}
+                          onClick={() => confirmRepull(stack)}
+                        >
+                          Repull
+                        </Button>
+                      </Tooltip>
+                      <Tooltip label="Force recreate (stop→start)">
+                        <Button size="xs" variant="light" color="orange"
+                          leftSection={<TbRefresh size={13} />}
+                          loading={recreate.isPending && (recreate.variables as number) === stack.id}
+                          onClick={() => confirmRecreate(stack)}
+                        >
+                          Recreate
+                        </Button>
+                      </Tooltip>
+                    </Group>
+                  </Group>
+                </Box>
+
+                {/* ── Containers list ──────────────────────── */}
+                <Box p="md">
+                  <Stack gap="xs">
+                    {stackFetching && stackContainers.length === 0 ? (
+                      <Group gap="xs" py="xs">
+                        <Loader size="xs" />
+                        <Text size="xs" c="dimmed">Memuat containers...</Text>
+                      </Group>
+                    ) : stackContainers.length === 0 ? (
+                      <Text size="xs" c="dimmed" py="xs">Tidak ada container di stack ini.</Text>
+                    ) : (
+                      stackContainers.map(c => (
+                        <Paper
+                          key={c.id} withBorder p="sm" radius="md"
+                          style={{ cursor: 'pointer', borderColor: stateColor[c.state] ? `var(--mantine-color-${stateColor[c.state]}-3)` : undefined }}
+                          onClick={() => { setLogsStack(stack); setSelectedContainerId(c.id); openLogs() }}
+                        >
+                          <Group justify="space-between" wrap="nowrap" gap="xs">
+                            <Group gap="sm" style={{ minWidth: 0 }}>
+                              <ThemeIcon size={32} radius="md" variant="light" color={stateColor[c.state] ?? 'gray'}>
+                                <TbServer size={15} />
+                              </ThemeIcon>
+                              <Box style={{ minWidth: 0 }}>
+                                <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {c.names[0]}
+                                </Text>
+                                <Group gap="xs" mt={2} wrap="nowrap">
+                                  <Code fz={10} c="dimmed">{c.shortId}</Code>
+                                  <Text fz={10} c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
+                                    {c.image.split('/').pop()}
+                                  </Text>
+                                </Group>
+                                {(() => {
+                                  const s = containerStatsMap[c.id]
+                                  if (!s) return null
+                                  return (
+                                    <Group gap={6} mt={2} wrap="nowrap">
+                                      <Badge size="xs" variant="dot" color={s.cpuPercent > 80 ? 'red' : s.cpuPercent > 50 ? 'orange' : 'teal'}>
+                                        CPU {s.cpuPercent.toFixed(1)}%
+                                      </Badge>
+                                      <Badge size="xs" variant="dot" color={s.memPercent > 80 ? 'red' : s.memPercent > 50 ? 'orange' : 'blue'}>
+                                        {s.memUsageMB}MB
+                                      </Badge>
+                                    </Group>
+                                  )
+                                })()}
+                              </Box>
+                            </Group>
+                            <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                              <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
+                              {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
+                              <Tooltip label="Restart container">
+                                <ActionIcon size="sm" variant="subtle" color="orange"
+                                  loading={restartContainer.isPending && (restartContainer.variables as any)?.containerId === c.id}
+                                  onClick={e => { e.stopPropagation(); confirmRestartContainer(stack, c.id, c.names[0]) }}>
+                                  <TbRefresh size={13} />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Lihat logs">
+                                <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); setLogsStack(stack); setSelectedContainerId(c.id); openLogs() }}>
+                                  <TbFileText size={13} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Group>
+                          </Group>
+                        </Paper>
+                      ))
+                    )}
+
+                    {/* Linked envman environments */}
+                    {stack.linkedEnvs.length > 0 && (
+                      <>
+                        <Divider mt="xs" label={<Text size="xs" c="dimmed" fw={500}>Terhubung ke envman</Text>} labelPosition="left" />
+                        <Group gap="xs" wrap="wrap">
+                          {stack.linkedEnvs.map(env => (
+                            <Anchor
+                              key={`${env.slug}:${env.envName}`}
+                              size="xs"
+                              component={Link}
+                              to="/envmanager/$slug/$env"
+                              params={{ slug: env.slug, env: env.envName } as any}
+                            >
+                              <Badge
+                                size="sm" variant="light"
+                                color={env.lastSyncOk === true ? 'teal' : env.lastSyncOk === false ? 'red' : 'gray'}
+                                leftSection={env.lastSyncOk === true ? <TbCheck size={9} /> : env.lastSyncOk === false ? <TbX size={9} /> : undefined}
+                                rightSection={<TbChevronRight size={9} />}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                {env.projectName}:{env.envName}
+                              </Badge>
+                            </Anchor>
+                          ))}
+                        </Group>
+                      </>
+                    )}
+                  </Stack>
+                </Box>
+              </Paper>
+            )
+          })}
+        </SimpleGrid>
+        {totalPages > 1 && (
+          <Group justify="center" mb="xl">
+            <Pagination total={totalPages} value={page} onChange={setPage} size="sm" />
+          </Group>
+        )}
+        </>
+      ) : (
+        <>
+        <Stack gap="md" mb={totalPages > 1 ? 'sm' : 'xl'}>
+          {pagedStacks.map(stack => {
+            const { containers: stackContainers, isFetching: stackFetching } = stackStatusMap[stack.id] ?? { containers: [], isFetching: false }
+            const runningCount = stackContainers.filter(c => c.state === 'running').length
+            const totalCount = stackContainers.length
+            return (
+              <Paper key={stack.id} withBorder radius="md" style={{ overflow: 'hidden' }}>
+                <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
+                  <Group justify="space-between" wrap="wrap" gap="xs">
+                    <Group gap="sm" style={{ minWidth: 0 }}>
+                      <ThemeIcon size={40} radius="md" variant="light" color={stack.status === 1 ? 'teal' : 'red'}>
+                        <TbServer size={20} />
+                      </ThemeIcon>
+                      <Box style={{ minWidth: 0 }}>
+                        <Group gap="xs" mb={4} wrap="nowrap">
+                          <Text fw={700} size="md" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stack.name}</Text>
+                          <Badge size="xs" color={stack.status === 1 ? 'teal' : 'red'} variant="light">{stack.status === 1 ? 'active' : 'inactive'}</Badge>
+                          <Badge size="xs" variant="outline" color="gray">{stack.type === 2 ? 'compose' : 'swarm'}</Badge>
+                          <Badge size="xs" variant="dot" color="gray">ep#{stack.endpointId}</Badge>
+                        </Group>
+                        <Group gap="xs">
+                          <Text size="xs" c="dimmed">Diperbarui {relTime(stack.updatedAt)}</Text>
+                          {!stackFetching && totalCount > 0 && (
+                            <Badge size="xs" variant="light" color={runningCount === totalCount ? 'teal' : runningCount > 0 ? 'yellow' : 'red'}>
+                              {runningCount}/{totalCount} running
+                            </Badge>
+                          )}
+                          {stackFetching && <Loader size={10} />}
+                        </Group>
+                      </Box>
+                    </Group>
+                    <Group gap="xs" wrap="nowrap">
+                      <Tooltip label="Pull image terbaru & restart">
+                        <Button size="xs" variant="light" color="blue" leftSection={<TbRefreshDot size={13} />}
+                          loading={repull.isPending && (repull.variables as number) === stack.id}
+                          onClick={() => confirmRepull(stack)}>Repull</Button>
+                      </Tooltip>
+                      <Tooltip label="Force recreate (stop→start)">
+                        <Button size="xs" variant="light" color="orange" leftSection={<TbRefresh size={13} />}
+                          loading={recreate.isPending && (recreate.variables as number) === stack.id}
+                          onClick={() => confirmRecreate(stack)}>Recreate</Button>
+                      </Tooltip>
+                    </Group>
+                  </Group>
+                </Box>
+                <Box p="md">
+                  <Stack gap="xs">
+                    {stackFetching && stackContainers.length === 0 ? (
+                      <Group gap="xs" py="xs"><Loader size="xs" /><Text size="xs" c="dimmed">Memuat containers...</Text></Group>
+                    ) : stackContainers.length === 0 ? (
+                      <Text size="xs" c="dimmed" py="xs">Tidak ada container di stack ini.</Text>
+                    ) : (
+                      stackContainers.map(c => (
+                        <Paper key={c.id} withBorder p="sm" radius="md" style={{ cursor: 'pointer' }}
+                          onClick={() => { setLogsStack(stack); setSelectedContainerId(c.id); openLogs() }}>
+                          <Group justify="space-between" wrap="nowrap" gap="xs">
+                            <Group gap="sm" style={{ minWidth: 0 }}>
+                              <ThemeIcon size={32} radius="md" variant="light" color={stateColor[c.state] ?? 'gray'}>
+                                <TbServer size={15} />
+                              </ThemeIcon>
+                              <Box style={{ minWidth: 0 }}>
+                                <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.names[0]}</Text>
+                                <Group gap="xs" mt={2} wrap="nowrap">
+                                  <Code fz={10} c="dimmed">{c.shortId}</Code>
+                                  <Text fz={10} c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{c.image.split('/').pop()}</Text>
+                                </Group>
+                              </Box>
+                            </Group>
+                            <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                              <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
+                              {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
+                              <Tooltip label="Restart container">
+                                <ActionIcon size="sm" variant="subtle" color="orange"
+                                  loading={restartContainer.isPending && (restartContainer.variables as any)?.containerId === c.id}
+                                  onClick={e => { e.stopPropagation(); confirmRestartContainer(stack, c.id, c.names[0]) }}>
+                                  <TbRefresh size={13} />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Lihat logs">
+                                <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); setLogsStack(stack); setSelectedContainerId(c.id); openLogs() }}>
+                                  <TbFileText size={13} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Group>
+                          </Group>
+                        </Paper>
+                      ))
+                    )}
+                    {stack.linkedEnvs.length > 0 && (
+                      <>
+                        <Divider mt="xs" label={<Text size="xs" c="dimmed" fw={500}>Terhubung ke envman</Text>} labelPosition="left" />
+                        <Group gap="xs" wrap="wrap">
+                          {stack.linkedEnvs.map(env => (
+                            <Anchor key={`${env.slug}:${env.envName}`} size="xs" component={Link} to="/envmanager/$slug/$env" params={{ slug: env.slug, env: env.envName } as any}>
+                              <Badge size="sm" variant="light"
+                                color={env.lastSyncOk === true ? 'teal' : env.lastSyncOk === false ? 'red' : 'gray'}
+                                leftSection={env.lastSyncOk === true ? <TbCheck size={9} /> : env.lastSyncOk === false ? <TbX size={9} /> : undefined}
+                                rightSection={<TbChevronRight size={9} />} style={{ cursor: 'pointer' }}>
+                                {env.projectName}:{env.envName}
+                              </Badge>
+                            </Anchor>
+                          ))}
+                        </Group>
+                      </>
+                    )}
+                  </Stack>
+                </Box>
               </Paper>
             )
           })}
         </Stack>
+        {totalPages > 1 && (
+          <Group justify="center" mb="xl">
+            <Pagination total={totalPages} value={page} onChange={setPage} size="sm" />
+          </Group>
+        )}
+        </>
       )}
 
-      {/* ─── Cleanup Section ─────────────────────────────── */}
+      </>}
+
+      {/* ─── Tab: Maintenance ───────────────────────────── */}
+      {activeTab === 'maintenance' && <>
+
       <Divider mb="md" label={
         <Group gap="xs">
           <TbPackage size={13} />
@@ -435,6 +905,28 @@ function ConnectionDetailPage() {
       } labelPosition="left" />
 
       <Paper withBorder p="md" radius="md">
+        {/* Endpoint selector */}
+        {endpointIds.length > 1 && (
+          <Group mb="md" gap="xs">
+            <Text size="xs" c="dimmed" fw={500}>Endpoint:</Text>
+            {endpointIds.map(epId => (
+              <Badge
+                key={epId} size="sm"
+                variant={cleanupEndpointId === epId ? 'filled' : 'outline'}
+                color="gray" style={{ cursor: 'pointer' }}
+                onClick={() => setCleanupEndpointId(epId)}
+              >
+                #{epId}
+              </Badge>
+            ))}
+          </Group>
+        )}
+        {cleanupEndpointId !== null && (
+          <Text size="xs" c="dimmed" mb="md">
+            Endpoint <strong>#{cleanupEndpointId}</strong>
+          </Text>
+        )}
+
         <Group justify="space-between" mb="md" wrap="wrap" gap="xs">
           <Box>
             <Text fw={600} size="sm" mb={2}>Dangling Images</Text>
@@ -445,6 +937,9 @@ function ConnectionDetailPage() {
               <Badge size="sm" variant="light" color={imagesData.count > 0 ? 'orange' : 'teal'}>
                 {imagesData.count} image — {imagesData.totalSizeMB} MB
               </Badge>
+            )}
+            {cleanupEndpointId === null && (
+              <Text size="xs" c="dimmed">Menunggu data stacks...</Text>
             )}
             <ActionIcon size="sm" variant="subtle" color="gray" loading={imagesFetching} onClick={() => refetchImages()}>
               <TbRefresh size={13} />
@@ -489,6 +984,25 @@ function ConnectionDetailPage() {
           </Paper>
         ) : null}
 
+        {/* Info jika ada stuck images setelah prune */}
+        {pruneImages.data?.stuckByContainers > 0 && (
+          <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs" mb="sm">
+            <Text size="xs" fw={500} mb={2}>
+              {pruneImages.data.stuckByContainers} image tidak bisa dihapus
+            </Text>
+            <Text size="xs" c="dimmed">
+              Image masih direferensi oleh container yang stopped. Hapus container tersebut terlebih dahulu dengan <strong>Prune Volumes</strong> atau hapus manual di Portainer, lalu coba prune ulang.
+            </Text>
+            {pruneImages.data.stuckImages?.length > 0 && (
+              <Group gap="xs" mt="xs" wrap="wrap">
+                {pruneImages.data.stuckImages.map((img: any) => (
+                  <Code key={img.id} fz={10}>{img.tags[0] ?? img.id}</Code>
+                ))}
+              </Group>
+            )}
+          </Alert>
+        )}
+
         <Divider label="Prune lainnya" labelPosition="center" mb="sm" />
         <Group gap="xs">
           <Button size="xs" variant="light" color="orange" leftSection={<TbTrash size={13} />}
@@ -527,204 +1041,257 @@ function ConnectionDetailPage() {
         </Group>
       </Paper>
 
-      {/* ─── Status Modal ────────────────────────────────── */}
+      </>}
+
+      {/* ─── Compose Modal ──────────────────────────────── */}
       <Modal
-        opened={statusOpen}
-        onClose={closeStatus}
+        opened={composeOpen}
+        onClose={() => { closeCompose(); setComposeEditing(false) }}
         title={
           <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="teal" radius="md"><TbServer size={13} /></ThemeIcon>
-            <Text fw={600} size="sm">Status — {statusStack?.name}</Text>
-            <ActionIcon size="sm" variant="subtle" color="gray" loading={statusFetching} onClick={() => refetchStatus()}>
-              <TbRefresh size={13} />
-            </ActionIcon>
+            <ThemeIcon size="sm" variant="light" color="blue" radius="md"><TbFileCode size={13} /></ThemeIcon>
+            <Text fw={600} size="sm">Compose — {composeStack?.name}</Text>
+            {composeEditing && <Badge size="xs" color="orange" variant="light">editing</Badge>}
           </Group>
         }
-        size="lg"
+        size="xl"
       >
-        {statusFetching && !statusData ? (
-          <Group justify="center" py="xl"><Loader size="sm" /></Group>
-        ) : statusData?.stack ? (
-          <Stack gap="md">
-            <Paper withBorder p="sm" radius="md">
-              <Group justify="space-between" mb="xs">
-                <Text size="sm" fw={600}>Stack Info</Text>
-                <Badge size="sm" color={statusData.stack.status === 1 ? 'teal' : 'red'} variant="light">
-                  {statusData.stack.status === 1 ? 'Active' : 'Inactive'}
-                </Badge>
+        <Stack gap="sm">
+          {composeFetching && !composeContent ? (
+            <Group justify="center" py="xl"><Loader size="sm" /></Group>
+          ) : (
+            <>
+              <Group justify="space-between">
+                <Group gap="xs">
+                  <Badge size="xs" variant="outline" color="gray">docker-compose.yml</Badge>
+                  <Text fz={10} c="dimmed">{composeContent.split('\n').length} baris</Text>
+                </Group>
+                <Group gap="xs">
+                  {!composeEditing ? (
+                    <Button size="xs" variant="light" color="blue" leftSection={<TbPencil size={13} />}
+                      onClick={() => setComposeEditing(true)}>
+                      Edit
+                    </Button>
+                  ) : (
+                    <>
+                      <Button size="xs" variant="subtle" color="gray"
+                        onClick={() => { setComposeEditing(false); setComposeContent(composeData?.content ?? '') }}>
+                        Batal
+                      </Button>
+                      <Button size="xs" color="blue" leftSection={<TbCheck size={13} />}
+                        loading={saveCompose.isPending} onClick={confirmSaveCompose}>
+                        Simpan
+                      </Button>
+                    </>
+                  )}
+                </Group>
               </Group>
-              <Group gap="xl">
-                {[['Type', statusData.stack.type === 2 ? 'Compose' : 'Swarm'], ['Endpoint', `#${statusData.stack.endpointId}`], ['Containers', statusData.containers.length]].map(([label, value]) => (
-                  <Box key={String(label)}>
-                    <Text size="xs" c="dimmed">{label}</Text>
-                    <Text size="sm" fw={600}>{String(value)}</Text>
-                  </Box>
-                ))}
-              </Group>
-            </Paper>
-            {statusData.containers.length > 0 ? (
-              <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
-                <Table fz="xs" horizontalSpacing="sm" verticalSpacing="xs" highlightOnHover>
-                  <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
-                    <Table.Tr>
-                      <Table.Th>Container</Table.Th>
-                      <Table.Th>Image</Table.Th>
-                      <Table.Th>State</Table.Th>
-                      <Table.Th>Ports</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {(statusData.containers as ContainerInfo[]).map(c => (
-                      <Table.Tr key={c.id}>
-                        <Table.Td>
-                          <Text fz="xs" fw={500}>{c.names[0]}</Text>
-                          <Code fz={10} c="dimmed">{c.shortId}</Code>
-                        </Table.Td>
-                        <Table.Td><Text fz="xs" style={{ wordBreak: 'break-all' }}>{c.image.split('/').pop()}</Text></Table.Td>
-                        <Table.Td>
-                          <Badge size="xs" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          {c.ports.length > 0 ? <Code fz={10}>{c.ports.join(', ')}</Code> : <Text fz="xs" c="dimmed">—</Text>}
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
+              <Paper withBorder radius="sm" style={{ overflow: 'hidden' }}>
+                <Textarea
+                  value={composeContent}
+                  onChange={e => setComposeContent(e.target.value)}
+                  readOnly={!composeEditing}
+                  autosize
+                  minRows={10}
+                  maxRows={30}
+                  styles={{
+                    input: {
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      background: composeEditing ? undefined : 'var(--mantine-color-default-hover)',
+                      lineHeight: 1.6,
+                    },
+                  }}
+                />
               </Paper>
-            ) : (
-              <Text size="xs" c="dimmed" ta="center" py="sm">Tidak ada container running</Text>
-            )}
-          </Stack>
-        ) : (
-          <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs">{statusData?.error ?? 'Gagal mengambil status'}</Text>
-          </Alert>
-        )}
+              {composeEditing && (
+                <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
+                  <Text size="xs">Perubahan langsung ke Portainer. Gunakan <strong>Recreate</strong> atau <strong>Repull</strong> setelah save untuk menerapkan ke container.</Text>
+                </Alert>
+              )}
+            </>
+          )}
+        </Stack>
       </Modal>
 
       {/* ─── Logs Modal ──────────────────────────────────── */}
       <Modal
         opened={logsOpen}
-        onClose={() => { closeLogs(); setAutoRefresh(false) }}
+        onClose={() => { closeLogs(); setAutoRefresh(false); setSelectedContainerId(null); setLiveLines([]); lastLogTimestamp.current = null }}
         title={
           <Group gap="xs">
             <ThemeIcon size="sm" variant="light" color="gray" radius="md"><TbFileText size={13} /></ThemeIcon>
             <Text fw={600} size="sm">Logs — {logsStack?.name}</Text>
+            {selectedContainerId && (
+              <Badge size="xs" variant="outline" color="gray" style={{ cursor: 'pointer' }}
+                onClick={() => { setSelectedContainerId(null); setLiveLines([]); lastLogTimestamp.current = null }}>
+                ← ganti container
+              </Badge>
+            )}
           </Group>
         }
         size="xl"
         fullScreen={isMobile}
       >
         <Stack gap="sm">
-          {/* Container selector dari status data */}
-          {statusFetching && (statusData?.containers ?? []).length === 0 ? (
-            <Group justify="center" py="xs"><Loader size="xs" /></Group>
-          ) : (statusData?.containers ?? []).length === 0 ? (
-            <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-              <Text size="xs">Tidak ada container. Klik Status terlebih dahulu untuk load container list.</Text>
-            </Alert>
-          ) : (
-            <Group gap="xs" wrap="wrap">
-              {(statusData.containers as ContainerInfo[]).map(c => (
-                <Button
-                  key={c.id}
-                  size="xs"
-                  variant={selectedContainerId === c.id ? 'filled' : 'light'}
-                  color={stateColor[c.state] ?? 'gray'}
-                  onClick={() => setSelectedContainerId(c.id)}
-                  leftSection={<Badge size="xs" variant="dot" color={stateColor[c.state] ?? 'gray'} style={{ pointerEvents: 'none' }}>{c.state}</Badge>}
-                >
-                  {c.names[0]}
-                </Button>
-              ))}
-            </Group>
-          )}
-
-          {/* Controls */}
-          <Group justify="space-between" wrap="wrap" gap="xs">
-            <Group gap="xs">
-              <NumberInput size="xs" w={90} label="Tail" min={10} max={1000} step={50} value={logTail} onChange={v => setLogTail(Number(v) || 200)} />
-              <Stack gap={2} pt={2}>
-                <Checkbox size="xs" label="stdout" checked={showStdout} onChange={e => setShowStdout(e.currentTarget.checked)} />
-                <Checkbox size="xs" label="stderr" checked={showStderr} onChange={e => setShowStderr(e.currentTarget.checked)} />
-              </Stack>
-            </Group>
-            <Group gap="xs" align="flex-end">
-              <Switch size="xs" label="Auto refresh 5s" checked={autoRefresh} onChange={e => setAutoRefresh(e.currentTarget.checked)} />
-              <Switch size="xs" label="Auto scroll" checked={autoScroll} onChange={e => setAutoScroll(e.currentTarget.checked)} />
-              <ActionIcon size="sm" variant="subtle" color="gray" loading={logsFetching} onClick={() => refetchLogs()}><TbRefresh size={13} /></ActionIcon>
-              <Tooltip label="Copy logs">
-                <ActionIcon size="sm" variant="subtle" color="gray" disabled={logLines.length === 0}
-                  onClick={() => {
-                    const text = logLines.map(l => `[${l.stream}] ${l.timestamp ? new Date(l.timestamp).toLocaleTimeString('id-ID') + ' ' : ''}${l.message}`).join('\n')
-                    navigator.clipboard.writeText(text)
-                  }}>
-                  <TbCopy size={13} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Download .log">
-                <ActionIcon size="sm" variant="subtle" color="gray" disabled={logLines.length === 0}
-                  onClick={() => {
-                    const text = logLines.map(l => `[${l.stream.toUpperCase()}] ${l.timestamp ?? ''} ${l.message}`).join('\n')
-                    const blob = new Blob([text], { type: 'text/plain' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url; a.download = `${logsStack?.name ?? 'container'}-${selectedContainerId?.slice(0, 8) ?? 'logs'}.log`
-                    a.click(); URL.revokeObjectURL(url)
-                  }}>
-                  <TbDownload size={13} />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-          </Group>
-
-          {/* Log output */}
+          {/* Step 1: Pilih container */}
           {!selectedContainerId ? (
-            <Text size="xs" c="dimmed" ta="center" py="md">Pilih container di atas untuk melihat logs</Text>
-          ) : logsFetching && logLines.length === 0 ? (
-            <Group justify="center" py="xl"><Loader size="sm" /></Group>
-          ) : (
-            <Paper withBorder radius="sm" style={{ overflow: 'hidden' }}>
-              <Group px="xs" py={4} justify="space-between" style={{ background: '#161b22', borderBottom: '1px solid #30363d' }}>
-                <Group gap="xs">
-                  <Badge size="xs" color="gray" variant="filled">{logLines.length} baris</Badge>
-                  {autoRefresh && <Badge size="xs" color="teal" variant="dot">live</Badge>}
-                  {logsFetching && <Loader size={10} color="gray" />}
+            <>
+              <Text size="xs" c="dimmed" fw={500}>Pilih container untuk melihat logs:</Text>
+              {(() => {
+                const s = logsStack ? stackStatusMap[logsStack.id] : undefined
+                const logsContainers = s?.containers ?? []
+                const logsLoading = s?.isFetching && logsContainers.length === 0
+                return logsLoading
+              })() ? (
+                <Group gap="xs" align="center" py="md" justify="center">
+                  <Loader size="sm" />
+                  <Text size="sm" c="dimmed">Memuat daftar container di stack <strong>{logsStack?.name}</strong>...</Text>
                 </Group>
-                <Code fz={10} c="dimmed">{selectedContainerId?.slice(0, 12)}</Code>
+              ) : (logsStack ? (stackStatusMap[logsStack.id]?.containers ?? []) : []).length === 0 ? (
+                <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="sm">
+                  <Text size="xs">Tidak ada container ditemukan di stack <strong>{logsStack?.name}</strong>.</Text>
+                </Alert>
+              ) : (
+                <Stack gap="xs">
+                  {(logsStack ? (stackStatusMap[logsStack.id]?.containers ?? []) : []).map(c => (
+                    <Paper
+                      key={c.id} withBorder p="sm" radius="md"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setSelectedContainerId(c.id)}
+                    >
+                      <Group justify="space-between" wrap="nowrap">
+                        <Group gap="sm" style={{ minWidth: 0 }}>
+                          <ThemeIcon size={32} radius="md" variant="light" color={stateColor[c.state] ?? 'gray'}>
+                            <TbFileText size={16} />
+                          </ThemeIcon>
+                          <Box style={{ minWidth: 0 }}>
+                            <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {c.names[0]}
+                            </Text>
+                            <Group gap="xs" mt={2}>
+                              <Code fz={10} c="dimmed">{c.shortId}</Code>
+                              <Text fz={10} c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+                                {c.image.split('/').pop()}
+                              </Text>
+                            </Group>
+                          </Box>
+                        </Group>
+                        <Group gap="xs" wrap="nowrap">
+                          <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
+                          {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
+                          <TbChevronRight size={14} color="var(--mantine-color-dimmed)" />
+                        </Group>
+                      </Group>
+                    </Paper>
+                  ))}
+                </Stack>
+              )}
+            </>
+          ) : (
+            /* Step 2: Logs container yang dipilih */
+            <>
+              {/* Info container terpilih */}
+              {(() => {
+                const c = (logsStack ? (stackStatusMap[logsStack.id]?.containers ?? []) : []).find(x => x.id === selectedContainerId)
+                return c ? (
+                  <Paper withBorder p="xs" radius="md" style={{ background: 'var(--mantine-color-default-hover)' }}>
+                    <Group gap="sm" wrap="nowrap">
+                      <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
+                      <Text size="xs" fw={600}>{c.names[0]}</Text>
+                      <Code fz={10} c="dimmed">{c.shortId}</Code>
+                      <Text fz={10} c="dimmed" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.image.split('/').pop()}
+                      </Text>
+                    </Group>
+                  </Paper>
+                ) : null
+              })()}
+
+              {/* Controls */}
+              <Group justify="space-between" wrap="wrap" gap="xs">
+                <Group gap="xs">
+                  <NumberInput size="xs" w={90} label="Tail" min={10} max={1000} step={50} value={logTail} onChange={v => setLogTail(Number(v) || 200)} />
+                  <Stack gap={2} pt={2}>
+                    <Checkbox size="xs" label="stdout" checked={showStdout} onChange={e => setShowStdout(e.currentTarget.checked)} />
+                    <Checkbox size="xs" label="stderr" checked={showStderr} onChange={e => setShowStderr(e.currentTarget.checked)} />
+                  </Stack>
+                </Group>
+                <Group gap="xs" align="flex-end">
+                  <Switch size="xs" label="Auto refresh 5s" checked={autoRefresh} onChange={e => setAutoRefresh(e.currentTarget.checked)} />
+                  <Switch size="xs" label="Auto scroll" checked={autoScroll} onChange={e => setAutoScroll(e.currentTarget.checked)} />
+                  <ActionIcon size="sm" variant="subtle" color="gray" loading={logsFetching} onClick={() => refetchLogs()}><TbRefresh size={13} /></ActionIcon>
+                  <Tooltip label="Copy logs">
+                    <ActionIcon size="sm" variant="subtle" color="gray" disabled={logLines.length === 0}
+                      onClick={() => {
+                        const text = logLines.map(l => `[${l.stream}] ${l.timestamp ? new Date(l.timestamp).toLocaleTimeString('id-ID') + ' ' : ''}${l.message}`).join('\n')
+                        navigator.clipboard.writeText(text)
+                      }}>
+                      <TbCopy size={13} />
+                    </ActionIcon>
+                  </Tooltip>
+                  <Tooltip label="Download .log">
+                    <ActionIcon size="sm" variant="subtle" color="gray" disabled={logLines.length === 0}
+                      onClick={() => {
+                        const text = logLines.map(l => `[${l.stream.toUpperCase()}] ${l.timestamp ?? ''} ${l.message}`).join('\n')
+                        const blob = new Blob([text], { type: 'text/plain' })
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url; a.download = `${logsStack?.name ?? 'stack'}-${selectedContainerId.slice(0, 8)}.log`
+                        a.click(); URL.revokeObjectURL(url)
+                      }}>
+                      <TbDownload size={13} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Group>
               </Group>
-              <ScrollArea.Autosize mah={440} viewportRef={logViewportRef}
-                onScrollPositionChange={({ y }) => {
-                  if (logViewportRef.current) {
-                    const { scrollHeight, clientHeight } = logViewportRef.current
-                    setAutoScroll(y + clientHeight >= scrollHeight - 20)
-                  }
-                }}
-              >
-                <Box p="xs" style={{ background: '#0d1117', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6, minHeight: 120 }}>
-                  {logLines.length === 0 ? (
-                    <Text fz={11} c="dimmed" ff="monospace">(tidak ada log)</Text>
-                  ) : (
-                    logLines.map((line, i) => (
-                      <Box key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        {line.timestamp && (
-                          <Text span fz={10} ff="monospace" style={{ color: '#8b949e', flexShrink: 0, userSelect: 'none', paddingTop: 1 }}>
-                            {new Date(line.timestamp).toLocaleTimeString('id-ID', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                          </Text>
-                        )}
-                        <Text span fz={9} ff="monospace" style={{ color: line.stream === 'stderr' ? '#ff7b72' : '#7ee787', flexShrink: 0, paddingTop: 2, userSelect: 'none' }}>
-                          {line.stream === 'stderr' ? 'ERR' : 'OUT'}
-                        </Text>
-                        <Text span fz={12} ff="monospace" style={{ color: line.stream === 'stderr' ? '#ff7b72' : '#e6edf3', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
-                          {line.message}
-                        </Text>
-                      </Box>
-                    ))
-                  )}
-                </Box>
-              </ScrollArea.Autosize>
-            </Paper>
+
+              {/* Log output */}
+              {logsFetching && logLines.length === 0 ? (
+                <Group justify="center" py="xl"><Loader size="sm" /></Group>
+              ) : (
+                <Paper withBorder radius="sm" style={{ overflow: 'hidden' }}>
+                  <Group px="xs" py={4} justify="space-between" style={{ background: '#161b22', borderBottom: '1px solid #30363d' }}>
+                    <Group gap="xs">
+                      <Badge size="xs" color="gray" variant="filled">{logLines.length} baris</Badge>
+                      {autoRefresh && <Badge size="xs" color="teal" variant="dot">live</Badge>}
+                      {logsFetching && <Loader size={10} color="gray" />}
+                    </Group>
+                    <Code fz={10} c="dimmed">{selectedContainerId.slice(0, 12)}</Code>
+                  </Group>
+                  <ScrollArea.Autosize mah={440} viewportRef={logViewportRef}
+                    onScrollPositionChange={({ y }) => {
+                      if (logViewportRef.current) {
+                        const { scrollHeight, clientHeight } = logViewportRef.current
+                        setAutoScroll(y + clientHeight >= scrollHeight - 20)
+                      }
+                    }}
+                  >
+                    <Box p="xs" style={{ background: '#0d1117', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6, minHeight: 120 }}>
+                      {logLines.length === 0 ? (
+                        <Text fz={11} c="dimmed" ff="monospace">(tidak ada log)</Text>
+                      ) : (
+                        logLines.map((line, i) => (
+                          <Box key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            {line.timestamp && (
+                              <Text span fz={10} ff="monospace" style={{ color: '#8b949e', flexShrink: 0, userSelect: 'none', paddingTop: 1 }}>
+                                {new Date(line.timestamp).toLocaleTimeString('id-ID', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              </Text>
+                            )}
+                            <Text span fz={9} ff="monospace" style={{ color: line.stream === 'stderr' ? '#ff7b72' : '#7ee787', flexShrink: 0, paddingTop: 2, userSelect: 'none' }}>
+                              {line.stream === 'stderr' ? 'ERR' : 'OUT'}
+                            </Text>
+                            <Text span fz={12} ff="monospace" style={{ color: line.stream === 'stderr' ? '#ff7b72' : '#e6edf3', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                              {line.message}
+                            </Text>
+                          </Box>
+                        ))
+                      )}
+                    </Box>
+                  </ScrollArea.Autosize>
+                </Paper>
+              )}
+            </>
           )}
         </Stack>
       </Modal>

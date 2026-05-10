@@ -55,6 +55,7 @@ model User {
   reported              Ticket[]              @relation("TicketReporter")
   assigned              Ticket[]              @relation("TicketAssignee")
   portainerConnections  PortainerConnection[]
+  portainerSyncLogs     PortainerSyncLog[]
   comments              TicketComment[]
   projectMembers        ProjectMember[]
   apiTokens             ApiToken[]
@@ -315,8 +316,9 @@ model PortainerConnection {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  createdBy User             @relation(fields: [createdById], references: [id])
-  configs   PortainerConfig[]
+  createdBy      User                   @relation(fields: [createdById], references: [id])
+  configs        PortainerConfig[]
+  stackTargets   PortainerStackTarget[]
 
   @@map("portainer_connection")
 }
@@ -325,21 +327,60 @@ model PortainerConfig {
   id           String    @id @default(uuid())
   projectId    String
   envName      String
-  connectionId String?   // New: reference to global connection
-  portainerUrl String?   // Legacy: kept for backward compat
-  apiToken     String?   // Legacy: kept for backward compat
+  connectionId String?
+  portainerUrl String?
+  apiToken     String?
   stackId      Int
   stackName    String
   endpointId   Int       @default(1)
   lastSyncAt   DateTime?
   lastSyncOk   Boolean?
+  autoSync     Boolean   @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  project    Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  connection PortainerConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  project          Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection       PortainerConnection?   @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  syncLogs         PortainerSyncLog[]
+  additionalTargets PortainerStackTarget[]
 
   @@unique([projectId, envName])
   @@index([connectionId])
   @@map("portainer_config")
+}
+
+model PortainerSyncLog {
+  id          String   @id @default(uuid())
+  configId    String
+  userId      String?
+  triggeredBy String   // "manual" | "auto"
+  varsCount   Int
+  secretCount Int      @default(0)
+  ok          Boolean
+  error       String?
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+
+  config PortainerConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  user   User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([configId])
+  @@map("portainer_sync_log")
+}
+
+model PortainerStackTarget {
+  id           String   @id @default(uuid())
+  configId     String
+  connectionId String?
+  stackId      Int
+  stackName    String
+  endpointId   Int      @default(1)
+  label        String?
+  createdAt    DateTime @default(now())
+
+  config     PortainerConfig     @relation(fields: [configId], references: [id], onDelete: Cascade)
+  connection PortainerConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([configId])
+  @@map("portainer_stack_target")
 }

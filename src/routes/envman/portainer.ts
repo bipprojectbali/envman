@@ -23,6 +23,48 @@ async function getPortainerCfg(slug: string, envName: string) {
   return prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: project.id, envName } } })
 }
 
+export async function triggerAutoSync(slug: string, envName: string, userId: string) {
+  try {
+    const project = await prisma.project.findUnique({ where: { slug } })
+    if (!project) return
+    const cfg = await prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: project.id, envName } } })
+    if (!cfg?.autoSync) return
+    const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: envName } }, include: { vars: true } })
+    if (!environment) return
+    let portainerUrl: string, portainerToken: string
+    if (cfg.connectionId) {
+      const conn = await prisma.portainerConnection.findUnique({ where: { id: cfg.connectionId } })
+      if (!conn) return
+      portainerUrl = conn.portainerUrl; portainerToken = conn.apiToken
+    } else {
+      if (!cfg.portainerUrl || !cfg.apiToken) return
+      portainerUrl = cfg.portainerUrl; portainerToken = cfg.apiToken
+    }
+    const url = portainerUrl.replace(/\/$/, '')
+    const startMs = Date.now()
+    const fileRes = await fetch(`${url}/api/stacks/${cfg.stackId}/file`, { headers: { 'X-API-Key': portainerToken } })
+    if (!fileRes.ok) return
+    const { StackFileContent: rawFile } = await fileRes.json() as { StackFileContent: string }
+    const content = injectEnvFileIntoCompose(rawFile)
+    const escapeEnvValue = (val: string) => val.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
+    const portainerEnv = environment.vars.filter(v => !v.isDisabled).map(v => ({
+      name: v.key, value: escapeEnvValue(v.isSecret ? decryptSecret(v.value) : v.value),
+    }))
+    const syncRes = await fetch(`${url}/api/stacks/${cfg.stackId}?endpointId=${cfg.endpointId}`, {
+      method: 'PUT',
+      headers: { 'X-API-Key': portainerToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ StackFileContent: content, Env: portainerEnv, Prune: false }),
+    })
+    const ok = syncRes.ok
+    const durationMs = Date.now() - startMs
+    await prisma.portainerConfig.update({ where: { id: cfg.id }, data: { lastSyncAt: new Date(), lastSyncOk: ok } })
+    await prisma.portainerSyncLog.create({ data: { configId: cfg.id, userId, triggeredBy: 'auto', varsCount: portainerEnv.length, secretCount: environment.vars.filter(v => v.isSecret && !v.isDisabled).length, ok, error: ok ? null : `HTTP ${syncRes.status}`, durationMs } })
+    appLog('info', `[auto-sync] ${slug}:${envName} → ${ok ? 'ok' : 'failed'} (${durationMs}ms)`)
+  } catch (e) {
+    appLog('warn', `[auto-sync] ${slug}:${envName} error: ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
+
 export const portainerRouter = new Elysia()
 
       // ─── Portainer Connections (global) ──────────────────
@@ -152,9 +194,35 @@ export const portainerRouter = new Elysia()
       if (!stackRes.ok) { set.status = 400; return { error: `Portainer error ${stackRes.status}` } }
       const stack = await stackRes.json() as any
 
-      const label = encodeURIComponent(JSON.stringify({ 'com.docker.compose.project': [stack.Name] }))
-      const cRes = await fetch(`${url}/api/endpoints/${stack.EndpointId}/docker/containers/json?all=1&filters=${label}`, { headers: { 'X-API-Key': conn.apiToken } })
-      const containers = cRes.ok ? (await cRes.json() as any[]) : []
+      appLog('info', `[portainer:status] stack.Name=${stack.Name} stack.ResourceControl=${JSON.stringify(stack.ResourceControl?.SubResourceIds ?? [])} endpointId=${stack.EndpointId}`)
+
+      // Fetch all containers on the endpoint, match by label
+      const allRes = await fetch(`${url}/api/endpoints/${stack.EndpointId}/docker/containers/json?all=1`, { headers: { 'X-API-Key': conn.apiToken } })
+      let containers: any[] = []
+      if (allRes.ok) {
+        const all = await allRes.json() as any[]
+        // Log all unique compose project names found
+        const projects = [...new Set(all.map((c: any) => c.Labels?.['com.docker.compose.project'] ?? '').filter(Boolean))]
+        appLog('info', `[portainer:status] total=${all.length} compose_projects=${JSON.stringify(projects)} stack.Name=${stack.Name}`)
+
+        const stackNameLower = stack.Name.toLowerCase()
+        containers = all.filter((c: any) => {
+          const proj = (c.Labels?.['com.docker.compose.project'] ?? '').toLowerCase()
+          return proj === stackNameLower
+        })
+
+        // Fallback: match by com.docker.compose.config.hash or portainer label
+        if (containers.length === 0) {
+          containers = all.filter((c: any) => {
+            const stackLabel = c.Labels?.['com.docker.stack.namespace'] ?? ''
+            return stackLabel.toLowerCase() === stackNameLower
+          })
+        }
+
+        appLog('info', `[portainer:status] matched=${containers.length}`)
+      } else {
+        appLog('warn', `[portainer:status] list containers failed: ${allRes.status} ${await allRes.text()}`)
+      }
 
       return {
         stack: { id: stack.Id, name: stack.Name, status: stack.Status, type: stack.Type, endpointId: stack.EndpointId },
@@ -187,9 +255,11 @@ export const portainerRouter = new Elysia()
     const stdout = (query as any).stdout !== '0' ? 1 : 0
     const stderr = (query as any).stderr !== '0' ? 1 : 0
     const timestamps = (query as any).timestamps !== '0' ? 1 : 0
+    const since = (query as any).since as string | undefined  // ISO timestamp for incremental fetch
 
     try {
       const qs = new URLSearchParams({ stdout: String(stdout), stderr: String(stderr), tail: String(tail), timestamps: String(timestamps) })
+      if (since) qs.set('since', since)
       const res = await fetch(`${url}/api/endpoints/${stack.EndpointId}/docker/containers/${params.containerId}/logs?${qs}`, { headers: { 'X-API-Key': conn.apiToken } })
       if (!res.ok) { set.status = 400; return { error: `Logs error ${res.status}: ${await res.text()}` } }
 
@@ -218,6 +288,132 @@ export const portainerRouter = new Elysia()
       return { lines, total: lines.length }
     } catch (e) {
       set.status = 500; return { error: `Logs failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Compose file viewer
+  .get('/api/envman/portainer/connections/:id/stacks/:stackId/file', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    try {
+      const res = await fetch(`${url}/api/stacks/${params.stackId}/file`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!res.ok) { set.status = 400; return { error: `Portainer error ${res.status}` } }
+      const data = await res.json() as any
+      return { content: data.StackFileContent ?? '' }
+    } catch (e) {
+      set.status = 500; return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Compose file editor (save)
+  .put('/api/envman/portainer/connections/:id/stacks/:stackId/file', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const body = await request.json().catch(() => null) as any
+    if (!body?.content) { set.status = 400; return { error: 'content required' } }
+    try {
+      const stackRes = await fetch(`${url}/api/stacks/${params.stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!stackRes.ok) { set.status = 400; return { error: `Stack not found` } }
+      const stack = await stackRes.json() as any
+      const res = await fetch(`${url}/api/stacks/${params.stackId}?endpointId=${stack.EndpointId}`, {
+        method: 'PUT',
+        headers: { 'X-API-Key': conn.apiToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ StackFileContent: body.content, Env: stack.Env ?? [], Prune: false, PullImage: false }),
+      })
+      if (!res.ok) { set.status = 400; return { error: `Save failed: ${res.status} ${await res.text()}` } }
+      appLog('info', `[portainer:compose-save] connection=${conn.name} stack=${params.stackId}`)
+      return { ok: true }
+    } catch (e) {
+      set.status = 500; return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Container restart
+  .post('/api/envman/portainer/connections/:id/stacks/:stackId/containers/:containerId/restart', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    try {
+      const stackRes = await fetch(`${url}/api/stacks/${params.stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!stackRes.ok) { set.status = 400; return { error: `Stack not found` } }
+      const stack = await stackRes.json() as any
+      const res = await fetch(`${url}/api/endpoints/${stack.EndpointId}/docker/containers/${params.containerId}/restart`, {
+        method: 'POST', headers: { 'X-API-Key': conn.apiToken },
+      })
+      if (!res.ok) { set.status = 400; return { error: `Restart failed: ${res.status}` } }
+      appLog('info', `[portainer:restart] connection=${conn.name} container=${params.containerId.slice(0, 12)}`)
+      return { ok: true }
+    } catch (e) {
+      set.status = 500; return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Container stats (CPU%, memory, network)
+  .get('/api/envman/portainer/connections/:id/stacks/:stackId/containers/:containerId/stats', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    try {
+      const stackRes = await fetch(`${url}/api/stacks/${params.stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!stackRes.ok) { set.status = 400; return { error: `Stack not found` } }
+      const stack = await stackRes.json() as any
+      const res = await fetch(`${url}/api/endpoints/${stack.EndpointId}/docker/containers/${params.containerId}/stats?stream=false`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!res.ok) { set.status = 400; return { error: `Stats error ${res.status}` } }
+      const s = await res.json() as any
+      // CPU calculation
+      const cpuDelta = (s.cpu_stats?.cpu_usage?.total_usage ?? 0) - (s.precpu_stats?.cpu_usage?.total_usage ?? 0)
+      const systemDelta = (s.cpu_stats?.system_cpu_usage ?? 0) - (s.precpu_stats?.system_cpu_usage ?? 0)
+      const numCPUs = s.cpu_stats?.online_cpus ?? s.cpu_stats?.cpu_usage?.percpu_usage?.length ?? 1
+      const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * numCPUs * 100 : 0
+      // Memory
+      const memUsage = s.memory_stats?.usage ?? 0
+      const memCache = s.memory_stats?.stats?.cache ?? 0
+      const memLimit = s.memory_stats?.limit ?? 0
+      const memUsageMB = Math.round((memUsage - memCache) / 1024 / 1024)
+      const memLimitMB = Math.round(memLimit / 1024 / 1024)
+      const memPercent = memLimit > 0 ? ((memUsage - memCache) / memLimit) * 100 : 0
+      // Network
+      const netStats = s.networks ?? {}
+      const netRx = Object.values(netStats).reduce((acc: number, n: any) => acc + (n.rx_bytes ?? 0), 0)
+      const netTx = Object.values(netStats).reduce((acc: number, n: any) => acc + (n.tx_bytes ?? 0), 0)
+      return {
+        cpuPercent: Math.round(cpuPercent * 10) / 10,
+        memUsageMB,
+        memLimitMB,
+        memPercent: Math.round(memPercent * 10) / 10,
+        netRxMB: Math.round(netRx / 1024 / 1024 * 100) / 100,
+        netTxMB: Math.round(netTx / 1024 / 1024 * 100) / 100,
+      }
+    } catch (e) {
+      set.status = 500; return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Connection health (stack summary)
+  .get('/api/envman/portainer/connections/:id/health', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    try {
+      const res = await fetch(`${url}/api/stacks`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!res.ok) { set.status = 400; return { error: `Portainer error ${res.status}` } }
+      const stacks = await res.json() as any[]
+      const activeStacks = stacks.filter(s => s.Status === 1).length
+      return { totalStacks: stacks.length, activeStacks, inactiveStacks: stacks.length - activeStacks }
+    } catch (e) {
+      set.status = 500; return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
     }
   })
 
@@ -282,7 +478,11 @@ export const portainerRouter = new Elysia()
     try {
       const filters = encodeURIComponent(JSON.stringify({ dangling: ['true'] }))
       const res = await fetch(`${url}/api/endpoints/${endpointId}/docker/images/json?filters=${filters}`, { headers: { 'X-API-Key': conn.apiToken } })
-      if (!res.ok) { set.status = 400; return { error: `Portainer error ${res.status}` } }
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        appLog('warn', `[portainer:dangling] endpointId=${endpointId} status=${res.status} body=${errText}`)
+        set.status = 400; return { error: `Portainer error ${res.status}: ${errText}` }
+      }
       const images = await res.json() as any[]
       const totalSize = images.reduce((acc, img) => acc + (img.Size ?? 0), 0)
       return {
@@ -309,11 +509,38 @@ export const portainerRouter = new Elysia()
         method: 'POST', headers: { 'X-API-Key': conn.apiToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ Filters: { dangling: ['true'] } }),
       })
-      if (!res.ok) { set.status = 400; return { error: `Prune failed: ${res.status}` } }
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        appLog('warn', `[portainer:prune-images] failed ${res.status}: ${errText}`)
+        set.status = 400; return { error: `Prune failed: ${res.status}: ${errText}` }
+      }
       const result = await res.json() as any
       const reclaimedMB = Math.round((result.SpaceReclaimed ?? 0) / 1024 / 1024)
-      appLog('info', `Portainer prune images via connection ${conn.name} — ${reclaimedMB}MB`)
-      return { ok: true, deletedCount: result.ImagesDeleted?.length ?? 0, reclaimedMB }
+      appLog('info', `[portainer:prune-images] deleted=${result.ImagesDeleted?.length ?? 0} reclaimed=${reclaimedMB}MB`)
+
+      // Cek sisa dangling images setelah prune (image yang masih direferensi container stopped)
+      const filters2 = encodeURIComponent(JSON.stringify({ dangling: ['true'] }))
+      const remainRes = await fetch(`${url}/api/endpoints/${endpointId}/docker/images/json?filters=${filters2}`, { headers: { 'X-API-Key': conn.apiToken } })
+      let remaining: any[] = []
+      if (remainRes.ok) remaining = await remainRes.json() as any[]
+      if (remaining.length > 0) {
+        // Cek apakah ada container stopped yang pakai image ini
+        const allContainersRes = await fetch(`${url}/api/endpoints/${endpointId}/docker/containers/json?all=1`, { headers: { 'X-API-Key': conn.apiToken } })
+        const allContainers = allContainersRes.ok ? await allContainersRes.json() as any[] : []
+        const usedImageIds = new Set(allContainers.map((c: any) => c.ImageID))
+        const stuck = remaining.filter((img: any) => usedImageIds.has(img.Id))
+        appLog('info', `[portainer:prune-images] remaining=${remaining.length} stuck_by_stopped_containers=${stuck.length}`)
+        return {
+          ok: true,
+          deletedCount: result.ImagesDeleted?.length ?? 0,
+          reclaimedMB,
+          remaining: remaining.length,
+          stuckByContainers: stuck.length,
+          stuckImages: stuck.map((img: any) => ({ id: img.Id.replace('sha256:', '').slice(0, 12), tags: img.RepoTags ?? [] })),
+        }
+      }
+
+      return { ok: true, deletedCount: result.ImagesDeleted?.length ?? 0, reclaimedMB, remaining: 0, stuckByContainers: 0 }
     } catch (e) {
       set.status = 500; return { error: `Prune failed: ${e instanceof Error ? e.message : String(e)}` }
     }
@@ -366,19 +593,29 @@ export const portainerRouter = new Elysia()
     if (!access) { set.status = 403; return { error: 'No access' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
-    const cfg = await prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: project.id, envName: params.envName } } })
-    if (!cfg) return { config: null }
+    const cfg = await prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: project.id, envName: params.envName } }, include: { additionalTargets: true } })
+    if (!cfg) return { config: null, unsyncedCount: 0 }
     // Resolve connection details for response
     const conn = cfg.connectionId ? await prisma.portainerConnection.findUnique({ where: { id: cfg.connectionId }, select: { id: true, name: true, portainerUrl: true } }) : null
+    // Count vars changed since last sync
+    const env = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } } })
+    const unsyncedCount = env ? await prisma.envVar.count({
+      where: {
+        environmentId: env.id,
+        isDisabled: false,
+        ...(cfg.lastSyncAt ? { updatedAt: { gt: cfg.lastSyncAt } } : {}),
+      }
+    }) : 0
     return {
       config: {
         id: cfg.id, stackId: cfg.stackId, stackName: cfg.stackName, endpointId: cfg.endpointId,
         lastSyncAt: cfg.lastSyncAt, lastSyncOk: cfg.lastSyncOk,
-        // New: connection ref
         connectionId: cfg.connectionId, connectionName: conn?.name, portainerUrl: conn?.portainerUrl ?? cfg.portainerUrl,
-        // Legacy fallback
         apiToken: '***',
-      }
+        autoSync: cfg.autoSync,
+        additionalTargets: cfg.additionalTargets.map(t => ({ id: t.id, stackId: t.stackId, stackName: t.stackName, endpointId: t.endpointId, label: t.label })),
+      },
+      unsyncedCount,
     }
       })
 
@@ -416,6 +653,37 @@ export const portainerRouter = new Elysia()
     })
     return { config: { id: cfg.id, portainerUrl: cfg.portainerUrl, stackId: cfg.stackId, stackName: cfg.stackName, endpointId: cfg.endpointId } }
       })
+
+  // Update autoSync + additional stack targets
+  .patch('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
+    const body = await request.json().catch(() => null) as any
+    const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+    if (!project) { set.status = 404; return { error: 'Project not found' } }
+    const cfg = await prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: project.id, envName: params.envName } } })
+    if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
+
+    if (typeof body?.autoSync === 'boolean') {
+      await prisma.portainerConfig.update({ where: { id: cfg.id }, data: { autoSync: body.autoSync } })
+    }
+
+    // Add additional target
+    if (body?.addTarget) {
+      const t = body.addTarget
+      await prisma.portainerStackTarget.create({ data: { configId: cfg.id, connectionId: t.connectionId ?? cfg.connectionId, stackId: t.stackId, stackName: t.stackName, endpointId: t.endpointId ?? 1, label: t.label ?? null } })
+    }
+
+    // Remove additional target
+    if (body?.removeTargetId) {
+      await prisma.portainerStackTarget.deleteMany({ where: { id: body.removeTargetId, configId: cfg.id } })
+    }
+
+    const updatedCfg = await prisma.portainerConfig.findUnique({ where: { id: cfg.id }, include: { additionalTargets: true } })
+    return { ok: true, autoSync: updatedCfg?.autoSync, additionalTargets: updatedCfg?.additionalTargets }
+  })
 
   .delete('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
@@ -495,25 +763,78 @@ export const portainerRouter = new Elysia()
         name: v.key,
         value: escapeEnvValue(v.isSecret ? decryptSecret(v.value) : v.value),
       }))
-      const syncRes = await fetch(`${url}/api/stacks/${cfg.stackId}?endpointId=${cfg.endpointId}`, {
-        method: 'PUT',
-        headers: { 'X-API-Key': portainerToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ StackFileContent: stackFileContent, Env: portainerEnv, Prune: false }),
-      })
-      if (!syncRes.ok) {
-        const errText = await syncRes.text()
-        await prisma.portainerConfig.update({ where: { id: cfg.id }, data: { lastSyncAt: new Date(), lastSyncOk: false } })
-        set.status = 400
-        return { error: `Portainer sync error ${syncRes.status}: ${errText}` }
+      const startMs = Date.now()
+      const syncToStack = async (stackId: number, endpointId: number, stackUrl: string, token: string) => {
+        const fileRes = await fetch(`${stackUrl}/api/stacks/${stackId}/file`, { headers: { 'X-API-Key': token } })
+        if (!fileRes.ok) throw new Error(`Stack file error: ${fileRes.status}`)
+        const { StackFileContent: rawFile } = await fileRes.json() as { StackFileContent: string }
+        const content = injectEnvFileIntoCompose(rawFile)
+        const syncRes = await fetch(`${stackUrl}/api/stacks/${stackId}?endpointId=${endpointId}`, {
+          method: 'PUT',
+          headers: { 'X-API-Key': token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ StackFileContent: content, Env: portainerEnv, Prune: false }),
+        })
+        if (!syncRes.ok) throw new Error(`Portainer sync error ${syncRes.status}: ${await syncRes.text()}`)
       }
+
+      // Sync primary stack
+      await syncToStack(cfg.stackId, cfg.endpointId, url, portainerToken)
+
+      // Sync additional targets (multi-stack)
+      const additionalTargets = await prisma.portainerStackTarget.findMany({ where: { configId: cfg.id } })
+      const targetResults: { stackName: string; ok: boolean; error?: string }[] = []
+      for (const target of additionalTargets) {
+        try {
+          let tUrl = url; let tToken = portainerToken
+          if (target.connectionId && target.connectionId !== cfg.connectionId) {
+            const tConn = await prisma.portainerConnection.findUnique({ where: { id: target.connectionId } })
+            if (tConn) { tUrl = tConn.portainerUrl.replace(/\/$/, ''); tToken = tConn.apiToken }
+          }
+          await syncToStack(target.stackId, target.endpointId, tUrl, tToken)
+          targetResults.push({ stackName: target.stackName, ok: true })
+        } catch (e) {
+          targetResults.push({ stackName: target.stackName, ok: false, error: e instanceof Error ? e.message : String(e) })
+        }
+      }
+
+      const durationMs = Date.now() - startMs
+      const secretCount = environment.vars.filter(v => v.isSecret && !v.isDisabled).length
+      const varsCount = environment.vars.filter(v => !v.isDisabled).length
+      const body = await request.json().catch(() => ({})) as any
+      const triggeredBy = (body as any)?.triggeredBy ?? 'manual'
+
       await prisma.portainerConfig.update({ where: { id: cfg.id }, data: { lastSyncAt: new Date(), lastSyncOk: true } })
-      appLog('info', `Portainer sync: ${params.slug}:${params.envName} → stack ${cfg.stackName} (${environment.vars.length} vars)`)
-      return { ok: true, varsCount: environment.vars.length, stackName: cfg.stackName }
+      await prisma.portainerSyncLog.create({ data: { configId: cfg.id, userId: caller.userId, triggeredBy, varsCount, secretCount, ok: true, durationMs } })
+      appLog('info', `Portainer sync: ${params.slug}:${params.envName} → stack ${cfg.stackName} (${varsCount} vars, ${durationMs}ms)`)
+      return { ok: true, varsCount, stackName: cfg.stackName, durationMs, additionalTargets: targetResults }
     } catch (e) {
+      const durationMs = Date.now()
+      const errMsg = e instanceof Error ? e.message : String(e)
       await prisma.portainerConfig.update({ where: { id: cfg.id }, data: { lastSyncAt: new Date(), lastSyncOk: false } }).catch(() => {})
+      await prisma.portainerSyncLog.create({ data: { configId: cfg.id, userId: caller.userId, triggeredBy: 'manual', varsCount: 0, ok: false, error: errMsg, durationMs: 0 } }).catch(() => {})
       set.status = 500
-      return { error: `Sync failed: ${e instanceof Error ? e.message : String(e)}` }
+      return { error: `Sync failed: ${errMsg}` }
     }
+  })
+
+  // Sync history
+  .get('/api/envman/projects/:slug/environments/:envName/portainer/history', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    if (!access) { set.status = 403; return { error: 'No access' } }
+    const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+    if (!project) { set.status = 404; return { error: 'Project not found' } }
+    const cfg = await prisma.portainerConfig.findUnique({ where: { projectId_envName: { projectId: project.id, envName: params.envName } } })
+    if (!cfg) return { logs: [] }
+    const limit = Math.min(Number((query as any).limit) || 20, 100)
+    const logs = await prisma.portainerSyncLog.findMany({
+      where: { configId: cfg.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: { user: { select: { id: true, name: true, email: true } } },
+    })
+    return { logs }
   })
 
   // ─── Stack Status (services + containers) ────────────────────────────────

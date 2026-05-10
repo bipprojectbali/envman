@@ -10,6 +10,7 @@ import {
   CopyButton,
   Divider,
   Group,
+  Loader,
   Menu,
   Modal,
   Paper,
@@ -24,6 +25,7 @@ import {
   Textarea,
   TextInput,
   ThemeIcon,
+  Timeline,
   Tooltip,
 } from '@mantine/core'
 import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
@@ -58,6 +60,7 @@ import {
   TbToggleLeft,
   TbToggleRight,
   TbCloud,
+  TbHistory,
   TbTrash,
   TbVariable,
   TbX,
@@ -138,6 +141,19 @@ function VarsPage() {
     queryKey: ['envman', 'vars', slug, env],
     queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`),
     refetchInterval: 15000,
+  })
+
+  const { data: portainerData } = useQuery({
+    queryKey: ['portainer', slug, env],
+    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`),
+    staleTime: 30000,
+  })
+
+  const { data: historyData } = useQuery({
+    queryKey: ['portainer', 'history', slug, env],
+    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/history`),
+    enabled: activeTab === 'history' && !!portainerData?.config,
+    staleTime: 30000,
   })
 
   const myRole: string = projectData?.project?.myRole ?? 'VIEWER'
@@ -409,13 +425,71 @@ function VarsPage() {
           </Tabs.Tab>
           <Tabs.Tab value="portainer" leftSection={<TbCloud size={14} />}>
             Portainer
+            {portainerData?.config && portainerData.unsyncedCount > 0 && (
+              <Tooltip label={`${portainerData.unsyncedCount} var belum disync ke Portainer`}>
+                <Badge size="xs" variant="filled" color="orange" ml="xs">{portainerData.unsyncedCount}</Badge>
+              </Tooltip>
+            )}
           </Tabs.Tab>
+          {portainerData?.config && (
+            <Tabs.Tab value="history" leftSection={<TbHistory size={14} />}>
+              History
+            </Tabs.Tab>
+          )}
         </Tabs.List>
       </Tabs>
 
       {/* ─── Tab: Portainer ─────────────────── */}
       {activeTab === 'portainer' && (
         <PortainerSync slug={slug} env={env} canEdit={canEdit} secretCount={secretCount} />
+      )}
+
+      {/* ─── Tab: History ───────────────────── */}
+      {activeTab === 'history' && (
+        <Stack gap="md">
+          <Group justify="space-between">
+            <Text fw={600} size="sm">Sync History</Text>
+            <Badge size="sm" variant="light" color="gray">{historyData?.logs?.length ?? 0} entri</Badge>
+          </Group>
+          {!historyData ? (
+            <Group justify="center" py="xl"><Loader size="sm" /></Group>
+          ) : historyData.logs?.length === 0 ? (
+            <Paper withBorder p="xl" ta="center" radius="md">
+              <ThemeIcon size={40} variant="light" color="gray" radius="xl" mx="auto" mb="sm"><TbHistory size={20} /></ThemeIcon>
+              <Text size="sm" c="dimmed">Belum ada riwayat sync.</Text>
+            </Paper>
+          ) : (
+            <Timeline bulletSize={24} lineWidth={2}>
+              {(historyData.logs as any[]).map((log: any) => (
+                <Timeline.Item
+                  key={log.id}
+                  bullet={log.ok ? <TbCheck size={12} /> : <TbAlertTriangle size={12} />}
+                  color={log.ok ? 'teal' : 'red'}
+                  title={
+                    <Group gap="xs">
+                      <Badge size="xs" color={log.ok ? 'teal' : 'red'} variant="light">
+                        {log.ok ? 'Berhasil' : 'Gagal'}
+                      </Badge>
+                      <Badge size="xs" variant="outline" color="gray">
+                        {log.triggeredBy === 'auto' ? 'auto-sync' : 'manual'}
+                      </Badge>
+                    </Group>
+                  }
+                >
+                  <Text size="xs" c="dimmed" mt={4}>
+                    {new Date(log.createdAt).toLocaleString('id-ID')}
+                    {log.user && ` · ${log.user.name}`}
+                    {` · ${log.varsCount} vars`}
+                    {log.durationMs && ` · ${log.durationMs}ms`}
+                  </Text>
+                  {log.error && (
+                    <Text size="xs" c="red" mt={2}>{log.error}</Text>
+                  )}
+                </Timeline.Item>
+              ))}
+            </Timeline>
+          )}
+        </Stack>
       )}
 
       {/* ─── Tab: Env Vars ─────────────────── */}

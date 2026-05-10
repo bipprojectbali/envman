@@ -5,6 +5,7 @@ import { getProjectAccess, tokenScopeAllows } from '../../lib/access'
 import { decryptSecret, encryptSecret, hasMasterKey } from '../../lib/crypto'
 import { withCache, invalidateCache, cacheKeys } from '../../lib/cache'
 import { notDeleted, softDelete } from '../../lib/db-helpers'
+import { triggerAutoSync } from './portainer'
 
 export const projectsRouter = new Elysia()
 
@@ -245,6 +246,8 @@ export const projectsRouter = new Elysia()
       update: { value: body.isSecret ? encryptSecret(body.value) : body.value, isSecret: body.isSecret ?? false },
       create: { key: body.key, value: body.isSecret ? encryptSecret(body.value) : body.value, isSecret: body.isSecret ?? false, environmentId: environment.id },
     })
+    // Auto-sync to Portainer if enabled (fire-and-forget)
+    triggerAutoSync(params.slug, params.envName, caller.userId).catch(() => {})
     return { var: { id: envVar.id, key: envVar.key, isSecret: envVar.isSecret } }
       })
 
