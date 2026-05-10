@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/envmanager/connections')({
+export const Route = createFileRoute('/envmanager/connections/$id')({
   component: () => <Outlet />,
 })

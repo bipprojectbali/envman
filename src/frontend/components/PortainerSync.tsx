@@ -6,21 +6,16 @@ import {
   Box,
   Button,
   Card,
-  Checkbox,
   Code,
   Divider,
   Group,
   Loader,
-  Menu,
   Modal,
-  NumberInput,
   Paper,
   ScrollArea,
   Select,
   Stack,
   Stepper,
-  Switch,
-  Table,
   Text,
   ThemeIcon,
   Tooltip,
@@ -28,26 +23,22 @@ import {
 import { useDisclosure } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import {
   TbAlertTriangle,
   TbCheck,
-  TbChevronDown,
+  TbChevronRight,
   TbCloud,
   TbCloudUpload,
-  TbCopy,
-  TbDownload,
   TbExternalLink,
-  TbFileText,
   TbLock,
-  TbPackage,
   TbPencil,
   TbPlug,
   TbPlugConnected,
   TbPlugConnectedX,
   TbPlus,
   TbRefresh,
-  TbRefreshDot,
   TbServer,
   TbTrash,
   TbX,
@@ -84,37 +75,19 @@ interface PortainerConfig {
   connectionName?: string | null
 }
 
-interface ContainerInfo {
-  id: string
-  shortId: string
-  names: string[]
-  image: string
-  status: string
-  state: string
-  created: number
-  ports: string[]
+interface DiffItem {
+  key: string
+  oldValue: string
+  newValue: string
 }
 
-interface ContainerListItem {
-  id: string
-  shortId: string
-  names: string[]
-  image: string
-  state: string
-  status: string
-}
-
-interface LogLine {
-  stream: 'stdout' | 'stderr'
-  timestamp: string | null
-  message: string
-}
-
-interface DanglingImage {
-  id: string
-  tags: string[]
-  size: number
-  created: number
+interface DiffResult {
+  added: string[]
+  removed: string[]
+  changed: DiffItem[]
+  unchanged: string[]
+  totalCurrent: number
+  totalProposed: number
 }
 
 const apiFetch = (url: string, opts?: RequestInit) =>
@@ -134,36 +107,10 @@ function relativeTime(dateStr: string): string {
   return `${Math.floor(h / 24)} hari lalu`
 }
 
-function fmtBytes(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${Math.round(bytes / 1024 / 1024)} MB`
-}
-
-const stateColor: Record<string, string> = {
-  running: 'teal',
-  exited: 'red',
-  paused: 'yellow',
-  restarting: 'orange',
-  dead: 'red',
-  created: 'gray',
-}
-
 export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
   const qc = useQueryClient()
   const [setupOpen, { open: openSetup, close: closeSetup }] = useDisclosure(false)
-  const [statusOpen, { open: openStatus, close: closeStatus }] = useDisclosure(false)
   const [diffOpen, { open: openDiff, close: closeDiff }] = useDisclosure(false)
-  const [cleanupOpen, { open: openCleanup, close: closeCleanup }] = useDisclosure(false)
-  const [logsOpen, { open: openLogs, close: closeLogs }] = useDisclosure(false)
-
-  // Logs state
-  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null)
-  const [logTail, setLogTail] = useState<number>(200)
-  const [showStdout, setShowStdout] = useState(true)
-  const [showStderr, setShowStderr] = useState(true)
-  const [autoRefresh, setAutoRefresh] = useState(false)
-  const [autoScroll, setAutoScroll] = useState(true)
-  const logViewportRef = useRef<HTMLDivElement>(null)
 
   const [isEditing, setIsEditing] = useState(false)
   const [step, setStep] = useState(0)
@@ -203,62 +150,11 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
     queryFn: () => apiFetch('/api/envman/portainer/connections'),
   })
 
-  const { data: statusData, isFetching: statusFetching, refetch: refetchStatus } = useQuery({
-    queryKey: ['portainer', 'status', slug, env],
-    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/status`),
-    enabled: statusOpen,
-    refetchInterval: statusOpen ? 10000 : false,
-  })
-
   const { data: diffData, isFetching: diffFetching } = useQuery({
     queryKey: ['portainer', 'diff', slug, env],
     queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/sync-preview`, { method: 'POST' }),
     enabled: diffOpen,
   })
-
-  const { data: imagesData, isFetching: imagesFetching, refetch: refetchImages } = useQuery({
-    queryKey: ['portainer', 'images', slug, env],
-    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/images/dangling`),
-    enabled: cleanupOpen,
-  })
-
-  const { data: containersData, isFetching: containersFetching } = useQuery({
-    queryKey: ['portainer', 'containers', slug, env],
-    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/containers`),
-    enabled: logsOpen,
-  })
-
-  const containers: ContainerListItem[] = containersData?.containers ?? []
-
-  const logQs = new URLSearchParams({
-    tail: String(logTail),
-    stdout: showStdout ? '1' : '0',
-    stderr: showStderr ? '1' : '0',
-    timestamps: '1',
-  })
-  const { data: logsData, isFetching: logsFetching, refetch: refetchLogs } = useQuery({
-    queryKey: ['portainer', 'logs', slug, env, selectedContainerId, logTail, showStdout, showStderr],
-    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/logs/${selectedContainerId}?${logQs}`),
-    enabled: logsOpen && !!selectedContainerId,
-    refetchInterval: autoRefresh ? 5000 : false,
-    staleTime: 0,
-  })
-
-  const logLines: LogLine[] = logsData?.lines ?? []
-
-  // Auto-select container pertama saat list tiba
-  useEffect(() => {
-    if (containers.length > 0 && !selectedContainerId) {
-      setSelectedContainerId(containers[0].id)
-    }
-  }, [containers, selectedContainerId])
-
-  // Auto-scroll ke bawah saat log baru masuk
-  useEffect(() => {
-    if (autoScroll && logViewportRef.current) {
-      logViewportRef.current.scrollTo({ top: logViewportRef.current.scrollHeight, behavior: 'smooth' })
-    }
-  }, [logLines, autoScroll])
 
   const config: PortainerConfig | null = data?.config ?? null
   const connections: PortainerConnection[] = connectionsData?.connections ?? []
@@ -296,34 +192,6 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['portainer', slug, env] }),
   })
 
-  const repull = useMutation({
-    mutationFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/repull`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['portainer', slug, env] }),
-  })
-
-  const recreate = useMutation({
-    mutationFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/recreate`, { method: 'POST' }),
-  })
-
-  const syncRepull = useMutation({
-    mutationFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/sync-repull`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['portainer', slug, env] }),
-  })
-
-  const pruneImages = useMutation({
-    mutationFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/prune/images`, { method: 'POST' }),
-    onSuccess: () => refetchImages(),
-  })
-
-  const pruneVolumes = useMutation({
-    mutationFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/prune/volumes`, { method: 'POST' }),
-  })
-
-  const pruneNetworks = useMutation({
-    mutationFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/prune/networks`, { method: 'POST' }),
-  })
-
-  // ─── Confirm helpers ──────────────────────────────────────────────────────
   const confirmSync = () =>
     modals.openConfirmModal({
       title: 'Sync vars ke Portainer',
@@ -346,107 +214,11 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
       onConfirm: () => sync.mutate(),
     })
 
-  const confirmRepull = () =>
-    modals.openConfirmModal({
-      title: 'Repull Image Terbaru',
-      children: (
-        <Stack gap="xs">
-          <Text size="sm">Pull image terbaru untuk stack <strong>{config?.stackName}</strong> dan restart container?</Text>
-          <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs">Setara dengan <Code fz="xs">docker compose pull && docker compose up -d</Code>. Container akan restart.</Text>
-          </Alert>
-        </Stack>
-      ),
-      labels: { confirm: 'Pull & Restart', cancel: 'Batal' },
-      confirmProps: { color: 'blue' },
-      onConfirm: () => repull.mutate(),
-    })
-
-  const confirmRecreate = () =>
-    modals.openConfirmModal({
-      title: 'Force Recreate Containers',
-      children: (
-        <Stack gap="xs">
-          <Text size="sm">Stop dan start ulang semua container di stack <strong>{config?.stackName}</strong>?</Text>
-          <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs">Setara dengan <Code fz="xs">docker compose stop && docker compose up -d</Code>. Image tidak di-pull ulang.</Text>
-          </Alert>
-        </Stack>
-      ),
-      labels: { confirm: 'Recreate', cancel: 'Batal' },
-      confirmProps: { color: 'orange' },
-      onConfirm: () => recreate.mutate(),
-    })
-
-  const confirmSyncRepull = () =>
-    modals.openConfirmModal({
-      title: 'Sync Vars + Repull Image',
-      children: (
-        <Stack gap="xs">
-          <Text size="sm">Sync vars <strong>{slug}:{env}</strong> sekaligus pull image terbaru ke stack <strong>{config?.stackName}</strong>?</Text>
-          {secretCount > 0 && (
-            <Alert color="red" icon={<TbLock size={14} />} p="xs">
-              <Text size="xs" fw={600} mb={2}>{secretCount} secret var akan di-decrypt dan dikirim plaintext.</Text>
-            </Alert>
-          )}
-          <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs">Operasi ini sync vars + pull image + restart container sekaligus.</Text>
-          </Alert>
-        </Stack>
-      ),
-      labels: { confirm: 'Sync + Repull', cancel: 'Batal' },
-      confirmProps: { color: 'violet' },
-      onConfirm: () => syncRepull.mutate(),
-    })
-
-  const confirmPruneImages = () =>
-    modals.openConfirmModal({
-      title: 'Hapus Dangling Images',
-      children: (
-        <Stack gap="xs">
-          <Text size="sm">
-            Hapus <strong>{imagesData?.count ?? 0} dangling image</strong> (~{imagesData?.totalSizeMB ?? 0} MB) dari host Docker?
-          </Text>
-          <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs">Hanya image yang tidak dipakai container manapun yang akan dihapus. Operasi ini tidak bisa dibatalkan.</Text>
-          </Alert>
-        </Stack>
-      ),
-      labels: { confirm: 'Hapus Images', cancel: 'Batal' },
-      confirmProps: { color: 'red' },
-      onConfirm: () => pruneImages.mutate(),
-    })
-
-  const confirmPruneVolumes = () =>
-    modals.openConfirmModal({
-      title: 'Hapus Unused Volumes',
-      children: (
-        <Stack gap="xs">
-          <Text size="sm">Hapus semua volume yang tidak dipakai container manapun?</Text>
-          <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs" fw={600}>Peringatan: Data di volume yang dihapus tidak bisa dikembalikan.</Text>
-          </Alert>
-        </Stack>
-      ),
-      labels: { confirm: 'Hapus Volumes', cancel: 'Batal' },
-      confirmProps: { color: 'red' },
-      onConfirm: () => pruneVolumes.mutate(),
-    })
-
-  const confirmPruneNetworks = () =>
-    modals.openConfirmModal({
-      title: 'Hapus Unused Networks',
-      children: <Text size="sm">Hapus semua network Docker yang tidak dipakai container manapun?</Text>,
-      labels: { confirm: 'Hapus Networks', cancel: 'Batal' },
-      confirmProps: { color: 'orange' },
-      onConfirm: () => pruneNetworks.mutate(),
-    })
-
   if (isLoading) return null
 
   const syncStatus = config?.lastSyncOk === true ? 'success' : config?.lastSyncOk === false ? 'failed' : 'never'
   const displayUrl = config?.portainerUrl ?? ''
-  const anyPending = sync.isPending || repull.isPending || recreate.isPending || syncRepull.isPending
+  const diff: DiffResult | undefined = diffData?.diff
 
   return (
     <>
@@ -457,7 +229,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
         </Group>
       } labelPosition="left" />
 
-      {/* ─── Not configured ───────────────────────────── */}
+      {/* ─── Not configured ─────────────────────────────── */}
       {!config ? (
         <Card withBorder p="sm" radius="md" style={{ borderStyle: 'dashed' }}>
           <Group justify="space-between" wrap="wrap" gap="xs">
@@ -487,8 +259,9 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
             )}
           </Group>
         </Card>
+
       ) : (
-        /* ─── Configured — status + actions ─────────── */
+        /* ─── Configured ────────────────────────────────── */
         <Group justify="space-between" wrap="wrap" gap="xs">
           {/* Info kiri */}
           <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
@@ -502,11 +275,6 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                 {config.connectionName && (
                   <Badge size="xs" variant="dot" color="violet">{config.connectionName}</Badge>
                 )}
-                <Tooltip label={displayUrl}>
-                  <Badge size="xs" variant="dot" color="gray" style={{ cursor: 'default' }}>
-                    {displayUrl.replace(/^https?:\/\//, '')}
-                  </Badge>
-                </Tooltip>
                 {syncStatus === 'success' && <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={9} />}>synced</Badge>}
                 {syncStatus === 'failed' && <Badge size="xs" color="red" variant="light" leftSection={<TbX size={9} />}>failed</Badge>}
               </Group>
@@ -515,33 +283,32 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                   {config.lastSyncAt ? `Sync ${relativeTime(config.lastSyncAt)}` : 'Belum pernah sync'}
                 </Text>
                 <Anchor size="xs" href={`${displayUrl}#!/${config.endpointId}/docker/stacks/${config.stackId}`} target="_blank" rel="noreferrer" c="dimmed">
-                  Buka Portainer <TbExternalLink size={10} style={{ verticalAlign: 'middle' }} />
+                  Portainer <TbExternalLink size={10} style={{ verticalAlign: 'middle' }} />
                 </Anchor>
-                {/* Status containers */}
-                <Anchor size="xs" c="dimmed" style={{ cursor: 'pointer' }} onClick={() => { openStatus(); refetchStatus() }}>
-                  <TbServer size={10} style={{ verticalAlign: 'middle' }} /> Status
-                </Anchor>
-                <Anchor size="xs" c="dimmed" style={{ cursor: 'pointer' }} onClick={() => { setSelectedContainerId(null); openLogs() }}>
-                  <TbFileText size={10} style={{ verticalAlign: 'middle' }} /> Logs
-                </Anchor>
+                {/* Link ke halaman detail connection */}
+                {config.connectionId && (
+                  <Anchor
+                    size="xs" c="dimmed"
+                    component={Link}
+                    to="/envmanager/connections/$id"
+                    params={{ id: config.connectionId } as any}
+                  >
+                    <TbServer size={10} style={{ verticalAlign: 'middle' }} /> Detail connection <TbChevronRight size={9} style={{ verticalAlign: 'middle' }} />
+                  </Anchor>
+                )}
               </Group>
             </Box>
           </Group>
 
-          {/* Action buttons kanan */}
+          {/* Aksi kanan */}
           <Group gap="xs" wrap="nowrap">
-            {(sync.isError || repull.isError || recreate.isError || syncRepull.isError) && (
-              <Tooltip
-                label={(sync.error || repull.error || recreate.error || syncRepull.error as Error)?.message}
-                position="left" multiline maw={260}
-              >
+            {sync.isError && (
+              <Tooltip label={(sync.error as Error).message} position="left" multiline maw={260}>
                 <Badge size="xs" color="red" variant="light" leftSection={<TbAlertTriangle size={10} />} style={{ cursor: 'help' }}>error</Badge>
               </Tooltip>
             )}
-
             {canEdit && (
               <>
-                {/* Edit + Delete */}
                 <Tooltip label="Edit konfigurasi">
                   <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEdit(config!)}>
                     <TbPencil size={13} />
@@ -553,89 +320,30 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                   </ActionIcon>
                 </Tooltip>
 
-                {/* ─── Sync (sync vars only) ─── */}
+                {/* Diff preview */}
+                <Tooltip label="Preview perubahan vars sebelum sync">
+                  <Button size="xs" variant="subtle" color="gray" leftSection={<TbPlug size={13} />} onClick={() => openDiff()}>
+                    Diff
+                  </Button>
+                </Tooltip>
+
+                {/* Sync vars */}
                 <Button
                   size="xs" color="violet"
                   variant={sync.isPending ? 'filled' : 'light'}
-                  leftSection={anyPending ? <Loader size={11} color="white" /> : <TbCloudUpload size={13} />}
+                  leftSection={sync.isPending ? <Loader size={11} color="white" /> : <TbCloudUpload size={13} />}
                   onClick={confirmSync}
                   loading={sync.isPending}
-                  disabled={anyPending && !sync.isPending}
                 >
                   Sync
                 </Button>
-
-                {/* ─── Deploy Actions dropdown ─── */}
-                <Menu shadow="md" width={230} position="bottom-end">
-                  <Menu.Target>
-                    <Button size="xs" variant="light" color="gray" rightSection={<TbChevronDown size={12} />}
-                      leftSection={<TbRefresh size={13} />}
-                      loading={repull.isPending || recreate.isPending || syncRepull.isPending}
-                    >
-                      Deploy
-                    </Button>
-                  </Menu.Target>
-                  <Menu.Dropdown>
-                    <Menu.Label>Sync + Deploy</Menu.Label>
-                    <Menu.Item leftSection={<TbCloudUpload size={14} />} onClick={confirmSyncRepull}>
-                      Sync vars + Repull image
-                      <Text size="xs" c="dimmed">Push vars & pull image terbaru</Text>
-                    </Menu.Item>
-                    <Menu.Divider />
-                    <Menu.Label>Deploy saja (tanpa sync vars)</Menu.Label>
-                    <Menu.Item leftSection={<TbRefreshDot size={14} />} onClick={confirmRepull}>
-                      Repull image
-                      <Text size="xs" c="dimmed">Pull image terbaru, restart containers</Text>
-                    </Menu.Item>
-                    <Menu.Item leftSection={<TbRefresh size={14} />} onClick={confirmRecreate}>
-                      Force recreate
-                      <Text size="xs" c="dimmed">Stop → start, tanpa pull image</Text>
-                    </Menu.Item>
-                    <Menu.Divider />
-                    <Menu.Label>Preview</Menu.Label>
-                    <Menu.Item leftSection={<TbPlug size={14} />} onClick={() => openDiff()}>
-                      Diff sebelum sync
-                      <Text size="xs" c="dimmed">Bandingkan vars envman vs Portainer</Text>
-                    </Menu.Item>
-                  </Menu.Dropdown>
-                </Menu>
-
-                {/* ─── Cleanup dropdown ─── */}
-                <Menu shadow="md" width={230} position="bottom-end">
-                  <Menu.Target>
-                    <Tooltip label="Cleanup Docker resources">
-                      <Button size="xs" variant="light" color="orange" rightSection={<TbChevronDown size={12} />}
-                        leftSection={<TbPackage size={13} />}
-                        loading={pruneImages.isPending || pruneVolumes.isPending || pruneNetworks.isPending}
-                      >
-                        Cleanup
-                      </Button>
-                    </Tooltip>
-                  </Menu.Target>
-                  <Menu.Dropdown>
-                    <Menu.Label>Docker Cleanup</Menu.Label>
-                    <Menu.Item leftSection={<TbPackage size={14} />} onClick={() => openCleanup()}>
-                      Preview & prune images
-                      <Text size="xs" c="dimmed">Lihat dan hapus dangling images</Text>
-                    </Menu.Item>
-                    <Menu.Divider />
-                    <Menu.Item leftSection={<TbTrash size={14} />} color="orange" onClick={confirmPruneVolumes}>
-                      Prune unused volumes
-                      <Text size="xs" c="dimmed">Hapus volume yang tidak dipakai</Text>
-                    </Menu.Item>
-                    <Menu.Item leftSection={<TbTrash size={14} />} onClick={confirmPruneNetworks}>
-                      Prune unused networks
-                      <Text size="xs" c="dimmed">Hapus network yang tidak dipakai</Text>
-                    </Menu.Item>
-                  </Menu.Dropdown>
-                </Menu>
               </>
             )}
           </Group>
         </Group>
       )}
 
-      {/* ─── Setup Modal ─────────────────────────────── */}
+      {/* ─── Setup Modal ────────────────────────────────── */}
       <Modal
         opened={setupOpen}
         onClose={handleClose}
@@ -663,9 +371,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               </Alert>
             ) : (
               <>
-                <Text size="xs" c="dimmed">
-                  Pilih Portainer instance untuk environment <strong>{slug}:{env}</strong>.
-                </Text>
+                <Text size="xs" c="dimmed">Pilih Portainer instance untuk environment <strong>{slug}:{env}</strong>.</Text>
                 <Select
                   label="Portainer Connection"
                   placeholder="Pilih connection..."
@@ -674,11 +380,6 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                   onChange={setSelectedConnectionId}
                   searchable
                 />
-                {selectedConnectionId && (
-                  <Alert color="blue" p="xs" icon={<TbServer size={14} />}>
-                    <Text size="xs">{connections.find(c => c.id === selectedConnectionId)?.portainerUrl}</Text>
-                  </Alert>
-                )}
                 {probeError && (
                   <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
                     <Text size="xs">{probeError}</Text>
@@ -744,99 +445,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
         )}
       </Modal>
 
-      {/* ─── Stack Status Modal ───────────────────────── */}
-      <Modal
-        opened={statusOpen}
-        onClose={closeStatus}
-        title={
-          <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="teal" radius="md"><TbServer size={13} /></ThemeIcon>
-            <Text fw={600} size="sm">Status Stack — {config?.stackName}</Text>
-            <ActionIcon size="sm" variant="subtle" color="gray" loading={statusFetching} onClick={() => refetchStatus()}>
-              <TbRefresh size={13} />
-            </ActionIcon>
-          </Group>
-        }
-        size="lg"
-      >
-        {statusFetching && !statusData ? (
-          <Group justify="center" py="xl"><Loader size="sm" /></Group>
-        ) : statusData?.stack ? (
-          <Stack gap="md">
-            {/* Stack info */}
-            <Paper withBorder p="sm" radius="md">
-              <Group justify="space-between" mb="xs">
-                <Text size="sm" fw={600}>Stack Info</Text>
-                <Badge size="sm" color={statusData.stack.status === 1 ? 'teal' : 'red'} variant="light">
-                  {statusData.stack.status === 1 ? 'Active' : 'Inactive'}
-                </Badge>
-              </Group>
-              <Group gap="xl">
-                {[
-                  ['Type', statusData.stack.type === 2 ? 'Compose' : 'Swarm'],
-                  ['Endpoint', `#${statusData.stack.endpointId}`],
-                  ['Containers', statusData.containers.length],
-                ].map(([label, value]) => (
-                  <Box key={String(label)}>
-                    <Text size="xs" c="dimmed">{label}</Text>
-                    <Text size="sm" fw={600}>{String(value)}</Text>
-                  </Box>
-                ))}
-              </Group>
-            </Paper>
-
-            {/* Containers */}
-            {statusData.containers.length > 0 ? (
-              <Box>
-                <Text size="sm" fw={600} mb="xs">Containers ({statusData.containers.length})</Text>
-                <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
-                  <Table fz="xs" horizontalSpacing="sm" verticalSpacing="xs" highlightOnHover>
-                    <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
-                      <Table.Tr>
-                        <Table.Th>Container</Table.Th>
-                        <Table.Th>Image</Table.Th>
-                        <Table.Th>Status</Table.Th>
-                        <Table.Th>Ports</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {statusData.containers.map((c: ContainerInfo) => (
-                        <Table.Tr key={c.id}>
-                          <Table.Td>
-                            <Text fz="xs" fw={500}>{c.names[0]}</Text>
-                            <Code fz={10} c="dimmed">{c.id}</Code>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text fz="xs" style={{ wordBreak: 'break-all' }}>{c.image.split('/').pop()}</Text>
-                          </Table.Td>
-                          <Table.Td>
-                            <Badge size="xs" color={stateColor[c.state] ?? 'gray'} variant="light">
-                              {c.state}
-                            </Badge>
-                          </Table.Td>
-                          <Table.Td>
-                            {c.ports.length > 0
-                              ? <Code fz={10}>{c.ports.join(', ')}</Code>
-                              : <Text fz="xs" c="dimmed">—</Text>}
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                </Paper>
-              </Box>
-            ) : (
-              <Text size="xs" c="dimmed" ta="center" py="sm">Tidak ada container running</Text>
-            )}
-          </Stack>
-        ) : (
-          <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs">{statusData?.error ?? 'Gagal mengambil status'}</Text>
-          </Alert>
-        )}
-      </Modal>
-
-      {/* ─── Diff Modal ───────────────────────────────── */}
+      {/* ─── Diff Modal ─────────────────────────────────── */}
       <Modal
         opened={diffOpen}
         onClose={closeDiff}
@@ -850,43 +459,42 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
       >
         {diffFetching ? (
           <Group justify="center" py="xl"><Loader size="sm" /></Group>
-        ) : diffData?.diff ? (
+        ) : diff ? (
           <Stack gap="md">
-            {/* Summary */}
             <Group gap="xs">
-              {diffData.diff.added.length > 0 && <Badge color="teal" variant="light">+{diffData.diff.added.length} baru</Badge>}
-              {diffData.diff.removed.length > 0 && <Badge color="red" variant="light">-{diffData.diff.removed.length} dihapus</Badge>}
-              {diffData.diff.changed.length > 0 && <Badge color="yellow" variant="light">~{diffData.diff.changed.length} berubah</Badge>}
-              {diffData.diff.unchanged.length > 0 && <Badge color="gray" variant="light">{diffData.diff.unchanged.length} sama</Badge>}
+              {diff.added.length > 0 && <Badge color="teal" variant="light">+{diff.added.length} baru</Badge>}
+              {diff.removed.length > 0 && <Badge color="red" variant="light">-{diff.removed.length} dihapus</Badge>}
+              {diff.changed.length > 0 && <Badge color="yellow" variant="light">~{diff.changed.length} berubah</Badge>}
+              {diff.unchanged.length > 0 && <Badge color="gray" variant="light">{diff.unchanged.length} sama</Badge>}
             </Group>
 
-            {diffData.diff.added.length === 0 && diffData.diff.removed.length === 0 && diffData.diff.changed.length === 0 && (
+            {diff.added.length === 0 && diff.removed.length === 0 && diff.changed.length === 0 && (
               <Alert color="teal" icon={<TbCheck size={14} />} p="xs">
-                <Text size="xs">Semua vars sudah sinkron dengan Portainer. Tidak perlu sync.</Text>
+                <Text size="xs">Semua vars sudah sinkron. Tidak perlu sync.</Text>
               </Alert>
             )}
 
             <ScrollArea.Autosize mah={400}>
               <Stack gap="xs">
-                {diffData.diff.added.map((key: string) => (
+                {diff.added.map((key: string) => (
                   <Paper key={key} p="xs" radius="sm" style={{ background: 'var(--mantine-color-teal-light)', borderLeft: '3px solid var(--mantine-color-teal-5)' }}>
                     <Group gap="xs">
                       <Badge size="xs" color="teal">+</Badge>
                       <Code fz="xs" fw={600}>{key}</Code>
-                      <Text fz="xs" c="dimmed">— akan ditambahkan ke Portainer</Text>
+                      <Text fz="xs" c="dimmed">akan ditambahkan</Text>
                     </Group>
                   </Paper>
                 ))}
-                {diffData.diff.removed.map((key: string) => (
+                {diff.removed.map((key: string) => (
                   <Paper key={key} p="xs" radius="sm" style={{ background: 'var(--mantine-color-red-light)', borderLeft: '3px solid var(--mantine-color-red-5)' }}>
                     <Group gap="xs">
                       <Badge size="xs" color="red">-</Badge>
                       <Code fz="xs" fw={600}>{key}</Code>
-                      <Text fz="xs" c="dimmed">— ada di Portainer, tidak di envman</Text>
+                      <Text fz="xs" c="dimmed">ada di Portainer, tidak di envman</Text>
                     </Group>
                   </Paper>
                 ))}
-                {diffData.diff.changed.map((item: { key: string; oldValue: string; newValue: string }) => (
+                {diff.changed.map((item: DiffItem) => (
                   <Paper key={item.key} p="xs" radius="sm" style={{ background: 'var(--mantine-color-yellow-light)', borderLeft: '3px solid var(--mantine-color-yellow-5)' }}>
                     <Group gap="xs" mb={4}>
                       <Badge size="xs" color="yellow">~</Badge>
@@ -901,9 +509,8 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               </Stack>
             </ScrollArea.Autosize>
 
-            {(diffData.diff.added.length > 0 || diffData.diff.changed.length > 0) && (
+            {(diff.added.length > 0 || diff.changed.length > 0) && (
               <>
-                <Divider />
                 <Button fullWidth color="violet" leftSection={<TbCloudUpload size={14} />}
                   onClick={() => { closeDiff(); confirmSync() }}>
                   Lanjut Sync
@@ -916,310 +523,6 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
             <Text size="xs">{diffData?.error ?? 'Gagal mengambil diff'}</Text>
           </Alert>
         )}
-      </Modal>
-
-      {/* ─── Cleanup Modal ────────────────────────────── */}
-      <Modal
-        opened={cleanupOpen}
-        onClose={closeCleanup}
-        title={
-          <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="orange" radius="md"><TbPackage size={13} /></ThemeIcon>
-            <Text fw={600} size="sm">Cleanup Docker — {config?.connectionName}</Text>
-            <ActionIcon size="sm" variant="subtle" color="gray" loading={imagesFetching} onClick={() => refetchImages()}>
-              <TbRefresh size={13} />
-            </ActionIcon>
-          </Group>
-        }
-        size="lg"
-      >
-        <Stack gap="md">
-          {/* Dangling images */}
-          <Box>
-            <Group justify="space-between" mb="xs">
-              <Group gap="xs">
-                <Text size="sm" fw={600}>Dangling Images</Text>
-                {imagesData && (
-                  <Badge size="sm" variant="light" color={imagesData.count > 0 ? 'orange' : 'teal'}>
-                    {imagesData.count} image — {imagesData.totalSizeMB} MB
-                  </Badge>
-                )}
-              </Group>
-              {canEdit && imagesData?.count > 0 && (
-                <Button size="xs" color="red" variant="light"
-                  leftSection={<TbTrash size={13} />}
-                  loading={pruneImages.isPending}
-                  onClick={confirmPruneImages}>
-                  Prune Images
-                </Button>
-              )}
-            </Group>
-
-            {imagesFetching && !imagesData ? (
-              <Group justify="center" py="md"><Loader size="sm" /></Group>
-            ) : imagesData?.count === 0 ? (
-              <Alert color="teal" icon={<TbCheck size={14} />} p="xs">
-                <Text size="xs">Tidak ada dangling images. Docker host bersih!</Text>
-              </Alert>
-            ) : imagesData?.images ? (
-              <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
-                <ScrollArea.Autosize mah={250}>
-                  <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
-                    <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
-                      <Table.Tr>
-                        <Table.Th>ID</Table.Th>
-                        <Table.Th>Tags</Table.Th>
-                        <Table.Th>Size</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {imagesData.images.map((img: DanglingImage) => (
-                        <Table.Tr key={img.id}>
-                          <Table.Td><Code fz={10}>{img.id}</Code></Table.Td>
-                          <Table.Td>
-                            {img.tags.length > 0
-                              ? <Code fz={10}>{img.tags[0]}</Code>
-                              : <Text fz="xs" c="dimmed">&lt;none&gt;</Text>}
-                          </Table.Td>
-                          <Table.Td><Text fz="xs">{fmtBytes(img.size)}</Text></Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                </ScrollArea.Autosize>
-              </Paper>
-            ) : null}
-          </Box>
-
-          {/* Volumes + Networks */}
-          {canEdit && (
-            <>
-              <Divider label="Cleanup lainnya" labelPosition="center" />
-              <Group gap="xs">
-                <Button size="xs" variant="light" color="orange" leftSection={<TbTrash size={13} />}
-                  loading={pruneVolumes.isPending} onClick={confirmPruneVolumes}>
-                  Prune Volumes
-                </Button>
-                <Button size="xs" variant="light" color="gray" leftSection={<TbTrash size={13} />}
-                  loading={pruneNetworks.isPending} onClick={confirmPruneNetworks}>
-                  Prune Networks
-                </Button>
-              </Group>
-              {pruneVolumes.isSuccess && (
-                <Alert color="teal" icon={<TbCheck size={14} />} p="xs">
-                  <Text size="xs">Volumes dihapus: {(pruneVolumes.data as any)?.deletedVolumes?.join(', ') || 'tidak ada yang dihapus'}</Text>
-                </Alert>
-              )}
-              {pruneNetworks.isSuccess && (
-                <Alert color="teal" icon={<TbCheck size={14} />} p="xs">
-                  <Text size="xs">Networks dihapus: {(pruneNetworks.data as any)?.deletedNetworks?.join(', ') || 'tidak ada yang dihapus'}</Text>
-                </Alert>
-              )}
-            </>
-          )}
-        </Stack>
-      </Modal>
-
-      {/* ─── Logs Modal ───────────────────────────────── */}
-      <Modal
-        opened={logsOpen}
-        onClose={() => { closeLogs(); setAutoRefresh(false) }}
-        title={
-          <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="gray" radius="md"><TbFileText size={13} /></ThemeIcon>
-            <Text fw={600} size="sm">Container Logs — {config?.stackName}</Text>
-          </Group>
-        }
-        size="xl"
-        fullScreen={typeof window !== 'undefined' && window.innerWidth < 768}
-      >
-        <Stack gap="sm">
-          {/* Container selector */}
-          {containersFetching && containers.length === 0 ? (
-            <Group justify="center" py="xs"><Loader size="xs" /></Group>
-          ) : containers.length === 0 ? (
-            <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-              <Text size="xs">Tidak ada container yang running di stack ini.</Text>
-            </Alert>
-          ) : (
-            <Select
-              label="Container"
-              size="xs"
-              data={containers.map(c => ({
-                value: c.id,
-                label: c.names[0] ?? c.shortId,
-                description: `${c.image.split('/').pop()?.split(':')[0]} · ${c.state}`,
-              }))}
-              value={selectedContainerId}
-              onChange={v => { setSelectedContainerId(v); }}
-              leftSection={
-                selectedContainerId ? (
-                  <Badge size="xs" color={stateColor[containers.find(c => c.id === selectedContainerId)?.state ?? ''] ?? 'gray'} variant="dot" style={{ pointerEvents: 'none' }}>
-                    {containers.find(c => c.id === selectedContainerId)?.state}
-                  </Badge>
-                ) : undefined
-              }
-            />
-          )}
-
-          {/* Toolbar */}
-          <Group justify="space-between" wrap="wrap" gap="xs">
-            <Group gap="xs">
-              <NumberInput
-                size="xs"
-                w={90}
-                min={10}
-                max={1000}
-                step={50}
-                value={logTail}
-                onChange={v => setLogTail(Number(v) || 200)}
-                label="Tail"
-                hideControls={false}
-              />
-              <Stack gap={2} pt={2}>
-                <Checkbox size="xs" label="stdout" checked={showStdout} onChange={e => setShowStdout(e.currentTarget.checked)} />
-                <Checkbox size="xs" label="stderr" checked={showStderr} onChange={e => setShowStderr(e.currentTarget.checked)} />
-              </Stack>
-            </Group>
-            <Group gap="xs" align="flex-end">
-              <Switch size="xs" label="Auto refresh 5s" checked={autoRefresh} onChange={e => setAutoRefresh(e.currentTarget.checked)} />
-              <Switch size="xs" label="Auto scroll" checked={autoScroll} onChange={e => setAutoScroll(e.currentTarget.checked)} />
-              <Tooltip label="Refresh">
-                <ActionIcon size="sm" variant="subtle" color="gray" loading={logsFetching} onClick={() => refetchLogs()}>
-                  <TbRefresh size={13} />
-                </ActionIcon>
-              </Tooltip>
-              {/* Copy logs */}
-              <Tooltip label="Copy semua logs">
-                <ActionIcon size="sm" variant="subtle" color="gray"
-                  disabled={logLines.length === 0}
-                  onClick={() => {
-                    const text = logLines.map(l => `[${l.stream}] ${l.timestamp ? new Date(l.timestamp).toLocaleTimeString('id-ID') + ' ' : ''}${l.message}`).join('\n')
-                    navigator.clipboard.writeText(text)
-                  }}>
-                  <TbCopy size={13} />
-                </ActionIcon>
-              </Tooltip>
-              {/* Download logs */}
-              <Tooltip label="Download sebagai .log">
-                <ActionIcon size="sm" variant="subtle" color="gray"
-                  disabled={logLines.length === 0}
-                  onClick={() => {
-                    const text = logLines.map(l => `[${l.stream.toUpperCase()}] ${l.timestamp ?? ''} ${l.message}`).join('\n')
-                    const blob = new Blob([text], { type: 'text/plain' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `${config?.stackName ?? 'container'}-${selectedContainerId?.slice(0, 8) ?? 'logs'}.log`
-                    a.click()
-                    URL.revokeObjectURL(url)
-                  }}>
-                  <TbDownload size={13} />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-          </Group>
-
-          {/* Log output */}
-          {!selectedContainerId ? (
-            <Text size="xs" c="dimmed" ta="center" py="md">Pilih container untuk melihat logs</Text>
-          ) : logsFetching && logLines.length === 0 ? (
-            <Group justify="center" py="xl"><Loader size="sm" /></Group>
-          ) : logsData?.error ? (
-            <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
-              <Text size="xs">{logsData.error}</Text>
-            </Alert>
-          ) : (
-            <Paper withBorder radius="sm" style={{ overflow: 'hidden', position: 'relative' }}>
-              {/* Header bar */}
-              <Group px="xs" py={4} justify="space-between"
-                style={{ background: 'var(--mantine-color-dark-7)', borderBottom: '1px solid var(--mantine-color-dark-5)' }}>
-                <Group gap="xs">
-                  <Badge size="xs" color="gray" variant="filled">{logLines.length} baris</Badge>
-                  {autoRefresh && <Badge size="xs" color="teal" variant="dot">live</Badge>}
-                  {logsFetching && <Loader size={10} color="gray" />}
-                </Group>
-                <Text fz={10} c="dimmed" ff="monospace">
-                  {selectedContainerId?.slice(0, 12)}
-                </Text>
-              </Group>
-
-              {/* Log content */}
-              <ScrollArea.Autosize
-                mah={420}
-                viewportRef={logViewportRef}
-                onScrollPositionChange={({ y }) => {
-                  if (logViewportRef.current) {
-                    const { scrollHeight, clientHeight } = logViewportRef.current
-                    setAutoScroll(y + clientHeight >= scrollHeight - 20)
-                  }
-                }}
-              >
-                <Box
-                  p="xs"
-                  style={{
-                    background: '#0d1117',
-                    fontFamily: "'Courier New', Courier, monospace",
-                    fontSize: 12,
-                    lineHeight: 1.6,
-                    minHeight: 120,
-                  }}
-                >
-                  {logLines.length === 0 ? (
-                    <Text fz={11} c="dimmed" ff="monospace">(tidak ada log)</Text>
-                  ) : (
-                    logLines.map((line, i) => (
-                      <Box
-                        key={i}
-                        style={{
-                          display: 'flex',
-                          gap: 8,
-                          color: line.stream === 'stderr' ? '#ff7b72' : '#e6edf3',
-                          alignItems: 'flex-start',
-                        }}
-                      >
-                        {/* Timestamp */}
-                        {line.timestamp && (
-                          <Text
-                            span
-                            fz={10}
-                            ff="monospace"
-                            style={{ color: '#8b949e', flexShrink: 0, userSelect: 'none', paddingTop: 1 }}
-                          >
-                            {new Date(line.timestamp).toLocaleTimeString('id-ID', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                          </Text>
-                        )}
-                        {/* Stream badge */}
-                        <Text
-                          span fz={9} ff="monospace"
-                          style={{
-                            color: line.stream === 'stderr' ? '#ff7b72' : '#7ee787',
-                            flexShrink: 0,
-                            paddingTop: 2,
-                            userSelect: 'none',
-                          }}
-                        >
-                          {line.stream === 'stderr' ? 'ERR' : 'OUT'}
-                        </Text>
-                        {/* Message */}
-                        <Text
-                          span fz={12} ff="monospace"
-                          style={{
-                            color: line.stream === 'stderr' ? '#ff7b72' : '#e6edf3',
-                            wordBreak: 'break-all',
-                            whiteSpace: 'pre-wrap',
-                          }}
-                        >
-                          {line.message}
-                        </Text>
-                      </Box>
-                    ))
-                  )}
-                </Box>
-              </ScrollArea.Autosize>
-            </Paper>
-          )}
-        </Stack>
       </Modal>
     </>
   )

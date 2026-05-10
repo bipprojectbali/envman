@@ -93,6 +93,271 @@ export const portainerRouter = new Elysia()
     }
       })
 
+  // ─── Connection detail: list stacks + linked envs ────────────────────────
+  .get('/api/envman/portainer/connections/:id/stacks', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    try {
+      // Fetch all stacks from Portainer
+      const res = await fetch(`${url}/api/stacks`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!res.ok) { set.status = 400; return { error: `Portainer error ${res.status}: ${await res.text()}` } }
+      const rawStacks = await res.json() as any[]
+
+      // Find which envman environments are linked to each stack
+      const configs = await prisma.portainerConfig.findMany({
+        where: { connectionId: params.id },
+        include: { project: { select: { slug: true, name: true } } },
+      })
+
+      const stacks = rawStacks.map(s => {
+        const linked = configs.filter(c => c.stackId === s.Id).map(c => ({
+          slug: c.project.slug,
+          projectName: c.project.name,
+          envName: c.envName,
+          lastSyncAt: c.lastSyncAt,
+          lastSyncOk: c.lastSyncOk,
+        }))
+        return {
+          id: s.Id,
+          name: s.Name,
+          status: s.Status,       // 1=active, 2=inactive
+          type: s.Type,           // 1=swarm, 2=compose
+          endpointId: s.EndpointId,
+          createdAt: s.CreationDate,
+          updatedAt: s.UpdateDate,
+          linkedEnvs: linked,
+        }
+      })
+
+      return { connection: { id: conn.id, name: conn.name, portainerUrl: conn.portainerUrl }, stacks }
+    } catch (e) {
+      set.status = 500
+      return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Stack status + containers (by connectionId)
+  .get('/api/envman/portainer/connections/:id/stacks/:stackId/status', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const stackId = Number(params.stackId)
+    try {
+      const stackRes = await fetch(`${url}/api/stacks/${stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!stackRes.ok) { set.status = 400; return { error: `Portainer error ${stackRes.status}` } }
+      const stack = await stackRes.json() as any
+
+      const label = encodeURIComponent(JSON.stringify({ 'com.docker.compose.project': [stack.Name] }))
+      const cRes = await fetch(`${url}/api/endpoints/${stack.EndpointId}/docker/containers/json?all=1&filters=${label}`, { headers: { 'X-API-Key': conn.apiToken } })
+      const containers = cRes.ok ? (await cRes.json() as any[]) : []
+
+      return {
+        stack: { id: stack.Id, name: stack.Name, status: stack.Status, type: stack.Type, endpointId: stack.EndpointId },
+        containers: containers.map(c => ({
+          id: c.Id, shortId: c.Id.slice(0, 12),
+          names: c.Names.map((n: string) => n.replace(/^\//, '')),
+          image: c.Image, status: c.Status, state: c.State,
+          ports: c.Ports?.map((p: any) => p.PublicPort ? `${p.PublicPort}:${p.PrivatePort}` : null).filter(Boolean) ?? [],
+        })),
+      }
+    } catch (e) {
+      set.status = 500; return { error: `Status failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Container logs (by connectionId)
+  .get('/api/envman/portainer/connections/:id/stacks/:stackId/logs/:containerId', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+
+    // Need endpointId — fetch stack to get it
+    const stackRes = await fetch(`${url}/api/stacks/${params.stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
+    if (!stackRes.ok) { set.status = 400; return { error: `Stack not found` } }
+    const stack = await stackRes.json() as any
+
+    const tail = Math.min(Number((query as any).tail) || 200, 1000)
+    const stdout = (query as any).stdout !== '0' ? 1 : 0
+    const stderr = (query as any).stderr !== '0' ? 1 : 0
+    const timestamps = (query as any).timestamps !== '0' ? 1 : 0
+
+    try {
+      const qs = new URLSearchParams({ stdout: String(stdout), stderr: String(stderr), tail: String(tail), timestamps: String(timestamps) })
+      const res = await fetch(`${url}/api/endpoints/${stack.EndpointId}/docker/containers/${params.containerId}/logs?${qs}`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!res.ok) { set.status = 400; return { error: `Logs error ${res.status}: ${await res.text()}` } }
+
+      const buf = Buffer.from(await res.arrayBuffer())
+      const lines: { stream: 'stdout' | 'stderr'; timestamp: string | null; message: string }[] = []
+      let offset = 0
+      while (offset < buf.length) {
+        if (offset + 8 > buf.length) break
+        const streamType = buf[offset]
+        const size = buf.readUInt32BE(offset + 4)
+        offset += 8
+        if (offset + size > buf.length) break
+        const payload = buf.slice(offset, offset + size).toString('utf8')
+        offset += size
+        for (const raw of payload.split('\n')) {
+          const line = raw.trimEnd()
+          if (!line) continue
+          let timestamp: string | null = null; let message = line
+          if (timestamps) {
+            const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\s(.*)$/)
+            if (tsMatch) { timestamp = tsMatch[1]; message = tsMatch[2] }
+          }
+          lines.push({ stream: streamType === 2 ? 'stderr' : 'stdout', timestamp, message })
+        }
+      }
+      return { lines, total: lines.length }
+    } catch (e) {
+      set.status = 500; return { error: `Logs failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Repull image (by connectionId)
+  .post('/api/envman/portainer/connections/:id/stacks/:stackId/repull', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const stackId = Number(params.stackId)
+    try {
+      const fileRes = await fetch(`${url}/api/stacks/${stackId}/file`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!fileRes.ok) { set.status = 400; return { error: `Stack file error ${fileRes.status}` } }
+      const { StackFileContent } = await fileRes.json() as { StackFileContent: string }
+      const stackRes = await fetch(`${url}/api/stacks/${stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
+      const stackData = stackRes.ok ? await stackRes.json() as any : { Env: [], EndpointId: 1 }
+      const res = await fetch(`${url}/api/stacks/${stackId}?endpointId=${stackData.EndpointId}`, {
+        method: 'PUT',
+        headers: { 'X-API-Key': conn.apiToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ StackFileContent, Env: stackData.Env ?? [], Prune: false, PullImage: true }),
+      })
+      if (!res.ok) { set.status = 400; return { error: `Repull failed: ${res.status} ${await res.text()}` } }
+      appLog('info', `Portainer repull via connection ${conn.name}: stack ${stackId}`)
+      return { ok: true, stackName: stackData.Name }
+    } catch (e) {
+      set.status = 500; return { error: `Repull failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Force recreate (stop → start, by connectionId)
+  .post('/api/envman/portainer/connections/:id/stacks/:stackId/recreate', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const stackId = Number(params.stackId)
+    try {
+      const stackRes = await fetch(`${url}/api/stacks/${stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
+      const stackData = stackRes.ok ? await stackRes.json() as any : { EndpointId: 1, Name: String(stackId) }
+      const endpointId = stackData.EndpointId ?? 1
+      const stopRes = await fetch(`${url}/api/stacks/${stackId}/stop?endpointId=${endpointId}`, { method: 'POST', headers: { 'X-API-Key': conn.apiToken } })
+      if (!stopRes.ok) { set.status = 400; return { error: `Stop failed: ${stopRes.status}` } }
+      const startRes = await fetch(`${url}/api/stacks/${stackId}/start?endpointId=${endpointId}`, { method: 'POST', headers: { 'X-API-Key': conn.apiToken } })
+      if (!startRes.ok) { set.status = 400; return { error: `Start failed: ${startRes.status}` } }
+      appLog('info', `Portainer recreate via connection ${conn.name}: stack ${stackId}`)
+      return { ok: true, stackName: stackData.Name }
+    } catch (e) {
+      set.status = 500; return { error: `Recreate failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Dangling images (by connectionId, endpointId from query or default 1)
+  .get('/api/envman/portainer/connections/:id/images/dangling', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const endpointId = Number((query as any).endpointId) || 1
+    try {
+      const filters = encodeURIComponent(JSON.stringify({ dangling: ['true'] }))
+      const res = await fetch(`${url}/api/endpoints/${endpointId}/docker/images/json?filters=${filters}`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!res.ok) { set.status = 400; return { error: `Portainer error ${res.status}` } }
+      const images = await res.json() as any[]
+      const totalSize = images.reduce((acc, img) => acc + (img.Size ?? 0), 0)
+      return {
+        images: images.map(img => ({ id: img.Id.replace('sha256:', '').slice(0, 12), tags: img.RepoTags ?? [], size: img.Size, created: img.Created })),
+        count: images.length,
+        totalSizeMB: Math.round(totalSize / 1024 / 1024),
+        endpointId,
+      }
+    } catch (e) {
+      set.status = 500; return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Prune images (by connectionId)
+  .post('/api/envman/portainer/connections/:id/prune/images', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const endpointId = Number((query as any).endpointId) || 1
+    try {
+      const res = await fetch(`${url}/api/endpoints/${endpointId}/docker/images/prune`, {
+        method: 'POST', headers: { 'X-API-Key': conn.apiToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Filters: { dangling: ['true'] } }),
+      })
+      if (!res.ok) { set.status = 400; return { error: `Prune failed: ${res.status}` } }
+      const result = await res.json() as any
+      const reclaimedMB = Math.round((result.SpaceReclaimed ?? 0) / 1024 / 1024)
+      appLog('info', `Portainer prune images via connection ${conn.name} — ${reclaimedMB}MB`)
+      return { ok: true, deletedCount: result.ImagesDeleted?.length ?? 0, reclaimedMB }
+    } catch (e) {
+      set.status = 500; return { error: `Prune failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Prune volumes (by connectionId)
+  .post('/api/envman/portainer/connections/:id/prune/volumes', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const endpointId = Number((query as any).endpointId) || 1
+    try {
+      const res = await fetch(`${url}/api/endpoints/${endpointId}/docker/volumes/prune`, { method: 'POST', headers: { 'X-API-Key': conn.apiToken, 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      if (!res.ok) { set.status = 400; return { error: `Prune volumes failed: ${res.status}` } }
+      const result = await res.json() as any
+      const reclaimedMB = Math.round((result.SpaceReclaimed ?? 0) / 1024 / 1024)
+      appLog('info', `Portainer prune volumes via connection ${conn.name}`)
+      return { ok: true, deletedVolumes: result.VolumesDeleted ?? [], reclaimedMB }
+    } catch (e) {
+      set.status = 500; return { error: `Prune volumes failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Prune networks (by connectionId)
+  .post('/api/envman/portainer/connections/:id/prune/networks', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const endpointId = Number((query as any).endpointId) || 1
+    try {
+      const res = await fetch(`${url}/api/endpoints/${endpointId}/docker/networks/prune`, { method: 'POST', headers: { 'X-API-Key': conn.apiToken, 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      if (!res.ok) { set.status = 400; return { error: `Prune networks failed: ${res.status}` } }
+      const result = await res.json() as any
+      appLog('info', `Portainer prune networks via connection ${conn.name}`)
+      return { ok: true, deletedNetworks: result.NetworksDeleted ?? [] }
+    } catch (e) {
+      set.status = 500; return { error: `Prune networks failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
       // ─── Portainer Integration ────────────────────────────
   .get('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
