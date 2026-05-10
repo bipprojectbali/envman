@@ -81,11 +81,13 @@ function VarsPage() {
   // modals
   const [addOpen, { open: openAdd, close: closeAdd }] = useDisclosure(false)
   const [bulkOpen, { open: openBulk, close: closeBulk }] = useDisclosure(false)
+  const [editEnvOpen, { open: openEditEnv, close: closeEditEnv }] = useDisclosure(false)
 
   // form state
   const [form, setForm] = useState({ key: '', value: '', isSecret: false })
   const [bulkText, setBulkText] = useState('')
   const [bulkAllSecret, setBulkAllSecret] = useState(false)
+  const [editEnvText, setEditEnvText] = useState('')
 
   // table state
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
@@ -236,6 +238,47 @@ function VarsPage() {
     onSuccess: (data: { count: number }) => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); closeBulk(); setBulkText(''); setBulkAllSecret(false); notifyOk(`${data.count} variabel berhasil diimpor`) },
     onError: (e) => notifyErr(e),
   })
+
+  const parsedEditEnv = useMemo(() => {
+    const result: { key: string; value: string }[] = []
+    for (const raw of editEnvText.split('\n')) {
+      const line = raw.trim()
+      if (!line || line.startsWith('#')) continue
+      const eq = line.indexOf('=')
+      if (eq === -1) continue
+      const key = line.slice(0, eq).trim()
+      if (!key) continue
+      let value = line.slice(eq + 1)
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+        value = value.slice(1, -1)
+      result.push({ key, value })
+    }
+    return result
+  }, [editEnvText])
+
+  const editEnvSave = useMutation({
+    mutationFn: () => {
+      const secretKeys = vars.filter(v => v.isSecret).map(v => v.key)
+      return apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          vars: Object.fromEntries(parsedEditEnv.map(({ key, value }) => [key, value])),
+          secrets: secretKeys.filter(k => parsedEditEnv.some(p => p.key === k)),
+        }),
+      })
+    },
+    onSuccess: (data: { count: number }) => {
+      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })
+      closeEditEnv()
+      notifyOk(`${data.count} variabel disimpan`)
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  const openEditEnvModal = () => {
+    setEditEnvText(toEnvText(vars.filter(v => v.value !== '***')))
+    openEditEnv()
+  }
 
   const parsedBulk = useMemo(() => {
     const result: { key: string; value: string }[] = []
@@ -468,6 +511,11 @@ function VarsPage() {
               <Button size="xs" variant="subtle" leftSection={<TbFileImport size={13} />} onClick={openBulk}>
                 Paste .env
               </Button>
+              {vars.length > 0 && (
+                <Button size="xs" variant="subtle" leftSection={<TbPencil size={13} />} onClick={openEditEnvModal}>
+                  Edit .env
+                </Button>
+              )}
               <Button size="xs" leftSection={<TbPlus size={13} />} onClick={openAdd}>
                 Add Var
               </Button>
@@ -790,6 +838,41 @@ function VarsPage() {
             leftSection={<TbFileImport size={14} />}
           >
             Import {parsedBulk.length > 0 ? `${parsedBulk.length} variable(s)` : ''}
+          </Button>
+        </Stack>
+      </Modal>
+
+      {/* ─── Edit .env modal ───────────────── */}
+      <Modal opened={editEnvOpen} onClose={closeEditEnv} title={`Edit .env — ${slug}:${env}`} size="lg">
+        <Stack gap="sm">
+          {secretCount > 0 && (
+            <Alert color="orange" icon={<TbAlertTriangle size={14} />} py="xs">
+              <Text size="xs">
+                <strong>{secretCount} secret var</strong> tidak ditampilkan (nilai tersembunyi).
+                Secret vars yang ada akan tetap dipertahankan — hanya plain vars yang bisa diedit di sini.
+              </Text>
+            </Alert>
+          )}
+          <Textarea
+            label="Konten .env"
+            description="Edit langsung. Setiap baris KEY=value. Komentar (#) diabaikan."
+            value={editEnvText}
+            onChange={e => setEditEnvText(e.target.value)}
+            autosize
+            minRows={8}
+            maxRows={20}
+            styles={{ input: { fontFamily: 'monospace', fontSize: 12 } }}
+          />
+          {parsedEditEnv.length > 0 && (
+            <Text size="xs" c="dimmed">{parsedEditEnv.length} variabel terdeteksi</Text>
+          )}
+          <Button
+            onClick={() => editEnvSave.mutate()}
+            loading={editEnvSave.isPending}
+            disabled={parsedEditEnv.length === 0}
+            leftSection={<TbCheck size={14} />}
+          >
+            Simpan {parsedEditEnv.length > 0 ? `${parsedEditEnv.length} variable(s)` : ''}
           </Button>
         </Stack>
       </Modal>
