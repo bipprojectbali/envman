@@ -183,6 +183,15 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
               <ThemeToggle />
               <Button
                 component={Link}
+                to="/docs"
+                size="sm"
+                variant="subtle"
+                color="gray"
+              >
+                Docs
+              </Button>
+              <Button
+                component={Link}
                 to="/login"
                 size="sm"
                 variant="gradient"
@@ -602,14 +611,19 @@ ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<TOKEN> \\
       {/* ─── Footer ──────────────────────────────────────────────────── */}
       <Box style={{ borderTop: '1px solid var(--mantine-color-default-border)' }} py="md">
         <Container size="lg">
-          <Group justify="space-between" wrap="nowrap">
+          <Group justify="space-between" wrap="wrap" gap="xs">
             <Group gap="xs">
               <ThemeIcon size={22} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="sm">
                 <TbVariable size={11} />
               </ThemeIcon>
               <Text size="xs" fw={600}>Env Manager</Text>
             </Group>
-            <Text size="xs" c="dimmed">Self-hosted. Data tetap milikmu.</Text>
+            <Group gap="md">
+              <Button component={Link} to="/docs" size="compact-xs" variant="subtle" color="gray">
+                Docs
+              </Button>
+              <Text size="xs" c="dimmed">Self-hosted. Data tetap milikmu.</Text>
+            </Group>
           </Group>
         </Container>
       </Box>

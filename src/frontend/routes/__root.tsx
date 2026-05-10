@@ -15,7 +15,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   errorComponent: ({ error }) => <ErrorPage error={error} />,
 })
 
-const PUBLIC_ROUTES = ['/', '/login', '/blocked']
+const PUBLIC_ROUTES = ['/', '/login', '/blocked', '/docs']
 
 function SessionGuard() {
   const { data, isLoading } = useSession()
