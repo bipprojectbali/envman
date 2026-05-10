@@ -1108,6 +1108,20 @@ function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpenModal,
                 </Box>
 
                 <Group gap={4} wrap="nowrap" onClick={e => e.stopPropagation()}>
+                  <CopyButton value={note.body} timeout={2000}>
+                    {({ copied, copy }) => (
+                      <Tooltip label={copied ? 'Tersalin!' : 'Copy'} position="left">
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          color={copied ? 'teal' : 'gray'}
+                          onClick={e => { e.stopPropagation(); copy() }}
+                        >
+                          {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </CopyButton>
                   {(isOwner || (canEdit && note.author.id === myUserId)) && (
                     <Tooltip label={note.pinned ? 'Unpin' : 'Pin'} position="left">
                       <ActionIcon
