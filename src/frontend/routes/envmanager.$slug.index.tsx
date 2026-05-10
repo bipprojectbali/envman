@@ -96,6 +96,8 @@ function ProjectDetailPage() {
   const qc = useQueryClient()
   const { data: sessionData } = useSession()
   const myUserId = sessionData?.user?.id
+  const [noteModal, setNoteModal] = useState<Note | null | 'new'>(null)
+  const [noteView, setNoteView] = useState<Note | null>(null)
   const [newEnvName, setNewEnvName] = useState('')
   const [envSearch, setEnvSearch] = useState('')
   const [envSort, setEnvSort] = useState<'name' | 'vars'>('name')
@@ -631,9 +633,29 @@ function ProjectDetailPage() {
         </Tabs.Panel>
         {/* ── Notes tab ────────────────────── */}
         <Tabs.Panel value="notes">
-          <NotesPanel slug={slug} canEdit={canEdit} isOwner={isOwner} myUserId={myUserId ?? ''} />
+          <NotesPanel
+            slug={slug}
+            canEdit={canEdit}
+            isOwner={isOwner}
+            myUserId={myUserId ?? ''}
+            openModal={noteModal}
+            setOpenModal={setNoteModal}
+            viewNote={noteView}
+            setViewNote={setNoteView}
+          />
         </Tabs.Panel>
       </Tabs>
+
+      {/* ─── Note modals — di luar Tabs agar tidak konflik z-index ── */}
+      <NoteFormModal slug={slug} openNote={noteModal} setOpenNote={setNoteModal} />
+      <NoteViewModal
+        slug={slug}
+        note={noteView}
+        onClose={() => setNoteView(null)}
+        canEditNote={(note) => isOwner || (canEdit && note.author.id === (myUserId ?? ''))}
+        onEdit={(note) => { setNoteView(null); setNoteModal(note) }}
+        onDelete={(note) => { setNoteView(null) }}
+      />
     </Box>
   )
 }
@@ -699,8 +721,8 @@ function NoteForm({
         placeholder="Judul note..."
         value={title}
         onChange={e => setTitle(e.target.value)}
-        required
         autoFocus
+        onKeyDown={e => { if (e.key === 'Enter') e.preventDefault() }}
       />
 
       <Box>
@@ -761,8 +783,9 @@ function NoteForm({
       />
 
       <Group justify="flex-end" gap="xs" mt="xs">
-        <Button variant="subtle" color="gray" onClick={onClose}>Batal</Button>
+        <Button type="button" variant="subtle" color="gray" onClick={onClose}>Batal</Button>
         <Button
+          type="button"
           leftSection={<TbFileText size={14} />}
           onClick={() => save.mutate()}
           loading={save.isPending}
@@ -775,15 +798,138 @@ function NoteForm({
   )
 }
 
+// ─── NoteFormModal (di luar Tabs) ─────────────────────────────────────────────
+
+function NoteFormModal({ slug, openNote, setOpenNote }: { slug: string; openNote: Note | null | 'new'; setOpenNote: (n: Note | null | 'new') => void }) {
+  return (
+    <Modal
+      opened={openNote !== null}
+      onClose={() => setOpenNote(null)}
+      title={openNote === 'new' ? 'Buat Note Baru' : 'Edit Note'}
+      size="xl"
+      zIndex={300}
+      styles={{ body: { paddingTop: 8 } }}
+    >
+      {openNote !== null && (
+        <NoteForm
+          slug={slug}
+          note={openNote === 'new' ? undefined : openNote}
+          onClose={() => setOpenNote(null)}
+        />
+      )}
+    </Modal>
+  )
+}
+
+// ─── NoteViewModal (di luar Tabs) ─────────────────────────────────────────────
+
+function NoteViewModal({
+  slug,
+  note,
+  onClose,
+  canEditNote,
+  onEdit,
+  onDelete,
+}: {
+  slug: string
+  note: Note | null
+  onClose: () => void
+  canEditNote: (note: Note) => boolean
+  onEdit: (note: Note) => void
+  onDelete: (note: Note) => void
+}) {
+  const qc = useQueryClient()
+
+  function relTime(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime()
+    const m = Math.floor(diff / 60000)
+    if (m < 1) return 'baru saja'
+    if (m < 60) return `${m}m lalu`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}j lalu`
+    const d = Math.floor(h / 24)
+    if (d < 30) return `${d}h lalu`
+    return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  const deleteNote = (n: Note) =>
+    modals.openConfirmModal({
+      title: 'Hapus note',
+      children: <Text size="sm">Hapus note <strong>{n.title}</strong>?</Text>,
+      labels: { confirm: 'Hapus', cancel: 'Batal' },
+      confirmProps: { color: 'red' },
+      onConfirm: () =>
+        apiFetch(`/api/envman/projects/${slug}/notes/${n.id}`, { method: 'DELETE' })
+          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'notes', slug] }); onDelete(n); notifyOk('Note dihapus') })
+          .catch(notifyErr),
+    })
+
+  return (
+    <Modal
+      opened={note !== null}
+      onClose={onClose}
+      title={
+        <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+          {note?.pinned && <TbBookmarkFilled size={16} color="var(--mantine-color-yellow-5)" />}
+          <Text fw={700} size="md" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {note?.title}
+          </Text>
+        </Group>
+      }
+      size="xl"
+      zIndex={300}
+    >
+      {note && (
+        <Stack gap="sm">
+          <Group gap="xs" wrap="wrap">
+            {note.tags.map(t => (
+              <Badge key={t} size="xs" variant="outline" color="violet" leftSection={<TbTag size={10} />}>{t}</Badge>
+            ))}
+            <Text size="xs" c="dimmed" ml="auto">
+              oleh {note.author.name} · diperbarui {relTime(note.updatedAt)}
+            </Text>
+          </Group>
+          <ScrollArea mah={500}>
+            <Paper withBorder p="md">
+              <div className="markdown-body" style={{ fontSize: 14 }}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.body || '_Tidak ada konten._'}</ReactMarkdown>
+              </div>
+            </Paper>
+          </ScrollArea>
+          {canEditNote(note) && (
+            <Group justify="flex-end" gap="xs">
+              <Button type="button" size="xs" variant="subtle" color="red" leftSection={<TbTrash size={13} />} onClick={() => deleteNote(note)}>
+                Hapus
+              </Button>
+              <Button type="button" size="xs" leftSection={<TbEdit size={13} />} onClick={() => onEdit(note)}>
+                Edit
+              </Button>
+            </Group>
+          )}
+        </Stack>
+      )}
+    </Modal>
+  )
+}
+
 // ─── NotesPanel ───────────────────────────────────────────────────────────────
 
-function NotesPanel({ slug, canEdit, isOwner, myUserId }: { slug: string; canEdit: boolean; isOwner: boolean; myUserId: string }) {
+interface NotesPanelProps {
+  slug: string
+  canEdit: boolean
+  isOwner: boolean
+  myUserId: string
+  openModal: Note | null | 'new'
+  setOpenModal: (n: Note | null | 'new') => void
+  viewNote: Note | null
+  setViewNote: (n: Note | null) => void
+}
+
+function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpenModal, viewNote, setViewNote }: NotesPanelProps) {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState<string[]>([])
   const [sort, setSort] = useState<'updated' | 'created' | 'title'>('updated')
-  const [openNote, setOpenNote] = useState<Note | null | 'new'>(null)
-  const [viewNote, setViewNote] = useState<Note | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'notes', slug],
@@ -828,7 +974,7 @@ function NotesPanel({ slug, canEdit, isOwner, myUserId }: { slug: string; canEdi
       confirmProps: { color: 'red' },
       onConfirm: () =>
         apiFetch(`/api/envman/projects/${slug}/notes/${note.id}`, { method: 'DELETE' })
-          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'notes', slug] }); if (viewNote?.id === note.id) setViewNote(null); notifyOk('Note dihapus') })
+          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'notes', slug] }); notifyOk('Note dihapus') })
           .catch(notifyErr),
     })
 
@@ -847,204 +993,140 @@ function NotesPanel({ slug, canEdit, isOwner, myUserId }: { slug: string; canEdi
   }
 
   return (
-    <>
-      {/* ─── Form modal ─────────────────────── */}
-      <Modal
-        opened={openNote !== null}
-        onClose={() => setOpenNote(null)}
-        title={openNote === 'new' ? 'Buat Note Baru' : 'Edit Note'}
-        size="xl"
-        styles={{ body: { paddingTop: 8 } }}
-      >
-        {openNote !== null && (
-          <NoteForm
-            slug={slug}
-            note={openNote === 'new' ? undefined : openNote}
-            onClose={() => setOpenNote(null)}
-          />
-        )}
-      </Modal>
-
-      {/* ─── View modal ─────────────────────── */}
-      <Modal
-        opened={viewNote !== null}
-        onClose={() => setViewNote(null)}
-        title={
-          <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-            {viewNote?.pinned && <TbBookmarkFilled size={16} color="var(--mantine-color-yellow-5)" />}
-            <Text fw={700} size="md" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {viewNote?.title}
-            </Text>
-          </Group>
-        }
-        size="xl"
-      >
-        {viewNote && (
-          <Stack gap="sm">
-            <Group gap="xs" wrap="wrap">
-              {viewNote.tags.map(t => (
-                <Badge key={t} size="xs" variant="outline" color="violet" leftSection={<TbTag size={10} />}>{t}</Badge>
-              ))}
-              <Text size="xs" c="dimmed" ml="auto">
-                oleh {viewNote.author.name} · diperbarui {relTime(viewNote.updatedAt)}
-              </Text>
-            </Group>
-            <ScrollArea mah={500}>
-              <Paper withBorder p="md">
-                <div className="markdown-body" style={{ fontSize: 14 }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewNote.body || '_Tidak ada konten._'}</ReactMarkdown>
-                </div>
-              </Paper>
-            </ScrollArea>
-            {canEditNote(viewNote) && (
-              <Group justify="flex-end" gap="xs">
-                <Button size="xs" variant="subtle" color="red" leftSection={<TbTrash size={13} />} onClick={() => { setViewNote(null); deleteNote(viewNote) }}>
-                  Hapus
-                </Button>
-                <Button size="xs" leftSection={<TbEdit size={13} />} onClick={() => { setOpenNote(viewNote); setViewNote(null) }}>
-                  Edit
-                </Button>
-              </Group>
-            )}
-          </Stack>
-        )}
-      </Modal>
-
+    <Stack gap="sm">
       {/* ─── Toolbar ────────────────────────── */}
-      <Stack gap="sm">
-        <Group gap="xs">
-          <TextInput
+      <Group gap="xs">
+        <TextInput
+          size="xs"
+          placeholder="Cari notes..."
+          leftSection={<TbSearch size={13} />}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
+          style={{ flex: 1 }}
+        />
+        {allTags.length > 0 && (
+          <MultiSelect
             size="xs"
-            placeholder="Cari notes..."
-            leftSection={<TbSearch size={13} />}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
-            style={{ flex: 1 }}
+            placeholder="Filter tag..."
+            data={allTags}
+            value={tagFilter}
+            onChange={setTagFilter}
+            leftSection={<TbTag size={13} />}
+            clearable
+            w={180}
           />
-          {allTags.length > 0 && (
-            <MultiSelect
-              size="xs"
-              placeholder="Filter tag..."
-              data={allTags}
-              value={tagFilter}
-              onChange={setTagFilter}
-              leftSection={<TbTag size={13} />}
-              clearable
-              w={180}
-            />
-          )}
-          <Select
-            size="xs"
-            w={130}
-            leftSection={<TbSortAscending size={13} />}
-            value={sort}
-            onChange={v => setSort((v ?? 'updated') as typeof sort)}
-            data={[
-              { label: 'Terbaru edit', value: 'updated' },
-              { label: 'Terbaru buat', value: 'created' },
-              { label: 'Judul A-Z', value: 'title' },
-            ]}
-            allowDeselect={false}
-          />
+        )}
+        <Select
+          size="xs"
+          w={130}
+          leftSection={<TbSortAscending size={13} />}
+          value={sort}
+          onChange={v => setSort((v ?? 'updated') as typeof sort)}
+          data={[
+            { label: 'Terbaru edit', value: 'updated' },
+            { label: 'Terbaru buat', value: 'created' },
+            { label: 'Judul A-Z', value: 'title' },
+          ]}
+          allowDeselect={false}
+        />
+        {canEdit && (
+          <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
+            New Note
+          </Button>
+        )}
+      </Group>
+
+      {/* ─── Note list ───────────────────── */}
+      {isLoading ? (
+        <Stack gap="xs">
+          {[1, 2, 3].map(i => <Skeleton key={i} height={72} radius="md" />)}
+        </Stack>
+      ) : notes.length === 0 ? (
+        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+          <ThemeIcon size={40} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
+            <TbNote size={20} />
+          </ThemeIcon>
+          <Text fw={500} mb={4}>Belum ada notes</Text>
+          <Text size="sm" c="dimmed" mb="md">Buat catatan dalam Markdown untuk project ini.</Text>
           {canEdit && (
-            <Button size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenNote('new')}>
-              New Note
+            <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
+              Buat Note Pertama
             </Button>
           )}
-        </Group>
-
-        {/* ─── Note list ───────────────────── */}
-        {isLoading ? (
-          <Stack gap="xs">
-            {[1, 2, 3].map(i => <Skeleton key={i} height={72} radius="md" />)}
-          </Stack>
-        ) : notes.length === 0 ? (
-          <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
-            <ThemeIcon size={40} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
-              <TbNote size={20} />
-            </ThemeIcon>
-            <Text fw={500} mb={4}>Belum ada notes</Text>
-            <Text size="sm" c="dimmed" mb="md">Buat catatan dalam Markdown untuk project ini.</Text>
-            {canEdit && (
-              <Button size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenNote('new')}>
-                Buat Note Pertama
-              </Button>
-            )}
-          </Card>
-        ) : filtered.length === 0 ? (
-          <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
-            <Text size="sm" c="dimmed">Tidak ada note yang cocok.</Text>
-            <Button size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setTagFilter([]) }}>Reset Filter</Button>
-          </Card>
-        ) : (
-          <Stack gap="xs">
-            {filtered.map(note => (
-              <Card
-                key={note.id}
-                withBorder
-                p="sm"
-                style={{ cursor: 'pointer', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
-                onClick={() => setViewNote(note)}
-              >
-                <Group justify="space-between" wrap="nowrap" gap="xs">
-                  <Box style={{ flex: 1, minWidth: 0 }}>
-                    <Group gap="xs" mb={2} wrap="nowrap">
-                      {note.pinned && <TbBookmarkFilled size={14} color="var(--mantine-color-yellow-5)" style={{ flexShrink: 0 }} />}
-                      <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {note.title}
-                      </Text>
-                    </Group>
-                    <Text size="xs" c="dimmed" lineClamp={1} style={{ fontFamily: 'monospace' }}>
-                      {note.body.replace(/#{1,6}\s|[*_`>-]/g, '').slice(0, 120) || '—'}
+        </Card>
+      ) : filtered.length === 0 ? (
+        <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
+          <Text size="sm" c="dimmed">Tidak ada note yang cocok.</Text>
+          <Button type="button" size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setTagFilter([]) }}>Reset Filter</Button>
+        </Card>
+      ) : (
+        <Stack gap="xs">
+          {filtered.map(note => (
+            <Card
+              key={note.id}
+              withBorder
+              p="sm"
+              style={{ cursor: 'pointer', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
+              onClick={() => setViewNote(note)}
+            >
+              <Group justify="space-between" wrap="nowrap" gap="xs">
+                <Box style={{ flex: 1, minWidth: 0 }}>
+                  <Group gap="xs" mb={2} wrap="nowrap">
+                    {note.pinned && <TbBookmarkFilled size={14} color="var(--mantine-color-yellow-5)" style={{ flexShrink: 0 }} />}
+                    <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {note.title}
                     </Text>
-                    <Group gap={4} mt={4} wrap="wrap">
-                      {note.tags.map(t => (
-                        <Badge key={t} size="xs" variant="outline" color="violet">{t}</Badge>
-                      ))}
-                      <Text size="xs" c="dimmed">
-                        {note.author.name} · {relTime(note.updatedAt)}
-                      </Text>
-                    </Group>
-                  </Box>
+                  </Group>
+                  <Text size="xs" c="dimmed" lineClamp={1} style={{ fontFamily: 'monospace' }}>
+                    {note.body.replace(/#{1,6}\s|[*_`>-]/g, '').slice(0, 120) || '—'}
+                  </Text>
+                  <Group gap={4} mt={4} wrap="wrap">
+                    {note.tags.map(t => (
+                      <Badge key={t} size="xs" variant="outline" color="violet">{t}</Badge>
+                    ))}
+                    <Text size="xs" c="dimmed">
+                      {note.author.name} · {relTime(note.updatedAt)}
+                    </Text>
+                  </Group>
+                </Box>
 
-                  <Group gap={4} wrap="nowrap" onClick={e => e.stopPropagation()}>
-                    {(isOwner || (canEdit && note.author.id === myUserId)) && (
-                      <Tooltip label={note.pinned ? 'Unpin' : 'Pin'} position="left">
-                        <ActionIcon
-                          size="sm"
-                          variant="subtle"
-                          color={note.pinned ? 'yellow' : 'gray'}
-                          onClick={e => { e.stopPropagation(); togglePin(note) }}
-                        >
-                          {note.pinned ? <TbBookmarkFilled size={13} /> : <TbBookmark size={13} />}
+                <Group gap={4} wrap="nowrap" onClick={e => e.stopPropagation()}>
+                  {(isOwner || (canEdit && note.author.id === myUserId)) && (
+                    <Tooltip label={note.pinned ? 'Unpin' : 'Pin'} position="left">
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color={note.pinned ? 'yellow' : 'gray'}
+                        onClick={e => { e.stopPropagation(); togglePin(note) }}
+                      >
+                        {note.pinned ? <TbBookmarkFilled size={13} /> : <TbBookmark size={13} />}
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                  {canEditNote(note) && (
+                    <>
+                      <Tooltip label="Edit" position="left">
+                        <ActionIcon size="sm" variant="subtle" color="blue" onClick={e => { e.stopPropagation(); setOpenModal(note) }}>
+                          <TbEdit size={13} />
                         </ActionIcon>
                       </Tooltip>
-                    )}
-                    {canEditNote(note) && (
-                      <>
-                        <Tooltip label="Edit" position="left">
-                          <ActionIcon size="sm" variant="subtle" color="blue" onClick={e => { e.stopPropagation(); setOpenNote(note) }}>
-                            <TbEdit size={13} />
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label="Hapus" position="left">
-                          <ActionIcon size="sm" variant="subtle" color="red" onClick={e => { e.stopPropagation(); deleteNote(note) }}>
-                            <TbTrash size={13} />
-                          </ActionIcon>
-                        </Tooltip>
-                      </>
-                    )}
-                    <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); setViewNote(note) }}>
-                      <TbChevronRight size={13} />
-                    </ActionIcon>
-                  </Group>
+                      <Tooltip label="Hapus" position="left">
+                        <ActionIcon size="sm" variant="subtle" color="red" onClick={e => { e.stopPropagation(); deleteNote(note) }}>
+                          <TbTrash size={13} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </>
+                  )}
+                  <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); setViewNote(note) }}>
+                    <TbChevronRight size={13} />
+                  </ActionIcon>
                 </Group>
-              </Card>
-            ))}
-          </Stack>
-        )}
-      </Stack>
-    </>
+              </Group>
+            </Card>
+          ))}
+        </Stack>
+      )}
+    </Stack>
   )
 }
