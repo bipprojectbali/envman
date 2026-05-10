@@ -37,6 +37,8 @@ export const ticketsRouter = new Elysia()
     if (query.reporterId) where.reporterId = String(query.reporterId)
     if (query.mine === '1') where.assigneeId = caller.userId
 
+    const limit = Math.min(Number(query.limit) || 50, 200)
+    const cursor = query.cursor as string | undefined
     const tickets = await prisma.ticket.findMany({
       where,
       include: {
@@ -45,9 +47,13 @@ export const ticketsRouter = new Elysia()
         _count: { select: { comments: true, evidence: true } },
       },
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-      take: Math.min(Number(query.limit) || 100, 500),
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     })
-    return { tickets }
+    const hasMore = tickets.length > limit
+    const page = hasMore ? tickets.slice(0, limit) : tickets
+    const nextCursor = hasMore ? page[page.length - 1]?.id : undefined
+    return { tickets: page, nextCursor, hasMore }
   })
 
   .get('/api/tickets/:id', async ({ request, params, set }) => {

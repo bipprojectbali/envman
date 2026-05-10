@@ -7,9 +7,11 @@ export const gistsRouter = new Elysia()
       // ─── Gists ────────────────────────────────────────────
 
       // GET /api/envman/gists — list (milik sendiri + public milik user lain)
-  .get('/api/envman/gists', async ({ request, set }) => {
+  .get('/api/envman/gists', async ({ request, query, set }) => {
     const caller = await requireAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const limit = Math.min(Number(query.limit) || 20, 100)
+    const cursor = query.cursor as string | undefined
     const [mine, publicOthers] = await Promise.all([
       prisma.gist.findMany({
         where: { userId: caller.userId },
@@ -22,7 +24,11 @@ export const gistsRouter = new Elysia()
         include: { user: { select: { id: true, name: true } } },
       }),
     ])
-    return { gists: [...mine, ...publicOthers] }
+    const all = [...mine, ...publicOthers].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    const startIdx = cursor ? all.findIndex(g => g.id === cursor) + 1 : 0
+    const page = all.slice(startIdx, startIdx + limit)
+    const nextCursor = page.length === limit ? page[page.length - 1]?.id : undefined
+    return { gists: page, nextCursor, total: all.length }
       })
 
       // POST /api/envman/gists — create

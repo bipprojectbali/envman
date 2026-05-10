@@ -190,9 +190,22 @@ function VarsPage() {
 
   const toggleDisabled = useMutation({
     mutationFn: (key: string) =>
-      apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars/${key}/toggle`, { method: 'PATCH' }),
-    onSuccess: (data: { isDisabled: boolean }) => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); notifyOk(data.isDisabled ? 'Variabel dinonaktifkan' : 'Variabel diaktifkan') },
-    onError: (e) => notifyErr(e),
+      apiFetch<{ isDisabled: boolean }>(`/api/envman/projects/${slug}/environments/${env}/vars/${key}/toggle`, { method: 'PATCH' }),
+    onMutate: async (key) => {
+      await qc.cancelQueries({ queryKey: ['envman', 'vars', slug, env] })
+      const previous = qc.getQueryData(['envman', 'vars', slug, env])
+      qc.setQueryData(['envman', 'vars', slug, env], (old: any) => ({
+        ...old,
+        vars: old?.vars?.map((v: any) => v.key === key ? { ...v, isDisabled: !v.isDisabled } : v) ?? [],
+      }))
+      return { previous }
+    },
+    onError: (e, _key, context) => {
+      if (context?.previous) qc.setQueryData(['envman', 'vars', slug, env], context.previous)
+      notifyErr(e)
+    },
+    onSuccess: (data) => notifyOk(data.isDisabled ? 'Variabel dinonaktifkan' : 'Variabel diaktifkan'),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }),
   })
 
   const clearAll = useMutation({

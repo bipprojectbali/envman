@@ -108,25 +108,33 @@ function OverviewPage() {
   const { data: projectsData, isLoading: loadingProjects, refetch: refetchProjects } = useQuery({
     queryKey: ['envman', 'projects'],
     queryFn: () => apiFetch('/api/envman/projects'),
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
   })
 
   const { data: tokensData, isLoading: loadingTokens } = useQuery({
     queryKey: ['envman', 'tokens'],
     queryFn: () => apiFetch('/api/envman/tokens'),
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
   })
 
   const { data: connectionsData, isLoading: loadingConnections } = useQuery({
     queryKey: ['portainer', 'connections'],
     queryFn: () => apiFetch('/api/envman/portainer/connections'),
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
   })
 
   const { data: gistsData, isLoading: loadingGists } = useQuery({
     queryKey: ['envman', 'gists'],
     queryFn: () => apiFetch('/api/envman/gists'),
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
   })
 
   const projects = projectsData?.projects ?? []

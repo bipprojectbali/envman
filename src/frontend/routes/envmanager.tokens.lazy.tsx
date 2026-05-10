@@ -249,7 +249,9 @@ function TokensPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'tokens'],
     queryFn: () => apiFetch('/api/envman/tokens'),
-    refetchInterval: 30000,
+    staleTime: 2 * 60_000,
+    refetchInterval: 2 * 60_000,
+    refetchIntervalInBackground: false,
   })
 
   const { data: projectsData } = useQuery({

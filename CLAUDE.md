@@ -87,9 +87,6 @@ bun run test:integration  # tests/integration/ — via app.handle(), no server n
 
 ## Scaling Roadmap
 
-Project ini punya roadmap scaling bertahap. Baca sebelum menambah fitur besar atau melakukan refactor:
+Baca sebelum menambah fitur besar atau melakukan refactor:
 
-- @docs/SCALING-ROADMAP.md — overview semua phase dan urutan pengerjaan
-- @docs/PHASE-1-FOUNDATION.md — split monolith, centralize auth, transaction, pagination
-- @docs/PHASE-2-RELIABILITY.md — test coverage, Redis cache, soft delete, API versioning
-- @docs/PHASE-3-SCALE.md — infinite scroll, optimistic update, component split, HTTP caching
+- @docs/SCALING.md — panduan lengkap: fondasi, reliability, performance (Phase 1–3)

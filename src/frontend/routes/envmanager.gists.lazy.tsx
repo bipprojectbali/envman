@@ -26,14 +26,16 @@ import {
 } from '@mantine/core'
 import { useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { apiFetch } from '@/frontend/lib/api'
 import { useSession } from '@/frontend/hooks/useAuth'
+import { useGistsInfinite } from '@/frontend/hooks/useGistsInfinite'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { InfiniteList } from '@/frontend/components/InfiniteList'
 import {
   TbBrandGithub,
   TbCheck,
@@ -128,7 +130,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
         : apiFetch('/api/envman/gists', { method: 'POST', body: JSON.stringify(body) })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['envman', 'gists'] })
+      qc.invalidateQueries({ queryKey: ['envman', 'gists', 'infinite'] })
       notifyOk(gist ? 'Gist diperbarui' : 'Gist dibuat')
       onClose()
     },
@@ -497,12 +499,8 @@ function GistsPage() {
   const [formModal, setFormModal] = useState<Gist | null | 'new'>(null)
   const [viewGist, setViewGist] = useState<Gist | null>(null)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['envman', 'gists'],
-    queryFn: () => apiFetch<{ gists: Gist[] }>('/api/envman/gists'),
-    refetchInterval: 30000,
-  })
-  const gists: Gist[] = data?.gists ?? []
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useGistsInfinite()
+  const gists: Gist[] = useMemo(() => data?.pages.flatMap(p => p.gists) ?? [], [data])
 
   const allTags = useMemo(() => [...new Set(gists.flatMap(g => g.tags))].sort(), [gists])
 
@@ -537,7 +535,7 @@ function GistsPage() {
       confirmProps: { color: 'red' },
       onConfirm: () =>
         apiFetch(`/api/envman/gists/${g.id}`, { method: 'DELETE' })
-          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'gists'] }); notifyOk('Gist dihapus') })
+          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'gists', 'infinite'] }); notifyOk('Gist dihapus') })
           .catch(notifyErr),
     })
 
@@ -593,7 +591,7 @@ function GistsPage() {
           { value: 'all', label: `Semua (${gists.length})` },
           { value: 'mine', label: `Milik saya (${mineCount})` },
           { value: 'public', label: `Public (${publicCount})` },
-          { value: 'private', label: `Private (${mineCount - gists.filter(g => g.isPublic && g.user.id === myUserId).length})` },
+          { value: 'private', label: `Private (${mineCount - gists.filter((g: Gist) => g.isPublic && g.user.id === myUserId).length})` },
         ] as const).map(f => (
           <Badge
             key={f.value}
@@ -658,11 +656,7 @@ function GistsPage() {
       </Group>
 
       {/* List */}
-      {isLoading ? (
-        <Stack gap="xs">
-          {[1, 2, 3].map(i => <Skeleton key={i} height={100} radius="md" />)}
-        </Stack>
-      ) : gists.length === 0 ? (
+      {!isLoading && gists.length === 0 ? (
         <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
           <ThemeIcon size={40} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
             <TbBrandGithub size={20} />
@@ -673,37 +667,51 @@ function GistsPage() {
             Buat Gist Pertama
           </Button>
         </Card>
-      ) : filtered.length === 0 ? (
+      ) : !isLoading && filtered.length === 0 ? (
         <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
           <Text size="sm" c="dimmed">Tidak ada gist yang cocok.</Text>
           <Button type="button" size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setTagFilter([]); setFilter('all') }}>Reset Filter</Button>
         </Card>
       ) : view === 'list' ? (
-        <Stack gap="xs">
-          {filtered.map(g => (
-            <GistCard
-              key={g.id}
-              gist={g}
-              isOwner={g.user.id === myUserId}
-              onView={() => setViewGist(g)}
-              onEdit={() => setFormModal(g)}
-              onDelete={() => deleteGist(g)}
-            />
-          ))}
-        </Stack>
+        <InfiniteList
+          fetchNextPage={fetchNextPage}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          isLoading={isLoading}
+        >
+          <Stack gap="xs">
+            {filtered.map(g => (
+              <GistCard
+                key={g.id}
+                gist={g}
+                isOwner={g.user.id === myUserId}
+                onView={() => setViewGist(g)}
+                onEdit={() => setFormModal(g)}
+                onDelete={() => deleteGist(g)}
+              />
+            ))}
+          </Stack>
+        </InfiniteList>
       ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
-          {filtered.map(g => (
-            <GistCard
-              key={g.id}
-              gist={g}
-              isOwner={g.user.id === myUserId}
-              onView={() => setViewGist(g)}
-              onEdit={() => setFormModal(g)}
-              onDelete={() => deleteGist(g)}
-            />
-          ))}
-        </SimpleGrid>
+        <InfiniteList
+          fetchNextPage={fetchNextPage}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          isLoading={isLoading}
+        >
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
+            {filtered.map(g => (
+              <GistCard
+                key={g.id}
+                gist={g}
+                isOwner={g.user.id === myUserId}
+                onView={() => setViewGist(g)}
+                onEdit={() => setFormModal(g)}
+                onDelete={() => deleteGist(g)}
+              />
+            ))}
+          </SimpleGrid>
+        </InfiniteList>
       )}
     </Box>
   )

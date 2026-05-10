@@ -24,6 +24,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
+      gcTime: 10 * 60_000,       // Keep unused data in cache 10 minutes
+      refetchOnWindowFocus: true, // Refresh saat user kembali ke tab
       retry: (count, err) => !(err instanceof UnauthorizedError) && count < 1,
     },
   },

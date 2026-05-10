@@ -61,7 +61,9 @@ function ProjectListPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'projects'],
     queryFn: () => apiFetch('/api/envman/projects'),
-    refetchInterval: 30000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
   })
 
   const createProject = useMutation({

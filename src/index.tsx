@@ -143,11 +143,14 @@ async function serveFrontend(request: Request): Promise<Response> {
       '.png': 'image/png',
       '.ico': 'image/x-icon',
     }
+    // Vite puts content-hashed files in /assets/ — safe to cache 1 year
     const isHashed = pathname.startsWith('/assets/')
     return new Response(Bun.file(filePath), {
       headers: {
         'Content-Type': contentType[ext] ?? 'application/octet-stream',
-        'Cache-Control': isHashed ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+        'Cache-Control': isHashed
+          ? 'public, max-age=31536000, immutable'
+          : 'public, max-age=0, must-revalidate',
       },
     })
   }
