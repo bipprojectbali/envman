@@ -14,7 +14,6 @@ import {
   Modal,
   MultiSelect,
   Paper,
-  ScrollArea,
   SegmentedControl,
   Select,
   Skeleton,
@@ -889,13 +888,11 @@ function NoteViewModal({
               oleh {note.author.name} · diperbarui {relTime(note.updatedAt)}
             </Text>
           </Group>
-          <ScrollArea mah={500}>
-            <Paper withBorder p="md">
-              <div className="markdown-body" style={{ fontSize: 14 }}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.body || '_Tidak ada konten._'}</ReactMarkdown>
-              </div>
-            </Paper>
-          </ScrollArea>
+          <Paper withBorder p="md" style={{ maxHeight: 460, overflowY: 'auto' }}>
+            <div className="markdown-body" style={{ fontSize: 14 }}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.body || '_Tidak ada konten._'}</ReactMarkdown>
+            </div>
+          </Paper>
           {canEditNote(note) && (
             <Group justify="flex-end" gap="xs">
               <Button type="button" size="xs" variant="subtle" color="red" leftSection={<TbTrash size={13} />} onClick={() => deleteNote(note)}>
