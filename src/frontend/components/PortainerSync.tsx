@@ -7,7 +7,6 @@ import {
   Button,
   Card,
   Code,
-  Divider,
   Group,
   Loader,
   Modal,
@@ -222,13 +221,6 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
 
   return (
     <>
-      <Divider mt="xl" mb="sm" label={
-        <Group gap="xs">
-          <TbCloud size={13} />
-          <Text size="xs" fw={500} c="dimmed">Portainer</Text>
-        </Group>
-      } labelPosition="left" />
-
       {/* ─── Not configured ─────────────────────────────── */}
       {!config ? (
         <Card withBorder p="sm" radius="md" style={{ borderStyle: 'dashed' }}>

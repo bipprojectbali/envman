@@ -19,13 +19,14 @@ import {
   Select,
   Stack,
   Table,
+  Tabs,
   Text,
   Textarea,
   TextInput,
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure, useMediaQuery } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
@@ -56,6 +57,7 @@ import {
   TbSquareCheckFilled,
   TbToggleLeft,
   TbToggleRight,
+  TbCloud,
   TbTrash,
   TbVariable,
   TbX,
@@ -94,6 +96,10 @@ function VarsPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const isMobile = useMediaQuery('(max-width: 48em)')
+  const [activeTab, setActiveTab] = useLocalStorage<string>({
+    key: `envman:tab:${slug}:${env}`,
+    defaultValue: 'env',
+  })
 
   // modals
   const [addOpen, { open: openAdd, close: closeAdd }] = useDisclosure(false)
@@ -345,6 +351,7 @@ function VarsPage() {
     <Box>
 
       {/* ─── Breadcrumb ─────────────────────── */}
+
       <Group mb="md" justify="space-between" align="center" gap="xs" wrap="nowrap">
         {/* Kiri: breadcrumb navigasi */}
         <Group gap={4} align="center" style={{ minWidth: 0, flex: 1 }}>
@@ -390,6 +397,29 @@ function VarsPage() {
           </Tooltip>
         </Group>
       </Group>
+
+      {/* ─── Tabs ──────────────────────────── */}
+      <Tabs value={activeTab} onChange={v => setActiveTab(v ?? 'env')} mb="sm">
+        <Tabs.List>
+          <Tabs.Tab value="env" leftSection={<TbVariable size={14} />}>
+            Env Vars
+            {vars.length > 0 && (
+              <Badge size="xs" variant="light" color="blue" ml="xs">{vars.length}</Badge>
+            )}
+          </Tabs.Tab>
+          <Tabs.Tab value="portainer" leftSection={<TbCloud size={14} />}>
+            Portainer
+          </Tabs.Tab>
+        </Tabs.List>
+      </Tabs>
+
+      {/* ─── Tab: Portainer ─────────────────── */}
+      {activeTab === 'portainer' && (
+        <PortainerSync slug={slug} env={env} canEdit={canEdit} secretCount={secretCount} />
+      )}
+
+      {/* ─── Tab: Env Vars ─────────────────── */}
+      {activeTab === 'env' && <>
 
       {/* ─── Warning enkripsi ──────────────── */}
       {!encryptionEnabled && secretCount > 0 && (
@@ -1368,7 +1398,8 @@ function VarsPage() {
         </Stack>
       </Modal>
 
-      <PortainerSync slug={slug} env={env} canEdit={canEdit} secretCount={secretCount} />
+      </>}
+
     </Box>
   )
 }
