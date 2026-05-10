@@ -21,6 +21,7 @@ import { useState } from 'react'
 import {
   TbBook,
   TbCode,
+  TbBrandGithub,
   TbHome,
   TbKey,
   TbLayoutDashboard,
@@ -90,13 +91,15 @@ function EnvManagerLayout() {
   const isTokens = pathname.startsWith('/envmanager/tokens')
   const isConnections = pathname.startsWith('/envmanager/connections')
   const isReadme = pathname.startsWith('/envmanager/docs')
-  const isProjectsActive = !isOverview && !isTokens && !isConnections && !isReadme
+  const isGists = pathname.startsWith('/envmanager/gists')
+  const isProjectsActive = !isOverview && !isTokens && !isConnections && !isReadme && !isGists
 
   const mainNav = [
     { label: 'Overview', description: 'Ringkasan semua resources', icon: TbHome, href: '/envmanager/overview', active: isOverview },
     { label: 'Projects', description: 'Kelola environment vars', icon: TbVariable, href: '/envmanager', active: isProjectsActive },
     { label: 'Tokens', description: 'API token untuk CLI', icon: TbKey, href: '/envmanager/tokens', active: isTokens },
     { label: 'Connections', description: 'Portainer instances', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections },
+    { label: 'Gists', description: 'Snippets & konfigurasi', icon: TbBrandGithub, href: '/envmanager/gists', active: isGists },
   ]
 
   const otherNav = [
