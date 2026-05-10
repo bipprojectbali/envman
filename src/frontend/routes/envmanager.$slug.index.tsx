@@ -7,6 +7,7 @@ import {
   Card,
   Code,
   Combobox,
+  CopyButton,
   Divider,
   Group,
   InputBase,
@@ -39,8 +40,10 @@ import { apiFetch } from '@/frontend/lib/api'
 import {
   TbBookmark,
   TbBookmarkFilled,
+  TbCheck,
   TbChevronRight,
   TbChevronDown,
+  TbCopy,
   TbEdit,
   TbEye,
   TbFileText,
@@ -893,16 +896,32 @@ function NoteViewModal({
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.body || '_Tidak ada konten._'}</ReactMarkdown>
             </div>
           </Paper>
-          {canEditNote(note) && (
-            <Group justify="flex-end" gap="xs">
-              <Button type="button" size="xs" variant="subtle" color="red" leftSection={<TbTrash size={13} />} onClick={() => deleteNote(note)}>
-                Hapus
-              </Button>
-              <Button type="button" size="xs" leftSection={<TbEdit size={13} />} onClick={() => onEdit(note)}>
-                Edit
-              </Button>
-            </Group>
-          )}
+          <Group justify="space-between" gap="xs">
+            <CopyButton value={note.body} timeout={2000}>
+              {({ copied, copy }) => (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="subtle"
+                  color={copied ? 'teal' : 'gray'}
+                  leftSection={copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
+                  onClick={copy}
+                >
+                  {copied ? 'Tersalin!' : 'Copy'}
+                </Button>
+              )}
+            </CopyButton>
+            {canEditNote(note) && (
+              <Group gap="xs">
+                <Button type="button" size="xs" variant="subtle" color="red" leftSection={<TbTrash size={13} />} onClick={() => deleteNote(note)}>
+                  Hapus
+                </Button>
+                <Button type="button" size="xs" leftSection={<TbEdit size={13} />} onClick={() => onEdit(note)}>
+                  Edit
+                </Button>
+              </Group>
+            )}
+          </Group>
         </Stack>
       )}
     </Modal>
