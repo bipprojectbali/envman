@@ -83,3 +83,4 @@ bun run test:integration  # tests/integration/ — via app.handle(), no server n
 - @docs/FRONTEND.md — routes, components, hooks, UI patterns, dev console visualizations
 - @docs/CLI.md — CLI commands, options, auth resolution, examples
 - @docs/INFRA.md — Redis, logging, MCP server, dev tools
+- @docs/AI-CONTRACT.md — aturan kerja AI di repo ini (wajib dibaca sebelum edit kode)
