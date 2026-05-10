@@ -7,7 +7,6 @@ import {
   Code,
   Divider,
   Group,
-  RingProgress,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -19,10 +18,14 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   TbArrowRight,
+  TbBrandGithub,
   TbChevronRight,
   TbClock,
+  TbFileCode,
+  TbGlobe,
   TbKey,
   TbLock,
+  TbNote,
   TbPlugConnected,
   TbPlus,
   TbRefresh,
@@ -120,9 +123,16 @@ function OverviewPage() {
     refetchInterval: 60_000,
   })
 
+  const { data: gistsData, isLoading: loadingGists } = useQuery({
+    queryKey: ['envman', 'gists'],
+    queryFn: () => apiFetch('/api/envman/gists'),
+    refetchInterval: 60_000,
+  })
+
   const projects = projectsData?.projects ?? []
   const tokens = tokensData?.tokens ?? []
   const connections = connectionsData?.connections ?? []
+  const gists: any[] = gistsData?.gists ?? []
 
   const totalEnvs = projects.reduce((s: number, p: any) => s + (p._count?.environments ?? 0), 0)
   const totalVars = projects.reduce((s: number, p: any) => s + (p._count?.vars ?? 0), 0)
@@ -132,17 +142,18 @@ function OverviewPage() {
     return new Date(t.expiresAt) > new Date()
   })
   const secretVarCount = projects.reduce((s: number, p: any) => s + (p._count?.secrets ?? 0), 0)
+  const publicGists = gists.filter((g: any) => g.isPublic)
 
-  // Recent projects (sorted by updatedAt if available, otherwise take first 5)
   const recentProjects = [...projects].slice(0, 5)
-
-  // Active tokens sorted by last used
   const recentTokens = [...tokens]
     .filter((t: any) => t.lastUsedAt)
     .sort((a: any, b: any) => new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime())
     .slice(0, 3)
+  const recentGists = [...gists]
+    .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 4)
 
-  const isLoading = loadingProjects || loadingTokens || loadingConnections
+  const isLoading = loadingProjects || loadingTokens || loadingConnections || loadingGists
 
   return (
     <Box>
@@ -150,7 +161,7 @@ function OverviewPage() {
       <Group justify="space-between" mb="xl">
         <Box>
           <Text fw={700} size="lg">Overview</Text>
-          <Text size="sm" c="dimmed">Ringkasan seluruh environment variables yang kamu kelola</Text>
+          <Text size="sm" c="dimmed">Ringkasan seluruh resources yang kamu kelola</Text>
         </Box>
         <Tooltip label="Refresh">
           <ActionIcon variant="subtle" color="gray" loading={isLoading} onClick={() => refetchProjects()}>
@@ -160,7 +171,7 @@ function OverviewPage() {
       </Group>
 
       {/* ─── Stats cards ────────────────── */}
-      <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mb="xl">
+      <SimpleGrid cols={{ base: 2, sm: 3, md: 6 }} spacing="sm" mb="xl">
         <StatCard
           icon={TbVariable}
           label="Projects"
@@ -180,7 +191,7 @@ function OverviewPage() {
         />
         <StatCard
           icon={TbKey}
-          label="API Tokens"
+          label="Tokens"
           value={activeTokens.length}
           sub={tokens.length > activeTokens.length ? `${tokens.length - activeTokens.length} inactive` : 'semua aktif'}
           color="orange"
@@ -195,6 +206,23 @@ function OverviewPage() {
           color="teal"
           loading={loadingConnections}
           onClick={() => navigate({ to: '/envmanager/connections' })}
+        />
+        <StatCard
+          icon={TbBrandGithub}
+          label="Gists"
+          value={gists.length}
+          sub={publicGists.length > 0 ? `${publicGists.length} public` : 'semua private'}
+          color="grape"
+          loading={loadingGists}
+          onClick={() => navigate({ to: '/envmanager/gists' })}
+        />
+        <StatCard
+          icon={TbNote}
+          label="Notes"
+          value={projects.reduce((s: number, p: any) => s + (p._count?.notes ?? 0), 0)}
+          sub="di semua project"
+          color="pink"
+          loading={loadingProjects}
         />
       </SimpleGrid>
 
@@ -277,6 +305,65 @@ function OverviewPage() {
         {/* ─── Right column ──────────────── */}
         <Stack gap="md">
 
+          {/* Gists */}
+          <Card withBorder p="md">
+            <Group justify="space-between" mb="md">
+              <Group gap="xs">
+                <ThemeIcon size={24} radius="sm" variant="light" color="grape">
+                  <TbBrandGithub size={13} />
+                </ThemeIcon>
+                <Text fw={600} size="sm">Gists Terbaru</Text>
+              </Group>
+              <Button
+                size="compact-xs"
+                variant="subtle"
+                color="grape"
+                rightSection={<TbArrowRight size={12} />}
+                onClick={() => navigate({ to: '/envmanager/gists' })}
+              >
+                Lihat semua
+              </Button>
+            </Group>
+
+            {loadingGists ? (
+              <Stack gap="xs">{[1, 2].map(i => <Skeleton key={i} height={44} radius="md" />)}</Stack>
+            ) : gists.length === 0 ? (
+              <Text size="xs" c="dimmed" ta="center" py="sm">Belum ada gist</Text>
+            ) : (
+              <Stack gap="xs">
+                {recentGists.map((g: any) => (
+                  <Group
+                    key={g.id}
+                    justify="space-between"
+                    p="xs"
+                    style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
+                    onClick={() => navigate({ to: '/envmanager/gists' })}
+                  >
+                    <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                      <TbFileCode size={14} style={{ color: 'var(--mantine-color-grape-5)', flexShrink: 0 }} />
+                      <Box style={{ flex: 1, minWidth: 0 }}>
+                        <Text size="xs" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {g.title}
+                        </Text>
+                        <Group gap={4}>
+                          <Text size="xs" c="dimmed">{g.files?.length ?? 0} file</Text>
+                          {g.isPublic
+                            ? <Badge size="xs" variant="dot" color="teal" leftSection={<TbGlobe size={8} />}>public</Badge>
+                            : <Badge size="xs" variant="dot" color="gray" leftSection={<TbLock size={8} />}>private</Badge>
+                          }
+                          <Text size="xs" c="dimmed">{relativeTime(g.updatedAt)}</Text>
+                        </Group>
+                      </Box>
+                    </Group>
+                  </Group>
+                ))}
+                {gists.length > 4 && (
+                  <Text size="xs" c="dimmed" ta="center">+{gists.length - 4} gist lainnya</Text>
+                )}
+              </Stack>
+            )}
+          </Card>
+
           {/* Tokens */}
           <Card withBorder p="md">
             <Group justify="space-between" mb="md">
@@ -303,7 +390,6 @@ function OverviewPage() {
               <Text size="xs" c="dimmed" ta="center" py="sm">Belum ada token</Text>
             ) : (
               <Stack gap="xs">
-                {/* Summary row */}
                 <Group gap="md" p="xs" style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 8 }}>
                   <Group gap="xs">
                     <TbShieldCheck size={13} style={{ color: 'var(--mantine-color-teal-6)' }} />
@@ -317,8 +403,6 @@ function OverviewPage() {
                     <Text size="xs" c="dimmed">{tokens.filter((t: any) => t.isDisabled).length} disabled</Text>
                   )}
                 </Group>
-
-                {/* Recently used */}
                 {recentTokens.length > 0 && (
                   <>
                     <Text size="xs" c="dimmed" fw={500}>Terakhir digunakan</Text>
