@@ -29,9 +29,8 @@ import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { apiFetch } from '@/frontend/lib/api'
+import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
 import { useSession } from '@/frontend/hooks/useAuth'
 import { useGistsInfinite } from '@/frontend/hooks/useGistsInfinite'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -249,13 +248,11 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
               ) : (
                 <Paper withBorder p="md" mih={120}>
                   {f.content ? (
-                    f.language === 'markdown' ? (
-                      <div className="markdown-body" style={{ fontSize: 13 }}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{f.content}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <Code block style={{ fontSize: 12 }}>{f.content}</Code>
-                    )
+                    <MarkdownRenderer fontSize={13}>
+                      {f.language === 'markdown'
+                        ? f.content
+                        : `\`\`\`${f.language}\n${f.content}\n\`\`\``}
+                    </MarkdownRenderer>
                   ) : (
                     <Text size="sm" c="dimmed">Tidak ada konten.</Text>
                   )}
@@ -443,17 +440,13 @@ function GistViewModal({
           </Tabs.List>
           {gist.files.map((f, i) => (
             <Tabs.Panel key={i} value={String(i)} pt="xs">
-              {f.language === 'markdown' ? (
-                <Paper withBorder p="md" style={{ maxHeight: 400, overflowY: 'auto' }}>
-                  <div className="markdown-body" style={{ fontSize: 13 }}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{f.content || '_Kosong_'}</ReactMarkdown>
-                  </div>
-                </Paper>
-              ) : (
-                <Code block style={{ fontSize: 12, maxHeight: 400, overflowY: 'auto', display: 'block' }}>
-                  {f.content || '(kosong)'}
-                </Code>
-              )}
+              <Paper withBorder p="md" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                <MarkdownRenderer fontSize={13}>
+                  {f.language === 'markdown'
+                    ? (f.content || '_Kosong_')
+                    : `\`\`\`${f.language}\n${f.content || ''}\n\`\`\``}
+                </MarkdownRenderer>
+              </Paper>
             </Tabs.Panel>
           ))}
         </Tabs>

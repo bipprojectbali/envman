@@ -16,11 +16,10 @@ import {
 import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { TbBookmarkFilled, TbCheck, TbCopy, TbEdit, TbEye, TbFileText, TbTag, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
 import type { Note } from './NotesPanel'
 
 function NoteForm({ slug, note, onClose }: { slug: string; note?: Note; onClose: () => void }) {
@@ -89,9 +88,7 @@ function NoteForm({ slug, note, onClose }: { slug: string; note?: Note; onClose:
         ) : (
           <Paper withBorder p="md" mih={200} style={{ overflow: 'auto' }}>
             {body ? (
-              <div className="markdown-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
-              </div>
+              <MarkdownRenderer fontSize={13}>{body}</MarkdownRenderer>
             ) : (
               <Text size="sm" c="dimmed">Tidak ada konten.</Text>
             )}
@@ -221,9 +218,7 @@ export function NoteViewModal({ slug, note, onClose, canEditNote, onEdit, onDele
             </Text>
           </Group>
           <Paper withBorder p="md" style={{ maxHeight: 460, overflowY: 'auto' }}>
-            <div className="markdown-body" style={{ fontSize: 14 }}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.body || '_Tidak ada konten._'}</ReactMarkdown>
-            </div>
+            <MarkdownRenderer fontSize={14}>{note.body || '_Tidak ada konten._'}</MarkdownRenderer>
           </Paper>
           <Group justify="space-between" gap="xs">
             <CopyButton value={note.body} timeout={2000}>
