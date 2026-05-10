@@ -24,7 +24,7 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useLocalStorage } from '@mantine/hooks'
+import { useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute } from '@tanstack/react-router'
@@ -404,6 +404,7 @@ function GistViewModal({
   gist: Gist | null; onClose: () => void; isOwner: boolean; onEdit: () => void
 }) {
   const [activeFile, setActiveFile] = useState(0)
+  const isMobile = useMediaQuery('(max-width: 48em)')
 
   if (!gist) return null
   const file = gist.files[activeFile] ?? gist.files[0]
@@ -413,15 +414,16 @@ function GistViewModal({
       opened={gist !== null}
       onClose={onClose}
       title={
-        <Group gap="xs">
-          <TbBrandGithub size={16} />
-          <Text fw={700}>{gist.title}</Text>
-          <Badge size="xs" variant="light" color={gist.isPublic ? 'teal' : 'gray'} leftSection={gist.isPublic ? <TbGlobe size={10} /> : <TbLock size={10} />}>
+        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+          <TbBrandGithub size={16} style={{ flexShrink: 0 }} />
+          <Text fw={700} lineClamp={1}>{gist.title}</Text>
+          <Badge size="xs" variant="light" color={gist.isPublic ? 'teal' : 'gray'} leftSection={gist.isPublic ? <TbGlobe size={10} /> : <TbLock size={10} />} style={{ flexShrink: 0 }}>
             {gist.isPublic ? 'Public' : 'Private'}
           </Badge>
         </Group>
       }
       size="xl"
+      fullScreen={isMobile}
       zIndex={300}
     >
       <Stack gap="sm">
@@ -483,6 +485,7 @@ function GistsPage() {
   const { data: sessionData } = useSession()
   const myUserId = sessionData?.user?.id ?? ''
   const qc = useQueryClient()
+  const isMobile = useMediaQuery('(max-width: 48em)')
 
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'mine' | 'public' | 'private'>('all')
@@ -542,7 +545,8 @@ function GistsPage() {
         opened={formModal !== null}
         onClose={() => setFormModal(null)}
         title={formModal === 'new' ? 'Buat Gist Baru' : 'Edit Gist'}
-        size="90vw"
+        size={isMobile ? undefined : '90vw'}
+        fullScreen={isMobile}
         zIndex={300}
         styles={{ body: { paddingTop: 8 } }}
       >
@@ -600,17 +604,17 @@ function GistsPage() {
       </Group>
 
       {/* Toolbar */}
-      <Group gap="xs" mb="md">
+      <Group gap="xs" mb="md" wrap="wrap">
         <TextInput
           size="xs"
-          placeholder="Cari gists, file, konten..."
+          placeholder="Cari gists..."
           leftSection={<TbSearch size={13} />}
           value={search}
           onChange={e => setSearch(e.target.value)}
           rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
-          style={{ flex: 1 }}
+          style={{ flex: 1, minWidth: 120 }}
         />
-        {allTags.length > 0 && (
+        {!isMobile && allTags.length > 0 && (
           <MultiSelect
             size="xs"
             placeholder="Filter tag..."
@@ -619,12 +623,13 @@ function GistsPage() {
             onChange={setTagFilter}
             leftSection={<TbTag size={13} />}
             clearable
-            w={180}
+            maw={180}
+            style={{ flex: 1 }}
           />
         )}
         <Select
           size="xs"
-          w={130}
+          w={isMobile ? 115 : 130}
           leftSection={<TbSortAscending size={13} />}
           value={sort}
           onChange={v => setSort((v ?? 'updated') as typeof sort)}
@@ -634,17 +639,13 @@ function GistsPage() {
           ]}
           allowDeselect={false}
         />
-        <Group gap={2}>
-          <Tooltip label="List view" position="bottom">
-            <ActionIcon size="sm" variant={view === 'list' ? 'filled' : 'subtle'} color={view === 'list' ? 'violet' : 'gray'} onClick={() => setView('list')}>
-              <TbLayoutList size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Grid view" position="bottom">
-            <ActionIcon size="sm" variant={view === 'grid' ? 'filled' : 'subtle'} color={view === 'grid' ? 'violet' : 'gray'} onClick={() => setView('grid')}>
-              <TbLayoutGrid size={14} />
-            </ActionIcon>
-          </Tooltip>
+        <Group gap={2} wrap="nowrap">
+          <ActionIcon size="sm" variant={view === 'list' ? 'filled' : 'subtle'} color={view === 'list' ? 'violet' : 'gray'} onClick={() => setView('list')}>
+            <TbLayoutList size={14} />
+          </ActionIcon>
+          <ActionIcon size="sm" variant={view === 'grid' ? 'filled' : 'subtle'} color={view === 'grid' ? 'violet' : 'gray'} onClick={() => setView('grid')}>
+            <TbLayoutGrid size={14} />
+          </ActionIcon>
         </Group>
       </Group>
 

@@ -1,4 +1,4 @@
-import { ColorSchemeScript, createTheme, MantineProvider } from '@mantine/core'
+import { ColorSchemeScript, createTheme, MantineProvider, rem } from '@mantine/core'
 import '@mantine/core/styles.css'
 import { Notifications } from '@mantine/notifications'
 import '@mantine/notifications/styles.css'
@@ -11,6 +11,32 @@ import { routeTree } from './routeTree.gen'
 const theme = createTheme({
   primaryColor: 'blue',
   fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
+  components: {
+    Button: {
+      defaultProps: { radius: 'md' },
+    },
+    TextInput: {
+      defaultProps: { radius: 'md' },
+    },
+    PasswordInput: {
+      defaultProps: { radius: 'md' },
+    },
+    Select: {
+      defaultProps: { radius: 'md' },
+    },
+    Textarea: {
+      defaultProps: { radius: 'md' },
+    },
+    Modal: {
+      defaultProps: { radius: 'lg' },
+    },
+    Paper: {
+      defaultProps: { radius: 'md' },
+    },
+  },
+  other: {
+    mobileBreak: rem(768),
+  },
 })
 
 const queryClient = new QueryClient({
@@ -49,7 +75,7 @@ export function App() {
     <>
       <ColorSchemeScript defaultColorScheme="auto" />
       <MantineProvider theme={theme} defaultColorScheme="auto">
-        <Notifications position="top-right" zIndex={1000} />
+        <Notifications position="top-right" zIndex={1000} maw={320} />
         <ModalsProvider>
           <QueryClientProvider client={queryClient}>
             <RouterProvider router={router} />

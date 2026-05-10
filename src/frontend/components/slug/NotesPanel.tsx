@@ -16,7 +16,7 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useLocalStorage } from '@mantine/hooks'
+import { useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import {
@@ -170,7 +170,7 @@ function NoteCardGrid(props: NoteCardProps) {
         borderTop: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined,
         display: 'flex',
         flexDirection: 'column',
-        height: 180,
+        minHeight: 140,
       }}
       onClick={onView}
     >
@@ -197,6 +197,7 @@ function NoteCardGrid(props: NoteCardProps) {
 
 export function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpenModal, viewNote, setViewNote }: NotesPanelProps) {
   const qc = useQueryClient()
+  const isMobile = useMediaQuery('(max-width: 48em)')
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState<string[]>([])
   const [sort, setSort] = useState<'updated' | 'created' | 'title'>('updated')
@@ -264,7 +265,7 @@ export function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpe
   return (
     <Stack gap="sm">
       {/* ─── Toolbar ────────────────────────── */}
-      <Group gap="xs">
+      <Group gap="xs" wrap="wrap">
         <TextInput
           size="xs"
           placeholder="Cari notes..."
@@ -272,9 +273,9 @@ export function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpe
           value={search}
           onChange={e => setSearch(e.target.value)}
           rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
-          style={{ flex: 1 }}
+          style={{ flex: 1, minWidth: 120 }}
         />
-        {allTags.length > 0 && (
+        {!isMobile && allTags.length > 0 && (
           <MultiSelect
             size="xs"
             placeholder="Filter tag..."
@@ -283,12 +284,13 @@ export function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpe
             onChange={setTagFilter}
             leftSection={<TbTag size={13} />}
             clearable
-            w={180}
+            maw={180}
+            style={{ flex: 1 }}
           />
         )}
         <Select
           size="xs"
-          w={130}
+          w={isMobile ? 115 : 130}
           leftSection={<TbSortAscending size={13} />}
           value={sort}
           onChange={v => setSort((v ?? 'updated') as typeof sort)}
@@ -299,27 +301,23 @@ export function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpe
           ]}
           allowDeselect={false}
         />
-        <Group gap={2}>
-          <Tooltip label="List view" position="bottom">
-            <ActionIcon
-              size="sm"
-              variant={view === 'list' ? 'filled' : 'subtle'}
-              color={view === 'list' ? 'violet' : 'gray'}
-              onClick={() => setView('list')}
-            >
-              <TbLayoutList size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Grid view" position="bottom">
-            <ActionIcon
-              size="sm"
-              variant={view === 'grid' ? 'filled' : 'subtle'}
-              color={view === 'grid' ? 'violet' : 'gray'}
-              onClick={() => setView('grid')}
-            >
-              <TbLayoutGrid size={14} />
-            </ActionIcon>
-          </Tooltip>
+        <Group gap={2} wrap="nowrap">
+          <ActionIcon
+            size="sm"
+            variant={view === 'list' ? 'filled' : 'subtle'}
+            color={view === 'list' ? 'violet' : 'gray'}
+            onClick={() => setView('list')}
+          >
+            <TbLayoutList size={14} />
+          </ActionIcon>
+          <ActionIcon
+            size="sm"
+            variant={view === 'grid' ? 'filled' : 'subtle'}
+            color={view === 'grid' ? 'violet' : 'gray'}
+            onClick={() => setView('grid')}
+          >
+            <TbLayoutGrid size={14} />
+          </ActionIcon>
         </Group>
         {canEdit && (
           <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>

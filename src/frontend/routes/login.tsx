@@ -89,7 +89,7 @@ function LoginPage() {
       {/* ─── Top bar ──────────────────────── */}
       <Group
         justify="space-between"
-        px="xl"
+        px={{ base: 'md', sm: 'xl' }}
         py="sm"
         style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
       >
@@ -188,7 +188,7 @@ function LoginPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '40px 24px',
+            padding: 'clamp(20px, 5vw, 40px) clamp(16px, 5vw, 24px)',
           }}
         >
           <Box style={{ width: '100%', maxWidth: 400 }}>
@@ -277,7 +277,7 @@ function LoginPage() {
                 <TbKey size={13} style={{ color: 'var(--mantine-color-dimmed)' }} />
                 <Text size="xs" fw={600} c="dimmed">Demo accounts (development)</Text>
               </Group>
-              <Group gap="xs">
+              <Group gap="xs" wrap="wrap">
                 {demoAccounts.map(acc => (
                   <Tooltip
                     key={acc.label}
@@ -286,7 +286,7 @@ function LoginPage() {
                     withArrow
                   >
                     <Button
-                      size="compact-xs"
+                      size="xs"
                       variant="light"
                       color={acc.color}
                       loading={login.isPending && email === acc.email}

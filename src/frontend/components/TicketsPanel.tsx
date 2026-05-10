@@ -2,6 +2,7 @@ import {
   ActionIcon,
   Alert,
   Badge,
+  Box,
   Button,
   Card,
   Container,
@@ -9,6 +10,8 @@ import {
   Group,
   Menu,
   Modal,
+  Paper,
+  ScrollArea,
   Select,
   Stack,
   Table,
@@ -19,6 +22,7 @@ import {
   Tooltip,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMediaQuery } from '@mantine/hooks'
 import { useState } from 'react'
 import { TbBug, TbCheck, TbChevronRight, TbMessagePlus, TbPaperclip, TbPlus, TbRefresh, TbRotate } from 'react-icons/tb'
 import { type Role, useSession } from '@/frontend/hooks/useAuth'
@@ -98,6 +102,7 @@ export function TicketsPanel() {
   const role = user?.role
   const canCreate = role === 'QC' || role === 'ADMIN' || role === 'SUPER_ADMIN'
   const isQc = role === 'QC' || role === 'SUPER_ADMIN'
+  const isMobile = useMediaQuery('(max-width: 48em)')
 
   const [statusFilter, setStatusFilter] = useState<string>('active')
   const [createOpen, setCreateOpen] = useState(false)
@@ -138,122 +143,149 @@ export function TicketsPanel() {
   })
 
   return (
-    <Container size="xl">
-      <Stack gap="lg">
-        <Group justify="space-between">
+    <Container size="xl" px={{ base: 0, sm: 'md' }}>
+      <Stack gap="md">
+        {/* Header */}
+        <Group justify="space-between" wrap="wrap" gap="xs">
           <Group gap="xs">
-            <TbBug size={24} />
-            <Title order={3}>Tickets</Title>
+            <TbBug size={20} />
+            <Title order={4}>Tickets</Title>
           </Group>
-          <Group gap="xs">
+          <Group gap="xs" wrap="nowrap">
             <Select
               size="xs"
               value={statusFilter}
               onChange={(v) => setStatusFilter(v || 'active')}
               data={[
-                { value: 'active', label: 'Active' },
-                { value: 'all', label: 'All' },
+                { value: 'active', label: 'Aktif' },
+                { value: 'all', label: 'Semua' },
                 { value: 'OPEN', label: 'Open' },
                 { value: 'IN_PROGRESS', label: 'In Progress' },
-                { value: 'READY_FOR_QC', label: 'Ready for QC' },
+                { value: 'READY_FOR_QC', label: 'QC' },
                 { value: 'REOPENED', label: 'Reopened' },
                 { value: 'CLOSED', label: 'Closed' },
               ]}
-              w={160}
+              w={isMobile ? 110 : 150}
+              allowDeselect={false}
             />
-            <Tooltip label="Refresh">
-              <ActionIcon variant="subtle" onClick={() => refetch()} loading={isFetching}>
-                <TbRefresh size={16} />
-              </ActionIcon>
-            </Tooltip>
+            <ActionIcon variant="subtle" size="md" onClick={() => refetch()} loading={isFetching}>
+              <TbRefresh size={16} />
+            </ActionIcon>
             {canCreate && (
               <Button size="xs" leftSection={<TbPlus size={14} />} onClick={() => setCreateOpen(true)}>
-                New Ticket
+                {isMobile ? 'Buat' : 'New Ticket'}
               </Button>
             )}
           </Group>
         </Group>
 
-        <Card withBorder padding={0} radius="md">
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th style={{ width: 110 }}>Status</Table.Th>
-                <Table.Th style={{ width: 100 }}>Priority</Table.Th>
-                <Table.Th>Title</Table.Th>
-                <Table.Th style={{ width: 140 }}>Reporter</Table.Th>
-                <Table.Th style={{ width: 140 }}>Assignee</Table.Th>
-                <Table.Th style={{ width: 80 }}>Activity</Table.Th>
-                <Table.Th style={{ width: 40 }}></Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {isLoading && (
-                <Table.Tr>
-                  <Table.Td colSpan={7}>
-                    <Text ta="center" c="dimmed" py="md">
-                      Loading…
-                    </Text>
-                  </Table.Td>
-                </Table.Tr>
-              )}
-              {!isLoading && tickets.length === 0 && (
-                <Table.Tr>
-                  <Table.Td colSpan={7}>
-                    <Text ta="center" c="dimmed" py="md">
-                      No tickets
-                    </Text>
-                  </Table.Td>
-                </Table.Tr>
-              )}
-              {tickets.map((t) => (
-                <Table.Tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => setDetailId(t.id)}>
-                  <Table.Td>
-                    <Badge size="sm" color={STATUS_COLOR[t.status]} variant="light">
+        {/* Mobile: card list */}
+        {isMobile ? (
+          <Stack gap="xs">
+            {isLoading && <Text ta="center" c="dimmed" py="md" size="sm">Loading…</Text>}
+            {!isLoading && tickets.length === 0 && (
+              <Paper withBorder p="lg" ta="center" radius="md">
+                <Text size="sm" c="dimmed">Tidak ada ticket</Text>
+              </Paper>
+            )}
+            {tickets.map((t) => (
+              <Paper
+                key={t.id}
+                withBorder p="sm" radius="md"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setDetailId(t.id)}
+              >
+                <Group justify="space-between" mb={6} wrap="nowrap">
+                  <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
+                    <Badge size="xs" color={STATUS_COLOR[t.status]} variant="light" style={{ flexShrink: 0 }}>
                       {t.status.replace('_', ' ')}
                     </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge size="sm" color={PRIORITY_COLOR[t.priority]} variant="outline">
+                    <Badge size="xs" color={PRIORITY_COLOR[t.priority]} variant="outline" style={{ flexShrink: 0 }}>
                       {t.priority}
                     </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" fw={500} lineClamp={1}>
-                      {t.title}
-                    </Text>
-                    {t.route && (
-                      <Text size="xs" c="dimmed">
-                        {t.route}
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="xs">{t.reporter.name}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="xs" c={t.assignee ? undefined : 'dimmed'}>
-                      {t.assignee?.name ?? '—'}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap={4}>
-                      <Badge size="xs" variant="default">
-                        {t._count.comments}c
-                      </Badge>
-                      <Badge size="xs" variant="default">
-                        {t._count.evidence}e
-                      </Badge>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    <TbChevronRight size={14} />
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </Card>
+                  </Group>
+                  <TbChevronRight size={14} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
+                </Group>
+                <Text size="sm" fw={500} lineClamp={2} mb={4}>{t.title}</Text>
+                {t.route && <Text size="xs" c="dimmed" mb={4} lineClamp={1}>{t.route}</Text>}
+                <Group gap="xs">
+                  <Text size="xs" c="dimmed">{t.reporter.name}</Text>
+                  {t.assignee && <><Text size="xs" c="dimmed">→</Text><Text size="xs">{t.assignee.name}</Text></>}
+                  <Group gap={4} ml="auto">
+                    <Badge size="xs" variant="default">{t._count.comments}c</Badge>
+                    <Badge size="xs" variant="default">{t._count.evidence}e</Badge>
+                  </Group>
+                </Group>
+              </Paper>
+            ))}
+          </Stack>
+        ) : (
+          /* Desktop: scrollable table */
+          <Card withBorder padding={0} radius="md">
+            <ScrollArea>
+              <Table striped highlightOnHover style={{ minWidth: 680 }}>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th style={{ width: 110 }}>Status</Table.Th>
+                    <Table.Th style={{ width: 100 }}>Priority</Table.Th>
+                    <Table.Th>Title</Table.Th>
+                    <Table.Th style={{ width: 130 }}>Reporter</Table.Th>
+                    <Table.Th style={{ width: 130 }}>Assignee</Table.Th>
+                    <Table.Th style={{ width: 72 }}>Activity</Table.Th>
+                    <Table.Th style={{ width: 36 }}></Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {isLoading && (
+                    <Table.Tr>
+                      <Table.Td colSpan={7}>
+                        <Text ta="center" c="dimmed" py="md">Loading…</Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                  {!isLoading && tickets.length === 0 && (
+                    <Table.Tr>
+                      <Table.Td colSpan={7}>
+                        <Text ta="center" c="dimmed" py="md">No tickets</Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                  {tickets.map((t) => (
+                    <Table.Tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => setDetailId(t.id)}>
+                      <Table.Td>
+                        <Badge size="sm" color={STATUS_COLOR[t.status]} variant="light">
+                          {t.status.replace('_', ' ')}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge size="sm" color={PRIORITY_COLOR[t.priority]} variant="outline">
+                          {t.priority}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm" fw={500} lineClamp={1}>{t.title}</Text>
+                        {t.route && <Text size="xs" c="dimmed">{t.route}</Text>}
+                      </Table.Td>
+                      <Table.Td><Text size="xs">{t.reporter.name}</Text></Table.Td>
+                      <Table.Td>
+                        <Text size="xs" c={t.assignee ? undefined : 'dimmed'}>
+                          {t.assignee?.name ?? '—'}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap={4}>
+                          <Badge size="xs" variant="default">{t._count.comments}c</Badge>
+                          <Badge size="xs" variant="default">{t._count.evidence}e</Badge>
+                        </Group>
+                      </Table.Td>
+                      <Table.Td><TbChevronRight size={14} /></Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea>
+          </Card>
+        )}
       </Stack>
 
       <CreateTicketModal

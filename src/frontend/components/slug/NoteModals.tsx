@@ -13,6 +13,7 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -138,12 +139,14 @@ export function NoteFormModal({ slug, openNote, setOpenNote }: {
   openNote: Note | null | 'new'
   setOpenNote: (n: Note | null | 'new') => void
 }) {
+  const isMobile = useMediaQuery('(max-width: 48em)')
   return (
     <Modal
       opened={openNote !== null}
       onClose={() => setOpenNote(null)}
       title={openNote === 'new' ? 'Buat Note Baru' : 'Edit Note'}
       size="xl"
+      fullScreen={isMobile}
       zIndex={300}
       styles={{ body: { paddingTop: 8 } }}
     >
@@ -179,6 +182,7 @@ export function NoteViewModal({ slug, note, onClose, canEditNote, onEdit, onDele
   onDelete: (note: Note) => void
 }) {
   const qc = useQueryClient()
+  const isMobile = useMediaQuery('(max-width: 48em)')
 
   const deleteNote = (n: Note) =>
     modals.openConfirmModal({
@@ -205,6 +209,7 @@ export function NoteViewModal({ slug, note, onClose, canEditNote, onEdit, onDele
         </Group>
       }
       size="xl"
+      fullScreen={isMobile}
       zIndex={300}
     >
       {note && (
@@ -217,7 +222,7 @@ export function NoteViewModal({ slug, note, onClose, canEditNote, onEdit, onDele
               oleh {note.author.name} · diperbarui {relTime(note.updatedAt)}
             </Text>
           </Group>
-          <Paper withBorder p="md" style={{ maxHeight: 460, overflowY: 'auto' }}>
+          <Paper withBorder p="md" style={{ maxHeight: isMobile ? '50vh' : 460, overflowY: 'auto' }}>
             <MarkdownRenderer fontSize={14}>{note.body || '_Tidak ada konten._'}</MarkdownRenderer>
           </Paper>
           <Group justify="space-between" gap="xs">

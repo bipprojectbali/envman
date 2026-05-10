@@ -249,8 +249,8 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
           </Group>
         </Card>
       ) : (
-        <Group justify="space-between" wrap="nowrap">
-          <Group gap="sm">
+        <Group justify="space-between" wrap="wrap" gap="xs">
+          <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
             <ThemeIcon
               size={32}
               radius="md"
@@ -331,8 +331,8 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
         size="md"
       >
         <Stepper active={step} size="xs" mb="md" onStepClick={s => { if (s < step) setStep(s) }}>
-          <Stepper.Step label="Connection" description="Pilih instance" />
-          <Stepper.Step label="Stack" description="Pilih stack target" />
+          <Stepper.Step label="Connection" />
+          <Stepper.Step label="Stack" />
         </Stepper>
 
         {step === 0 && (

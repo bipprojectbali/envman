@@ -104,15 +104,15 @@ function ProjectListPage() {
   return (
     <Box>
       {/* ─── Header ─────────────────────────── */}
-      <Group justify="space-between" mb="md">
-        <Group gap="xs">
+      <Group justify="space-between" mb="md" wrap="nowrap">
+        <Group gap="xs" style={{ minWidth: 0 }}>
           <ThemeIcon size={28} radius="md" variant="light" color="violet">
             <TbFolders size={15} />
           </ThemeIcon>
-          <Box>
+          <Box style={{ minWidth: 0 }}>
             <Text fw={700} size="sm">Projects</Text>
             {!isLoading && projects.length > 0 && (
-              <Text size="xs" c="dimmed">
+              <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {ownerCount > 0 && `${ownerCount} milik saya`}
                 {ownerCount > 0 && memberCount > 0 && ' · '}
                 {memberCount > 0 && `${memberCount} member`}
@@ -120,7 +120,7 @@ function ProjectListPage() {
             )}
           </Box>
         </Group>
-        <Group gap="xs">
+        <Group gap="xs" wrap="nowrap">
           <Tooltip label={view === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
             <ActionIcon
               size="sm" variant="subtle" color="gray"
@@ -221,7 +221,7 @@ function ProjectListPage() {
             ))}
           </Stack>
         ) : (
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
+          <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
             {projects.map((p) => (
               <Card
                 key={p.slug}

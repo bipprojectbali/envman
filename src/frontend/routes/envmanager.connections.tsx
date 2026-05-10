@@ -16,7 +16,7 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure, useLocalStorage } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
@@ -53,6 +53,7 @@ interface Connection {
 }
 
 function ConnectionsPage() {
+  const isMobile = useMediaQuery('(max-width: 48em)')
   const qc = useQueryClient()
   const [modalOpen, { open, close }] = useDisclosure(false)
   const [editTarget, setEditTarget] = useState<Connection | null>(null)
@@ -291,6 +292,7 @@ function ConnectionsPage() {
       <Modal
         opened={modalOpen}
         onClose={handleClose}
+        fullScreen={isMobile}
         title={
           <Group gap="xs">
             <ThemeIcon size="sm" variant="light" color="violet" radius="md">

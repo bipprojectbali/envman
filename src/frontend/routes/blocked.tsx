@@ -16,7 +16,7 @@ function BlockedPage() {
       <Box style={{ position: 'absolute', top: 16, right: 16 }}>
         <ThemeToggle />
       </Box>
-      <Paper shadow="md" p="xl" radius="md" w={460} withBorder>
+      <Paper shadow="md" p={{ base: 'lg', sm: 'xl' }} radius="md" w="100%" maw={460} withBorder mx="md">
         <Stack align="center" gap="lg">
           <ThemeIcon color="red" size={72} radius="xl" variant="light">
             <TbShieldOff size={40} />

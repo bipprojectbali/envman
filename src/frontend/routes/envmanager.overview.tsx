@@ -76,7 +76,7 @@ function StatCard({
 }) {
   return (
     <Card
-      withBorder p="md" radius="md"
+      withBorder p={{ base: 'sm', sm: 'md' }} radius="md"
       style={{
         cursor: onClick ? 'pointer' : undefined,
         transition: 'box-shadow 0.15s, transform 0.15s',
@@ -86,18 +86,18 @@ function StatCard({
       onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--mantine-shadow-sm)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' } }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = ''; (e.currentTarget as HTMLElement).style.transform = '' }}
     >
-      <Group justify="space-between" align="flex-start" mb="sm">
-        <ThemeIcon size={40} radius="md" variant="light" color={color}>
-          <Icon size={20} />
+      <Group justify="space-between" align="flex-start" mb={{ base: 6, sm: 'sm' }}>
+        <ThemeIcon size={36} radius="md" variant="light" color={color}>
+          <Icon size={18} />
         </ThemeIcon>
         {loading ? (
-          <Skeleton height={32} width={48} />
+          <Skeleton height={28} width={40} />
         ) : (
           <Text fw={800} size="xl" lh={1}>{value}</Text>
         )}
       </Group>
       <Text size="sm" fw={600}>{label}</Text>
-      {sub && <Text size="xs" c="dimmed" mt={2}>{sub}</Text>}
+      {sub && <Text size="xs" c="dimmed" mt={2} lineClamp={1}>{sub}</Text>}
     </Card>
   )
 }
@@ -166,10 +166,10 @@ function OverviewPage() {
   return (
     <Box>
       {/* ─── Header ─────────────────────── */}
-      <Group justify="space-between" mb="xl">
+      <Group justify="space-between" mb={{ base: 'md', sm: 'xl' }}>
         <Box>
           <Text fw={700} size="lg">Overview</Text>
-          <Text size="sm" c="dimmed">Ringkasan seluruh resources yang kamu kelola</Text>
+          <Text size="xs" c="dimmed" visibleFrom="xs">Ringkasan seluruh resources yang kamu kelola</Text>
         </Box>
         <Tooltip label="Refresh">
           <ActionIcon variant="subtle" color="gray" loading={isLoading} onClick={() => refetchProjects()}>
@@ -179,7 +179,7 @@ function OverviewPage() {
       </Group>
 
       {/* ─── Stats cards ────────────────── */}
-      <SimpleGrid cols={{ base: 2, sm: 3, md: 6 }} spacing="sm" mb="xl">
+      <SimpleGrid cols={{ base: 2, sm: 3, md: 6 }} spacing={{ base: 'xs', sm: 'sm' }} mb={{ base: 'md', sm: 'xl' }}>
         <StatCard
           icon={TbVariable}
           label="Projects"
@@ -234,7 +234,7 @@ function OverviewPage() {
         />
       </SimpleGrid>
 
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: 'sm', md: 'md' }}>
 
         {/* ─── Projects list ──────────────── */}
         <Card withBorder p="md">

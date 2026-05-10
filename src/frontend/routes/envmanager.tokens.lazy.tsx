@@ -23,7 +23,7 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure, useLocalStorage } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute } from '@tanstack/react-router'
@@ -234,6 +234,7 @@ const emptyForm = { name: '', canWrite: false, expiresAt: '', scopes: [] as stri
 
 function TokensPage() {
   const qc = useQueryClient()
+  const isMobile = useMediaQuery('(max-width: 48em)')
   const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false)
   const [editOpen, { open: openEdit, close: closeEdit }] = useDisclosure(false)
   const [editingToken, setEditingToken] = useState<ApiToken | null>(null)
@@ -486,22 +487,38 @@ function TokensPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
-            style={{ flex: 1, minWidth: 160 }}
+            style={{ flex: 1, minWidth: 120 }}
           />
-          <SegmentedControl
-            size="xs"
-            value={filterStatus}
-            onChange={setFilterStatus}
-            data={[
-              { label: 'Semua', value: 'semua' },
-              { label: 'Aktif', value: 'aktif' },
-              { label: 'Expired', value: 'expired' },
-              { label: 'Disabled', value: 'disabled' },
-            ]}
-          />
+          {isMobile ? (
+            <Select
+              size="xs"
+              value={filterStatus}
+              onChange={v => setFilterStatus(v ?? 'semua')}
+              data={[
+                { label: 'Semua', value: 'semua' },
+                { label: 'Aktif', value: 'aktif' },
+                { label: 'Expired', value: 'expired' },
+                { label: 'Disabled', value: 'disabled' },
+              ]}
+              allowDeselect={false}
+              w={110}
+            />
+          ) : (
+            <SegmentedControl
+              size="xs"
+              value={filterStatus}
+              onChange={setFilterStatus}
+              data={[
+                { label: 'Semua', value: 'semua' },
+                { label: 'Aktif', value: 'aktif' },
+                { label: 'Expired', value: 'expired' },
+                { label: 'Disabled', value: 'disabled' },
+              ]}
+            />
+          )}
           <Select
             size="xs"
-            w={130}
+            w={isMobile ? 105 : 130}
             leftSection={<TbSortAscending size={13} />}
             value={sort}
             onChange={v => setSort(v ?? 'terbaru')}
@@ -751,6 +768,7 @@ function TokensPage() {
         opened={createOpen}
         onClose={() => { closeCreate(); setForm(emptyForm) }}
         size="lg"
+        fullScreen={isMobile}
         title={
           <Group gap="xs">
             <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
@@ -802,6 +820,7 @@ function TokensPage() {
         opened={editOpen}
         onClose={() => { closeEdit(); setEditingToken(null) }}
         size="lg"
+        fullScreen={isMobile}
         title={
           <Group gap="xs">
             <ThemeIcon size={28} variant="light" color="violet" radius="md">

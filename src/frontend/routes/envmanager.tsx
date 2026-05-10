@@ -7,7 +7,6 @@ import {
   Burger,
   Divider,
   Group,
-  NavLink,
   Stack,
   Text,
   ThemeIcon,
@@ -108,35 +107,54 @@ function EnvManagerLayout() {
     { label: 'Docs', icon: TbBook, href: '/envmanager/docs', active: isReadme },
   ]
 
+  // Bottom tab items untuk mobile (5 item utama)
+  const bottomTabs = [
+    { label: 'Overview', icon: TbHome, href: '/envmanager/overview', active: isOverview },
+    { label: 'Projects', icon: TbVariable, href: '/envmanager', active: isProjectsActive },
+    { label: 'Tokens', icon: TbKey, href: '/envmanager/tokens', active: isTokens },
+    { label: 'Gists', icon: TbBrandGithub, href: '/envmanager/gists', active: isGists },
+    { label: 'Profil', icon: TbUser, href: '/profile', active: false },
+  ]
+
   return (
     <AppShell
       header={{ height: 56, collapsed: !isMobile }}
       navbar={{ width: collapsed ? 60 : 260, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }}
-      padding="md"
+      padding={{ base: 'sm', sm: 'md' }}
     >
       {/* ─── Mobile header ──────────────── */}
-      <AppShell.Header px="md" hiddenFrom="sm">
+      <AppShell.Header px="sm" hiddenFrom="sm" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
         <Group h="100%" justify="space-between">
           <Group gap="xs">
             <Burger opened={mobileOpened} onClick={toggleMobile} size="sm" />
-            <ThemeIcon size="md" variant="gradient" gradient={{ from: 'violet', to: 'grape' }}>
-              <TbVariable size={16} />
-            </ThemeIcon>
-            <Text fw={700} size="sm">Env Manager</Text>
+            <Group gap={6}>
+              <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+                <TbVariable size={14} />
+              </ThemeIcon>
+              <Text fw={700} size="sm">Env Manager</Text>
+            </Group>
           </Group>
-          <Group gap="xs">
+          <Group gap={6}>
             <ThemeToggle size="sm" />
-            <Avatar color="violet" radius="xl" size="sm">
+            <Avatar
+              color="violet"
+              radius="xl"
+              size="sm"
+              variant="gradient"
+              gradient={{ from: 'violet', to: 'grape' }}
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate({ to: '/profile' })}
+            >
               {user?.name?.charAt(0).toUpperCase()}
             </Avatar>
           </Group>
         </Group>
       </AppShell.Header>
 
-      {/* ─── Sidebar ───────────────────── */}
+      {/* ─── Sidebar (desktop only) ─────── */}
       <AppShell.Navbar p={collapsed ? 'xs' : 'md'}>
 
-        {/* Logo section */}
+        {/* Logo */}
         <AppShell.Section mb="xs">
           <Group gap="xs" justify={collapsed ? 'center' : 'space-between'}>
             {collapsed ? (
@@ -179,7 +197,7 @@ function EnvManagerLayout() {
                     color={item.active ? 'violet' : 'gray'}
                     size="lg"
                     onClick={() => { navigate({ to: item.href }); closeMobile() }}
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', height: 44 }}
                   >
                     <item.icon size={18} />
                   </ActionIcon>
@@ -192,7 +210,8 @@ function EnvManagerLayout() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    padding: '8px 10px',
+                    padding: '10px 10px',
+                    minHeight: 44,
                     borderRadius: 8,
                     background: item.active ? 'var(--mantine-color-violet-light)' : undefined,
                     borderLeft: item.active ? '3px solid var(--mantine-color-violet-5)' : '3px solid transparent',
@@ -201,8 +220,8 @@ function EnvManagerLayout() {
                   onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
                   onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
                 >
-                  <ThemeIcon size={30} variant={item.active ? 'light' : 'subtle'} color={item.active ? 'violet' : 'gray'} radius="md">
-                    <item.icon size={15} />
+                  <ThemeIcon size={32} variant={item.active ? 'light' : 'subtle'} color={item.active ? 'violet' : 'gray'} radius="md">
+                    <item.icon size={16} />
                   </ThemeIcon>
                   <Box style={{ flex: 1, minWidth: 0 }}>
                     <Text size="sm" fw={item.active ? 600 : 500} c={item.active ? 'violet' : undefined} lh={1.2}>
@@ -226,7 +245,7 @@ function EnvManagerLayout() {
                     color={item.active ? 'violet' : 'gray'}
                     size="lg"
                     onClick={() => { navigate({ to: item.href }); closeMobile() }}
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', height: 44 }}
                   >
                     <item.icon size={18} />
                   </ActionIcon>
@@ -239,7 +258,8 @@ function EnvManagerLayout() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    padding: '7px 10px',
+                    padding: '9px 10px',
+                    minHeight: 40,
                     borderRadius: 8,
                     background: item.active ? 'var(--mantine-color-violet-light)' : undefined,
                     borderLeft: item.active ? '3px solid var(--mantine-color-violet-5)' : '3px solid transparent',
@@ -264,11 +284,8 @@ function EnvManagerLayout() {
             <Stack align="center" gap="xs">
               <Tooltip label={`${user?.name} · ${roleLabel[user?.role ?? ''] ?? user?.role}`} position="right">
                 <Avatar
-                  color="violet"
-                  radius="xl"
-                  size="md"
-                  variant="gradient"
-                  gradient={{ from: 'violet', to: 'grape' }}
+                  color="violet" radius="xl" size="md"
+                  variant="gradient" gradient={{ from: 'violet', to: 'grape' }}
                   style={{ cursor: 'default' }}
                 >
                   {user?.name?.charAt(0).toUpperCase()}
@@ -289,13 +306,7 @@ function EnvManagerLayout() {
           ) : (
             <Box>
               <Group gap="xs" mb="xs" wrap="nowrap">
-                <Avatar
-                  color="violet"
-                  radius="xl"
-                  size="md"
-                  variant="gradient"
-                  gradient={{ from: 'violet', to: 'grape' }}
-                >
+                <Avatar color="violet" radius="xl" size="md" variant="gradient" gradient={{ from: 'violet', to: 'grape' }}>
                   {user?.name?.charAt(0).toUpperCase()}
                 </Avatar>
                 <Box style={{ flex: 1, minWidth: 0 }}>
@@ -325,9 +336,52 @@ function EnvManagerLayout() {
         </AppShell.Section>
       </AppShell.Navbar>
 
-      <AppShell.Main>
+      <AppShell.Main style={{ paddingBottom: isMobile ? 'calc(64px + env(safe-area-inset-bottom))' : undefined }}>
         <Outlet />
       </AppShell.Main>
+
+      {/* ─── Mobile bottom tab bar ──────── */}
+      {isMobile && (
+        <Box
+          hiddenFrom="sm"
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 200,
+            background: 'var(--mantine-color-body)',
+            borderTop: '1px solid var(--mantine-color-default-border)',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+            display: 'flex',
+          }}
+        >
+          {bottomTabs.map(tab => (
+            <UnstyledButton
+              key={tab.href}
+              onClick={() => { navigate({ to: tab.href }); closeMobile() }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                padding: '8px 4px',
+                minHeight: 56,
+                color: tab.active ? 'var(--mantine-color-violet-6)' : 'var(--mantine-color-dimmed)',
+                borderTop: tab.active ? '2px solid var(--mantine-color-violet-5)' : '2px solid transparent',
+                transition: 'color 0.1s',
+              }}
+            >
+              <tab.icon size={20} />
+              <Text size="xs" fw={tab.active ? 600 : 400} lh={1} style={{ fontSize: 10 }}>
+                {tab.label}
+              </Text>
+            </UnstyledButton>
+          ))}
+        </Box>
+      )}
     </AppShell>
   )
 }
