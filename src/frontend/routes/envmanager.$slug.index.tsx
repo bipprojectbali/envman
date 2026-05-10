@@ -15,6 +15,7 @@ import {
   Modal,
   MultiSelect,
   Paper,
+  SimpleGrid,
   SegmentedControl,
   Select,
   Skeleton,
@@ -47,6 +48,8 @@ import {
   TbEdit,
   TbEye,
   TbFileText,
+  TbLayoutGrid,
+  TbLayoutList,
   TbNote,
   TbPlus,
   TbSearch,
@@ -946,6 +949,7 @@ function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpenModal,
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState<string[]>([])
   const [sort, setSort] = useState<'updated' | 'created' | 'title'>('updated')
+  const [view, setView] = useState<'list' | 'grid'>('list')
 
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'notes', slug],
@@ -1046,6 +1050,28 @@ function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpenModal,
           ]}
           allowDeselect={false}
         />
+        <Group gap={2}>
+          <Tooltip label="List view" position="bottom">
+            <ActionIcon
+              size="sm"
+              variant={view === 'list' ? 'filled' : 'subtle'}
+              color={view === 'list' ? 'violet' : 'gray'}
+              onClick={() => setView('list')}
+            >
+              <TbLayoutList size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Grid view" position="bottom">
+            <ActionIcon
+              size="sm"
+              variant={view === 'grid' ? 'filled' : 'subtle'}
+              color={view === 'grid' ? 'violet' : 'gray'}
+              onClick={() => setView('grid')}
+            >
+              <TbLayoutGrid size={14} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
         {canEdit && (
           <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
             New Note
@@ -1076,87 +1102,167 @@ function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpenModal,
           <Text size="sm" c="dimmed">Tidak ada note yang cocok.</Text>
           <Button type="button" size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setTagFilter([]) }}>Reset Filter</Button>
         </Card>
-      ) : (
+      ) : view === 'list' ? (
         <Stack gap="xs">
           {filtered.map(note => (
-            <Card
+            <NoteCardList
               key={note.id}
-              withBorder
-              p="sm"
-              style={{ cursor: 'pointer', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
-              onClick={() => setViewNote(note)}
-            >
-              <Group justify="space-between" wrap="nowrap" gap="xs">
-                <Box style={{ flex: 1, minWidth: 0 }}>
-                  <Group gap="xs" mb={2} wrap="nowrap">
-                    {note.pinned && <TbBookmarkFilled size={14} color="var(--mantine-color-yellow-5)" style={{ flexShrink: 0 }} />}
-                    <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {note.title}
-                    </Text>
-                  </Group>
-                  <Text size="xs" c="dimmed" lineClamp={1} style={{ fontFamily: 'monospace' }}>
-                    {note.body.replace(/#{1,6}\s|[*_`>-]/g, '').slice(0, 120) || '—'}
-                  </Text>
-                  <Group gap={4} mt={4} wrap="wrap">
-                    {note.tags.map(t => (
-                      <Badge key={t} size="xs" variant="outline" color="violet">{t}</Badge>
-                    ))}
-                    <Text size="xs" c="dimmed">
-                      {note.author.name} · {relTime(note.updatedAt)}
-                    </Text>
-                  </Group>
-                </Box>
-
-                <Group gap={4} wrap="nowrap" onClick={e => e.stopPropagation()}>
-                  <CopyButton value={note.body} timeout={2000}>
-                    {({ copied, copy }) => (
-                      <Tooltip label={copied ? 'Tersalin!' : 'Copy'} position="left">
-                        <ActionIcon
-                          size="sm"
-                          variant="subtle"
-                          color={copied ? 'teal' : 'gray'}
-                          onClick={e => { e.stopPropagation(); copy() }}
-                        >
-                          {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </CopyButton>
-                  {(isOwner || (canEdit && note.author.id === myUserId)) && (
-                    <Tooltip label={note.pinned ? 'Unpin' : 'Pin'} position="left">
-                      <ActionIcon
-                        size="sm"
-                        variant="subtle"
-                        color={note.pinned ? 'yellow' : 'gray'}
-                        onClick={e => { e.stopPropagation(); togglePin(note) }}
-                      >
-                        {note.pinned ? <TbBookmarkFilled size={13} /> : <TbBookmark size={13} />}
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                  {canEditNote(note) && (
-                    <>
-                      <Tooltip label="Edit" position="left">
-                        <ActionIcon size="sm" variant="subtle" color="blue" onClick={e => { e.stopPropagation(); setOpenModal(note) }}>
-                          <TbEdit size={13} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Hapus" position="left">
-                        <ActionIcon size="sm" variant="subtle" color="red" onClick={e => { e.stopPropagation(); deleteNote(note) }}>
-                          <TbTrash size={13} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </>
-                  )}
-                  <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); setViewNote(note) }}>
-                    <TbChevronRight size={13} />
-                  </ActionIcon>
-                </Group>
-              </Group>
-            </Card>
+              note={note}
+              canEdit={canEdit}
+              isOwner={isOwner}
+              myUserId={myUserId}
+              onView={() => setViewNote(note)}
+              onEdit={() => setOpenModal(note)}
+              onDelete={() => deleteNote(note)}
+              onPin={() => togglePin(note)}
+              relTime={relTime}
+            />
           ))}
         </Stack>
+      ) : (
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
+          {filtered.map(note => (
+            <NoteCardGrid
+              key={note.id}
+              note={note}
+              canEdit={canEdit}
+              isOwner={isOwner}
+              myUserId={myUserId}
+              onView={() => setViewNote(note)}
+              onEdit={() => setOpenModal(note)}
+              onDelete={() => deleteNote(note)}
+              onPin={() => togglePin(note)}
+              relTime={relTime}
+            />
+          ))}
+        </SimpleGrid>
       )}
     </Stack>
+  )
+}
+
+// ─── Shared card props ────────────────────────────────────────────────────────
+
+interface NoteCardProps {
+  note: Note
+  canEdit: boolean
+  isOwner: boolean
+  myUserId: string
+  onView: () => void
+  onEdit: () => void
+  onDelete: () => void
+  onPin: () => void
+  relTime: (iso: string) => string
+}
+
+function NoteCardActions({ note, canEdit, isOwner, myUserId, onView, onEdit, onDelete, onPin }: NoteCardProps) {
+  const canEditNote = isOwner || (canEdit && note.author.id === myUserId)
+  return (
+    <Group gap={4} wrap="nowrap" onClick={e => e.stopPropagation()}>
+      <CopyButton value={note.body} timeout={2000}>
+        {({ copied, copy }) => (
+          <Tooltip label={copied ? 'Tersalin!' : 'Copy'} position="left">
+            <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={e => { e.stopPropagation(); copy() }}>
+              {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </CopyButton>
+      {(isOwner || (canEdit && note.author.id === myUserId)) && (
+        <Tooltip label={note.pinned ? 'Unpin' : 'Pin'} position="left">
+          <ActionIcon size="sm" variant="subtle" color={note.pinned ? 'yellow' : 'gray'} onClick={e => { e.stopPropagation(); onPin() }}>
+            {note.pinned ? <TbBookmarkFilled size={13} /> : <TbBookmark size={13} />}
+          </ActionIcon>
+        </Tooltip>
+      )}
+      {canEditNote && (
+        <>
+          <Tooltip label="Edit" position="left">
+            <ActionIcon size="sm" variant="subtle" color="blue" onClick={e => { e.stopPropagation(); onEdit() }}>
+              <TbEdit size={13} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Hapus" position="left">
+            <ActionIcon size="sm" variant="subtle" color="red" onClick={e => { e.stopPropagation(); onDelete() }}>
+              <TbTrash size={13} />
+            </ActionIcon>
+          </Tooltip>
+        </>
+      )}
+      <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); onView() }}>
+        <TbChevronRight size={13} />
+      </ActionIcon>
+    </Group>
+  )
+}
+
+// ─── List card ────────────────────────────────────────────────────────────────
+
+function NoteCardList(props: NoteCardProps) {
+  const { note, relTime, onView } = props
+  return (
+    <Card
+      withBorder
+      p="sm"
+      style={{ cursor: 'pointer', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
+      onClick={onView}
+    >
+      <Group justify="space-between" wrap="nowrap" gap="xs">
+        <Box style={{ flex: 1, minWidth: 0 }}>
+          <Group gap="xs" mb={2} wrap="nowrap">
+            {note.pinned && <TbBookmarkFilled size={14} color="var(--mantine-color-yellow-5)" style={{ flexShrink: 0 }} />}
+            <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {note.title}
+            </Text>
+          </Group>
+          <Text size="xs" c="dimmed" lineClamp={1} style={{ fontFamily: 'monospace' }}>
+            {note.body.replace(/#{1,6}\s|[*_`>-]/g, '').slice(0, 120) || '—'}
+          </Text>
+          <Group gap={4} mt={4} wrap="wrap">
+            {note.tags.map(t => <Badge key={t} size="xs" variant="outline" color="violet">{t}</Badge>)}
+            <Text size="xs" c="dimmed">{note.author.name} · {relTime(note.updatedAt)}</Text>
+          </Group>
+        </Box>
+        <NoteCardActions {...props} />
+      </Group>
+    </Card>
+  )
+}
+
+// ─── Grid card ────────────────────────────────────────────────────────────────
+
+function NoteCardGrid(props: NoteCardProps) {
+  const { note, relTime, onView } = props
+  return (
+    <Card
+      withBorder
+      p="sm"
+      style={{
+        cursor: 'pointer',
+        borderTop: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined,
+        display: 'flex',
+        flexDirection: 'column',
+        height: 180,
+      }}
+      onClick={onView}
+    >
+      <Group justify="space-between" wrap="nowrap" mb={6} gap="xs">
+        <Group gap={4} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+          {note.pinned && <TbBookmarkFilled size={12} color="var(--mantine-color-yellow-5)" style={{ flexShrink: 0 }} />}
+          <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {note.title}
+          </Text>
+        </Group>
+        <NoteCardActions {...props} />
+      </Group>
+      <Text size="xs" c="dimmed" lineClamp={3} style={{ fontFamily: 'monospace', flex: 1 }}>
+        {note.body.replace(/#{1,6}\s|[*_`>-]/g, '').replace(/\n/g, ' ').slice(0, 200) || '—'}
+      </Text>
+      <Group gap={4} mt="xs" wrap="wrap" style={{ marginTop: 'auto' }}>
+        {note.tags.slice(0, 3).map(t => <Badge key={t} size="xs" variant="outline" color="violet">{t}</Badge>)}
+        {note.tags.length > 3 && <Text size="xs" c="dimmed">+{note.tags.length - 3}</Text>}
+        <Text size="xs" c="dimmed" ml="auto">{relTime(note.updatedAt)}</Text>
+      </Group>
+    </Card>
   )
 }
