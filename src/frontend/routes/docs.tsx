@@ -1002,119 +1002,90 @@ function DocsPage() {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const content = buildDocsMarkdown(origin)
 
+  // Warna GitHub markdown — seluruh halaman mengikuti ini
+  // light: bg #ffffff  text #1f2328  border #d0d7de
+  // dark:  bg #0d1117  text #f0f6fc  border #30363d
+  const ghDark = '#0d1117'
+  const ghLight = '#ffffff'
+  const ghBorderDark = '#30363d'
+  const ghBorderLight = '#d0d7de'
+
   return (
-    <Box style={{ minHeight: '100vh' }}>
-      {/* Navbar */}
+    <Box
+      style={{
+        minHeight: '100vh',
+        // background ikut warna GitHub markdown per color scheme
+      }}
+    >
+      <style>{`
+        html[data-mantine-color-scheme="light"] body { background-color: ${ghLight} !important; }
+        html[data-mantine-color-scheme="dark"]  body { background-color: ${ghDark}  !important; }
+      `}</style>
+
+      {/* Navbar — background solid sesuai GitHub markdown */}
       <Box
         component="header"
         style={{
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          borderBottom: '1px solid var(--mantine-color-default-border)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          backgroundColor: 'color-mix(in srgb, var(--mantine-color-body) 85%, transparent)',
         }}
       >
-        <Container size="lg">
-          <Group h={52} justify="space-between">
-            <Group gap="xs">
-              <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
-                <TbVariable size={14} />
-              </ThemeIcon>
-              <Anchor component={Link} to="/" underline="never">
-                <Text fw={700} size="sm">Env Manager</Text>
-              </Anchor>
-              <Text c="dimmed" size="sm">/</Text>
-              <Group gap={4}>
-                <TbBook size={14} />
-                <Text size="sm" fw={500}>Docs</Text>
+        <style>{`
+          html[data-mantine-color-scheme="light"] .docs-navbar {
+            background-color: ${ghLight};
+            border-bottom: 1px solid ${ghBorderLight};
+          }
+          html[data-mantine-color-scheme="dark"] .docs-navbar {
+            background-color: ${ghDark};
+            border-bottom: 1px solid ${ghBorderDark};
+          }
+        `}</style>
+        <Box className="docs-navbar">
+          <Container size="lg">
+            <Group h={52} justify="space-between">
+              <Group gap="xs">
+                <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+                  <TbVariable size={14} />
+                </ThemeIcon>
+                <Anchor component={Link} to="/" underline="never">
+                  <Text fw={700} size="sm">Env Manager</Text>
+                </Anchor>
+                <Text c="dimmed" size="sm">/</Text>
+                <Group gap={4}>
+                  <TbBook size={14} />
+                  <Text size="sm" fw={500}>Docs</Text>
+                </Group>
+              </Group>
+              <Group gap="xs">
+                <ThemeToggle />
+                <Button
+                  component={Link}
+                  to="/login"
+                  size="xs"
+                  variant="gradient"
+                  gradient={{ from: 'violet', to: 'grape' }}
+                  leftSection={<TbLogin size={13} />}
+                >
+                  Login
+                </Button>
               </Group>
             </Group>
-            <Group gap="xs">
-              <ThemeToggle />
-              <Button
-                component={Link}
-                to="/login"
-                size="xs"
-                variant="gradient"
-                gradient={{ from: 'violet', to: 'grape' }}
-                leftSection={<TbLogin size={13} />}
-              >
-                Login
-              </Button>
-            </Group>
-          </Group>
-        </Container>
+          </Container>
+        </Box>
       </Box>
 
       {/* Content */}
       <Container size="md" py={{ base: 'lg', sm: 48 }} px={{ base: 'sm', sm: 'md' }}>
-        <Box
-          className="markdown-body"
-          style={{
-            backgroundColor: 'transparent',
-            color: 'inherit',
-          }}
-        >
-          <style>{`
-            /* ── Reset background github-markdown-css agar ikut Mantine ── */
-            .markdown-body {
-              color-scheme: light dark;
-              --color-canvas-default: transparent;
-              --color-canvas-subtle: var(--mantine-color-default-hover);
-              --color-border-default: var(--mantine-color-default-border);
-              --color-border-muted: var(--mantine-color-default-border);
-              --color-fg-default: var(--mantine-color-text);
-              --color-fg-muted: var(--mantine-color-dimmed);
-              --color-fg-subtle: var(--mantine-color-dimmed);
-              --color-accent-fg: var(--mantine-color-blue-6);
-              --color-neutral-muted: var(--mantine-color-default-hover);
-            }
-
-            /* ── Dark mode overrides (syntax highlighting) ── */
-            html[data-mantine-color-scheme="dark"] .markdown-body {
-              --color-accent-fg: #58a6ff;
-              --color-accent-emphasis: #1f6feb;
-              --color-prettylights-syntax-comment: #8b949e;
-              --color-prettylights-syntax-constant: #79c0ff;
-              --color-prettylights-syntax-entity: #d2a8ff;
-              --color-prettylights-syntax-storage-modifier-import: #c9d1d9;
-              --color-prettylights-syntax-entity-tag: #7ee787;
-              --color-prettylights-syntax-keyword: #ff7b72;
-              --color-prettylights-syntax-string: #a5d6ff;
-              --color-prettylights-syntax-variable: #ffa657;
-              --color-prettylights-syntax-brackethighlighter-unmatched: #f85149;
-              --color-prettylights-syntax-invalid-illegal-text: #f0f6fc;
-              --color-prettylights-syntax-invalid-illegal-bg: #8e1519;
-              --color-prettylights-syntax-carriage-return-text: #f0f6fc;
-              --color-prettylights-syntax-carriage-return-bg: #b62324;
-              --color-prettylights-syntax-string-regexp: #7ee787;
-              --color-prettylights-syntax-markup-list: #f2cc60;
-              --color-prettylights-syntax-markup-heading: #1f6feb;
-              --color-prettylights-syntax-markup-italic: #c9d1d9;
-              --color-prettylights-syntax-markup-bold: #c9d1d9;
-              --color-prettylights-syntax-markup-deleted-text: #ffdcd7;
-              --color-prettylights-syntax-markup-deleted-bg: #67060c;
-              --color-prettylights-syntax-markup-inserted-text: #aff5b4;
-              --color-prettylights-syntax-markup-inserted-bg: #033a16;
-              --color-prettylights-syntax-markup-changed-text: #ffdfb6;
-              --color-prettylights-syntax-markup-changed-bg: #5a1e02;
-              --color-prettylights-syntax-markup-ignored-text: #c9d1d9;
-              --color-prettylights-syntax-markup-ignored-bg: #1158c7;
-              --color-prettylights-syntax-meta-diff-range: #d2a8ff;
-              --color-prettylights-syntax-brackethighlighter-angle: #8b949e;
-              --color-prettylights-syntax-sublimelighter-gutter-mark: #484f58;
-              --color-prettylights-syntax-constant-other-reference-link: #a5d6ff;
-            }
-          `}</style>
-          <MarkdownRenderer>{content}</MarkdownRenderer>
-        </Box>
+        <MarkdownRenderer>{content}</MarkdownRenderer>
       </Container>
 
       {/* Footer */}
-      <Box style={{ borderTop: '1px solid var(--mantine-color-default-border)' }} py="sm">
+      <style>{`
+        html[data-mantine-color-scheme="light"] .docs-footer { border-top: 1px solid ${ghBorderLight}; }
+        html[data-mantine-color-scheme="dark"]  .docs-footer { border-top: 1px solid ${ghBorderDark}; }
+      `}</style>
+      <Box className="docs-footer" py="sm">
         <Container size="lg">
           <Group justify="space-between" wrap="wrap" gap="xs">
             <Group gap="xs">
