@@ -558,3 +558,104 @@ export const portainerRouter = new Elysia()
       return { error: `Prune networks failed: ${e instanceof Error ? e.message : String(e)}` }
     }
   })
+
+  // ─── Container Logs ───────────────────────────────────────────────────────
+  // GET /api/envman/projects/:slug/environments/:envName/portainer/containers
+  // → List containers milik stack ini (untuk log selector)
+  .get('/api/envman/projects/:slug/environments/:envName/portainer/containers', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    if (!access) { set.status = 403; return { error: 'No access' } }
+    const cfg = await getPortainerCfg(params.slug, params.envName)
+    if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
+    const conn = await resolveConn(cfg)
+    if (!conn) { set.status = 400; return { error: 'Connection not found' } }
+    try {
+      const label = encodeURIComponent(JSON.stringify({ 'com.docker.compose.project': [cfg.stackName] }))
+      const res = await fetch(`${conn.url}/api/endpoints/${cfg.endpointId}/docker/containers/json?all=1&filters=${label}`, {
+        headers: { 'X-API-Key': conn.token },
+      })
+      if (!res.ok) { set.status = 400; return { error: `Portainer error ${res.status}` } }
+      const containers = await res.json() as any[]
+      return {
+        containers: containers.map(c => ({
+          id: c.Id,
+          shortId: c.Id.slice(0, 12),
+          names: c.Names.map((n: string) => n.replace(/^\//, '')),
+          image: c.Image,
+          state: c.State,
+          status: c.Status,
+        })),
+      }
+    } catch (e) {
+      set.status = 500
+      return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // GET /api/envman/projects/:slug/environments/:envName/portainer/logs/:containerId
+  // Query params: tail (default 200), stdout (default 1), stderr (default 1), timestamps (default 1)
+  .get('/api/envman/projects/:slug/environments/:envName/portainer/logs/:containerId', async ({ request, params, set, query }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    if (!access) { set.status = 403; return { error: 'No access' } }
+    const cfg = await getPortainerCfg(params.slug, params.envName)
+    if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
+    const conn = await resolveConn(cfg)
+    if (!conn) { set.status = 400; return { error: 'Connection not found' } }
+
+    const tail = Math.min(Number((query as any).tail) || 200, 1000)
+    const stdout = (query as any).stdout !== '0' ? 1 : 0
+    const stderr = (query as any).stderr !== '0' ? 1 : 0
+    const timestamps = (query as any).timestamps !== '0' ? 1 : 0
+
+    try {
+      const qs = new URLSearchParams({ stdout: String(stdout), stderr: String(stderr), tail: String(tail), timestamps: String(timestamps) })
+      const res = await fetch(
+        `${conn.url}/api/endpoints/${cfg.endpointId}/docker/containers/${params.containerId}/logs?${qs}`,
+        { headers: { 'X-API-Key': conn.token } },
+      )
+      if (!res.ok) { set.status = 400; return { error: `Portainer logs error ${res.status}: ${await res.text()}` } }
+
+      // Docker log stream menggunakan multiplexed format:
+      // [stream_type(1)][0][0][0][size(4)] payload
+      // stream_type: 1=stdout, 2=stderr
+      const buf = Buffer.from(await res.arrayBuffer())
+      const lines: { stream: 'stdout' | 'stderr'; timestamp: string | null; message: string }[] = []
+      let offset = 0
+
+      while (offset < buf.length) {
+        if (offset + 8 > buf.length) break
+        const streamType = buf[offset]       // 1=stdout, 2=stderr
+        const size = buf.readUInt32BE(offset + 4)
+        offset += 8
+        if (offset + size > buf.length) break
+        const payload = buf.slice(offset, offset + size).toString('utf8')
+        offset += size
+
+        // Tiap payload bisa punya banyak baris
+        for (const raw of payload.split('\n')) {
+          const line = raw.trimEnd()
+          if (!line) continue
+          // Docker timestamps format: 2024-01-15T10:00:00.000000000Z <message>
+          let timestamp: string | null = null
+          let message = line
+          if (timestamps) {
+            const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\s(.*)$/)
+            if (tsMatch) {
+              timestamp = tsMatch[1]
+              message = tsMatch[2]
+            }
+          }
+          lines.push({ stream: streamType === 2 ? 'stderr' : 'stdout', timestamp, message })
+        }
+      }
+
+      return { lines, total: lines.length, containerId: params.containerId.slice(0, 12) }
+    } catch (e) {
+      set.status = 500
+      return { error: `Logs fetch failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })

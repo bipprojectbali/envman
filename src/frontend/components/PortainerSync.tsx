@@ -6,17 +6,20 @@ import {
   Box,
   Button,
   Card,
+  Checkbox,
   Code,
   Divider,
   Group,
   Loader,
   Menu,
   Modal,
+  NumberInput,
   Paper,
   ScrollArea,
   Select,
   Stack,
   Stepper,
+  Switch,
   Table,
   Text,
   ThemeIcon,
@@ -25,14 +28,17 @@ import {
 import { useDisclosure } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   TbAlertTriangle,
   TbCheck,
   TbChevronDown,
   TbCloud,
   TbCloudUpload,
+  TbCopy,
+  TbDownload,
   TbExternalLink,
+  TbFileText,
   TbLock,
   TbPackage,
   TbPencil,
@@ -80,12 +86,28 @@ interface PortainerConfig {
 
 interface ContainerInfo {
   id: string
+  shortId: string
   names: string[]
   image: string
   status: string
   state: string
   created: number
   ports: string[]
+}
+
+interface ContainerListItem {
+  id: string
+  shortId: string
+  names: string[]
+  image: string
+  state: string
+  status: string
+}
+
+interface LogLine {
+  stream: 'stdout' | 'stderr'
+  timestamp: string | null
+  message: string
 }
 
 interface DanglingImage {
@@ -132,6 +154,16 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
   const [statusOpen, { open: openStatus, close: closeStatus }] = useDisclosure(false)
   const [diffOpen, { open: openDiff, close: closeDiff }] = useDisclosure(false)
   const [cleanupOpen, { open: openCleanup, close: closeCleanup }] = useDisclosure(false)
+  const [logsOpen, { open: openLogs, close: closeLogs }] = useDisclosure(false)
+
+  // Logs state
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null)
+  const [logTail, setLogTail] = useState<number>(200)
+  const [showStdout, setShowStdout] = useState(true)
+  const [showStderr, setShowStderr] = useState(true)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoScroll, setAutoScroll] = useState(true)
+  const logViewportRef = useRef<HTMLDivElement>(null)
 
   const [isEditing, setIsEditing] = useState(false)
   const [step, setStep] = useState(0)
@@ -189,6 +221,44 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
     queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/images/dangling`),
     enabled: cleanupOpen,
   })
+
+  const { data: containersData, isFetching: containersFetching } = useQuery({
+    queryKey: ['portainer', 'containers', slug, env],
+    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/containers`),
+    enabled: logsOpen,
+  })
+
+  const containers: ContainerListItem[] = containersData?.containers ?? []
+
+  const logQs = new URLSearchParams({
+    tail: String(logTail),
+    stdout: showStdout ? '1' : '0',
+    stderr: showStderr ? '1' : '0',
+    timestamps: '1',
+  })
+  const { data: logsData, isFetching: logsFetching, refetch: refetchLogs } = useQuery({
+    queryKey: ['portainer', 'logs', slug, env, selectedContainerId, logTail, showStdout, showStderr],
+    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/logs/${selectedContainerId}?${logQs}`),
+    enabled: logsOpen && !!selectedContainerId,
+    refetchInterval: autoRefresh ? 5000 : false,
+    staleTime: 0,
+  })
+
+  const logLines: LogLine[] = logsData?.lines ?? []
+
+  // Auto-select container pertama saat list tiba
+  useEffect(() => {
+    if (containers.length > 0 && !selectedContainerId) {
+      setSelectedContainerId(containers[0].id)
+    }
+  }, [containers, selectedContainerId])
+
+  // Auto-scroll ke bawah saat log baru masuk
+  useEffect(() => {
+    if (autoScroll && logViewportRef.current) {
+      logViewportRef.current.scrollTo({ top: logViewportRef.current.scrollHeight, behavior: 'smooth' })
+    }
+  }, [logLines, autoScroll])
 
   const config: PortainerConfig | null = data?.config ?? null
   const connections: PortainerConnection[] = connectionsData?.connections ?? []
@@ -450,6 +520,9 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                 {/* Status containers */}
                 <Anchor size="xs" c="dimmed" style={{ cursor: 'pointer' }} onClick={() => { openStatus(); refetchStatus() }}>
                   <TbServer size={10} style={{ verticalAlign: 'middle' }} /> Status
+                </Anchor>
+                <Anchor size="xs" c="dimmed" style={{ cursor: 'pointer' }} onClick={() => { setSelectedContainerId(null); openLogs() }}>
+                  <TbFileText size={10} style={{ verticalAlign: 'middle' }} /> Logs
                 </Anchor>
               </Group>
             </Box>
@@ -943,6 +1016,208 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                 </Alert>
               )}
             </>
+          )}
+        </Stack>
+      </Modal>
+
+      {/* ─── Logs Modal ───────────────────────────────── */}
+      <Modal
+        opened={logsOpen}
+        onClose={() => { closeLogs(); setAutoRefresh(false) }}
+        title={
+          <Group gap="xs">
+            <ThemeIcon size="sm" variant="light" color="gray" radius="md"><TbFileText size={13} /></ThemeIcon>
+            <Text fw={600} size="sm">Container Logs — {config?.stackName}</Text>
+          </Group>
+        }
+        size="xl"
+        fullScreen={typeof window !== 'undefined' && window.innerWidth < 768}
+      >
+        <Stack gap="sm">
+          {/* Container selector */}
+          {containersFetching && containers.length === 0 ? (
+            <Group justify="center" py="xs"><Loader size="xs" /></Group>
+          ) : containers.length === 0 ? (
+            <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
+              <Text size="xs">Tidak ada container yang running di stack ini.</Text>
+            </Alert>
+          ) : (
+            <Select
+              label="Container"
+              size="xs"
+              data={containers.map(c => ({
+                value: c.id,
+                label: c.names[0] ?? c.shortId,
+                description: `${c.image.split('/').pop()?.split(':')[0]} · ${c.state}`,
+              }))}
+              value={selectedContainerId}
+              onChange={v => { setSelectedContainerId(v); }}
+              leftSection={
+                selectedContainerId ? (
+                  <Badge size="xs" color={stateColor[containers.find(c => c.id === selectedContainerId)?.state ?? ''] ?? 'gray'} variant="dot" style={{ pointerEvents: 'none' }}>
+                    {containers.find(c => c.id === selectedContainerId)?.state}
+                  </Badge>
+                ) : undefined
+              }
+            />
+          )}
+
+          {/* Toolbar */}
+          <Group justify="space-between" wrap="wrap" gap="xs">
+            <Group gap="xs">
+              <NumberInput
+                size="xs"
+                w={90}
+                min={10}
+                max={1000}
+                step={50}
+                value={logTail}
+                onChange={v => setLogTail(Number(v) || 200)}
+                label="Tail"
+                hideControls={false}
+              />
+              <Stack gap={2} pt={2}>
+                <Checkbox size="xs" label="stdout" checked={showStdout} onChange={e => setShowStdout(e.currentTarget.checked)} />
+                <Checkbox size="xs" label="stderr" checked={showStderr} onChange={e => setShowStderr(e.currentTarget.checked)} />
+              </Stack>
+            </Group>
+            <Group gap="xs" align="flex-end">
+              <Switch size="xs" label="Auto refresh 5s" checked={autoRefresh} onChange={e => setAutoRefresh(e.currentTarget.checked)} />
+              <Switch size="xs" label="Auto scroll" checked={autoScroll} onChange={e => setAutoScroll(e.currentTarget.checked)} />
+              <Tooltip label="Refresh">
+                <ActionIcon size="sm" variant="subtle" color="gray" loading={logsFetching} onClick={() => refetchLogs()}>
+                  <TbRefresh size={13} />
+                </ActionIcon>
+              </Tooltip>
+              {/* Copy logs */}
+              <Tooltip label="Copy semua logs">
+                <ActionIcon size="sm" variant="subtle" color="gray"
+                  disabled={logLines.length === 0}
+                  onClick={() => {
+                    const text = logLines.map(l => `[${l.stream}] ${l.timestamp ? new Date(l.timestamp).toLocaleTimeString('id-ID') + ' ' : ''}${l.message}`).join('\n')
+                    navigator.clipboard.writeText(text)
+                  }}>
+                  <TbCopy size={13} />
+                </ActionIcon>
+              </Tooltip>
+              {/* Download logs */}
+              <Tooltip label="Download sebagai .log">
+                <ActionIcon size="sm" variant="subtle" color="gray"
+                  disabled={logLines.length === 0}
+                  onClick={() => {
+                    const text = logLines.map(l => `[${l.stream.toUpperCase()}] ${l.timestamp ?? ''} ${l.message}`).join('\n')
+                    const blob = new Blob([text], { type: 'text/plain' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `${config?.stackName ?? 'container'}-${selectedContainerId?.slice(0, 8) ?? 'logs'}.log`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }}>
+                  <TbDownload size={13} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          </Group>
+
+          {/* Log output */}
+          {!selectedContainerId ? (
+            <Text size="xs" c="dimmed" ta="center" py="md">Pilih container untuk melihat logs</Text>
+          ) : logsFetching && logLines.length === 0 ? (
+            <Group justify="center" py="xl"><Loader size="sm" /></Group>
+          ) : logsData?.error ? (
+            <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
+              <Text size="xs">{logsData.error}</Text>
+            </Alert>
+          ) : (
+            <Paper withBorder radius="sm" style={{ overflow: 'hidden', position: 'relative' }}>
+              {/* Header bar */}
+              <Group px="xs" py={4} justify="space-between"
+                style={{ background: 'var(--mantine-color-dark-7)', borderBottom: '1px solid var(--mantine-color-dark-5)' }}>
+                <Group gap="xs">
+                  <Badge size="xs" color="gray" variant="filled">{logLines.length} baris</Badge>
+                  {autoRefresh && <Badge size="xs" color="teal" variant="dot">live</Badge>}
+                  {logsFetching && <Loader size={10} color="gray" />}
+                </Group>
+                <Text fz={10} c="dimmed" ff="monospace">
+                  {selectedContainerId?.slice(0, 12)}
+                </Text>
+              </Group>
+
+              {/* Log content */}
+              <ScrollArea.Autosize
+                mah={420}
+                viewportRef={logViewportRef}
+                onScrollPositionChange={({ y }) => {
+                  if (logViewportRef.current) {
+                    const { scrollHeight, clientHeight } = logViewportRef.current
+                    setAutoScroll(y + clientHeight >= scrollHeight - 20)
+                  }
+                }}
+              >
+                <Box
+                  p="xs"
+                  style={{
+                    background: '#0d1117',
+                    fontFamily: "'Courier New', Courier, monospace",
+                    fontSize: 12,
+                    lineHeight: 1.6,
+                    minHeight: 120,
+                  }}
+                >
+                  {logLines.length === 0 ? (
+                    <Text fz={11} c="dimmed" ff="monospace">(tidak ada log)</Text>
+                  ) : (
+                    logLines.map((line, i) => (
+                      <Box
+                        key={i}
+                        style={{
+                          display: 'flex',
+                          gap: 8,
+                          color: line.stream === 'stderr' ? '#ff7b72' : '#e6edf3',
+                          alignItems: 'flex-start',
+                        }}
+                      >
+                        {/* Timestamp */}
+                        {line.timestamp && (
+                          <Text
+                            span
+                            fz={10}
+                            ff="monospace"
+                            style={{ color: '#8b949e', flexShrink: 0, userSelect: 'none', paddingTop: 1 }}
+                          >
+                            {new Date(line.timestamp).toLocaleTimeString('id-ID', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </Text>
+                        )}
+                        {/* Stream badge */}
+                        <Text
+                          span fz={9} ff="monospace"
+                          style={{
+                            color: line.stream === 'stderr' ? '#ff7b72' : '#7ee787',
+                            flexShrink: 0,
+                            paddingTop: 2,
+                            userSelect: 'none',
+                          }}
+                        >
+                          {line.stream === 'stderr' ? 'ERR' : 'OUT'}
+                        </Text>
+                        {/* Message */}
+                        <Text
+                          span fz={12} ff="monospace"
+                          style={{
+                            color: line.stream === 'stderr' ? '#ff7b72' : '#e6edf3',
+                            wordBreak: 'break-all',
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          {line.message}
+                        </Text>
+                      </Box>
+                    ))
+                  )}
+                </Box>
+              </ScrollArea.Autosize>
+            </Paper>
           )}
         </Stack>
       </Modal>
