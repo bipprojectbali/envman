@@ -26,6 +26,7 @@ import {
   TbCopy,
   TbDownload,
   TbKey,
+  TbLayoutDashboard,
   TbLogin,
   TbPlayerPlay,
   TbServer,
@@ -35,6 +36,7 @@ import {
   TbVariable,
 } from 'react-icons/tb'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
+import { useSession, getDefaultRoute } from '@/frontend/hooks/useAuth'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -130,6 +132,8 @@ function CodeBlock({ code, label }: { code: string; label?: string }) {
 
 function HomePage() {
   const origin = window.location.origin
+  const { data: sessionData } = useSession()
+  const user = sessionData?.user
 
   const installCmds = {
     'linux-x64': `curl -sL ${origin}/download/cli/linux-x64 -o envman
@@ -190,16 +194,29 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
               >
                 Docs
               </Button>
-              <Button
-                component={Link}
-                to="/login"
-                size="sm"
-                variant="gradient"
-                gradient={{ from: 'violet', to: 'grape' }}
-                leftSection={<TbLogin size={14} />}
-              >
-                Login
-              </Button>
+              {user ? (
+                <Button
+                  component={Link}
+                  to={getDefaultRoute(user.role)}
+                  size="sm"
+                  variant="gradient"
+                  gradient={{ from: 'violet', to: 'grape' }}
+                  leftSection={<TbLayoutDashboard size={14} />}
+                >
+                  Dashboard
+                </Button>
+              ) : (
+                <Button
+                  component={Link}
+                  to="/login"
+                  size="sm"
+                  variant="gradient"
+                  gradient={{ from: 'violet', to: 'grape' }}
+                  leftSection={<TbLogin size={14} />}
+                >
+                  Login
+                </Button>
+              )}
             </Group>
           </Group>
         </Container>

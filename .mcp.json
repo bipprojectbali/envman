@@ -16,12 +16,19 @@
       "command": "bunx",
       "args": ["@playwright/mcp@latest", "--output-dir", ".playwright-screenshots"]
     },
-    "app-mcp": {
+    "debug-dev": {
       "command": "bun",
-      "args": ["run", "scripts/mcp/server.ts"],
+      "args": ["run", "scripts/mcp/debug-dev.ts"],
+      "description": "Debug runtime local (dev): inspect logs, DB, Redis, presence, tickets + run test/lint/typecheck"
+    },
+    "debug-stg": {
+      "command": "bun",
+      "args": ["run", "scripts/mcp/debug-stg.ts"],
       "env": {
-        "MCP_SECRET": "${MCP_SECRET}"
-      }
+        "BASE_URL": "${STG_BASE_URL}",
+        "MCP_SECRET": "${STG_MCP_SECRET}"
+      },
+      "description": "Debug runtime staging: inspect logs, DB state, Redis, presence, tickets — compare dengan local"
     }
   }
 }

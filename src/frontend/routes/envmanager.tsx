@@ -44,7 +44,7 @@ export const Route = createFileRoute('/envmanager')({
       })
       if (!data?.user) throw redirect({ to: '/login' })
       if (data.user.blocked) throw redirect({ to: '/blocked' })
-      if (data.user.role === 'USER') throw redirect({ to: '/profile' })
+      if (data.user.role === 'QC') throw redirect({ to: '/dashboard', search: { tab: 'dashboard' } })
     } catch (e) {
       if (e instanceof Error) throw redirect({ to: '/login' })
       throw e

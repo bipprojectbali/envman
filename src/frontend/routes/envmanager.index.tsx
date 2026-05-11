@@ -23,6 +23,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
+import { useSession } from '@/frontend/hooks/useAuth'
 import {
   TbChevronRight,
   TbFolders,
@@ -53,6 +54,8 @@ const roleColor = { OWNER: 'blue', EDITOR: 'teal', VIEWER: 'gray' } as const
 function ProjectListPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { data: sessionData } = useSession()
+  const canCreateProject = sessionData?.user?.role !== 'USER'
   const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false)
   const [form, setForm] = useState({ slug: '', name: '', description: '' })
   const [slugManual, setSlugManual] = useState(false)
@@ -129,9 +132,11 @@ function ProjectListPage() {
               {view === 'grid' ? <TbLayoutList size={15} /> : <TbLayoutGrid size={15} />}
             </ActionIcon>
           </Tooltip>
-          <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
-            New Project
-          </Button>
+          {canCreateProject && (
+            <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
+              New Project
+            </Button>
+          )}
         </Group>
       </Group>
 
@@ -149,13 +154,21 @@ function ProjectListPage() {
             <TbFolders size={24} />
           </ThemeIcon>
           <Text fw={600} mb={4}>Belum ada project</Text>
-          <Text size="sm" c="dimmed" mb="lg" maw={320} mx="auto">
-            Buat project untuk mulai mengelola environment variables.
-            Setiap project bisa punya beberapa environment (dev, staging, production).
-          </Text>
-          <Button leftSection={<TbPlus size={14} />} onClick={openCreate}>
-            Buat Project Pertama
-          </Button>
+          {canCreateProject ? (
+            <>
+              <Text size="sm" c="dimmed" mb="lg" maw={320} mx="auto">
+                Buat project untuk mulai mengelola environment variables.
+                Setiap project bisa punya beberapa environment (dev, staging, production).
+              </Text>
+              <Button leftSection={<TbPlus size={14} />} onClick={openCreate}>
+                Buat Project Pertama
+              </Button>
+            </>
+          ) : (
+            <Text size="sm" c="dimmed" maw={320} mx="auto">
+              Kamu belum ditambahkan ke project manapun. Minta admin untuk mengundangmu ke project.
+            </Text>
+          )}
         </Card>
       )}
 

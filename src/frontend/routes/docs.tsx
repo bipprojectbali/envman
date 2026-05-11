@@ -8,9 +8,10 @@ import {
   ThemeIcon,
 } from '@mantine/core'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { TbBook, TbLogin, TbVariable } from 'react-icons/tb'
+import { TbBook, TbLogin, TbLayoutDashboard, TbVariable } from 'react-icons/tb'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
+import { useSession, getDefaultRoute } from '@/frontend/hooks/useAuth'
 import 'github-markdown-css/github-markdown.css'
 
 export const Route = createFileRoute('/docs')({
@@ -1001,6 +1002,8 @@ bun run test:integration  # integration tests saja
 function DocsPage() {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const content = buildDocsMarkdown(origin)
+  const { data: sessionData } = useSession()
+  const user = sessionData?.user
 
   // Warna GitHub markdown — seluruh halaman mengikuti ini
   // light: bg #ffffff  text #1f2328  border #d0d7de
@@ -1059,16 +1062,29 @@ function DocsPage() {
               </Group>
               <Group gap="xs">
                 <ThemeToggle />
-                <Button
-                  component={Link}
-                  to="/login"
-                  size="xs"
-                  variant="gradient"
-                  gradient={{ from: 'violet', to: 'grape' }}
-                  leftSection={<TbLogin size={13} />}
-                >
-                  Login
-                </Button>
+                {user ? (
+                  <Button
+                    component={Link}
+                    to={getDefaultRoute(user.role)}
+                    size="xs"
+                    variant="gradient"
+                    gradient={{ from: 'violet', to: 'grape' }}
+                    leftSection={<TbLayoutDashboard size={13} />}
+                  >
+                    Dashboard
+                  </Button>
+                ) : (
+                  <Button
+                    component={Link}
+                    to="/login"
+                    size="xs"
+                    variant="gradient"
+                    gradient={{ from: 'violet', to: 'grape' }}
+                    leftSection={<TbLogin size={13} />}
+                  >
+                    Login
+                  </Button>
+                )}
               </Group>
             </Group>
           </Container>
