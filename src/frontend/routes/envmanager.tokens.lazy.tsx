@@ -12,6 +12,7 @@ import {
   Divider,
   Group,
   Modal,
+  MultiSelect,
   Paper,
   SegmentedControl,
   Select,
@@ -38,6 +39,7 @@ import {
   TbChevronRight,
   TbClock,
   TbCopy,
+  TbFilter,
   TbInfoCircle,
   TbKey,
   TbLayoutGrid,
@@ -244,6 +246,7 @@ function TokensPage() {
   const [expandedUsage, setExpandedUsage] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('semua')
+  const [filterProjects, setFilterProjects] = useState<string[]>([])
   const [sort, setSort] = useState('terbaru')
   const [view, setView] = useLocalStorage<'grid' | 'list'>({ key: 'envman:tokens:view', defaultValue: 'list' })
 
@@ -279,12 +282,19 @@ function TokensPage() {
     if (filterStatus === 'aktif') list = list.filter(t => !t.isDisabled && expiryStatus(t.expiresAt) !== 'expired')
     if (filterStatus === 'expired') list = list.filter(t => expiryStatus(t.expiresAt) === 'expired')
     if (filterStatus === 'disabled') list = list.filter(t => t.isDisabled)
+    if (filterProjects.length > 0) {
+      list = list.filter(t =>
+        t.scopes.length === 0
+          ? false
+          : filterProjects.some(slug => t.scopes.some(s => s === `${slug}:*` || s.startsWith(`${slug}:`)))
+      )
+    }
     if (sort === 'nama') list.sort((a, b) => a.name.localeCompare(b.name))
     if (sort === 'terlama') list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     if (sort === 'last_used') list.sort((a, b) => (b.lastUsedAt ?? '').localeCompare(a.lastUsedAt ?? ''))
     // default 'terbaru': already sorted by server desc
     return list
-  }, [tokens, search, filterStatus, sort])
+  }, [tokens, search, filterStatus, filterProjects, sort])
 
   const createToken = useMutation({
     mutationFn: (body: typeof form) =>
@@ -461,7 +471,7 @@ function TokensPage() {
           <Box>
             <Text fw={700} size="sm">API Tokens</Text>
             <Text size="xs" c="dimmed">
-              {isLoading ? '...' : `${activeTokens.length} aktif${expiredTokens.length > 0 ? ` · ${expiredTokens.length} expired` : ''}${disabledTokens.length > 0 ? ` · ${disabledTokens.length} disabled` : ''}`}
+              {isLoading ? '...' : `${tokens.length} total · ${activeTokens.length} aktif${expiredTokens.length > 0 ? ` · ${expiredTokens.length} expired` : ''}${disabledTokens.length > 0 ? ` · ${disabledTokens.length} disabled` : ''}`}
             </Text>
           </Box>
         </Group>
@@ -514,6 +524,19 @@ function TokensPage() {
                 { label: 'Expired', value: 'expired' },
                 { label: 'Disabled', value: 'disabled' },
               ]}
+            />
+          )}
+          {projects.length > 0 && (
+            <MultiSelect
+              size="xs"
+              placeholder="Filter project"
+              leftSection={<TbFilter size={13} />}
+              data={projects.map(p => ({ value: p.slug, label: p.name }))}
+              value={filterProjects}
+              onChange={setFilterProjects}
+              clearable
+              maxDropdownHeight={200}
+              style={{ minWidth: 140 }}
             />
           )}
           <Select
@@ -603,7 +626,7 @@ function TokensPage() {
       ) : filteredTokens.length === 0 ? (
         <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
           <Text size="sm" c="dimmed">Tidak ada token yang cocok dengan filter.</Text>
-          <Button size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setFilterStatus('semua') }}>Reset filter</Button>
+          <Button size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setFilterStatus('semua'); setFilterProjects([]) }}>Reset filter</Button>
         </Card>
       ) : view === 'grid' ? (
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">

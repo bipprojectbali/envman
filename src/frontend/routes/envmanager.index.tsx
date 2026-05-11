@@ -8,9 +8,11 @@ import {
   Divider,
   Group,
   Modal,
+  MultiSelect,
   SimpleGrid,
   Skeleton,
   Stack,
+  TagsInput,
   Text,
   TextInput,
   ThemeIcon,
@@ -20,7 +22,7 @@ import { useDisclosure, useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
 import { useSession } from '@/frontend/hooks/useAuth'
@@ -30,6 +32,8 @@ import {
   TbLayoutGrid,
   TbLayoutList,
   TbPlus,
+  TbSearch,
+  TbTag,
   TbTrash,
   TbUsers,
   TbVariable,
@@ -44,6 +48,7 @@ interface Project {
   slug: string
   name: string
   description?: string
+  tags: string[]
   myRole: 'OWNER' | 'EDITOR' | 'VIEWER'
   _count: { environments: number }
   members?: { id: string }[]
@@ -51,15 +56,25 @@ interface Project {
 
 const roleColor = { OWNER: 'blue', EDITOR: 'teal', VIEWER: 'gray' } as const
 
+const TAG_COLORS = ['red','pink','grape','violet','indigo','blue','cyan','teal','green','lime','yellow','orange'] as const
+
+function tagColor(tag: string): string {
+  let h = 0
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0
+  return TAG_COLORS[h % TAG_COLORS.length]
+}
+
 function ProjectListPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: sessionData } = useSession()
   const canCreateProject = sessionData?.user?.role !== 'USER'
   const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false)
-  const [form, setForm] = useState({ slug: '', name: '', description: '' })
+  const [form, setForm] = useState({ slug: '', name: '', description: '', tags: [] as string[] })
   const [slugManual, setSlugManual] = useState(false)
   const [view, setView] = useLocalStorage<'grid' | 'list'>({ key: 'envman:projects:view', defaultValue: 'grid' })
+  const [search, setSearch] = useLocalStorage({ key: 'envman:projects:search', defaultValue: '' })
+  const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: 'envman:projects:tagFilter', defaultValue: [] })
 
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'projects'],
@@ -75,7 +90,7 @@ function ProjectListPage() {
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['envman', 'projects'] })
       closeCreate()
-      setForm({ slug: '', name: '', description: '' })
+      setForm({ slug: '', name: '', description: '', tags: [] })
       setSlugManual(false)
       notifyOk('Project berhasil dibuat')
       navigate({ to: '/envmanager/$slug', params: { slug: res.project.slug }, search: { tab: 'environments' } })
@@ -101,8 +116,30 @@ function ProjectListPage() {
     })
 
   const projects: Project[] = data?.projects ?? []
-  const ownerCount = projects.filter(p => p.myRole === 'OWNER').length
-  const memberCount = projects.filter(p => p.myRole !== 'OWNER').length
+
+  const allTags = useMemo(
+    () => [...new Set(projects.flatMap(p => p.tags ?? []))].sort(),
+    [projects]
+  )
+
+  const filtered = useMemo(() => {
+    let result = projects
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.slug.toLowerCase().includes(q) ||
+        (p.description?.toLowerCase().includes(q) ?? false)
+      )
+    }
+    if (tagFilter.length > 0) {
+      result = result.filter(p => tagFilter.every(t => (p.tags ?? []).includes(t)))
+    }
+    return result
+  }, [projects, search, tagFilter])
+
+  const ownerCount = filtered.filter(p => p.myRole === 'OWNER').length
+  const memberCount = filtered.filter(p => p.myRole !== 'OWNER').length
 
   return (
     <Box>
@@ -140,6 +177,38 @@ function ProjectListPage() {
         </Group>
       </Group>
 
+      {/* ─── Search + Filter ────────────────── */}
+      {!isLoading && projects.length > 0 && (
+        <Stack gap="xs" mb="md">
+          <Group gap="xs" grow>
+            <TextInput
+              size="xs"
+              placeholder="Cari project..."
+              leftSection={<TbSearch size={13} />}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {allTags.length > 0 && (
+              <MultiSelect
+                size="xs"
+                placeholder="Filter tag"
+                leftSection={<TbTag size={13} />}
+                data={allTags}
+                value={tagFilter}
+                onChange={setTagFilter}
+                clearable
+                maxDropdownHeight={200}
+              />
+            )}
+          </Group>
+          {(search.trim() || tagFilter.length > 0) && filtered.length < projects.length && (
+            <Text size="xs" c="dimmed">
+              {filtered.length} dari {projects.length} project
+            </Text>
+          )}
+        </Stack>
+      )}
+
       {/* ─── Loading skeleton ───────────────── */}
       {isLoading && (
         <Stack gap="xs">
@@ -172,11 +241,22 @@ function ProjectListPage() {
         </Card>
       )}
 
+      {/* ─── No results state ───────────────── */}
+      {!isLoading && projects.length > 0 && filtered.length === 0 && (
+        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+          <ThemeIcon size={48} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
+            <TbSearch size={24} />
+          </ThemeIcon>
+          <Text fw={600} mb={4}>Tidak ada hasil</Text>
+          <Text size="sm" c="dimmed">Coba ubah kata kunci atau filter tag.</Text>
+        </Card>
+      )}
+
       {/* ─── Project list / grid ────────────── */}
-      {projects.length > 0 && (
+      {filtered.length > 0 && (
         view === 'list' ? (
           <Stack gap="xs">
-            {projects.map((p) => (
+            {filtered.map((p) => (
               <Card
                 key={p.slug}
                 withBorder
@@ -214,6 +294,13 @@ function ProjectListPage() {
                           </Group>
                         )}
                       </Group>
+                      {p.tags?.length > 0 && (
+                        <Group gap={4} mt={4}>
+                          {p.tags.map(tag => (
+                            <Badge key={tag} size="xs" variant="light" color={tagColor(tag)}>{tag}</Badge>
+                          ))}
+                        </Group>
+                      )}
                     </Box>
                   </Group>
                   <Group gap="xs" wrap="nowrap" onClick={e => e.stopPropagation()}>
@@ -235,7 +322,7 @@ function ProjectListPage() {
           </Stack>
         ) : (
           <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
-            {projects.map((p) => (
+            {filtered.map((p) => (
               <Card
                 key={p.slug}
                 withBorder
@@ -271,6 +358,14 @@ function ProjectListPage() {
                   </Text>
                 )}
 
+                {p.tags?.length > 0 && (
+                  <Group gap={4} mb="xs">
+                    {p.tags.map(tag => (
+                      <Badge key={tag} size="xs" variant="light" color={tagColor(tag)}>{tag}</Badge>
+                    ))}
+                  </Group>
+                )}
+
                 <Group gap="md" mt="auto">
                   <Group gap={4}>
                     <TbVariable size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
@@ -292,7 +387,7 @@ function ProjectListPage() {
       {/* ─── Create modal ───────────────────── */}
       <Modal
         opened={createOpen}
-        onClose={() => { closeCreate(); setForm({ slug: '', name: '', description: '' }); setSlugManual(false) }}
+        onClose={() => { closeCreate(); setForm({ slug: '', name: '', description: '', tags: [] }); setSlugManual(false) }}
         title={
           <Group gap="xs">
             <ThemeIcon size="sm" variant="light" color="violet" radius="md"><TbFolders size={13} /></ThemeIcon>
@@ -332,6 +427,15 @@ function ProjectListPage() {
             placeholder="Opsional — penjelasan singkat project ini"
             value={form.description}
             onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+          />
+          <TagsInput
+            label="Tags"
+            placeholder="Tambah tag, tekan Enter"
+            description="Opsional — untuk filter dan pengelompokan"
+            value={form.tags}
+            onChange={tags => setForm(f => ({ ...f, tags }))}
+            data={allTags}
+            clearable
           />
           <Divider />
           <Button

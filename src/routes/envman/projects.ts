@@ -39,7 +39,7 @@ export const projectsRouter = new Elysia()
     const existing = await prisma.project.findUnique({ where: { slug } })
     if (existing) { set.status = 400; return { error: 'Slug already taken' } }
     const project = await prisma.project.create({
-      data: { slug, name: body.name, description: body.description ?? null, members: { create: { userId: auth.userId, role: 'OWNER' } } },
+      data: { slug, name: body.name, description: body.description ?? null, tags: Array.isArray(body.tags) ? body.tags : [], members: { create: { userId: auth.userId, role: 'OWNER' } } },
     })
     await invalidateCache(cacheKeys.projectList(auth.userId))
     return { project }
@@ -61,7 +61,7 @@ export const projectsRouter = new Elysia()
     const access = await getProjectAccess(auth.userId, auth.role, params.slug)
     if (!access || access === 'VIEWER' || access === 'EDITOR') { set.status = 403; return { error: 'Owner required' } }
     const body = await request.json().catch(() => null)
-    const project = await prisma.project.update({ where: { slug: params.slug }, data: { name: body?.name, description: body?.description } })
+    const project = await prisma.project.update({ where: { slug: params.slug }, data: { name: body?.name, description: body?.description, ...(body?.tags !== undefined ? { tags: body.tags } : {}) } })
     return { project }
       })
 
