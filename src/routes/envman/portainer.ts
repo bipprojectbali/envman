@@ -1,7 +1,8 @@
 import { Elysia } from 'elysia'
 import { prisma } from '../../lib/db'
 import { requireEnvAuth, unauthorized, forbidden } from '../../lib/auth-middleware'
-import { getProjectAccess } from '../../lib/access'
+import { getEnvironmentAccess } from '../../lib/access'
+import { hasCapability } from '../../lib/permissions'
 import { decryptSecret } from '../../lib/crypto'
 import { injectEnvFileIntoCompose } from '../../lib/portainer'
 import { appLog } from '../../lib/applog'
@@ -71,6 +72,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/portainer/connections', async ({ request, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'connection:view')) { set.status = 403; return { error: 'Tidak punya izin lihat Portainer connection.' } }
     const connections = await prisma.portainerConnection.findMany({
       orderBy: { createdAt: 'desc' },
       select: { id: true, name: true, portainerUrl: true, createdById: true, createdAt: true, _count: { select: { configs: true } } },
@@ -81,6 +83,8 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/portainer/connections', async ({ request, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    // Connection = infra global. Hanya SUPER_ADMIN yang boleh create.
+    if (caller.role !== 'SUPER_ADMIN') { set.status = 403; return { error: 'Hanya SUPER_ADMIN yang boleh create Portainer connection.' } }
     const body = await request.json().catch(() => null)
     if (!body?.name || !body?.portainerUrl || !body?.apiToken) { set.status = 400; return { error: 'name, portainerUrl, apiToken required' } }
     const conn = await prisma.portainerConnection.create({
@@ -92,9 +96,10 @@ export const portainerRouter = new Elysia()
   .patch('/api/envman/portainer/connections/:id', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    // Connection = infra global. Hanya SUPER_ADMIN yang boleh mutate.
+    if (caller.role !== 'SUPER_ADMIN') { set.status = 403; return { error: 'Hanya SUPER_ADMIN yang boleh edit Portainer connection.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Not found' } }
-    if (conn.createdById !== caller.userId && caller.role !== 'SUPER_ADMIN') { set.status = 403; return { error: 'Forbidden' } }
     const body = await request.json().catch(() => null)
     const updated = await prisma.portainerConnection.update({
       where: { id: params.id },
@@ -110,9 +115,10 @@ export const portainerRouter = new Elysia()
   .delete('/api/envman/portainer/connections/:id', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    // Connection = infra global. Hanya SUPER_ADMIN yang boleh delete.
+    if (caller.role !== 'SUPER_ADMIN') { set.status = 403; return { error: 'Hanya SUPER_ADMIN yang boleh hapus Portainer connection.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Not found' } }
-    if (conn.createdById !== caller.userId && caller.role !== 'SUPER_ADMIN') { set.status = 403; return { error: 'Forbidden' } }
     await prisma.portainerConnection.delete({ where: { id: params.id } })
     return { ok: true }
       })
@@ -121,6 +127,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/portainer/connections/:id/probe', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'connection:view')) { set.status = 403; return { error: 'Tidak punya izin probe connection.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -139,6 +146,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/stacks', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin operate stack.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -185,6 +193,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/stacks/:stackId/status', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin operate stack.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -242,6 +251,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/stacks/:stackId/logs/:containerId', async ({ request, params, query, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin lihat logs.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -295,6 +305,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/stacks/:stackId/file', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin lihat compose file.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -312,6 +323,7 @@ export const portainerRouter = new Elysia()
   .put('/api/envman/portainer/connections/:id/stacks/:stackId/file', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:mutate')) { set.status = 403; return { error: 'Tidak punya izin edit compose file.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -338,6 +350,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/portainer/connections/:id/stacks/:stackId/containers/:containerId/restart', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:mutate')) { set.status = 403; return { error: 'Tidak punya izin restart container.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -360,6 +373,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/stacks/:stackId/containers/:containerId/stats', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin lihat container stats.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -403,6 +417,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/health', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'connection:view')) { set.status = 403; return { error: 'Tidak punya izin lihat connection health.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -421,6 +436,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/portainer/connections/:id/stacks/:stackId/repull', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:mutate')) { set.status = 403; return { error: 'Tidak punya izin repull image.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -448,6 +464,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/portainer/connections/:id/stacks/:stackId/recreate', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:mutate')) { set.status = 403; return { error: 'Tidak punya izin recreate stack.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -471,6 +488,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/images/dangling', async ({ request, params, query, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin lihat dangling images.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -500,6 +518,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/portainer/connections/:id/prune/images', async ({ request, params, query, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:prune')) { set.status = 403; return { error: 'Tidak punya izin prune images.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -550,6 +569,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/portainer/connections/:id/prune/volumes', async ({ request, params, query, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:prune')) { set.status = 403; return { error: 'Tidak punya izin prune volumes.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -570,6 +590,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/portainer/connections/:id/prune/networks', async ({ request, params, query, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:prune')) { set.status = 403; return { error: 'Tidak punya izin prune networks.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
@@ -589,7 +610,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access) { set.status = 403; return { error: 'No access' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
@@ -622,7 +643,7 @@ export const portainerRouter = new Elysia()
   .put('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const body = await request.json().catch(() => null)
     if (!body?.stackId || !body?.stackName) { set.status = 400; return { error: 'stackId and stackName required' } }
@@ -658,7 +679,7 @@ export const portainerRouter = new Elysia()
   .patch('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const body = await request.json().catch(() => null) as any
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
@@ -688,7 +709,7 @@ export const portainerRouter = new Elysia()
   .delete('/api/envman/projects/:slug/environments/:envName/portainer', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access !== 'OWNER') { set.status = 403; return { error: 'Owner required' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
@@ -728,7 +749,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/projects/:slug/environments/:envName/portainer/sync', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
@@ -821,7 +842,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/projects/:slug/environments/:envName/portainer/history', async ({ request, params, query, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access) { set.status = 403; return { error: 'No access' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
@@ -841,7 +862,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/projects/:slug/environments/:envName/portainer/status', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access) { set.status = 403; return { error: 'No access' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -888,7 +909,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/projects/:slug/environments/:envName/portainer/sync-preview', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -932,7 +953,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/projects/:slug/environments/:envName/portainer/repull', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -966,7 +987,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/projects/:slug/environments/:envName/portainer/recreate', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -995,7 +1016,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/projects/:slug/environments/:envName/portainer/sync-repull', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -1039,7 +1060,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/projects/:slug/environments/:envName/portainer/images/dangling', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access) { set.status = 403; return { error: 'No access' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -1071,7 +1092,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/projects/:slug/environments/:envName/portainer/prune/images', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -1098,7 +1119,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/projects/:slug/environments/:envName/portainer/prune/volumes', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -1124,7 +1145,7 @@ export const portainerRouter = new Elysia()
   .post('/api/envman/projects/:slug/environments/:envName/portainer/prune/networks', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -1151,7 +1172,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/projects/:slug/environments/:envName/portainer/containers', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access) { set.status = 403; return { error: 'No access' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }
@@ -1185,7 +1206,7 @@ export const portainerRouter = new Elysia()
   .get('/api/envman/projects/:slug/environments/:envName/portainer/logs/:containerId', async ({ request, params, set, query }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access) { set.status = 403; return { error: 'No access' } }
     const cfg = await getPortainerCfg(params.slug, params.envName)
     if (!cfg) { set.status = 404; return { error: 'Portainer not configured' } }

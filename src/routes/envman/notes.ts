@@ -2,6 +2,7 @@ import { Elysia } from 'elysia'
 import { prisma } from '../../lib/db'
 import { requireEnvAuth, unauthorized, forbidden } from '../../lib/auth-middleware'
 import { getProjectAccess } from '../../lib/access'
+import { hasCapability } from '../../lib/permissions'
 
 export const notesRouter = new Elysia()
 
@@ -27,10 +28,11 @@ export const notesRouter = new Elysia()
     return { notes }
       })
 
-      // POST /api/envman/projects/:slug/notes — create note (EDITOR+)
+      // POST /api/envman/projects/:slug/notes — create note (butuh note:create + EDITOR+ project)
   .post('/api/envman/projects/:slug/notes', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(authResult, 'note:create')) { set.status = 403; return { error: 'Tidak punya izin create note. Hubungi SUPER_ADMIN.' } }
     const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Forbidden' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })

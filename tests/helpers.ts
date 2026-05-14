@@ -9,12 +9,29 @@ export function createTestApp() {
   return app
 }
 
-/** Create a test user via better-auth (creates both user + account records), returns the user record */
-export async function seedTestUser(email = 'test@example.com', password = 'test123', name = 'Test User', role: 'USER' | 'ADMIN' | 'SUPER_ADMIN' = 'USER') {
+/** Create a test user via better-auth (creates both user + account records), returns the user record.
+ * permissions defaults to all capabilities for ADMIN (preserves pre-capability test behavior).
+ * For USER/SUPER_ADMIN defaults to []. SUPER_ADMIN bypasses checks anyway. */
+export async function seedTestUser(
+  email = 'test@example.com',
+  password = 'test123',
+  name = 'Test User',
+  role: 'USER' | 'ADMIN' | 'SUPER_ADMIN' = 'USER',
+  permissions?: string[],
+) {
   // Sign up via better-auth to ensure account record is created (password stored in account table)
   await auth.api.signUpEmail({ body: { email, password, name } }).catch(() => {})
-  // Update role if needed (better-auth always creates USER role)
-  return prisma.user.update({ where: { email }, data: { role } })
+  // Default: ADMIN gets all capabilities (legacy compatibility); USER gets none.
+  // Connection CRUD is SUPER_ADMIN-only (no capability), so excluded here.
+  const defaultPerms = role === 'ADMIN'
+    ? [
+        'project:create', 'ticket:create', 'gist:create', 'token:create', 'note:create',
+        'menu:overview', 'menu:tokens', 'menu:connections', 'menu:gists',
+        'connection:view', 'stack:operate', 'stack:mutate', 'stack:prune',
+      ]
+    : []
+  const perms = permissions ?? defaultPerms
+  return prisma.user.update({ where: { email }, data: { role, permissions: perms } })
 }
 
 /** Create a session for a user via better-auth, returns the signed session token */

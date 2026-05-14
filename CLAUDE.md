@@ -84,6 +84,8 @@ bun run test:integration  # tests/integration/ — via app.handle(), no server n
 - @docs/CLI.md — CLI commands, options, auth resolution, examples
 - @docs/INFRA.md — Redis, logging, MCP server, dev tools
 - @docs/AI-CONTRACT.md — aturan kerja AI di repo ini (wajib dibaca sebelum edit kode)
+- @docs/PERFORMANCE.md — panduan performa per layer: runtime, caching, bundle, infra (agnostik, bisa diterapkan di project serupa)
+- @docs/PRISMA7-MIGRATION.md — audit lengkap migrasi Prisma 6 → 7: breaking changes, solusi, potensi bug, urutan eksekusi
 
 ## Scaling Roadmap
 

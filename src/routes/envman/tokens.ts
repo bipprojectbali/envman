@@ -2,6 +2,7 @@ import { Elysia } from 'elysia'
 import { prisma } from '../../lib/db'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { getProjectAccess } from '../../lib/access'
+import { hasCapability } from '../../lib/permissions'
 
 export const tokensRouter = new Elysia()
       // ─── API Tokens ───────────────────────────────────────
@@ -19,6 +20,7 @@ export const tokensRouter = new Elysia()
   .post('/api/envman/tokens', async ({ request, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'token:create')) { set.status = 403; return { error: 'Tidak punya izin create API token. Hubungi SUPER_ADMIN.' } }
     const body = await request.json().catch(() => null)
     if (!body?.name) { set.status = 400; return { error: 'name required' } }
     const { name, scopes = [], canWrite = false, expiresAt } = body

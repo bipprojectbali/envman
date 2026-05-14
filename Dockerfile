@@ -26,9 +26,10 @@ COPY --from=builder /app/scripts       ./scripts
 COPY --from=builder /app/dist          ./dist
 COPY --from=builder /app/public        ./public
 COPY --from=builder /app/prisma        ./prisma
-COPY --from=builder /app/package.json  ./
-COPY --from=builder /app/bunfig.toml   ./
-COPY --from=builder /app/tsconfig.json ./
+COPY --from=builder /app/package.json    ./
+COPY --from=builder /app/bunfig.toml    ./
+COPY --from=builder /app/tsconfig.json  ./
+COPY --from=builder /app/prisma.config.ts ./
 
 # Ensure default volume paths exist with correct permissions
 RUN mkdir -p /app/state /cliproxy-auth

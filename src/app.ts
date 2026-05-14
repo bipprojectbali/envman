@@ -485,7 +485,7 @@ export function createApp() {
         }
         const dbUser = await prisma.user.findUnique({
           where: { id: authResult.userId },
-          select: { id: true, name: true, email: true, role: true, blocked: true },
+          select: { id: true, name: true, email: true, role: true, blocked: true, permissions: true },
         })
         if (!dbUser || dbUser.blocked) {
           set.status = 401
@@ -555,7 +555,11 @@ export function createApp() {
           select: { role: true, email: true },
         })
         appLog('info', `Login (Google): ${dbUser?.email} (${dbUser?.role})`, getIp(request))
-        const defaultRoute = dbUser?.role === 'SUPER_ADMIN' ? '/dev' : dbUser?.role === 'ADMIN' ? '/dashboard' : '/profile'
+        const defaultRoute =
+          dbUser?.role === 'SUPER_ADMIN' ? '/dev' :
+          dbUser?.role === 'QC' ? '/dashboard' :
+          dbUser?.role === 'ADMIN' ? '/envmanager' :
+          '/profile'
         set.status = 302
         set.headers.location = defaultRoute
       })

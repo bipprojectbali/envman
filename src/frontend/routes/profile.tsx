@@ -47,7 +47,12 @@ function ProfilePage() {
                 Dev
               </Button>
             )}
-            {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
+            {user?.role === 'ADMIN' && (
+              <Button component={Link} to="/envmanager" variant="light" size="sm">
+                Env Manager
+              </Button>
+            )}
+            {(user?.role === 'QC' || user?.role === 'SUPER_ADMIN') && (
               <Button component={Link} to="/dashboard" variant="light" size="sm">
                 Dashboard
               </Button>

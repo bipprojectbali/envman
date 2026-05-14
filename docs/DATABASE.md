@@ -10,7 +10,7 @@ PostgreSQL via Prisma v6. Client generated to `./generated/prisma` (gitignored).
 - `Ticket` (id, title, description, status, priority, route, reporterId, assigneeId, timestamps, closedAt)
 - `TicketComment` (id, ticketId, authorId, authorTag, body, createdAt)
 - `TicketEvidence` (id, ticketId, kind, url, note, createdAt)
-- `Project` (id, slug, name, description, timestamps)
+- `Project` (id, slug, name, description, tags[], timestamps)
 - `Environment` (id, name, projectId, createdAt) — unique(projectId, name)
 - `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)

@@ -18,6 +18,47 @@ export async function getProjectAccess(
   return member.role as ProjectRole
 }
 
+// Hybrid resolver:
+//   - SUPER_ADMIN → OWNER (bypass)
+//   - EnvironmentMember exists:
+//       role = null → DENIED (explicit no access)
+//       role = OWNER/EDITOR/VIEWER → override
+//   - No env record → inherit projectRole
+//   - No project membership → no access
+export async function getEnvironmentAccess(
+  userId: string,
+  role: string,
+  projectSlug: string,
+  envName: string,
+): Promise<ProjectRole | null> {
+  if (role === 'SUPER_ADMIN') return 'OWNER'
+  const project = await prisma.project.findUnique({
+    where: { slug: projectSlug },
+    include: {
+      members: { where: { userId } },
+      environments: {
+        where: { name: envName },
+        include: { members: { where: { userId } } },
+      },
+    },
+  })
+  if (!project) return null
+
+  const env = project.environments[0]
+  if (env) {
+    const envMember = env.members[0]
+    if (envMember) {
+      // Record exists. role=null means explicit deny.
+      return envMember.role as ProjectRole | null
+    }
+  }
+
+  const projectMember = project.members[0]
+  if (projectMember) return projectMember.role as ProjectRole
+
+  return null
+}
+
 // Empty scopes = access to all projects the user is member of.
 export function tokenScopeAllows(scopes: string[], projectSlug: string, envName: string): boolean {
   if (scopes.length === 0) return true

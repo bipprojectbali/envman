@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 import { prisma } from '../../lib/db'
 import { requireAuth, unauthorized, forbidden } from '../../lib/auth-middleware'
+import { hasCapability } from '../../lib/permissions'
 
 export const gistsRouter = new Elysia()
 
@@ -35,6 +36,7 @@ export const gistsRouter = new Elysia()
   .post('/api/envman/gists', async ({ request, set }) => {
     const caller = await requireAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'gist:create')) { set.status = 403; return { error: 'Tidak punya izin create gist.' } }
     const { title, description, files, isPublic, tags } = (await request.json()) as {
       title: string; description?: string; files: { filename: string; content: string; language: string }[]
       isPublic?: boolean; tags?: string[]
@@ -48,13 +50,13 @@ export const gistsRouter = new Elysia()
     return { gist }
       })
 
-      // PUT /api/envman/gists/:id — update (owner only)
+      // PUT /api/envman/gists/:id — update (owner atau SUPER_ADMIN)
   .put('/api/envman/gists/:id', async ({ request, params, set }) => {
     const caller = await requireAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
     const gist = await prisma.gist.findUnique({ where: { id: params.id } })
     if (!gist) { set.status = 404; return { error: 'Gist tidak ditemukan' } }
-    if (gist.userId !== caller.userId) { set.status = 403; return { error: 'Forbidden' } }
+    if (gist.userId !== caller.userId && caller.role !== 'SUPER_ADMIN') { set.status = 403; return { error: 'Forbidden' } }
     const { title, description, files, isPublic, tags } = (await request.json()) as {
       title?: string; description?: string; files?: { filename: string; content: string; language: string }[]
       isPublic?: boolean; tags?: string[]
@@ -73,13 +75,13 @@ export const gistsRouter = new Elysia()
     return { gist: updated }
       })
 
-      // DELETE /api/envman/gists/:id — delete (owner only)
+      // DELETE /api/envman/gists/:id — delete (owner atau SUPER_ADMIN)
   .delete('/api/envman/gists/:id', async ({ request, params, set }) => {
     const caller = await requireAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
     const gist = await prisma.gist.findUnique({ where: { id: params.id } })
     if (!gist) { set.status = 404; return { error: 'Gist tidak ditemukan' } }
-    if (gist.userId !== caller.userId) { set.status = 403; return { error: 'Forbidden' } }
+    if (gist.userId !== caller.userId && caller.role !== 'SUPER_ADMIN') { set.status = 403; return { error: 'Forbidden' } }
     await prisma.gist.delete({ where: { id: params.id } })
     return { ok: true }
       })

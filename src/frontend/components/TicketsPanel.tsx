@@ -25,7 +25,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMediaQuery } from '@mantine/hooks'
 import { useState } from 'react'
 import { TbBug, TbCheck, TbChevronRight, TbMessagePlus, TbPaperclip, TbPlus, TbRefresh, TbRotate } from 'react-icons/tb'
-import { type Role, useSession } from '@/frontend/hooks/useAuth'
+import { type Role, useSession, hasCapability } from '@/frontend/hooks/useAuth'
 
 type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'READY_FOR_QC' | 'REOPENED' | 'CLOSED'
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
@@ -100,7 +100,8 @@ export function TicketsPanel() {
   const { data } = useSession()
   const user = data?.user
   const role = user?.role
-  const canCreate = role === 'QC' || role === 'ADMIN' || role === 'SUPER_ADMIN'
+  // QC tetap khusus untuk ticket workflow. ADMIN/lainnya butuh capability eksplisit.
+  const canCreate = role === 'QC' || role === 'SUPER_ADMIN' || hasCapability(user, 'ticket:create')
   const isQc = role === 'QC' || role === 'SUPER_ADMIN'
   const isMobile = useMediaQuery('(max-width: 48em)')
 

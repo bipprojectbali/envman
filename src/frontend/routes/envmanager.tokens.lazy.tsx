@@ -31,6 +31,7 @@ import { createLazyFileRoute } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
+import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import {
   TbAlertTriangle,
   TbCalendar,
@@ -236,6 +237,8 @@ const emptyForm = { name: '', canWrite: false, expiresAt: '', scopes: [] as stri
 
 function TokensPage() {
   const qc = useQueryClient()
+  const { data: sessionData } = useSession()
+  const canCreateToken = hasCapability(sessionData?.user, 'token:create')
   const isMobile = useMediaQuery('(max-width: 48em)')
   const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false)
   const [editOpen, { open: openEdit, close: closeEdit }] = useDisclosure(false)
@@ -481,9 +484,11 @@ function TokensPage() {
               {view === 'list' ? <TbLayoutGrid size={15} /> : <TbLayoutList size={15} />}
             </ActionIcon>
           </Tooltip>
-          <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
-            Buat Token
-          </Button>
+          {canCreateToken && (
+            <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
+              Buat Token
+            </Button>
+          )}
         </Group>
       </Group>
 
@@ -621,7 +626,11 @@ function TokensPage() {
           <ThemeIcon size={40} radius="xl" variant="light" color="gray" mx="auto" mb="sm"><TbKey size={20} /></ThemeIcon>
           <Text fw={500} mb={4}>Belum ada API token</Text>
           <Text size="sm" c="dimmed" mb="md">Buat token untuk login CLI tanpa password.</Text>
-          <Button size="xs" leftSection={<TbPlus size={13} />} onClick={openCreate}>Buat Token Pertama</Button>
+          {canCreateToken ? (
+            <Button size="xs" leftSection={<TbPlus size={13} />} onClick={openCreate}>Buat Token Pertama</Button>
+          ) : (
+            <Text size="xs" c="dimmed">Tidak punya izin create API token. Hubungi SUPER_ADMIN.</Text>
+          )}
         </Card>
       ) : filteredTokens.length === 0 ? (
         <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>

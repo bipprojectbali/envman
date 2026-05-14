@@ -37,8 +37,9 @@ Frontend: `src/frontend/components/TicketsPanel.tsx` — shared between `/dev` a
 Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI). `requireEnvAuth()` in `src/app.ts`.
 
 ### Projects
-- `GET /api/envman/projects` — list projects (only accessible ones)
-- `POST /api/envman/projects` — create project (ADMIN+)
+- `GET /api/envman/projects` — list projects (only accessible ones); returns `tags[]` per project
+- `POST /api/envman/projects` — create project (ADMIN+); body: `{slug, name, description?, tags?[]}`
+- `PATCH /api/envman/projects/:slug` — update project (OWNER); body: `{name?, description?, tags?[]}`
 - `GET /api/envman/projects/:slug` — project detail + members + environments
 - `GET /api/envman/projects/:slug/environments/:env/vars` — list vars (VIEWER: secrets masked as `***`)
 - `GET /api/envman/projects/:slug/environments/:env/vars/export` — all vars decrypted (EDITOR+)

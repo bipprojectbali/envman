@@ -67,6 +67,7 @@ export interface NoteCardProps {
 export interface NotesPanelProps {
   slug: string
   canEdit: boolean
+  canCreate: boolean
   isOwner: boolean
   myUserId: string
   openModal: Note | null | 'new'
@@ -195,7 +196,7 @@ function NoteCardGrid(props: NoteCardProps) {
   )
 }
 
-export function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpenModal, viewNote, setViewNote }: NotesPanelProps) {
+export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, openModal, setOpenModal, viewNote, setViewNote }: NotesPanelProps) {
   const qc = useQueryClient()
   const isMobile = useMediaQuery('(max-width: 48em)')
   const [search, setSearch] = useState('')
@@ -319,7 +320,7 @@ export function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpe
             <TbLayoutGrid size={14} />
           </ActionIcon>
         </Group>
-        {canEdit && (
+        {canEdit && canCreate && (
           <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
             New Note
           </Button>
@@ -338,7 +339,7 @@ export function NotesPanel({ slug, canEdit, isOwner, myUserId, openModal, setOpe
           </ThemeIcon>
           <Text fw={500} mb={4}>Belum ada notes</Text>
           <Text size="sm" c="dimmed" mb="md">Buat catatan dalam Markdown untuk project ini.</Text>
-          {canEdit && (
+          {canEdit && canCreate && (
             <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
               Buat Note Pertama
             </Button>

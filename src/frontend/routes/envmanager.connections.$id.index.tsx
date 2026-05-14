@@ -34,6 +34,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
+import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import {
   TbAlertTriangle,
   TbCheck,
@@ -124,6 +125,13 @@ function ConnectionDetailPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const isMobile = useMediaQuery('(max-width: 48em)')
+  const { data: sessionData } = useSession()
+  const user = sessionData?.user
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const canView = isSuperAdmin || hasCapability(user, 'connection:view')
+  const canOperate = isSuperAdmin || hasCapability(user, 'stack:operate')
+  const canMutate = isSuperAdmin || hasCapability(user, 'stack:mutate')
+  const canPrune = isSuperAdmin || hasCapability(user, 'stack:prune')
 
   const [activeTab, setActiveTab] = useLocalStorage<string>({
     key: `envman:connection-detail:${id}:tab`,
@@ -455,6 +463,19 @@ function ConnectionDetailPage() {
       onConfirm: () => pruneImages.mutate(),
     })
 
+  // Capability gate — butuh connection:view minimal
+  if (!canView) {
+    return (
+      <Box p="md">
+        <Alert color="yellow" icon={<TbAlertTriangle size={16} />} variant="light">
+          <Text size="sm" fw={600} mb={4}>Tidak punya izin lihat connection detail</Text>
+          <Text size="xs">Minta SUPER_ADMIN untuk grant capability <code>connection:view</code>.</Text>
+          <Button size="xs" mt="sm" component={Link} to="/envmanager/connections">← Kembali</Button>
+        </Alert>
+      </Box>
+    )
+  }
+
   if (isLoading) {
     return <Group justify="center" py="xl"><Loader /></Group>
   }
@@ -641,24 +662,28 @@ function ConnectionDetailPage() {
                           Compose
                         </Button>
                       </Tooltip>
-                      <Tooltip label="Pull image terbaru & restart">
-                        <Button size="xs" variant="light" color="blue"
-                          leftSection={<TbRefreshDot size={13} />}
-                          loading={repull.isPending && (repull.variables as number) === stack.id}
-                          onClick={() => confirmRepull(stack)}
-                        >
-                          Repull
-                        </Button>
-                      </Tooltip>
-                      <Tooltip label="Force recreate (stop→start)">
-                        <Button size="xs" variant="light" color="orange"
-                          leftSection={<TbRefresh size={13} />}
-                          loading={recreate.isPending && (recreate.variables as number) === stack.id}
-                          onClick={() => confirmRecreate(stack)}
-                        >
-                          Recreate
-                        </Button>
-                      </Tooltip>
+                      {canMutate && (
+                        <Tooltip label="Pull image terbaru & restart">
+                          <Button size="xs" variant="light" color="blue"
+                            leftSection={<TbRefreshDot size={13} />}
+                            loading={repull.isPending && (repull.variables as number) === stack.id}
+                            onClick={() => confirmRepull(stack)}
+                          >
+                            Repull
+                          </Button>
+                        </Tooltip>
+                      )}
+                      {canMutate && (
+                        <Tooltip label="Force recreate (stop→start)">
+                          <Button size="xs" variant="light" color="orange"
+                            leftSection={<TbRefresh size={13} />}
+                            loading={recreate.isPending && (recreate.variables as number) === stack.id}
+                            onClick={() => confirmRecreate(stack)}
+                          >
+                            Recreate
+                          </Button>
+                        </Tooltip>
+                      )}
                     </Group>
                   </Group>
                 </Box>
@@ -714,13 +739,15 @@ function ConnectionDetailPage() {
                             <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                               <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
                               {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
-                              <Tooltip label="Restart container">
-                                <ActionIcon size="sm" variant="subtle" color="orange"
-                                  loading={restartContainer.isPending && (restartContainer.variables as any)?.containerId === c.id}
-                                  onClick={e => { e.stopPropagation(); confirmRestartContainer(stack, c.id, c.names[0]) }}>
-                                  <TbRefresh size={13} />
-                                </ActionIcon>
-                              </Tooltip>
+                              {canMutate && (
+                                <Tooltip label="Restart container">
+                                  <ActionIcon size="sm" variant="subtle" color="orange"
+                                    loading={restartContainer.isPending && (restartContainer.variables as any)?.containerId === c.id}
+                                    onClick={e => { e.stopPropagation(); confirmRestartContainer(stack, c.id, c.names[0]) }}>
+                                    <TbRefresh size={13} />
+                                  </ActionIcon>
+                                </Tooltip>
+                              )}
                               <Tooltip label="Lihat logs">
                                 <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); setLogsStack(stack); setSelectedContainerId(c.id); openLogs() }}>
                                   <TbFileText size={13} />
@@ -844,13 +871,15 @@ function ConnectionDetailPage() {
                             <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                               <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
                               {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
-                              <Tooltip label="Restart container">
-                                <ActionIcon size="sm" variant="subtle" color="orange"
-                                  loading={restartContainer.isPending && (restartContainer.variables as any)?.containerId === c.id}
-                                  onClick={e => { e.stopPropagation(); confirmRestartContainer(stack, c.id, c.names[0]) }}>
-                                  <TbRefresh size={13} />
-                                </ActionIcon>
-                              </Tooltip>
+                              {canMutate && (
+                                <Tooltip label="Restart container">
+                                  <ActionIcon size="sm" variant="subtle" color="orange"
+                                    loading={restartContainer.isPending && (restartContainer.variables as any)?.containerId === c.id}
+                                    onClick={e => { e.stopPropagation(); confirmRestartContainer(stack, c.id, c.names[0]) }}>
+                                    <TbRefresh size={13} />
+                                  </ActionIcon>
+                                </Tooltip>
+                              )}
                               <Tooltip label="Lihat logs">
                                 <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); setLogsStack(stack); setSelectedContainerId(c.id); openLogs() }}>
                                   <TbFileText size={13} />
@@ -944,7 +973,7 @@ function ConnectionDetailPage() {
             <ActionIcon size="sm" variant="subtle" color="gray" loading={imagesFetching} onClick={() => refetchImages()}>
               <TbRefresh size={13} />
             </ActionIcon>
-            {imagesData?.count > 0 && (
+            {imagesData?.count > 0 && canPrune && (
               <Button size="xs" variant="light" color="red" leftSection={<TbTrash size={13} />}
                 loading={pruneImages.isPending} onClick={confirmPruneImages}>
                 Prune Images
@@ -1068,10 +1097,12 @@ function ConnectionDetailPage() {
                 </Group>
                 <Group gap="xs">
                   {!composeEditing ? (
-                    <Button size="xs" variant="light" color="blue" leftSection={<TbPencil size={13} />}
-                      onClick={() => setComposeEditing(true)}>
-                      Edit
-                    </Button>
+                    canMutate && (
+                      <Button size="xs" variant="light" color="blue" leftSection={<TbPencil size={13} />}
+                        onClick={() => setComposeEditing(true)}>
+                        Edit
+                      </Button>
+                    )
                   ) : (
                     <>
                       <Button size="xs" variant="subtle" color="gray"

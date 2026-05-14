@@ -23,6 +23,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
+import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import {
   TbAlertTriangle,
   TbCheck,
@@ -56,6 +57,11 @@ function ConnectionsPage() {
   const isMobile = useMediaQuery('(max-width: 48em)')
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { data: sessionData } = useSession()
+  // Capability gates
+  const canViewConnections = hasCapability(sessionData?.user, 'connection:view')
+  // Connection CRUD = strict SUPER_ADMIN only (tidak via capability)
+  const canManageConnections = sessionData?.user?.role === 'SUPER_ADMIN'
   const [modalOpen, { open, close }] = useDisclosure(false)
   const [editTarget, setEditTarget] = useState<Connection | null>(null)
   const [form, setForm] = useState({ name: '', portainerUrl: '', apiToken: '' })
@@ -164,6 +170,18 @@ function ConnectionsPage() {
           .catch(notifyErr),
     })
 
+  // Early gate — kalau tidak punya capability view, tampilkan alert
+  if (!canViewConnections && !canManageConnections) {
+    return (
+      <Box p="md">
+        <Alert color="yellow" icon={<TbAlertTriangle size={16} />} variant="light">
+          <Text size="sm" fw={600} mb={4}>Tidak punya izin melihat Portainer connections</Text>
+          <Text size="xs">Connection adalah infrastruktur global. Minta SUPER_ADMIN untuk grant capability <code>connection:view</code>.</Text>
+        </Alert>
+      </Box>
+    )
+  }
+
   return (
     <Box>
       <Group justify="space-between" mb="md">
@@ -184,9 +202,11 @@ function ConnectionsPage() {
               {view === 'grid' ? <TbLayoutList size={15} /> : <TbLayoutGrid size={15} />}
             </ActionIcon>
           </Tooltip>
-          <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
-            Add Connection
-          </Button>
+          {canManageConnections && (
+            <Button size="xs" leftSection={<TbPlus size={13} />} color="violet" onClick={openCreate}>
+              Add Connection
+            </Button>
+          )}
         </Group>
       </Group>
       <Alert color="gray" p="xs" mb="md" icon={<TbPlugConnected size={14} />}>
@@ -215,9 +235,13 @@ function ConnectionsPage() {
           <Text size="sm" c="dimmed" mb="md">
             Tambah Portainer instance yang akan digunakan oleh project-project kamu.
           </Text>
-          <Button size="xs" leftSection={<TbPlus size={13} />} onClick={openCreate}>
-            Add Connection
-          </Button>
+          {canManageConnections ? (
+            <Button size="xs" leftSection={<TbPlus size={13} />} onClick={openCreate}>
+              Add Connection
+            </Button>
+          ) : (
+            <Text size="xs" c="dimmed">Connection adalah infrastruktur global — hanya SUPER_ADMIN yang boleh menambah.</Text>
+          )}
         </Card>
       ) : filteredConnections.length === 0 ? (
         <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
@@ -236,14 +260,16 @@ function ConnectionsPage() {
                 <ThemeIcon size={36} radius="md" variant="light" color="violet">
                   <TbPlugConnected size={18} />
                 </ThemeIcon>
-                <Group gap={4} onClick={e => e.stopPropagation()}>
-                  <Tooltip label="Edit">
-                    <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => openEdit(c)}><TbPencil size={12} /></ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Hapus">
-                    <ActionIcon size="xs" variant="subtle" color="red" onClick={() => deleteConnection(c.id, c.name, c._count.configs)}><TbTrash size={12} /></ActionIcon>
-                  </Tooltip>
-                </Group>
+                {canManageConnections && (
+                  <Group gap={4} onClick={e => e.stopPropagation()}>
+                    <Tooltip label="Edit">
+                      <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => openEdit(c)}><TbPencil size={12} /></ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Hapus">
+                      <ActionIcon size="xs" variant="subtle" color="red" onClick={() => deleteConnection(c.id, c.name, c._count.configs)}><TbTrash size={12} /></ActionIcon>
+                    </Tooltip>
+                  </Group>
+                )}
               </Group>
               <Text fw={700} size="sm" mb={2}>{c.name}</Text>
               <Group gap="xs" mb="xs">
@@ -306,18 +332,20 @@ function ConnectionsPage() {
                     </Group>
                   </Box>
                 </Group>
-                <Group gap="xs" wrap="nowrap" onClick={e => e.stopPropagation()}>
-                  <Tooltip label="Edit">
-                    <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEdit(c)}>
-                      <TbPencil size={13} />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Hapus">
-                    <ActionIcon size="sm" variant="subtle" color="red" onClick={() => deleteConnection(c.id, c.name, c._count.configs)}>
-                      <TbTrash size={13} />
-                    </ActionIcon>
-                  </Tooltip>
-                </Group>
+                {canManageConnections && (
+                  <Group gap="xs" wrap="nowrap" onClick={e => e.stopPropagation()}>
+                    <Tooltip label="Edit">
+                      <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEdit(c)}>
+                        <TbPencil size={13} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Hapus">
+                      <ActionIcon size="sm" variant="subtle" color="red" onClick={() => deleteConnection(c.id, c.name, c._count.configs)}>
+                        <TbTrash size={13} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+                )}
               </Group>
             </Card>
           ))}

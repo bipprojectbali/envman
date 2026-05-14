@@ -4,6 +4,7 @@ import { prisma } from '../lib/db'
 import { requireAuth, unauthorized, forbidden } from '../lib/auth-middleware'
 import { audit } from '../lib/audit'
 import { getIp } from '../lib/request'
+import { hasCapability } from '../lib/permissions'
 
 function getAllowedStatusTransitions(current: string, role: 'QC' | 'ADMIN' | 'SUPER_ADMIN'): string[] {
   const isQc = role === 'QC' || role === 'SUPER_ADMIN'
@@ -80,7 +81,9 @@ export const ticketsRouter = new Elysia()
   .post('/api/tickets', async ({ request, set }) => {
     const caller = await requireAuth(request)
     if (!caller) return unauthorized(set)
-    if (!['QC', 'ADMIN', 'SUPER_ADMIN'].includes(caller.role)) return forbidden(set)
+    // QC tetap khusus untuk ticket workflow. ADMIN butuh capability eksplisit.
+    const isQcOrSuper = caller.role === 'QC' || caller.role === 'SUPER_ADMIN'
+    if (!isQcOrSuper && !hasCapability(caller, 'ticket:create')) return forbidden(set)
 
     const body = (await request.json()) as {
       title?: string; description?: string; priority?: string; route?: string; assigneeId?: string

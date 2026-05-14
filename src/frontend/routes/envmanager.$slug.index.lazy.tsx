@@ -1,16 +1,11 @@
 import {
   ActionIcon,
-  Avatar,
   Badge,
   Box,
   Button,
   Card,
   Code,
-  Combobox,
-  Divider,
   Group,
-  InputBase,
-  Menu,
   Select,
   Skeleton,
   Stack,
@@ -19,14 +14,12 @@ import {
   TextInput,
   ThemeIcon,
   Tooltip,
-  useCombobox,
 } from '@mantine/core'
-import { useDebouncedValue } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
-import { useSession } from '@/frontend/hooks/useAuth'
+import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
 import { NotesPanel } from '@/frontend/components/slug/NotesPanel'
@@ -35,15 +28,11 @@ import type { Note } from '@/frontend/components/slug/NotesPanel'
 import {
   TbCheck,
   TbChevronRight,
-  TbChevronDown,
   TbNote,
   TbPlus,
   TbSearch,
-  TbShieldCheck,
   TbSortAscending,
   TbTrash,
-  TbUserPlus,
-  TbUsers,
   TbVariable,
   TbX,
 } from 'react-icons/tb'
@@ -54,12 +43,6 @@ interface Environment {
   id: string
   name: string
   _count: { vars: number }
-}
-
-interface Member {
-  id: string
-  role: string
-  user: { id: string; name: string; email: string }
 }
 
 const roleColor = { OWNER: 'blue', EDITOR: 'teal', VIEWER: 'gray' } as const
@@ -78,20 +61,15 @@ function ProjectDetailPage() {
   const qc = useQueryClient()
   const { data: sessionData } = useSession()
   const myUserId = sessionData?.user?.id
+  const canCreateNote = hasCapability(sessionData?.user, 'note:create')
   const [noteModal, setNoteModal] = useState<Note | null | 'new'>(null)
   const [noteView, setNoteView] = useState<Note | null>(null)
   const [newEnvName, setNewEnvName] = useState('')
   const [envSearch, setEnvSearch] = useState('')
   const [envSort, setEnvSort] = useState<'name' | 'vars'>('name')
-  const [memberSearch, setMemberSearch] = useState('')
-  const [inviteUserId, setInviteUserId] = useState<string | null>(null)
-  const [inviteSearch, setInviteSearch] = useState('')
-  const [inviteRole, setInviteRole] = useState<string>('VIEWER')
-  const [debouncedSearch] = useDebouncedValue(inviteSearch, 300)
-  const combobox = useCombobox({ onDropdownClose: () => combobox.resetSelectedOption() })
 
   const setTab = (t: string) =>
-    navigate({ to: '/envmanager/$slug', params: { slug }, search: prev => ({ ...prev, tab: t as 'environments' | 'members' | 'notes' }) })
+    navigate({ to: '/envmanager/$slug', params: { slug }, search: prev => ({ ...prev, tab: t as 'environments' | 'notes' }) })
 
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'project', slug],
@@ -101,7 +79,6 @@ function ProjectDetailPage() {
 
   const project = data?.project
   const envs: Environment[] = project?.environments ?? []
-  const members: Member[] = project?.members ?? []
 
   const filteredEnvs = useMemo(() => {
     let list = [...envs]
@@ -111,28 +88,9 @@ function ProjectDetailPage() {
     return list
   }, [envs, envSearch, envSort])
 
-  const filteredMembers = useMemo(() => {
-    if (!memberSearch.trim()) return members
-    const q = memberSearch.toLowerCase()
-    return members.filter(m => m.user.name.toLowerCase().includes(q) || m.user.email.toLowerCase().includes(q))
-  }, [members, memberSearch])
   const myRole: string = project?.myRole ?? 'VIEWER'
   const canEdit = myRole === 'OWNER' || myRole === 'EDITOR'
   const isOwner = myRole === 'OWNER'
-  const ownerCount = members.filter(m => m.role === 'OWNER').length
-
-  const memberUserIds = new Set(members.map(m => m.user.id))
-
-  const { data: usersData } = useQuery({
-    queryKey: ['envman', 'users', debouncedSearch],
-    queryFn: () => apiFetch(`/api/envman/users?q=${encodeURIComponent(debouncedSearch)}`),
-    enabled: isOwner,
-  })
-  const invitableUsers: { id: string; name: string; email: string }[] =
-    (usersData?.users ?? []).filter((u: { id: string }) => !memberUserIds.has(u.id))
-
-  const selectedUser = invitableUsers.find(u => u.id === inviteUserId) ??
-    (usersData?.users ?? []).find((u: { id: string }) => u.id === inviteUserId)
 
   const addEnv = useMutation({
     mutationFn: (name: string) =>
@@ -159,61 +117,6 @@ function ProjectDetailPage() {
       onConfirm: () =>
         apiFetch(`/api/envman/projects/${slug}/environments/${name}`, { method: 'DELETE' })
           .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'project', slug] }); notifyOk(`Environment "${name}" dihapus`) })
-          .catch(notifyErr),
-    })
-
-  const addMember = useMutation({
-    mutationFn: () =>
-      apiFetch(`/api/envman/projects/${slug}/members`, {
-        method: 'POST',
-        body: JSON.stringify({ userId: inviteUserId, role: inviteRole }),
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
-      setInviteUserId(null)
-      setInviteSearch('')
-      notifyOk('Member ditambahkan ke project')
-    },
-    onError: (e) => notifyErr(e),
-  })
-
-  const updateMemberRole = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: string }) =>
-      apiFetch(`/api/envman/projects/${slug}/members/${userId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role }),
-      }),
-    onMutate: async ({ userId, role }) => {
-      await qc.cancelQueries({ queryKey: ['envman', 'project', slug] })
-      const previous = qc.getQueryData(['envman', 'project', slug])
-      qc.setQueryData(['envman', 'project', slug], (old: any) => ({
-        ...old,
-        project: {
-          ...old?.project,
-          members: old?.project?.members?.map((m: any) =>
-            m.user.id === userId ? { ...m, role } : m
-          ) ?? [],
-        },
-      }))
-      return { previous }
-    },
-    onError: (e, _vars, context) => {
-      if (context?.previous) qc.setQueryData(['envman', 'project', slug], context.previous)
-      notifyErr(e)
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['envman', 'project', slug] }),
-    onSuccess: () => notifyOk('Role member diperbarui'),
-  })
-
-  const removeMember = (userId: string, name: string) =>
-    modals.openConfirmModal({
-      title: 'Hapus member',
-      children: <Text size="sm">Hapus <strong>{name}</strong> dari project ini?</Text>,
-      labels: { confirm: 'Hapus', cancel: 'Batal' },
-      confirmProps: { color: 'red' },
-      onConfirm: () =>
-        apiFetch(`/api/envman/projects/${slug}/members/${userId}`, { method: 'DELETE' })
-          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'project', slug] }); notifyOk(`${name} dihapus dari project`) })
           .catch(notifyErr),
     })
 
@@ -249,15 +152,6 @@ function ProjectDetailPage() {
             ) : undefined}
           >
             Environments
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="members"
-            leftSection={<TbUsers size={14} />}
-            rightSection={!isLoading && members.length > 0 ? (
-              <Badge size="xs" variant="filled" color="gray" circle>{members.length}</Badge>
-            ) : undefined}
-          >
-            Members
           </Tabs.Tab>
           <Tabs.Tab value="notes" leftSection={<TbNote size={14} />}>
             Notes
@@ -409,233 +303,12 @@ function ProjectDetailPage() {
           )}
         </Tabs.Panel>
 
-        {/* ── Members tab ──────────────────── */}
-        <Tabs.Panel value="members">
-          {isLoading ? (
-            <Stack gap="xs">
-              {[1, 2].map(i => <Skeleton key={i} height={56} radius="md" />)}
-            </Stack>
-          ) : (
-            <Stack gap="xs">
-              {/* Role legend */}
-              <Card withBorder p="xs" bg="var(--mantine-color-default-hover)">
-                <Group gap="lg">
-                  {[
-                    { role: 'OWNER', desc: 'kontrol penuh', color: 'blue' },
-                    { role: 'EDITOR', desc: 'tambah / edit vars', color: 'teal' },
-                    { role: 'VIEWER', desc: 'read-only', color: 'gray' },
-                  ].map(r => (
-                    <Group key={r.role} gap={4}>
-                      <Badge size="xs" variant="dot" color={r.color}>{r.role}</Badge>
-                      <Text size="xs" c="dimmed">— {r.desc}</Text>
-                    </Group>
-                  ))}
-                </Group>
-              </Card>
-
-              {members.length > 0 && (
-                <TextInput
-                  size="xs"
-                  placeholder="Cari member..."
-                  leftSection={<TbSearch size={13} />}
-                  value={memberSearch}
-                  onChange={e => setMemberSearch(e.target.value)}
-                  rightSection={memberSearch ? <ActionIcon size="xs" variant="subtle" onClick={() => setMemberSearch('')}><TbX size={11} /></ActionIcon> : undefined}
-                />
-              )}
-
-              {members.length === 0 ? (
-                <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
-                  <ThemeIcon size={36} radius="xl" variant="light" color="gray" mx="auto" mb="xs">
-                    <TbUsers size={18} />
-                  </ThemeIcon>
-                  <Text size="sm" c="dimmed">Belum ada member lain.</Text>
-                </Card>
-              ) : filteredMembers.length === 0 ? (
-                <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
-                  <Text size="sm" c="dimmed">Tidak ada member yang cocok.</Text>
-                  <Button size="xs" variant="subtle" mt="xs" onClick={() => setMemberSearch('')}>Reset</Button>
-                </Card>
-              ) : (
-                filteredMembers.map(m => (
-                  <Group
-                    key={m.id}
-                    justify="space-between"
-                    p="sm"
-                    style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)' }}
-                  >
-                    <Group gap="sm">
-                      <Avatar radius="xl" size="sm" color={roleColor[m.role as keyof typeof roleColor] ?? 'gray'}>
-                        {m.user.name.charAt(0).toUpperCase()}
-                      </Avatar>
-                      <Box>
-                        <Text size="sm" fw={500}>{m.user.name}</Text>
-                        <Text size="xs" c="dimmed">{m.user.email}</Text>
-                      </Box>
-                    </Group>
-
-                    <Group gap="xs">
-                      {(() => {
-                        const isSelf = m.user.id === myUserId
-                        const isLastOwner = m.role === 'OWNER' && ownerCount === 1
-                        const canManage = isOwner && !isSelf
-                        return (
-                          <>
-                            {canManage ? (
-                              <Menu shadow="sm" width={160}>
-                                <Menu.Target>
-                                  <Badge
-                                    size="sm"
-                                    variant="light"
-                                    color={roleColor[m.role as keyof typeof roleColor] ?? 'gray'}
-                                    style={{ cursor: isLastOwner ? 'not-allowed' : 'pointer' }}
-                                    rightSection={
-                                      updateMemberRole.isPending && updateMemberRole.variables?.userId === m.user.id
-                                        ? undefined
-                                        : !isLastOwner ? <TbChevronDown size={10} /> : undefined
-                                    }
-                                  >
-                                    {updateMemberRole.isPending && updateMemberRole.variables?.userId === m.user.id ? '…' : m.role}
-                                  </Badge>
-                                </Menu.Target>
-                                {!isLastOwner && (
-                                  <Menu.Dropdown>
-                                    <Menu.Label>Ubah role</Menu.Label>
-                                    {['VIEWER', 'EDITOR', 'OWNER'].filter(r => r !== m.role).map(r => (
-                                      <Menu.Item
-                                        key={r}
-                                        leftSection={<TbShieldCheck size={13} />}
-                                        color={roleColor[r as keyof typeof roleColor]}
-                                        onClick={() => updateMemberRole.mutate({ userId: m.user.id, role: r })}
-                                      >
-                                        {r}
-                                      </Menu.Item>
-                                    ))}
-                                  </Menu.Dropdown>
-                                )}
-                              </Menu>
-                            ) : (
-                              <Tooltip label={isSelf ? 'Role kamu sendiri' : isLastOwner ? 'Owner terakhir' : ''} disabled={!isSelf && !isLastOwner}>
-                                <Badge size="sm" variant="light" color={roleColor[m.role as keyof typeof roleColor] ?? 'gray'}>
-                                  {m.role}
-                                </Badge>
-                              </Tooltip>
-                            )}
-
-                            {canManage && !isLastOwner && (
-                              <Tooltip label="Hapus member" position="left">
-                                <ActionIcon
-                                  size="sm"
-                                  variant="subtle"
-                                  color="red"
-                                  onClick={() => removeMember(m.user.id, m.user.name)}
-                                >
-                                  <TbTrash size={13} />
-                                </ActionIcon>
-                              </Tooltip>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </Group>
-                  </Group>
-                ))
-              )}
-
-              {isOwner && (
-                <>
-                  <Divider my="xs" label={
-                    <Group gap="xs">
-                      <TbUserPlus size={12} />
-                      <Text size="xs">Invite member</Text>
-                    </Group>
-                  } labelPosition="left" />
-                  <Group gap="xs" align="flex-start">
-                    <Box style={{ flex: 1 }}>
-                    <Combobox
-                      store={combobox}
-                      onOptionSubmit={val => {
-                        setInviteUserId(val)
-                        const u = invitableUsers.find(u => u.id === val)
-                        setInviteSearch(u ? `${u.name} (${u.email})` : '')
-                        combobox.closeDropdown()
-                      }}
-                    >
-                      <Combobox.Target>
-                        <InputBase
-                          size="xs"
-                          placeholder="Cari nama atau email..."
-                          value={inviteSearch}
-                          onChange={e => {
-                            setInviteSearch(e.target.value)
-                            setInviteUserId(null)
-                            combobox.openDropdown()
-                          }}
-                          onFocus={() => combobox.openDropdown()}
-                          onBlur={() => combobox.closeDropdown()}
-                          rightSection={inviteUserId ? <TbUserPlus size={13} color="var(--mantine-color-teal-5)" /> : undefined}
-                        />
-                      </Combobox.Target>
-                      <Combobox.Dropdown>
-                        <Combobox.Options>
-                          {invitableUsers.length === 0 ? (
-                            <Combobox.Empty>
-                              {debouncedSearch ? 'User tidak ditemukan' : 'Ketik untuk mencari user'}
-                            </Combobox.Empty>
-                          ) : (
-                            invitableUsers.map(u => (
-                              <Combobox.Option key={u.id} value={u.id}>
-                                <Group gap="xs">
-                                  <Avatar size={22} color="violet" radius="xl">
-                                    {u.name?.charAt(0).toUpperCase()}
-                                  </Avatar>
-                                  <Box>
-                                    <Text size="xs" fw={500}>{u.name}</Text>
-                                    <Text size="xs" c="dimmed">{u.email}</Text>
-                                  </Box>
-                                </Group>
-                              </Combobox.Option>
-                            ))
-                          )}
-                        </Combobox.Options>
-                      </Combobox.Dropdown>
-                    </Combobox>
-                    </Box>
-
-                    <Select
-                      size="xs"
-                      value={inviteRole}
-                      onChange={v => setInviteRole(v ?? 'VIEWER')}
-                      data={[
-                        { value: 'VIEWER', label: 'Viewer' },
-                        { value: 'EDITOR', label: 'Editor' },
-                        { value: 'OWNER', label: 'Owner' },
-                      ]}
-                      w={95}
-                    />
-                    <Button
-                      size="xs"
-                      leftSection={<TbUserPlus size={13} />}
-                      onClick={() => addMember.mutate()}
-                      loading={addMember.isPending}
-                      disabled={!inviteUserId}
-                    >
-                      Invite
-                    </Button>
-                  </Group>
-                  {addMember.isError && (
-                    <Text size="xs" c="red">{(addMember.error as Error).message}</Text>
-                  )}
-                </>
-              )}
-            </Stack>
-          )}
-        </Tabs.Panel>
         {/* ── Notes tab ────────────────────── */}
         <Tabs.Panel value="notes">
           <NotesPanel
             slug={slug}
             canEdit={canEdit}
+            canCreate={canCreateNote}
             isOwner={isOwner}
             myUserId={myUserId ?? ''}
             openModal={noteModal}

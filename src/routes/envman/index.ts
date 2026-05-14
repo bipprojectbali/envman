@@ -4,6 +4,8 @@ import { projectsRouter } from './projects'
 import { portainerRouter } from './portainer'
 import { notesRouter } from './notes'
 import { gistsRouter } from './gists'
+import { databaseRouter } from './database'
+import { adminUsersRouter } from './admin-users'
 
 // Misc envman routes (status, whoami, user lookup)
 import { prisma } from '../../lib/db'
@@ -49,3 +51,5 @@ export const envmanRouter = new Elysia()
   .use(portainerRouter)
   .use(notesRouter)
   .use(gistsRouter)
+  .use(databaseRouter)
+  .use(adminUsersRouter)

@@ -1,7 +1,8 @@
 import { Elysia } from 'elysia'
 import { prisma } from '../../lib/db'
 import { requireEnvAuth, unauthorized, forbidden } from '../../lib/auth-middleware'
-import { getProjectAccess, tokenScopeAllows } from '../../lib/access'
+import { getProjectAccess, getEnvironmentAccess, tokenScopeAllows } from '../../lib/access'
+import { hasCapability } from '../../lib/permissions'
 import { decryptSecret, encryptSecret, hasMasterKey } from '../../lib/crypto'
 import { withCache, invalidateCache, cacheKeys } from '../../lib/cache'
 import { notDeleted, softDelete } from '../../lib/db-helpers'
@@ -32,7 +33,7 @@ export const projectsRouter = new Elysia()
   .post('/api/envman/projects', async ({ request, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
-    if (auth.role === 'USER') { set.status = 403; return { error: 'ADMIN atau lebih tinggi diperlukan' } }
+    if (!hasCapability(auth, 'project:create')) { set.status = 403; return { error: 'Tidak punya izin create project. Hubungi SUPER_ADMIN.' } }
     const body = await request.json().catch(() => null)
     if (!body?.slug || !body?.name) { set.status = 400; return { error: 'slug and name required' } }
     const slug = body.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-')
@@ -156,7 +157,7 @@ export const projectsRouter = new Elysia()
   .delete('/api/envman/projects/:slug/environments/:envName', async ({ request, params, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+    const access = await getEnvironmentAccess(auth.userId, auth.role, params.slug, params.envName)
     if (!access || access !== 'OWNER') { set.status = 403; return { error: 'Owner required' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
@@ -168,7 +169,7 @@ export const projectsRouter = new Elysia()
   .get('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access) { set.status = 403; return { error: 'No access' } }
     if (caller.scopes.length > 0 && !tokenScopeAllows(caller.scopes, params.slug, params.envName)) { set.status = 403; return { error: 'Token tidak memiliki akses ke project/env ini' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
@@ -188,15 +189,22 @@ export const projectsRouter = new Elysia()
   .get('/api/envman/projects/:slug/environments/:envName/vars/export', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access) { set.status = 403; return { error: 'No access' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
     if (caller.scopes.length > 0 && !tokenScopeAllows(caller.scopes, params.slug, params.envName)) { set.status = 403; return { error: 'Token tidak memiliki akses ke project/env ini' } }
     const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } }, include: { vars: { orderBy: { key: 'asc' } } } })
     if (!environment) { set.status = 404; return { error: 'Environment not found' } }
+    // Mask secret untuk VIEWER (konsisten dengan GET vars). Hanya EDITOR/OWNER yang bisa export secret plaintext.
+    const canReadSecrets = access === 'OWNER' || access === 'EDITOR'
     const vars = Object.fromEntries(
-      environment.vars.filter(v => !v.isDisabled).map(v => [v.key, v.isSecret ? decryptSecret(v.value) : v.value])
+      environment.vars.filter(v => !v.isDisabled).map(v => [
+        v.key,
+        v.isSecret
+          ? (canReadSecrets ? decryptSecret(v.value) : '***')
+          : v.value,
+      ])
     )
     return { vars }
       })
@@ -204,7 +212,7 @@ export const projectsRouter = new Elysia()
   .put('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     if (!caller.canWrite) { set.status = 403; return { error: 'Token is read-only' } }
     const body = await request.json().catch(() => null)
@@ -232,7 +240,7 @@ export const projectsRouter = new Elysia()
   .post('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     if (!caller.canWrite) { set.status = 403; return { error: 'Token is read-only' } }
     const body = await request.json().catch(() => null)
@@ -254,7 +262,7 @@ export const projectsRouter = new Elysia()
   .delete('/api/envman/projects/:slug/environments/:envName/vars/:key', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     if (!caller.canWrite) { set.status = 403; return { error: 'Token is read-only' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
@@ -270,7 +278,7 @@ export const projectsRouter = new Elysia()
   .patch('/api/envman/projects/:slug/environments/:envName/vars/:key/toggle', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Editor or Owner required' } }
     if (!caller.canWrite) { set.status = 403; return { error: 'Token is read-only' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
@@ -289,8 +297,12 @@ export const projectsRouter = new Elysia()
   .get('/api/envman/projects/:slug/diff/:env1/:env2', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
-    const access = await getProjectAccess(caller.userId, caller.role, params.slug)
-    if (!access) { set.status = 403; return { error: 'No access' } }
+    // Diff butuh akses ke kedua env — kedua-duanya wajib accessible
+    const [access1, access2] = await Promise.all([
+      getEnvironmentAccess(caller.userId, caller.role, params.slug, params.env1),
+      getEnvironmentAccess(caller.userId, caller.role, params.slug, params.env2),
+    ])
+    if (!access1 || !access2) { set.status = 403; return { error: 'No access' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
     const [e1, e2] = await Promise.all([

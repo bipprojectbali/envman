@@ -25,7 +25,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
-import { useSession } from '@/frontend/hooks/useAuth'
+import { useSession, hasCapability } from '@/frontend/hooks/useAuth'
 import {
   TbChevronRight,
   TbFolders,
@@ -68,7 +68,7 @@ function ProjectListPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: sessionData } = useSession()
-  const canCreateProject = sessionData?.user?.role !== 'USER'
+  const canCreateProject = hasCapability(sessionData?.user, 'project:create')
   const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false)
   const [form, setForm] = useState({ slug: '', name: '', description: '', tags: [] as string[] })
   const [slugManual, setSlugManual] = useState(false)

@@ -10,16 +10,26 @@ export interface User {
   email: string
   role: Role
   blocked: boolean
+  permissions: string[]
+}
+
+// SUPER_ADMIN bypass semua capability. Lainnya cek permissions array.
+export function hasCapability(user: User | null | undefined, cap: string): boolean {
+  if (!user) return false
+  if (user.role === 'SUPER_ADMIN') return true
+  return Array.isArray(user.permissions) && user.permissions.includes(cap)
 }
 
 export function getDefaultRoute(role: Role): string {
   switch (role) {
     case 'SUPER_ADMIN':
       return '/dev'
-    case 'ADMIN':
-      return '/dashboard'
     case 'QC':
       return '/dashboard'
+    case 'ADMIN':
+      // ADMIN landing di envmanager (collaboration tool main view).
+      // Dashboard (/dashboard) khusus QC ticket workflow.
+      return '/envmanager'
     default:
       return '/profile'
   }

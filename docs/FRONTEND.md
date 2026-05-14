@@ -15,8 +15,8 @@ React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Rou
 - `dev.tsx` — Dev console (SUPER_ADMIN): Overview, Users, App Logs, User Logs, Database, Project, Settings
 - `dashboard.tsx` — Admin dashboard (ADMIN+): Dashboard, Tickets, Analytics, Settings. Links to `/envmanager` and `/dev`.
 - `envmanager.tsx` — Env Manager layout (AppShell sidebar, `<Outlet />`). Auth: ADMIN+
-- `envmanager.index.tsx` — `/envmanager` project list
-- `envmanager.tokens.tsx` — `/envmanager/tokens` API token management
+- `envmanager.index.tsx` — `/envmanager` project list; search (nama/slug/desc), filter multi-tag, TagsInput di modal create, warna tag deterministik via hash; search+tagFilter persist ke `localStorage`
+- `envmanager.tokens.lazy.tsx` — `/envmanager/tokens` API token management; filter by project (`MultiSelect`)
 - `envmanager.connections.tsx` — `/envmanager/connections` global Portainer connection CRUD
 - `envmanager.$slug.tsx` — `/envmanager/:slug` pure `<Outlet />` layout
 - `envmanager.$slug.index.tsx` — project detail content (environments + members tabs, `?tab=`)
@@ -44,6 +44,8 @@ React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Rou
 **Dark/Light mode**: Auto from device preference. Toggle per-page: sidebar footer (dev/dashboard), top-right (landing/login/blocked), header (profile). Flash-free: `index.html` reads `localStorage` before first paint.
 
 **Logout**: Confirm modal via `@mantine/modals` on dev, dashboard, profile. Blocked page logs out directly.
+
+**Tag colors**: Warna tag digenerate deterministik dari nama tag via hash (tidak disimpan di DB). Fungsi `tagColor(tag)` ada di `envmanager.index.tsx` — reuse untuk fitur lain yang butuh warna tag konsisten. Badge pakai `variant="light" color={tagColor(tag)}`.
 
 ## Dev Console Visualizations
 
