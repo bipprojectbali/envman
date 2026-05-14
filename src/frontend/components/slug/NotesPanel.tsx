@@ -6,7 +6,9 @@ import {
   Card,
   CopyButton,
   Group,
+  Kbd,
   MultiSelect,
+  Paper,
   Select,
   SimpleGrid,
   Skeleton,
@@ -16,10 +18,12 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useLocalStorage, useMediaQuery } from '@mantine/hooks'
-import { useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useDebouncedValue, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { modals } from '@mantine/modals'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useRef, useState } from 'react'
 import {
+  TbAlertTriangle,
   TbBookmark,
   TbBookmarkFilled,
   TbCheck,
@@ -36,8 +40,6 @@ import {
   TbTrash,
   TbX,
 } from 'react-icons/tb'
-import { modals } from '@mantine/modals'
-import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 
@@ -61,7 +63,7 @@ export interface NoteCardProps {
   onEdit: () => void
   onDelete: () => void
   onPin: () => void
-  relTime: (iso: string) => string
+  onTagClick: (tag: string) => void
 }
 
 export interface NotesPanelProps {
@@ -78,8 +80,9 @@ export interface NotesPanelProps {
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return 'baru saja'
+  if (diff < 0 || Number.isNaN(diff)) return ''
+  if (diff < 60_000) return 'baru saja'
+  const m = Math.floor(diff / 60_000)
   if (m < 60) return `${m}m lalu`
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}j lalu`
@@ -88,22 +91,80 @@ function relTime(iso: string) {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function NoteCardActions({ note, canEdit, isOwner, myUserId, onView, onEdit, onDelete, onPin }: NoteCardProps) {
+function absoluteTime(iso: string) {
+  return new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+function stripMarkdown(body: string, max: number): string {
+  const cleaned = body
+    .replace(/```[\s\S]*?```/g, '[code]')
+    .replace(/`[^`]+`/g, m => m.slice(1, -1))
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '[image]')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/^\s*>\s*/gm, '')
+    .replace(/[*_~]/g, '')
+    .replace(/\n+/g, ' ')
+    .trim()
+  return cleaned.length > max ? `${cleaned.slice(0, max)}…` : cleaned || '—'
+}
+
+const HOVER_STYLES = `
+.envman-note-card {
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.15s ease;
+}
+.envman-note-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--mantine-color-violet-5);
+  box-shadow: var(--mantine-shadow-sm);
+}
+.envman-note-card:focus-visible {
+  outline: 2px solid var(--mantine-color-violet-5);
+  outline-offset: 2px;
+  border-color: var(--mantine-color-violet-5);
+}
+.envman-note-pinned {
+  background: linear-gradient(180deg, var(--mantine-color-yellow-light) 0%, transparent 24px);
+}
+.envman-note-tag {
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.envman-note-tag:hover {
+  transform: scale(1.05);
+}
+`
+
+function NoteCardActions({ note, canEdit, isOwner, myUserId, onView, onEdit, onDelete, onPin }: Omit<NoteCardProps, 'onTagClick'>) {
   const canEditNote = isOwner || (canEdit && note.author.id === myUserId)
   return (
     <Group gap={4} wrap="nowrap" onClick={e => e.stopPropagation()}>
       <CopyButton value={note.body} timeout={2000}>
         {({ copied, copy }) => (
-          <Tooltip label={copied ? 'Tersalin!' : 'Copy'} position="left">
-            <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={e => { e.stopPropagation(); copy() }}>
+          <Tooltip label={copied ? 'Tersalin!' : 'Salin isi note'} position="left">
+            <ActionIcon
+              size="sm" variant="subtle"
+              color={copied ? 'teal' : 'gray'}
+              aria-label="Salin isi note"
+              onClick={e => { e.stopPropagation(); copy() }}
+            >
               {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
             </ActionIcon>
           </Tooltip>
         )}
       </CopyButton>
-      {(isOwner || (canEdit && note.author.id === myUserId)) && (
+      {canEditNote && (
         <Tooltip label={note.pinned ? 'Unpin' : 'Pin'} position="left">
-          <ActionIcon size="sm" variant="subtle" color={note.pinned ? 'yellow' : 'gray'} onClick={e => { e.stopPropagation(); onPin() }}>
+          <ActionIcon
+            size="sm" variant="subtle"
+            color={note.pinned ? 'yellow' : 'gray'}
+            aria-label={note.pinned ? 'Lepas pin note' : 'Pin note'}
+            onClick={e => { e.stopPropagation(); onPin() }}
+          >
             {note.pinned ? <TbBookmarkFilled size={13} /> : <TbBookmark size={13} />}
           </ActionIcon>
         </Tooltip>
@@ -111,113 +172,191 @@ function NoteCardActions({ note, canEdit, isOwner, myUserId, onView, onEdit, onD
       {canEditNote && (
         <>
           <Tooltip label="Edit" position="left">
-            <ActionIcon size="sm" variant="subtle" color="blue" onClick={e => { e.stopPropagation(); onEdit() }}>
+            <ActionIcon
+              size="sm" variant="subtle" color="blue"
+              aria-label="Edit note"
+              onClick={e => { e.stopPropagation(); onEdit() }}
+            >
               <TbEdit size={13} />
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Hapus" position="left">
-            <ActionIcon size="sm" variant="subtle" color="red" onClick={e => { e.stopPropagation(); onDelete() }}>
+            <ActionIcon
+              size="sm" variant="subtle" color="red"
+              aria-label="Hapus note"
+              onClick={e => { e.stopPropagation(); onDelete() }}
+            >
               <TbTrash size={13} />
             </ActionIcon>
           </Tooltip>
         </>
       )}
-      <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); onView() }}>
-        <TbChevronRight size={13} />
-      </ActionIcon>
+      <Tooltip label="Buka note">
+        <ActionIcon
+          size="sm" variant="subtle" color="gray"
+          aria-label="Buka note"
+          onClick={e => { e.stopPropagation(); onView() }}
+        >
+          <TbChevronRight size={13} />
+        </ActionIcon>
+      </Tooltip>
     </Group>
   )
 }
 
-function NoteCardList(props: NoteCardProps) {
-  const { note, onView } = props
+function NoteCardList({ note, canEdit, isOwner, myUserId, onView, onEdit, onDelete, onPin, onTagClick }: NoteCardProps) {
+  const wasEdited = new Date(note.updatedAt).getTime() - new Date(note.createdAt).getTime() > 60_000
   return (
     <Card
       withBorder
       p="sm"
-      style={{ cursor: 'pointer', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
+      className={`envman-note-card ${note.pinned ? 'envman-note-pinned' : ''}`}
+      role="article"
+      tabIndex={0}
+      aria-label={`Note: ${note.title}`}
       onClick={onView}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
+      style={{ cursor: 'pointer', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
     >
       <Group justify="space-between" wrap="nowrap" gap="xs">
         <Box style={{ flex: 1, minWidth: 0 }}>
           <Group gap="xs" mb={2} wrap="nowrap">
             {note.pinned && <TbBookmarkFilled size={14} color="var(--mantine-color-yellow-5)" style={{ flexShrink: 0 }} />}
-            <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {note.title}
             </Text>
           </Group>
-          <Text size="xs" c="dimmed" lineClamp={1} style={{ fontFamily: 'monospace' }}>
-            {note.body.replace(/#{1,6}\s|[*_`>-]/g, '').slice(0, 120) || '—'}
+          <Text size="xs" c="dimmed" lineClamp={1}>
+            {stripMarkdown(note.body, 140)}
           </Text>
-          <Group gap={4} mt={4} wrap="wrap">
-            {note.tags.map(t => <Badge key={t} size="xs" variant="outline" color="violet">{t}</Badge>)}
-            <Text size="xs" c="dimmed">{note.author.name} · {relTime(note.updatedAt)}</Text>
+          <Group gap={4} mt={4} wrap="wrap" align="center">
+            {note.tags.map(t => (
+              <Badge
+                key={t} size="xs" variant="outline" color="violet"
+                className="envman-note-tag"
+                onClick={e => { e.stopPropagation(); onTagClick(t) }}
+              >
+                {t}
+              </Badge>
+            ))}
+            <Tooltip label={`${wasEdited ? 'Diedit' : 'Dibuat'} ${absoluteTime(note.updatedAt)} oleh ${note.author.name}`}>
+              <Text size="xs" c="dimmed">
+                {note.author.name} · {wasEdited ? 'edit ' : ''}{relTime(note.updatedAt)}
+              </Text>
+            </Tooltip>
           </Group>
         </Box>
-        <NoteCardActions {...props} />
+        <NoteCardActions
+          note={note} canEdit={canEdit} isOwner={isOwner} myUserId={myUserId}
+          onView={onView} onEdit={onEdit} onDelete={onDelete} onPin={onPin}
+        />
       </Group>
     </Card>
   )
 }
 
-function NoteCardGrid(props: NoteCardProps) {
-  const { note, onView } = props
+function NoteCardGrid({ note, canEdit, isOwner, myUserId, onView, onEdit, onDelete, onPin, onTagClick }: NoteCardProps) {
+  const wasEdited = new Date(note.updatedAt).getTime() - new Date(note.createdAt).getTime() > 60_000
   return (
     <Card
       withBorder
       p="sm"
+      className={`envman-note-card ${note.pinned ? 'envman-note-pinned' : ''}`}
+      role="article"
+      tabIndex={0}
+      aria-label={`Note: ${note.title}`}
+      onClick={onView}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
       style={{
         cursor: 'pointer',
         borderTop: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined,
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 140,
+        minHeight: 156,
       }}
-      onClick={onView}
     >
       <Group justify="space-between" wrap="nowrap" mb={6} gap="xs">
         <Group gap={4} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
           {note.pinned && <TbBookmarkFilled size={12} color="var(--mantine-color-yellow-5)" style={{ flexShrink: 0 }} />}
-          <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {note.title}
           </Text>
         </Group>
-        <NoteCardActions {...props} />
+        <NoteCardActions
+          note={note} canEdit={canEdit} isOwner={isOwner} myUserId={myUserId}
+          onView={onView} onEdit={onEdit} onDelete={onDelete} onPin={onPin}
+        />
       </Group>
-      <Text size="xs" c="dimmed" lineClamp={3} style={{ fontFamily: 'monospace', flex: 1 }}>
-        {note.body.replace(/#{1,6}\s|[*_`>-]/g, '').replace(/\n/g, ' ').slice(0, 200) || '—'}
+      <Text size="xs" c="dimmed" lineClamp={3} lh={1.5} style={{ flex: 1 }}>
+        {stripMarkdown(note.body, 240)}
       </Text>
-      <Group gap={4} mt="xs" wrap="wrap" style={{ marginTop: 'auto' }}>
-        {note.tags.slice(0, 3).map(t => <Badge key={t} size="xs" variant="outline" color="violet">{t}</Badge>)}
-        {note.tags.length > 3 && <Text size="xs" c="dimmed">+{note.tags.length - 3}</Text>}
-        <Text size="xs" c="dimmed" ml="auto">{relTime(note.updatedAt)}</Text>
+      <Group gap={4} mt="xs" wrap="wrap" style={{ marginTop: 'auto' }} align="center">
+        {note.tags.slice(0, 3).map(t => (
+          <Badge
+            key={t} size="xs" variant="outline" color="violet"
+            className="envman-note-tag"
+            onClick={e => { e.stopPropagation(); onTagClick(t) }}
+          >
+            {t}
+          </Badge>
+        ))}
+        {note.tags.length > 3 && (
+          <Tooltip label={note.tags.slice(3).join(', ')}>
+            <Text size="xs" c="dimmed">+{note.tags.length - 3}</Text>
+          </Tooltip>
+        )}
+        <Tooltip label={`${wasEdited ? 'Diedit' : 'Dibuat'} ${absoluteTime(note.updatedAt)} oleh ${note.author.name}`}>
+          <Text size="xs" c="dimmed" ml="auto">
+            {wasEdited ? 'edit ' : ''}{relTime(note.updatedAt)}
+          </Text>
+        </Tooltip>
       </Group>
     </Card>
   )
 }
 
-export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, openModal, setOpenModal, viewNote, setViewNote }: NotesPanelProps) {
+export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpenModal, setViewNote }: NotesPanelProps) {
   const qc = useQueryClient()
   const isMobile = useMediaQuery('(max-width: 48em)')
+
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState<string[]>([])
   const [sort, setSort] = useState<'updated' | 'created' | 'title'>('updated')
   const [view, setView] = useLocalStorage<'list' | 'grid'>({ key: 'envman:notes:view', defaultValue: 'list' })
+  const [debouncedSearch] = useDebouncedValue(search, 150)
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  const { data, isLoading } = useQuery({
+  useHotkeys([
+    ['/', () => {
+      searchRef.current?.focus()
+      searchRef.current?.select()
+    }],
+  ])
+
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['envman', 'notes', slug],
     queryFn: () => apiFetch<{ notes: Note[] }>(`/api/envman/projects/${slug}/notes`),
     refetchInterval: 30000,
   })
   const notes: Note[] = data?.notes ?? []
 
-  const allTags = useMemo(() => [...new Set(notes.flatMap(n => n.tags))].sort(), [notes])
+  const allTags = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const n of notes) for (const t of n.tags) counts.set(t, (counts.get(t) ?? 0) + 1)
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, count]) => ({ value, label: `${value} (${count})` }))
+  }, [notes])
 
   const filtered = useMemo(() => {
     let list = [...notes]
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(n => n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q) || n.tags.some(t => t.toLowerCase().includes(q)))
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase()
+      list = list.filter(n =>
+        n.title.toLowerCase().includes(q) ||
+        n.body.toLowerCase().includes(q) ||
+        n.tags.some(t => t.toLowerCase().includes(q)),
+      )
     }
     if (tagFilter.length > 0) {
       list = list.filter(n => tagFilter.every(t => n.tags.includes(t)))
@@ -229,7 +368,16 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, openMo
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     })
     return list
-  }, [notes, search, tagFilter, sort])
+  }, [notes, debouncedSearch, tagFilter, sort])
+
+  const pinnedCount = notes.filter(n => n.pinned).length
+  const myCount = notes.filter(n => n.author.id === myUserId).length
+  const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0
+
+  const addTagFilter = (tag: string) =>
+    setTagFilter(prev => prev.includes(tag) ? prev : [...prev, tag])
+
+  const resetFilter = () => { setSearch(''); setTagFilter([]) }
 
   const togglePin = async (note: Note) => {
     await qc.cancelQueries({ queryKey: ['envman', 'notes', slug] })
@@ -251,106 +399,220 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, openMo
 
   const deleteNote = (note: Note) =>
     modals.openConfirmModal({
-      title: 'Hapus note',
-      children: <Text size="sm">Hapus note <strong>{note.title}</strong>?</Text>,
+      title: (
+        <Group gap="xs">
+          <ThemeIcon size="sm" variant="light" color="red" radius="md">
+            <TbTrash size={13} />
+          </ThemeIcon>
+          <Text fw={600} size="sm">Hapus note</Text>
+        </Group>
+      ),
+      children: (
+        <Stack gap="xs">
+          <Text size="sm">
+            Hapus note <strong>{note.title}</strong>?
+          </Text>
+          {note.body && (
+            <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+              <Text size="xs" c="dimmed" lineClamp={3}>
+                {stripMarkdown(note.body, 200)}
+              </Text>
+            </Paper>
+          )}
+          <Text size="xs" c="dimmed">
+            Dibuat {absoluteTime(note.createdAt)} oleh {note.author.name}.
+            Tindakan ini tidak dapat dibatalkan.
+          </Text>
+        </Stack>
+      ),
       labels: { confirm: 'Hapus', cancel: 'Batal' },
-      confirmProps: { color: 'red' },
+      confirmProps: { color: 'red', leftSection: <TbTrash size={13} /> },
       onConfirm: () =>
         apiFetch(`/api/envman/projects/${slug}/notes/${note.id}`, { method: 'DELETE' })
           .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'notes', slug] }); notifyOk('Note dihapus') })
           .catch(notifyErr),
     })
 
-  const canEditNote = (note: Note) => isOwner || (canEdit && note.author.id === myUserId)
-
   return (
     <Stack gap="sm">
-      {/* ─── Toolbar ────────────────────────── */}
-      <Group gap="xs" wrap="wrap">
-        <TextInput
-          size="xs"
-          placeholder="Cari notes..."
-          leftSection={<TbSearch size={13} />}
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
-          style={{ flex: 1, minWidth: 120 }}
-        />
-        {!isMobile && allTags.length > 0 && (
-          <MultiSelect
-            size="xs"
-            placeholder="Filter tag..."
-            data={allTags}
-            value={tagFilter}
-            onChange={setTagFilter}
-            leftSection={<TbTag size={13} />}
-            clearable
-            maw={180}
-            style={{ flex: 1 }}
-          />
-        )}
-        <Select
-          size="xs"
-          w={isMobile ? 115 : 130}
-          leftSection={<TbSortAscending size={13} />}
-          value={sort}
-          onChange={v => setSort((v ?? 'updated') as typeof sort)}
-          data={[
-            { label: 'Terbaru edit', value: 'updated' },
-            { label: 'Terbaru buat', value: 'created' },
-            { label: 'Judul A-Z', value: 'title' },
-          ]}
-          allowDeselect={false}
-        />
-        <Group gap={2} wrap="nowrap">
-          <ActionIcon
-            size="sm"
-            variant={view === 'list' ? 'filled' : 'subtle'}
-            color={view === 'list' ? 'violet' : 'gray'}
-            onClick={() => setView('list')}
-          >
-            <TbLayoutList size={14} />
-          </ActionIcon>
-          <ActionIcon
-            size="sm"
-            variant={view === 'grid' ? 'filled' : 'subtle'}
-            color={view === 'grid' ? 'violet' : 'gray'}
-            onClick={() => setView('grid')}
-          >
-            <TbLayoutGrid size={14} />
-          </ActionIcon>
-        </Group>
-        {canEdit && canCreate && (
-          <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
-            New Note
-          </Button>
-        )}
-      </Group>
+      {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
+      <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
-      {/* ─── Note list ───────────────────── */}
-      {isLoading ? (
-        <Stack gap="xs">
-          {[1, 2, 3].map(i => <Skeleton key={i} height={72} radius="md" />)}
-        </Stack>
-      ) : notes.length === 0 ? (
-        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
-          <ThemeIcon size={40} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
-            <TbNote size={20} />
+      {/* ─── Stats inline ───────────────────── */}
+      {!isLoading && !isError && notes.length > 0 && (
+        <Group gap="md" mb={-4}>
+          <Text size="xs" c="dimmed">
+            <Text component="span" fw={600} c="default">{notes.length}</Text> note
+          </Text>
+          {pinnedCount > 0 && (
+            <Group gap={4}>
+              <TbBookmarkFilled size={11} color="var(--mantine-color-yellow-5)" />
+              <Text size="xs" c="dimmed">
+                <Text component="span" fw={600} c="default">{pinnedCount}</Text> disematkan
+              </Text>
+            </Group>
+          )}
+          {myCount > 0 && (
+            <Text size="xs" c="dimmed">
+              <Text component="span" fw={600} c="default">{myCount}</Text> saya buat
+            </Text>
+          )}
+        </Group>
+      )}
+
+      {/* ─── Toolbar ────────────────────────── */}
+      {!isError && (notes.length > 0 || isLoading) && (
+        <Paper withBorder radius="md" p="xs">
+          <Group gap="xs" wrap="wrap">
+            <TextInput
+              ref={searchRef}
+              size="xs"
+              placeholder="Cari judul, isi, atau tag..."
+              leftSection={<TbSearch size={13} />}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              rightSection={
+                search ? (
+                  <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
+                    <TbX size={11} />
+                  </ActionIcon>
+                ) : (
+                  <Tooltip label="Tekan / untuk focus">
+                    <Kbd size="xs">/</Kbd>
+                  </Tooltip>
+                )
+              }
+              rightSectionWidth={32}
+              style={{ flex: '1 1 180px', minWidth: 0 }}
+            />
+            {!isMobile && allTags.length > 0 && (
+              <MultiSelect
+                size="xs"
+                placeholder="Tag"
+                data={allTags}
+                value={tagFilter}
+                onChange={setTagFilter}
+                leftSection={<TbTag size={13} />}
+                clearable
+                searchable
+                hidePickedOptions
+                w={170}
+                maxDropdownHeight={240}
+              />
+            )}
+            <Select
+              size="xs"
+              w={isMobile ? 130 : 150}
+              leftSection={<TbSortAscending size={13} />}
+              value={sort}
+              onChange={v => setSort((v ?? 'updated') as typeof sort)}
+              data={[
+                { label: 'Terbaru edit', value: 'updated' },
+                { label: 'Terbaru buat', value: 'created' },
+                { label: 'Judul A→Z', value: 'title' },
+              ]}
+              allowDeselect={false}
+            />
+            <Group gap={2} wrap="nowrap">
+              <Tooltip label="Tampilan list">
+                <ActionIcon
+                  size="sm"
+                  variant={view === 'list' ? 'filled' : 'subtle'}
+                  color={view === 'list' ? 'violet' : 'gray'}
+                  aria-label="Tampilan list"
+                  onClick={() => setView('list')}
+                >
+                  <TbLayoutList size={14} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Tampilan grid">
+                <ActionIcon
+                  size="sm"
+                  variant={view === 'grid' ? 'filled' : 'subtle'}
+                  color={view === 'grid' ? 'violet' : 'gray'}
+                  aria-label="Tampilan grid"
+                  onClick={() => setView('grid')}
+                >
+                  <TbLayoutGrid size={14} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+            {canEdit && canCreate && (
+              <Button type="button" size="xs" color="violet" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
+                New Note
+              </Button>
+            )}
+          </Group>
+          {hasFilter && (
+            <Group justify="space-between" mt="xs" gap="xs" wrap="nowrap">
+              <Text size="xs" c="dimmed">
+                {filtered.length === notes.length
+                  ? `Menampilkan semua ${notes.length} note`
+                  : `${filtered.length} dari ${notes.length} note`}
+              </Text>
+              <Button
+                size="compact-xs" variant="subtle" color="gray"
+                leftSection={<TbX size={11} />}
+                onClick={resetFilter}
+              >
+                Reset filter
+              </Button>
+            </Group>
+          )}
+        </Paper>
+      )}
+
+      {/* ─── Error state ────────────────────── */}
+      {isError && (
+        <Card withBorder p="xl" ta="center" style={{ borderColor: 'var(--mantine-color-red-5)' }}>
+          <ThemeIcon size={44} radius="xl" variant="light" color="red" mx="auto" mb="sm">
+            <TbAlertTriangle size={22} />
           </ThemeIcon>
-          <Text fw={500} mb={4}>Belum ada notes</Text>
-          <Text size="sm" c="dimmed" mb="md">Buat catatan dalam Markdown untuk project ini.</Text>
+          <Text fw={600} mb={4}>Gagal memuat notes</Text>
+          <Text size="sm" c="dimmed" mb="md">
+            {(error as Error)?.message ?? 'Terjadi kesalahan saat memuat notes.'}
+          </Text>
+          <Button size="xs" variant="light" color="red" onClick={() => refetch()}>
+            Coba lagi
+          </Button>
+        </Card>
+      )}
+
+      {/* ─── Note list ────────────────────── */}
+      {isLoading ? (
+        view === 'grid' ? (
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
+            {[0, 1, 2, 3, 4, 5].map(i => <Skeleton key={i} height={156} radius="md" />)}
+          </SimpleGrid>
+        ) : (
+          <Stack gap="xs">
+            {[0, 1, 2, 3].map(i => <Skeleton key={i} height={76} radius="md" />)}
+          </Stack>
+        )
+      ) : !isError && notes.length === 0 ? (
+        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+          <ThemeIcon size={48} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
+            <TbNote size={24} />
+          </ThemeIcon>
+          <Text fw={600} mb={4}>Belum ada notes</Text>
+          <Text size="sm" c="dimmed" mb="md" maw={400} mx="auto">
+            Notes untuk dokumentasi project: deployment instructions, troubleshooting log,
+            runbook, atau apapun yang berguna untuk tim. Mendukung Markdown.
+          </Text>
           {canEdit && canCreate && (
-            <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
+            <Button type="button" size="xs" color="violet" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
               Buat Note Pertama
             </Button>
           )}
         </Card>
-      ) : filtered.length === 0 ? (
+      ) : !isError && filtered.length === 0 ? (
         <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
-          <Text size="sm" c="dimmed">Tidak ada note yang cocok.</Text>
-          <Button type="button" size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setTagFilter([]) }}>Reset Filter</Button>
+          <Text size="sm" c="dimmed" mb="xs">Tidak ada note yang cocok dengan filter saat ini.</Text>
+          <Button type="button" size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={resetFilter}>
+            Reset filter
+          </Button>
         </Card>
-      ) : view === 'list' ? (
+      ) : !isError && view === 'list' ? (
         <Stack gap="xs">
           {filtered.map(note => (
             <NoteCardList
@@ -363,11 +625,11 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, openMo
               onEdit={() => setOpenModal(note)}
               onDelete={() => deleteNote(note)}
               onPin={() => togglePin(note)}
-              relTime={relTime}
+              onTagClick={addTagFilter}
             />
           ))}
         </Stack>
-      ) : (
+      ) : !isError ? (
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
           {filtered.map(note => (
             <NoteCardGrid
@@ -380,11 +642,11 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, openMo
               onEdit={() => setOpenModal(note)}
               onDelete={() => deleteNote(note)}
               onPin={() => togglePin(note)}
-              relTime={relTime}
+              onTagClick={addTagFilter}
             />
           ))}
         </SimpleGrid>
-      )}
+      ) : null}
     </Stack>
   )
 }

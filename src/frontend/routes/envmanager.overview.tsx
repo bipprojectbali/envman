@@ -1,11 +1,11 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
   Card,
   Code,
-  Divider,
   Group,
   SimpleGrid,
   Skeleton,
@@ -17,14 +17,17 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
+  TbAlertTriangle,
   TbArrowRight,
   TbBrandGithub,
   TbChevronRight,
   TbClock,
+  TbDashboard,
   TbFileCode,
   TbGlobe,
   TbKey,
   TbLock,
+  TbLockOpen,
   TbNote,
   TbPlugConnected,
   TbPlus,
@@ -50,6 +53,32 @@ function relativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('id-ID')
 }
 
+function absoluteTime(dateStr: string) {
+  return new Date(dateStr).toLocaleString('id-ID', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+const HOVER_STYLES = `
+.envman-stat-card,
+.envman-overview-row {
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.15s ease;
+}
+.envman-stat-card.is-clickable:hover,
+.envman-overview-row:hover {
+  transform: translateY(-1px);
+  border-color: var(--mantine-color-violet-5);
+  box-shadow: var(--mantine-shadow-sm);
+}
+.envman-stat-card.is-clickable:focus-visible,
+.envman-overview-row:focus-visible {
+  outline: 2px solid var(--mantine-color-violet-5);
+  outline-offset: 2px;
+  border-color: var(--mantine-color-violet-5);
+}
+`
+
 const envColor = (name: string) => {
   if (name === 'production' || name === 'prod') return 'red'
   if (name === 'staging' || name === 'stg') return 'orange'
@@ -74,17 +103,22 @@ function StatCard({
   loading?: boolean
   onClick?: () => void
 }) {
+  const clickable = !!onClick
   return (
     <Card
-      withBorder p={{ base: 'sm', sm: 'md' }} radius="md"
+      withBorder
+      p={{ base: 'sm', sm: 'md' }}
+      radius="md"
+      className={`envman-stat-card ${clickable ? 'is-clickable' : ''}`}
+      role={clickable ? 'link' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      aria-label={clickable ? `Buka ${label}` : undefined}
+      onClick={onClick}
+      onKeyDown={clickable ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } } : undefined}
       style={{
-        cursor: onClick ? 'pointer' : undefined,
-        transition: 'box-shadow 0.15s, transform 0.15s',
+        cursor: clickable ? 'pointer' : undefined,
         borderLeft: `3px solid var(--mantine-color-${color}-5)`,
       }}
-      onClick={onClick}
-      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--mantine-shadow-sm)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' } }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = ''; (e.currentTarget as HTMLElement).style.transform = '' }}
     >
       <Group justify="space-between" align="flex-start" mb={{ base: 6, sm: 'sm' }}>
         <ThemeIcon size={36} radius="md" variant="light" color={color}>
@@ -96,7 +130,10 @@ function StatCard({
           <Text fw={800} size="xl" lh={1}>{value}</Text>
         )}
       </Group>
-      <Text size="sm" fw={600}>{label}</Text>
+      <Group justify="space-between" align="center">
+        <Text size="sm" fw={600}>{label}</Text>
+        {clickable && <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)' }} />}
+      </Group>
       {sub && <Text size="xs" c="dimmed" mt={2} lineClamp={1}>{sub}</Text>}
     </Card>
   )
@@ -105,7 +142,7 @@ function StatCard({
 function OverviewPage() {
   const navigate = useNavigate()
 
-  const { data: projectsData, isLoading: loadingProjects, refetch: refetchProjects } = useQuery({
+  const { data: projectsData, isLoading: loadingProjects, isError: errorProjects, refetch: refetchProjects, dataUpdatedAt } = useQuery({
     queryKey: ['envman', 'projects'],
     queryFn: () => apiFetch('/api/envman/projects'),
     staleTime: 5 * 60_000,
@@ -165,18 +202,43 @@ function OverviewPage() {
 
   return (
     <Box>
+      {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
+      <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
+
       {/* ─── Header ─────────────────────── */}
-      <Group justify="space-between" mb={{ base: 'md', sm: 'xl' }}>
-        <Box>
-          <Text fw={700} size="lg">Overview</Text>
-          <Text size="xs" c="dimmed" visibleFrom="xs">Ringkasan seluruh resources yang kamu kelola</Text>
-        </Box>
-        <Tooltip label="Refresh">
-          <ActionIcon variant="subtle" color="gray" loading={isLoading} onClick={() => refetchProjects()}>
+      <Group justify="space-between" mb={{ base: 'md', sm: 'xl' }} wrap="nowrap" align="flex-start">
+        <Group gap="sm" style={{ minWidth: 0 }}>
+          <ThemeIcon size={38} radius="md" variant="light" color="violet">
+            <TbDashboard size={20} />
+          </ThemeIcon>
+          <Box style={{ minWidth: 0 }}>
+            <Text fw={700} size="lg" lh={1.2}>Overview</Text>
+            <Tooltip label={dataUpdatedAt ? `Diperbarui ${absoluteTime(new Date(dataUpdatedAt).toISOString())}` : 'Ringkasan seluruh resources'}>
+              <Text size="xs" c="dimmed">
+                Ringkasan seluruh resources yang kamu kelola
+                {dataUpdatedAt > 0 && <> · {relativeTime(new Date(dataUpdatedAt).toISOString())}</>}
+              </Text>
+            </Tooltip>
+          </Box>
+        </Group>
+        <Tooltip label="Refresh data">
+          <ActionIcon
+            size="lg"
+            variant="default"
+            aria-label="Refresh data"
+            loading={isLoading}
+            onClick={() => refetchProjects()}
+          >
             <TbRefresh size={16} />
           </ActionIcon>
         </Tooltip>
       </Group>
+
+      {errorProjects && (
+        <Alert color="red" icon={<TbAlertTriangle size={14} />} mb="md" withCloseButton onClose={() => refetchProjects()}>
+          <Text size="xs">Gagal memuat data project. <Text component="span" td="underline" style={{ cursor: 'pointer' }} onClick={() => refetchProjects()}>Coba lagi</Text></Text>
+        </Alert>
+      )}
 
       {/* ─── Stats cards ────────────────── */}
       <SimpleGrid cols={{ base: 2, sm: 3, md: 6 }} spacing={{ base: 'xs', sm: 'sm' }} mb={{ base: 'md', sm: 'xl' }}>
@@ -271,13 +333,19 @@ function OverviewPage() {
             <Stack gap="xs">
               {recentProjects.map((p: any) => {
                 const envs: any[] = p.environments ?? []
+                const goTo = () => navigate({ to: '/envmanager/$slug', params: { slug: p.slug }, search: { tab: 'environments' } })
                 return (
                   <Group
                     key={p.slug}
                     justify="space-between"
                     p="sm"
+                    className="envman-overview-row"
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`Buka project ${p.name}`}
+                    onClick={goTo}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTo() } }}
                     style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
-                    onClick={() => navigate({ to: '/envmanager/$slug', params: { slug: p.slug }, search: { tab: 'environments' } })}
                   >
                     <Box style={{ flex: 1, minWidth: 0 }}>
                       <Group gap="xs" mb={4}>
@@ -344,8 +412,13 @@ function OverviewPage() {
                     key={g.id}
                     justify="space-between"
                     p="xs"
-                    style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
+                    className="envman-overview-row"
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`Buka gist ${g.title}`}
                     onClick={() => navigate({ to: '/envmanager/gists' })}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate({ to: '/envmanager/gists' }) } }}
+                    style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
                   >
                     <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
                       <TbFileCode size={14} style={{ color: 'var(--mantine-color-grape-5)', flexShrink: 0 }} />
@@ -417,15 +490,19 @@ function OverviewPage() {
                     {recentTokens.map((t: any) => (
                       <Group key={t.id} justify="space-between" px="xs">
                         <Group gap="xs">
-                          <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light">
-                            {t.canWrite ? 'rw' : 'ro'}
-                          </Badge>
-                          <Text size="xs" fw={500}>{t.name}</Text>
+                          <Tooltip label={t.canWrite ? 'Read-write' : 'Read-only'}>
+                            <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light" leftSection={t.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
+                              {t.canWrite ? 'rw' : 'ro'}
+                            </Badge>
+                          </Tooltip>
+                          <Text size="xs" fw={500} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>{t.name}</Text>
                         </Group>
-                        <Group gap="xs">
-                          <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                          <Text size="xs" c="dimmed">{relativeTime(t.lastUsedAt)}</Text>
-                        </Group>
+                        <Tooltip label={`Terakhir dipakai ${absoluteTime(t.lastUsedAt)}`}>
+                          <Group gap="xs">
+                            <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
+                            <Text size="xs" c="dimmed">{relativeTime(t.lastUsedAt)}</Text>
+                          </Group>
+                        </Tooltip>
                       </Group>
                     ))}
                   </>

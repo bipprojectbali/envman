@@ -8,6 +8,7 @@ import {
   CopyButton,
   Divider,
   Group,
+  Kbd,
   Modal,
   MultiSelect,
   Paper,
@@ -24,11 +25,11 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { useDebouncedValue, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { apiFetch } from '@/frontend/lib/api'
 import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
 import { useSession, hasCapability } from '@/frontend/hooks/useAuth'
@@ -139,6 +140,36 @@ function relTime(iso: string) {
   if (d < 30) return `${d}h lalu`
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 }
+
+function absoluteTime(iso: string) {
+  return new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+const HOVER_STYLES = `
+.envman-gist-card {
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.15s ease;
+}
+.envman-gist-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--mantine-color-violet-5);
+  box-shadow: var(--mantine-shadow-sm);
+}
+.envman-gist-card:focus-visible {
+  outline: 2px solid var(--mantine-color-violet-5);
+  outline-offset: 2px;
+  border-color: var(--mantine-color-violet-5);
+}
+.envman-gist-tag {
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.envman-gist-tag:hover {
+  transform: scale(1.05);
+}
+`
 
 // ─── GistForm ─────────────────────────────────────────────────────────────────
 
@@ -525,40 +556,57 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
 // ─── GistCard ─────────────────────────────────────────────────────────────────
 
 function GistCard({
-  gist, isOwner, onEdit, onDelete, onView,
+  gist, isOwner, onEdit, onDelete, onView, onTagClick,
 }: {
   gist: Gist; isOwner: boolean
   onEdit: () => void; onDelete: () => void; onView: () => void
+  onTagClick?: (tag: string) => void
 }) {
   const firstFile = gist.files[0]
   return (
-    <Card withBorder p="sm" style={{ cursor: 'pointer' }} onClick={onView}>
+    <Card
+      withBorder
+      p="sm"
+      className="envman-gist-card"
+      role="article"
+      tabIndex={0}
+      aria-label={`Buka gist ${gist.title}`}
+      onClick={onView}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
+      style={{ cursor: 'pointer' }}
+    >
       <Group justify="space-between" wrap="nowrap" mb={4}>
         <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-          <ThemeIcon size={24} radius="sm" variant="light" color="violet">
-            <TbBrandGithub size={14} />
+          <ThemeIcon size={28} radius="sm" variant="light" color="violet">
+            <TbBrandGithub size={16} />
           </ThemeIcon>
           <Box style={{ flex: 1, minWidth: 0 }}>
-            <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {gist.title}
-            </Text>
+            <Group gap={6} wrap="nowrap">
+              <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {gist.title}
+              </Text>
+              <Tooltip label={gist.isPublic ? 'Public — semua user bisa lihat' : 'Private — hanya kamu yang bisa lihat'}>
+                <Badge size="xs" variant="light" color={gist.isPublic ? 'teal' : 'gray'} leftSection={gist.isPublic ? <TbGlobe size={9} /> : <TbLock size={9} />}>
+                  {gist.isPublic ? 'public' : 'private'}
+                </Badge>
+              </Tooltip>
+            </Group>
             {gist.description && (
-              <Text size="xs" c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Text size="xs" c="dimmed" lineClamp={1}>
                 {gist.description}
               </Text>
             )}
           </Box>
         </Group>
         <Group gap={4} wrap="nowrap" onClick={e => e.stopPropagation()}>
-          <Tooltip label={gist.isPublic ? 'Public' : 'Private'} position="left">
-            <Box c={gist.isPublic ? 'teal' : 'dimmed'}>
-              {gist.isPublic ? <TbGlobe size={14} /> : <TbLock size={14} />}
-            </Box>
-          </Tooltip>
           <CopyButton value={gist.files.map(f => `// ${f.filename}\n${f.content}`).join('\n\n')} timeout={2000}>
             {({ copied, copy }) => (
-              <Tooltip label={copied ? 'Tersalin!' : 'Copy semua'} position="left">
-                <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={e => { e.stopPropagation(); copy() }}>
+              <Tooltip label={copied ? 'Tersalin!' : 'Salin semua file'} position="left">
+                <ActionIcon
+                  size="sm" variant="subtle" color={copied ? 'teal' : 'gray'}
+                  aria-label="Salin semua file gist"
+                  onClick={e => { e.stopPropagation(); copy() }}
+                >
                   {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
                 </ActionIcon>
               </Tooltip>
@@ -567,12 +615,20 @@ function GistCard({
           {isOwner && (
             <>
               <Tooltip label="Edit" position="left">
-                <ActionIcon size="sm" variant="subtle" color="blue" onClick={e => { e.stopPropagation(); onEdit() }}>
+                <ActionIcon
+                  size="sm" variant="subtle" color="blue"
+                  aria-label="Edit gist"
+                  onClick={e => { e.stopPropagation(); onEdit() }}
+                >
                   <TbEdit size={13} />
                 </ActionIcon>
               </Tooltip>
               <Tooltip label="Hapus" position="left">
-                <ActionIcon size="sm" variant="subtle" color="red" onClick={e => { e.stopPropagation(); onDelete() }}>
+                <ActionIcon
+                  size="sm" variant="subtle" color="red"
+                  aria-label="Hapus gist"
+                  onClick={e => { e.stopPropagation(); onDelete() }}
+                >
                   <TbTrash size={13} />
                 </ActionIcon>
               </Tooltip>
@@ -588,21 +644,38 @@ function GistCard({
         </Code>
       )}
 
-      <Group gap={4} wrap="wrap">
-        {gist.files.map(f => (
-          <Badge key={f.filename} size="xs" variant="dot" color={getLangColor(f.language)}>
-            {f.filename}
+      <Group gap={4} wrap="wrap" align="center">
+        {gist.files.slice(0, 3).map(f => (
+          <Tooltip key={f.filename} label={`${f.language} · ${f.content.split('\n').length} baris`}>
+            <Badge size="xs" variant="dot" color={getLangColor(f.language)}>
+              {f.filename}
+            </Badge>
+          </Tooltip>
+        ))}
+        {gist.files.length > 3 && (
+          <Tooltip label={gist.files.slice(3).map(f => f.filename).join(', ')}>
+            <Badge size="xs" variant="default">+{gist.files.length - 3}</Badge>
+          </Tooltip>
+        )}
+        {gist.tags.slice(0, 3).map(t => (
+          <Badge
+            key={t} size="xs" variant="outline" color="gray"
+            className="envman-gist-tag"
+            onClick={onTagClick ? (e => { e.stopPropagation(); onTagClick(t) }) : undefined}
+          >
+            {t}
           </Badge>
         ))}
-        {gist.files.length > 1 && (
-          <Text size="xs" c="dimmed">{gist.files.length} files</Text>
+        {gist.tags.length > 3 && (
+          <Tooltip label={gist.tags.slice(3).join(', ')}>
+            <Text size="xs" c="dimmed">+{gist.tags.length - 3}</Text>
+          </Tooltip>
         )}
-        {gist.tags.map(t => (
-          <Badge key={t} size="xs" variant="outline" color="gray">{t}</Badge>
-        ))}
-        <Text size="xs" c="dimmed" ml="auto">
-          {gist.user.name} · {relTime(gist.updatedAt)}
-        </Text>
+        <Tooltip label={`Diperbarui ${absoluteTime(gist.updatedAt)} oleh ${gist.user.name}`}>
+          <Text size="xs" c="dimmed" ml="auto">
+            {gist.user.name} · {relTime(gist.updatedAt)}
+          </Text>
+        </Tooltip>
       </Group>
     </Card>
   )
@@ -710,6 +783,18 @@ function GistsPage() {
   const [view, setView] = useLocalStorage<'list' | 'grid'>({ key: 'envman:gists:view', defaultValue: 'list' })
   const [formModal, setFormModal] = useState<Gist | null | 'new'>(null)
   const [viewGist, setViewGist] = useState<Gist | null>(null)
+  const [debouncedSearch] = useDebouncedValue(search, 150)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useHotkeys([
+    ['/', () => {
+      searchRef.current?.focus()
+      searchRef.current?.select()
+    }],
+  ])
+
+  const addTagFilter = (tag: string) =>
+    setTagFilter(prev => prev.includes(tag) ? prev : [...prev, tag])
 
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useGistsInfinite()
   const gists: Gist[] = useMemo(() => data?.pages.flatMap(p => p.gists) ?? [], [data])
@@ -722,8 +807,8 @@ function GistsPage() {
     if (filter === 'public') list = list.filter(g => g.isPublic)
     if (filter === 'private') list = list.filter(g => !g.isPublic && g.user.id === myUserId)
     if (tagFilter.length > 0) list = list.filter(g => tagFilter.every(t => g.tags.includes(t)))
-    if (search.trim()) {
-      const q = search.toLowerCase()
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase()
       list = list.filter(g =>
         g.title.toLowerCase().includes(q) ||
         g.description.toLowerCase().includes(q) ||
@@ -737,25 +822,72 @@ function GistsPage() {
         : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
     return list
-  }, [gists, filter, tagFilter, search, sort, myUserId])
+  }, [gists, filter, tagFilter, debouncedSearch, sort, myUserId])
 
-  const deleteGist = (g: Gist) =>
-    modals.openConfirmModal({
-      title: 'Hapus gist',
-      children: <Text size="sm">Hapus gist <strong>{g.title}</strong>?</Text>,
-      labels: { confirm: 'Hapus', cancel: 'Batal' },
-      confirmProps: { color: 'red' },
-      onConfirm: () =>
-        apiFetch(`/api/envman/gists/${g.id}`, { method: 'DELETE' })
-          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'gists', 'infinite'] }); notifyOk('Gist dihapus') })
-          .catch(notifyErr),
+  const deleteGist = (g: Gist) => {
+    const modalId = `delete-gist-${g.id}`
+    modals.open({
+      modalId,
+      title: (
+        <Group gap="xs">
+          <ThemeIcon size="sm" variant="light" color="red" radius="md">
+            <TbTrash size={13} />
+          </ThemeIcon>
+          <Text fw={600} size="sm">Hapus gist</Text>
+        </Group>
+      ),
+      children: (
+        <Stack gap="sm">
+          <Text size="sm">
+            Hapus gist <strong>{g.title}</strong>?
+          </Text>
+          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+            <Group gap={4} mb={4}>
+              {g.files.map(f => (
+                <Badge key={f.filename} size="xs" variant="dot" color={getLangColor(f.language)}>{f.filename}</Badge>
+              ))}
+            </Group>
+            <Text size="xs" c="dimmed">
+              {g.files.length} file · dibuat {absoluteTime(g.createdAt)}
+              {g.isPublic ? ' · public' : ' · private'}
+            </Text>
+          </Paper>
+          <Text size="xs" c="dimmed">Tindakan ini tidak dapat dibatalkan.</Text>
+          <Group justify="flex-end" mt="xs">
+            <Button variant="subtle" color="gray" onClick={() => modals.close(modalId)}>Batal</Button>
+            <Button
+              color="red"
+              leftSection={<TbTrash size={13} />}
+              onClick={() =>
+                apiFetch(`/api/envman/gists/${g.id}`, { method: 'DELETE' })
+                  .then(() => {
+                    qc.invalidateQueries({ queryKey: ['envman', 'gists', 'infinite'] })
+                    notifyOk('Gist dihapus')
+                    modals.close(modalId)
+                  })
+                  .catch(notifyErr)
+              }
+            >
+              Hapus Permanen
+            </Button>
+          </Group>
+        </Stack>
+      ),
     })
+  }
 
   const mineCount = gists.filter(g => g.user.id === myUserId).length
   const publicCount = gists.filter(g => g.isPublic).length
+  const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0 || filter !== 'all'
+  const resetFilter = () => { setSearch(''); setTagFilter([]); setFilter('all') }
+
+  const privateCount = gists.filter(g => !g.isPublic && g.user.id === myUserId).length
 
   return (
     <Box>
+      {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
+      <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
+
       {/* Form modal */}
       <Modal
         opened={formModal !== null}
@@ -783,110 +915,184 @@ function GistsPage() {
       />
 
       {/* Header */}
-      <Group mb="md" justify="space-between">
-        <Group gap="xs">
-          <ThemeIcon size={32} radius="md" variant="light" color="violet">
-            <TbBrandGithub size={18} />
+      <Group mb="md" justify="space-between" wrap="nowrap" align="flex-start">
+        <Group gap="sm" style={{ minWidth: 0 }}>
+          <ThemeIcon size={38} radius="md" variant="light" color="violet">
+            <TbBrandGithub size={20} />
           </ThemeIcon>
-          <Box>
-            <Text fw={700} size="sm">Gists</Text>
-            <Text size="xs" c="dimmed">Snippets &amp; konfigurasi</Text>
+          <Box style={{ minWidth: 0 }}>
+            <Text fw={700} size="lg" lh={1.2}>Gists</Text>
+            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+              {isLoading
+                ? 'Memuat...'
+                : gists.length === 0
+                  ? 'Snippets, config, atau script untuk tim'
+                  : <>{gists.length} gist · {publicCount} public · {mineCount} milik saya</>}
+            </Text>
           </Box>
         </Group>
         {canCreateGist && (
-          <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setFormModal('new')}>
+          <Button type="button" size="sm" color="violet" leftSection={<TbPlus size={14} />} onClick={() => setFormModal('new')}>
             New Gist
           </Button>
         )}
       </Group>
 
-      {/* Filter pills */}
-      <Group gap="xs" mb="sm">
-        {([
-          { value: 'all', label: `Semua (${gists.length})` },
-          { value: 'mine', label: `Milik saya (${mineCount})` },
-          { value: 'public', label: `Public (${publicCount})` },
-          { value: 'private', label: `Private (${mineCount - gists.filter((g: Gist) => g.isPublic && g.user.id === myUserId).length})` },
-        ] as const).map(f => (
-          <Badge
-            key={f.value}
-            size="sm"
-            variant={filter === f.value ? 'filled' : 'outline'}
-            color="violet"
-            style={{ cursor: 'pointer' }}
-            onClick={() => setFilter(f.value)}
-          >
-            {f.label}
-          </Badge>
-        ))}
-      </Group>
-
       {/* Toolbar */}
-      <Group gap="xs" mb="md" wrap="wrap">
-        <TextInput
-          size="xs"
-          placeholder="Cari gists..."
-          leftSection={<TbSearch size={13} />}
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
-          style={{ flex: 1, minWidth: 120 }}
-        />
-        {!isMobile && allTags.length > 0 && (
-          <MultiSelect
-            size="xs"
-            placeholder="Filter tag..."
-            data={allTags}
-            value={tagFilter}
-            onChange={setTagFilter}
-            leftSection={<TbTag size={13} />}
-            clearable
-            maw={180}
-            style={{ flex: 1 }}
-          />
-        )}
-        <Select
-          size="xs"
-          w={isMobile ? 115 : 130}
-          leftSection={<TbSortAscending size={13} />}
-          value={sort}
-          onChange={v => setSort((v ?? 'updated') as typeof sort)}
-          data={[
-            { label: 'Terbaru edit', value: 'updated' },
-            { label: 'Terbaru buat', value: 'created' },
-          ]}
-          allowDeselect={false}
-        />
-        <Group gap={2} wrap="nowrap">
-          <ActionIcon size="sm" variant={view === 'list' ? 'filled' : 'subtle'} color={view === 'list' ? 'violet' : 'gray'} onClick={() => setView('list')}>
-            <TbLayoutList size={14} />
-          </ActionIcon>
-          <ActionIcon size="sm" variant={view === 'grid' ? 'filled' : 'subtle'} color={view === 'grid' ? 'violet' : 'gray'} onClick={() => setView('grid')}>
-            <TbLayoutGrid size={14} />
-          </ActionIcon>
-        </Group>
-      </Group>
+      {!isLoading && gists.length > 0 && (
+        <Paper withBorder radius="md" p="xs" mb="md">
+          {/* Filter pills */}
+          <Group gap="xs" mb="xs">
+            {([
+              { value: 'all', label: `Semua (${gists.length})` },
+              { value: 'mine', label: `Milik saya (${mineCount})` },
+              { value: 'public', label: `Public (${publicCount})` },
+              { value: 'private', label: `Private (${privateCount})` },
+            ] as const).map(f => (
+              <Badge
+                key={f.value}
+                size="sm"
+                variant={filter === f.value ? 'filled' : 'outline'}
+                color="violet"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setFilter(f.value)}
+              >
+                {f.label}
+              </Badge>
+            ))}
+          </Group>
+          <Group gap="xs" wrap="wrap">
+            <TextInput
+              ref={searchRef}
+              size="xs"
+              placeholder="Cari judul, deskripsi, filename, isi, atau tag..."
+              leftSection={<TbSearch size={13} />}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              rightSection={
+                search ? (
+                  <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
+                    <TbX size={11} />
+                  </ActionIcon>
+                ) : (
+                  <Tooltip label="Tekan / untuk focus">
+                    <Kbd size="xs">/</Kbd>
+                  </Tooltip>
+                )
+              }
+              rightSectionWidth={32}
+              style={{ flex: '1 1 180px', minWidth: 0 }}
+            />
+            {!isMobile && allTags.length > 0 && (
+              <MultiSelect
+                size="xs"
+                placeholder="Filter tag"
+                data={allTags}
+                value={tagFilter}
+                onChange={setTagFilter}
+                leftSection={<TbTag size={13} />}
+                clearable
+                searchable
+                hidePickedOptions
+                maw={180}
+                style={{ flex: 1 }}
+              />
+            )}
+            <Select
+              size="xs"
+              w={isMobile ? 130 : 150}
+              leftSection={<TbSortAscending size={13} />}
+              value={sort}
+              onChange={v => setSort((v ?? 'updated') as typeof sort)}
+              data={[
+                { label: 'Terbaru edit', value: 'updated' },
+                { label: 'Terbaru buat', value: 'created' },
+              ]}
+              allowDeselect={false}
+            />
+            <Group gap={2} wrap="nowrap">
+              <Tooltip label="Tampilan list">
+                <ActionIcon
+                  size="sm"
+                  variant={view === 'list' ? 'filled' : 'subtle'}
+                  color={view === 'list' ? 'violet' : 'gray'}
+                  aria-label="Tampilan list"
+                  onClick={() => setView('list')}
+                >
+                  <TbLayoutList size={14} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Tampilan grid">
+                <ActionIcon
+                  size="sm"
+                  variant={view === 'grid' ? 'filled' : 'subtle'}
+                  color={view === 'grid' ? 'violet' : 'gray'}
+                  aria-label="Tampilan grid"
+                  onClick={() => setView('grid')}
+                >
+                  <TbLayoutGrid size={14} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          </Group>
+          {hasFilter && (
+            <Group justify="space-between" mt="xs" gap="xs" wrap="nowrap">
+              <Text size="xs" c="dimmed">
+                {filtered.length === gists.length
+                  ? `Menampilkan semua ${gists.length} gist`
+                  : `${filtered.length} dari ${gists.length} gist`}
+              </Text>
+              <Button
+                size="compact-xs" variant="subtle" color="gray"
+                leftSection={<TbX size={11} />}
+                onClick={resetFilter}
+              >
+                Reset filter
+              </Button>
+            </Group>
+          )}
+        </Paper>
+      )}
 
       {/* List */}
-      {!isLoading && gists.length === 0 ? (
+      {isLoading ? (
+        view === 'grid' ? (
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
+            {[0, 1, 2, 3, 4, 5].map(i => <Skeleton key={i} height={160} radius="md" />)}
+          </SimpleGrid>
+        ) : (
+          <Stack gap="xs">
+            {[0, 1, 2, 3].map(i => <Skeleton key={i} height={120} radius="md" />)}
+          </Stack>
+        )
+      ) : gists.length === 0 ? (
         <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
-          <ThemeIcon size={40} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
-            <TbBrandGithub size={20} />
+          <ThemeIcon size={48} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
+            <TbBrandGithub size={24} />
           </ThemeIcon>
-          <Text fw={500} mb={4}>Belum ada gists</Text>
-          <Text size="sm" c="dimmed" mb="md">Simpan snippets, config, atau script yang sering dipakai.</Text>
+          <Text fw={600} mb={4}>Belum ada gists</Text>
+          <Text size="sm" c="dimmed" mb="md" maw={420} mx="auto">
+            Gist untuk simpan snippets kode, config file, atau script yang sering dipakai.
+            Dukung Markdown, syntax highlighting, dan multi-file.
+          </Text>
           {canCreateGist ? (
-            <Button type="button" size="xs" leftSection={<TbPlus size={13} />} onClick={() => setFormModal('new')}>
+            <Button type="button" size="sm" color="violet" leftSection={<TbPlus size={14} />} onClick={() => setFormModal('new')}>
               Buat Gist Pertama
             </Button>
           ) : (
             <Text size="xs" c="dimmed">Tidak punya izin create gist. Hubungi SUPER_ADMIN.</Text>
           )}
         </Card>
-      ) : !isLoading && filtered.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
-          <Text size="sm" c="dimmed">Tidak ada gist yang cocok.</Text>
-          <Button type="button" size="xs" variant="subtle" mt="xs" onClick={() => { setSearch(''); setTagFilter([]); setFilter('all') }}>Reset Filter</Button>
+          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
+            <TbSearch size={22} />
+          </ThemeIcon>
+          <Text fw={600} mb={4}>Tidak ada hasil</Text>
+          <Text size="sm" c="dimmed" mb="md">Tidak ada gist yang cocok dengan filter saat ini.</Text>
+          <Button type="button" size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={resetFilter}>
+            Reset filter
+          </Button>
         </Card>
       ) : view === 'list' ? (
         <InfiniteList
@@ -904,6 +1110,7 @@ function GistsPage() {
                 onView={() => setViewGist(g)}
                 onEdit={() => setFormModal(g)}
                 onDelete={() => deleteGist(g)}
+                onTagClick={addTagFilter}
               />
             ))}
           </Stack>
@@ -924,6 +1131,7 @@ function GistsPage() {
                 onView={() => setViewGist(g)}
                 onEdit={() => setFormModal(g)}
                 onDelete={() => deleteGist(g)}
+                onTagClick={addTagFilter}
               />
             ))}
           </SimpleGrid>
