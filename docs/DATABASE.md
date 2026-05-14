@@ -29,13 +29,13 @@ PostgreSQL via Prisma v6. Client generated to `./generated/prisma` (gitignored).
 
 - `prisma/schema.prisma` — schema definition
 - `src/lib/db.ts` — Prisma client singleton, import `{ prisma }` from here
-- `prisma/seed.ts` — demo users (superadmin, admin, user) with `Bun.password.hash` bcrypt
+- `prisma/seed-dev.ts` — demo users (superadmin, admin, user) with `Bun.password.hash` bcrypt. **Dev-only**: gitignored, guard `NODE_ENV !== 'development'` → exit 1. Tidak ikut ke image production.
 
 ## Commands
 
 ```bash
 bun run db:migrate    # bunx prisma migrate dev
-bun run db:seed       # bun run prisma/seed.ts
+bun run db:seed       # bun run prisma/seed-dev.ts (dev only)
 bun run db:generate   # bunx prisma generate
 bun run db:studio     # bunx prisma studio
 bun run db:push       # bunx prisma db push

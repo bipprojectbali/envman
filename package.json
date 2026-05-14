@@ -14,7 +14,7 @@
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "db:migrate": "bunx prisma migrate dev",
-    "db:seed": "bun run prisma/seed.ts",
+    "db:seed": "bun run prisma/seed-dev.ts",
     "db:studio": "bunx prisma studio",
     "db:generate": "bunx prisma generate",
     "db:push": "bunx prisma db push",

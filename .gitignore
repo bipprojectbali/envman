@@ -35,6 +35,9 @@ src/frontend/routeTree.gen.ts
 
 /generated/prisma
 
+# Dev-only seeder (NODE_ENV=development). Tidak masuk image production.
+prisma/seed-dev.ts
+
 # Playwright MCP artifacts & ad-hoc screenshots
 .playwright-mcp/
 .claude/scheduled_tasks.lock
