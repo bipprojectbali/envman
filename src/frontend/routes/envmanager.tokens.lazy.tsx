@@ -13,7 +13,6 @@ import {
   Group,
   Kbd,
   Modal,
-  MultiSelect,
   Paper,
   SegmentedControl,
   Select,
@@ -31,6 +30,7 @@ import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
+import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
@@ -617,18 +617,14 @@ function TokensPage() {
               />
             )}
             {projects.length > 0 && (
-              <MultiSelect
+              <MultiSelectChips
                 size="xs"
-                placeholder="Filter project"
-                leftSection={<TbFilter size={13} />}
-                data={projects.map(p => ({ value: p.slug, label: p.name }))}
+                label="Project"
+                icon={<TbFilter size={13} />}
+                width={130}
+                options={projects.map(p => ({ value: p.slug, label: p.name }))}
                 value={filterProjects}
                 onChange={setFilterProjects}
-                clearable
-                searchable
-                hidePickedOptions
-                maxDropdownHeight={220}
-                style={{ minWidth: 140 }}
               />
             )}
             <Select
@@ -646,6 +642,16 @@ function TokensPage() {
               allowDeselect={false}
             />
           </Group>
+          {filterProjects.length > 0 && (
+            <Group gap="xs" mt="xs" wrap="wrap" align="center">
+              <Text size="xs" c="dimmed">Project aktif:</Text>
+              <MultiSelectChipsRow
+                value={filterProjects}
+                onChange={setFilterProjects}
+                getLabel={slug => projects.find(p => p.slug === slug)?.name ?? slug}
+              />
+            </Group>
+          )}
           {hasFilter && (
             <Group justify="space-between" mt="xs" gap="xs" wrap="nowrap">
               <Text size="xs" c="dimmed">

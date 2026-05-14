@@ -165,6 +165,30 @@ export const projectsRouter = new Elysia()
     return { ok: true }
       })
 
+  .patch('/api/envman/projects/:slug/environments/:envName', async ({ request, params, set }) => {
+    const auth = await requireEnvAuth(request)
+    if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
+    const access = await getEnvironmentAccess(auth.userId, auth.role, params.slug, params.envName)
+    if (!access || access !== 'OWNER') { set.status = 403; return { error: 'Owner required to rename environment' } }
+    const body = await request.json().catch(() => null)
+    if (!body?.name || typeof body.name !== 'string') { set.status = 400; return { error: 'name required' } }
+    const newName = body.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(newName)) {
+      set.status = 400
+      return { error: 'Nama hanya boleh huruf kecil, angka, dan strip. Tidak diawali/diakhiri strip.' }
+    }
+    if (newName === params.envName) return { environment: null, unchanged: true }
+    const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+    if (!project) { set.status = 404; return { error: 'Project not found' } }
+    const duplicate = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: newName } } })
+    if (duplicate) { set.status = 400; return { error: `Environment "${newName}" sudah ada di project ini` } }
+    const environment = await prisma.environment.update({
+      where: { projectId_name: { projectId: project.id, name: params.envName } },
+      data: { name: newName },
+    })
+    return { environment }
+      })
+
       // ─── Env Vars ─────────────────────────────────────────
   .get('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)

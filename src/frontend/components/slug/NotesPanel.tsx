@@ -7,7 +7,6 @@ import {
   CopyButton,
   Group,
   Kbd,
-  MultiSelect,
   Paper,
   Select,
   SimpleGrid,
@@ -40,6 +39,7 @@ import {
   TbTrash,
   TbX,
 } from 'react-icons/tb'
+import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 
@@ -486,18 +486,14 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
               style={{ flex: '1 1 180px', minWidth: 0 }}
             />
             {!isMobile && allTags.length > 0 && (
-              <MultiSelect
+              <MultiSelectChips
                 size="xs"
-                placeholder="Tag"
-                data={allTags}
+                label="Tag"
+                icon={<TbTag size={13} />}
+                width={130}
+                options={allTags}
                 value={tagFilter}
                 onChange={setTagFilter}
-                leftSection={<TbTag size={13} />}
-                clearable
-                searchable
-                hidePickedOptions
-                w={170}
-                maxDropdownHeight={240}
               />
             )}
             <Select
@@ -543,6 +539,12 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
               </Button>
             )}
           </Group>
+          {tagFilter.length > 0 && (
+            <Group gap="xs" mt="xs" wrap="wrap" align="center">
+              <Text size="xs" c="dimmed">Tag aktif:</Text>
+              <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />
+            </Group>
+          )}
           {hasFilter && (
             <Group justify="space-between" mt="xs" gap="xs" wrap="nowrap">
               <Text size="xs" c="dimmed">

@@ -9,7 +9,6 @@ import {
   Group,
   Kbd,
   Modal,
-  MultiSelect,
   Paper,
   Select,
   SimpleGrid,
@@ -35,6 +34,7 @@ import {
   TbFolders,
   TbLayoutGrid,
   TbLayoutList,
+  TbPencil,
   TbPin,
   TbPinFilled,
   TbPlus,
@@ -45,6 +45,7 @@ import {
   TbVariable,
   TbX,
 } from 'react-icons/tb'
+import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -132,6 +133,7 @@ function ProjectListPage() {
   const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false)
   const [form, setForm] = useState({ slug: '', name: '', description: '', tags: [] as string[] })
   const [slugManual, setSlugManual] = useState(false)
+  const [editTarget, setEditTarget] = useState<Project | null>(null)
 
   const [view, setView] = useLocalStorage<'grid' | 'list'>({ key: 'envman:projects:view', defaultValue: 'grid' })
   const [search, setSearch] = useLocalStorage({ key: 'envman:projects:search', defaultValue: '' })
@@ -167,6 +169,20 @@ function ProjectListPage() {
       setSlugManual(false)
       notifyOk('Project berhasil dibuat')
       navigate({ to: '/envmanager/$slug', params: { slug: res.project.slug }, search: { tab: 'environments' } })
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  const editProject = useMutation({
+    mutationFn: ({ slug, name, description, tags }: { slug: string; name: string; description: string; tags: string[] }) =>
+      apiFetch(`/api/envman/projects/${slug}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name, description, tags }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['envman', 'projects'] })
+      setEditTarget(null)
+      notifyOk('Project diperbarui')
     },
     onError: (e) => notifyErr(e),
   })
@@ -332,18 +348,14 @@ function ProjectListPage() {
               style={{ flex: '1 1 220px', minWidth: 0 }}
             />
             {allTags.length > 0 && (
-              <MultiSelect
+              <MultiSelectChips
                 size="sm"
-                placeholder="Tag"
-                leftSection={<TbTag size={14} />}
-                data={allTags}
+                label="Tag"
+                icon={<TbTag size={14} />}
+                width={140}
+                options={allTags}
                 value={tagFilter}
                 onChange={setTagFilter}
-                clearable
-                maxDropdownHeight={240}
-                w={180}
-                hidePickedOptions
-                searchable
               />
             )}
             <Select
@@ -356,6 +368,16 @@ function ProjectListPage() {
               w={160}
             />
           </Group>
+          {tagFilter.length > 0 && (
+            <Group gap="xs" mt="xs" wrap="wrap" align="center">
+              <Text size="xs" c="dimmed">Filter aktif:</Text>
+              <MultiSelectChipsRow
+                value={tagFilter}
+                onChange={setTagFilter}
+                getColor={tagColor}
+              />
+            </Group>
+          )}
           {hasFilter && (
             <Group justify="space-between" mt="xs" gap="xs" wrap="nowrap">
               <Text size="xs" c="dimmed">
@@ -456,6 +478,7 @@ function ProjectListPage() {
                 project={p}
                 isPinned={pinned.includes(p.slug)}
                 onPin={() => togglePin(p.slug)}
+                onEdit={() => setEditTarget(p)}
                 onDelete={() => deleteProject(p.slug, p.name)}
                 onTagClick={addTagFilter}
                 onClick={() => openProject(p.slug)}
@@ -470,6 +493,7 @@ function ProjectListPage() {
                 project={p}
                 isPinned={pinned.includes(p.slug)}
                 onPin={() => togglePin(p.slug)}
+                onEdit={() => setEditTarget(p)}
                 onDelete={() => deleteProject(p.slug, p.name)}
                 onTagClick={addTagFilter}
                 onClick={() => openProject(p.slug)}
@@ -491,6 +515,15 @@ function ProjectListPage() {
         isPending={createProject.isPending}
         onClose={() => { closeCreate(); setForm({ slug: '', name: '', description: '', tags: [] }); setSlugManual(false) }}
         onSubmit={() => createProject.mutate(form)}
+      />
+
+      {/* ─── Edit modal ───────────────────── */}
+      <EditProjectModal
+        project={editTarget}
+        allTagValues={allTags.map(t => t.value)}
+        isPending={editProject.isPending}
+        onClose={() => setEditTarget(null)}
+        onSubmit={(data) => editProject.mutate(data)}
       />
     </Box>
   )
@@ -655,12 +688,137 @@ interface CardProps {
   project: Project
   isPinned: boolean
   onPin: () => void
+  onEdit: () => void
   onDelete: () => void
   onTagClick: (tag: string) => void
   onClick: () => void
 }
 
-function ProjectGridCard({ project: p, isPinned, onPin, onDelete, onTagClick, onClick }: CardProps) {
+// ─── Edit Project modal ──────────────────────────────────────────────────────
+
+function EditProjectModal({
+  project, allTagValues, isPending, onClose, onSubmit,
+}: {
+  project: Project | null
+  allTagValues: string[]
+  isPending: boolean
+  onClose: () => void
+  onSubmit: (data: { slug: string; name: string; description: string; tags: string[] }) => void
+}) {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+  const initialKeyRef = useRef<string | null>(null)
+
+  // Sync form when target changes (open or switch project)
+  if (project && initialKeyRef.current !== project.slug) {
+    initialKeyRef.current = project.slug
+    setName(project.name)
+    setDescription(project.description ?? '')
+    setTags(project.tags ?? [])
+  }
+  if (!project && initialKeyRef.current !== null) {
+    initialKeyRef.current = null
+  }
+
+  const handleClose = () => {
+    initialKeyRef.current = null
+    onClose()
+  }
+
+  if (!project) return null
+
+  const dirty =
+    name !== project.name ||
+    description !== (project.description ?? '') ||
+    JSON.stringify(tags) !== JSON.stringify(project.tags ?? [])
+  const canSubmit = !!name.trim() && dirty && !isPending
+
+  return (
+    <Modal
+      opened={project !== null}
+      onClose={handleClose}
+      title={
+        <Group gap="xs">
+          <ThemeIcon size={28} variant="light" color="blue" radius="md">
+            <TbPencil size={15} />
+          </ThemeIcon>
+          <Box>
+            <Text fw={700} size="sm">Edit Project</Text>
+            <Code fz="xs" c="dimmed">{project.slug}</Code>
+          </Box>
+        </Group>
+      }
+      size="md"
+      centered
+    >
+      <Stack gap="lg">
+        <Stack gap="xs">
+          <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Identitas</Text>
+          <TextInput
+            label="Nama project"
+            placeholder="My App, Backend API, ..."
+            value={name}
+            autoFocus
+            data-autofocus
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && canSubmit) onSubmit({ slug: project.slug, name, description, tags })
+            }}
+          />
+          <TextInput
+            label="Slug"
+            value={project.slug}
+            disabled
+            description="Slug tidak dapat diubah — akan break CLI / token / Portainer config yang sudah menggunakan."
+          />
+          <TextInput
+            label="Deskripsi"
+            placeholder="Opsional — penjelasan singkat project ini"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+          />
+        </Stack>
+
+        <Stack gap="xs">
+          <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Tags</Text>
+          <TagsInput
+            placeholder="Tambah tag, tekan Enter"
+            value={tags}
+            onChange={setTags}
+            data={allTagValues}
+            clearable
+            splitChars={[',', ' ']}
+          />
+          {tags.length > 0 && (
+            <Group gap={4}>
+              {tags.map(t => (
+                <Badge key={t} size="xs" variant="light" color={tagColor(t)}>{t}</Badge>
+              ))}
+            </Group>
+          )}
+        </Stack>
+
+        <Divider />
+
+        <Group justify="flex-end" gap="xs">
+          <Button variant="subtle" color="gray" onClick={handleClose} disabled={isPending}>Batal</Button>
+          <Button
+            leftSection={<TbCheck size={14} />}
+            color="blue"
+            onClick={() => onSubmit({ slug: project.slug, name, description, tags })}
+            loading={isPending}
+            disabled={!canSubmit}
+          >
+            Simpan Perubahan
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
+function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagClick, onClick }: CardProps) {
   return (
     <Card
       withBorder
@@ -689,15 +847,26 @@ function ProjectGridCard({ project: p, isPinned, onPin, onDelete, onTagClick, on
             </ActionIcon>
           </Tooltip>
           {p.myRole === 'OWNER' && (
-            <Tooltip label="Hapus project">
-              <ActionIcon
-                size="sm" variant="subtle" color="red"
-                aria-label="Hapus project"
-                onClick={e => { e.stopPropagation(); onDelete() }}
-              >
-                <TbTrash size={13} />
-              </ActionIcon>
-            </Tooltip>
+            <>
+              <Tooltip label="Edit project">
+                <ActionIcon
+                  size="sm" variant="subtle" color="blue"
+                  aria-label="Edit project"
+                  onClick={e => { e.stopPropagation(); onEdit() }}
+                >
+                  <TbPencil size={13} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Hapus project">
+                <ActionIcon
+                  size="sm" variant="subtle" color="red"
+                  aria-label="Hapus project"
+                  onClick={e => { e.stopPropagation(); onDelete() }}
+                >
+                  <TbTrash size={13} />
+                </ActionIcon>
+              </Tooltip>
+            </>
           )}
           <Badge size="xs" variant="dot" color={roleColor[p.myRole]}>{p.myRole}</Badge>
         </Group>
@@ -761,7 +930,7 @@ function ProjectGridCard({ project: p, isPinned, onPin, onDelete, onTagClick, on
   )
 }
 
-function ProjectListCard({ project: p, isPinned, onPin, onDelete, onTagClick, onClick }: CardProps) {
+function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagClick, onClick }: CardProps) {
   return (
     <Card
       withBorder
@@ -844,15 +1013,26 @@ function ProjectListCard({ project: p, isPinned, onPin, onDelete, onTagClick, on
             </ActionIcon>
           </Tooltip>
           {p.myRole === 'OWNER' && (
-            <Tooltip label="Hapus project" position="left">
-              <ActionIcon
-                size="sm" variant="subtle" color="red"
-                aria-label="Hapus project"
-                onClick={e => { e.stopPropagation(); onDelete() }}
-              >
-                <TbTrash size={13} />
-              </ActionIcon>
-            </Tooltip>
+            <>
+              <Tooltip label="Edit project" position="left">
+                <ActionIcon
+                  size="sm" variant="subtle" color="blue"
+                  aria-label="Edit project"
+                  onClick={e => { e.stopPropagation(); onEdit() }}
+                >
+                  <TbPencil size={13} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Hapus project" position="left">
+                <ActionIcon
+                  size="sm" variant="subtle" color="red"
+                  aria-label="Hapus project"
+                  onClick={e => { e.stopPropagation(); onDelete() }}
+                >
+                  <TbTrash size={13} />
+                </ActionIcon>
+              </Tooltip>
+            </>
           )}
           <ThemeIcon size="sm" variant="subtle" color="gray" radius="xl">
             <TbChevronRight size={13} />

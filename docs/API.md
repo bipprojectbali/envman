@@ -48,6 +48,7 @@ Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI). `requir
 - `DELETE /api/envman/projects/:slug/environments/:env/vars/:key` — delete var (EDITOR+)
 - `POST /api/envman/projects/:slug/environments` — add environment (EDITOR+)
 - `DELETE /api/envman/projects/:slug/environments/:env` — delete environment (OWNER+)
+- `PATCH /api/envman/projects/:slug/environments/:env` — rename environment (OWNER); body: `{name}`
 - `PUT /api/envman/projects/:slug/members/:userId/role` — change member role (OWNER)
 - `DELETE /api/envman/projects/:slug/members/:userId` — remove member (OWNER)
 

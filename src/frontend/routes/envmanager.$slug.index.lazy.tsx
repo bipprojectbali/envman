@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
@@ -29,6 +30,7 @@ import {
   TbClock,
   TbFolders,
   TbNote,
+  TbPencil,
   TbPlus,
   TbSearch,
   TbSortAscending,
@@ -197,6 +199,43 @@ function ProjectDetailPage() {
     },
     onError: (e) => notifyErr(e),
   })
+
+  const renameEnv = (oldName: string, varCount: number) => {
+    const modalId = `rename-env-${oldName}`
+    const otherNames = envs.filter(e => e.name !== oldName).map(e => e.name)
+    modals.open({
+      modalId,
+      title: (
+        <Group gap="xs">
+          <ThemeIcon size="sm" variant="light" color="blue" radius="md">
+            <TbPencil size={13} />
+          </ThemeIcon>
+          <Text fw={600} size="sm">Rename environment</Text>
+        </Group>
+      ),
+      children: (
+        <RenameEnvForm
+          oldName={oldName}
+          varCount={varCount}
+          otherNames={otherNames}
+          onCancel={() => modals.close(modalId)}
+          onConfirm={async (newName) => {
+            try {
+              await apiFetch(`/api/envman/projects/${slug}/environments/${oldName}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ name: newName }),
+              })
+              qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
+              notifyOk(`Environment "${oldName}" di-rename jadi "${newName}"`)
+              modals.close(modalId)
+            } catch (e) {
+              notifyErr(e)
+            }
+          }}
+        />
+      ),
+    })
+  }
 
   const deleteEnv = (name: string, varCount: number) => {
     const id = `delete-env-${name}`
@@ -490,15 +529,26 @@ function ProjectDetailPage() {
 
                           <Group gap="xs" wrap="nowrap" onClick={ev => ev.stopPropagation()}>
                             {isOwner && (
-                              <Tooltip label="Hapus environment" position="left">
-                                <ActionIcon
-                                  size="sm" variant="subtle" color="red"
-                                  aria-label="Hapus environment"
-                                  onClick={ev => { ev.stopPropagation(); deleteEnv(e.name, e._count?.vars ?? 0) }}
-                                >
-                                  <TbTrash size={13} />
-                                </ActionIcon>
-                              </Tooltip>
+                              <>
+                                <Tooltip label="Rename environment" position="left">
+                                  <ActionIcon
+                                    size="sm" variant="subtle" color="blue"
+                                    aria-label="Rename environment"
+                                    onClick={ev => { ev.stopPropagation(); renameEnv(e.name, e._count?.vars ?? 0) }}
+                                  >
+                                    <TbPencil size={13} />
+                                  </ActionIcon>
+                                </Tooltip>
+                                <Tooltip label="Hapus environment" position="left">
+                                  <ActionIcon
+                                    size="sm" variant="subtle" color="red"
+                                    aria-label="Hapus environment"
+                                    onClick={ev => { ev.stopPropagation(); deleteEnv(e.name, e._count?.vars ?? 0) }}
+                                  >
+                                    <TbTrash size={13} />
+                                  </ActionIcon>
+                                </Tooltip>
+                              </>
                             )}
                             <Button
                               size="xs"
@@ -589,6 +639,82 @@ function ProjectDetailPage() {
         onDelete={() => { setNoteView(null) }}
       />
     </Box>
+  )
+}
+
+// ─── Rename environment ──────────────────────────────────────────────────────
+
+function RenameEnvForm({
+  oldName, varCount, otherNames, onCancel, onConfirm,
+}: {
+  oldName: string
+  varCount: number
+  otherNames: string[]
+  onCancel: () => void
+  onConfirm: (newName: string) => Promise<void> | void
+}) {
+  const [name, setName] = useState(oldName)
+  const [loading, setLoading] = useState(false)
+  const normalized = name.toLowerCase().replace(/[^a-z0-9-]/g, '')
+  const valid = normalized.length > 0 && ENV_NAME_RE.test(normalized)
+  const unchanged = normalized === oldName
+  const duplicate = !unchanged && otherNames.includes(normalized)
+  const error = name.length === 0
+    ? null
+    : duplicate
+      ? `Environment "${normalized}" sudah ada`
+      : !valid
+        ? 'Hanya huruf kecil, angka, dan strip. Tidak diawali/diakhiri strip.'
+        : null
+  const canSubmit = valid && !duplicate && !unchanged && !loading
+
+  const handleConfirm = async () => {
+    if (!canSubmit) return
+    setLoading(true)
+    try {
+      await onConfirm(normalized)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Stack gap="sm">
+      <Text size="sm">
+        Rename <Code fz="xs">{oldName}</Code>
+        {varCount > 0 && <> dengan <strong>{varCount} variabel</strong></>}.
+      </Text>
+      <TextInput
+        label="Nama baru"
+        placeholder={oldName}
+        value={name}
+        autoFocus
+        data-autofocus
+        spellCheck={false}
+        leftSection={<TbVariable size={13} />}
+        onChange={e => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+        onKeyDown={e => { if (e.key === 'Enter' && canSubmit) handleConfirm() }}
+        error={error ?? undefined}
+      />
+      <Alert color="yellow" icon={<TbAlertTriangle size={13} />} p="xs">
+        <Text size="xs">
+          Semua CLI / CI yang masih pakai <Code fz="xs">{oldName}</Code> akan langsung gagal —
+          mereka harus diupdate ke <Code fz="xs">{normalized || '<nama-baru>'}</Code> setelah rename.
+        </Text>
+      </Alert>
+      <Group justify="flex-end" mt="xs">
+        <Button variant="subtle" color="gray" onClick={onCancel} disabled={loading}>Batal</Button>
+        <Button
+          color="blue"
+          leftSection={<TbPencil size={13} />}
+          disabled={!canSubmit}
+          loading={loading}
+          onClick={handleConfirm}
+        >
+          Rename
+        </Button>
+      </Group>
+    </Stack>
   )
 }
 
