@@ -3,6 +3,11 @@ import { prisma } from '../../lib/db'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { getProjectAccess } from '../../lib/access'
 import { hasCapability } from '../../lib/permissions'
+import { audit } from '../../lib/audit'
+
+function getIp(request: Request): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown'
+}
 
 export const tokensRouter = new Elysia()
       // ─── API Tokens ───────────────────────────────────────
@@ -77,6 +82,29 @@ export const tokensRouter = new Elysia()
       data: { isDisabled: !existing.isDisabled },
     })
     return { id: updated.id, isDisabled: updated.isDisabled }
+      })
+
+  .get('/api/envman/tokens/:id/reveal', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const existing = await prisma.apiToken.findUnique({ where: { id: params.id } })
+    if (!existing || existing.userId !== caller.userId) { set.status = 404; return { error: 'Not found' } }
+    audit(caller.userId, 'TOKEN_REVEALED', `name=${existing.name}`, getIp(request))
+    return { token: existing.token }
+      })
+
+  .post('/api/envman/tokens/:id/rotate', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    const existing = await prisma.apiToken.findUnique({ where: { id: params.id } })
+    if (!existing || existing.userId !== caller.userId) { set.status = 404; return { error: 'Not found' } }
+    const token = `em_${crypto.randomUUID().replace(/-/g, '')}`
+    const updated = await prisma.apiToken.update({
+      where: { id: params.id },
+      data: { token, lastUsedAt: null },
+    })
+    audit(caller.userId, 'TOKEN_ROTATED', `name=${existing.name}`, getIp(request))
+    return { id: updated.id, token }
       })
 
   .delete('/api/envman/tokens/:id', async ({ request, params, set }) => {

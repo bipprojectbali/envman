@@ -51,6 +51,7 @@ import {
   TbLockOpen,
   TbPencil,
   TbPlus,
+  TbRefresh,
   TbSearch,
   TbShieldCheck,
   TbSortAscending,
@@ -379,6 +380,58 @@ function TokensPage() {
     onSuccess: (data: { isDisabled: boolean }) => { qc.invalidateQueries({ queryKey: ['envman', 'tokens'] }); notifyOk(data.isDisabled ? 'Token dinonaktifkan' : 'Token diaktifkan') },
     onError: (e) => notifyErr(e),
   })
+
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const copyToken = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/reveal`),
+    onSuccess: async (data: { token: string }, id) => {
+      try {
+        await navigator.clipboard.writeText(data.token)
+        setCopiedId(id)
+        notifyOk('Token disalin ke clipboard')
+        setTimeout(() => setCopiedId(prev => (prev === id ? null : prev)), 1500)
+      } catch {
+        notifyErr(new Error('Gagal akses clipboard — coba browser modern atau HTTPS'))
+      }
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  const rotateToken = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/rotate`, { method: 'POST' }),
+    onSuccess: (data: { token: string }) => {
+      qc.invalidateQueries({ queryKey: ['envman', 'tokens'] })
+      setNewToken(data.token)
+      notifyOk('Token di-rotate — salin nilai baru sekarang!')
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  const confirmRotate = (id: string, name: string) => {
+    modals.openConfirmModal({
+      title: (
+        <Group gap="xs">
+          <ThemeIcon size="sm" variant="light" color="yellow" radius="md">
+            <TbRefresh size={13} />
+          </ThemeIcon>
+          <Text fw={600} size="sm">Rotate token</Text>
+        </Group>
+      ),
+      children: (
+        <Stack gap="xs">
+          <Text size="sm">
+            Token <strong>{name}</strong> akan diganti dengan nilai baru.
+            Nilai lama langsung <strong>invalid</strong> — semua script/CI yang masih
+            memakai token lama akan gagal autentikasi sampai diganti.
+          </Text>
+          <Text size="xs" c="dimmed">Nilai baru hanya ditampilkan sekali setelah rotate.</Text>
+        </Stack>
+      ),
+      labels: { confirm: 'Rotate token', cancel: 'Batal' },
+      confirmProps: { color: 'yellow', leftSection: <TbRefresh size={13} /> },
+      onConfirm: () => rotateToken.mutate(id),
+    })
+  }
 
   const revokeToken = (id: string, name: string) => {
     const modalId = `revoke-token-${id}`
@@ -818,6 +871,27 @@ function TokensPage() {
                         {t.isDisabled ? <TbToggleLeft size={13} /> : <TbToggleRight size={13} />}
                       </ActionIcon>
                     </Tooltip>
+                    <Tooltip label={copiedId === t.id ? 'Tersalin!' : 'Copy token'}>
+                      <ActionIcon
+                        size="xs" variant="subtle"
+                        color={copiedId === t.id ? 'teal' : 'gray'}
+                        aria-label="Copy token"
+                        loading={copyToken.isPending && copyToken.variables === t.id}
+                        onClick={() => copyToken.mutate(t.id)}
+                      >
+                        {copiedId === t.id ? <TbCheck size={12} /> : <TbCopy size={12} />}
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Rotate token">
+                      <ActionIcon
+                        size="xs" variant="subtle" color="yellow"
+                        aria-label="Rotate token"
+                        loading={rotateToken.isPending && rotateToken.variables === t.id}
+                        onClick={() => confirmRotate(t.id, t.name)}
+                      >
+                        <TbRefresh size={12} />
+                      </ActionIcon>
+                    </Tooltip>
                     <Tooltip label="Edit token">
                       <ActionIcon size="xs" variant="subtle" color="gray" aria-label="Edit token" onClick={() => openEditModal(t)}>
                         <TbPencil size={12} />
@@ -937,6 +1011,27 @@ function TokensPage() {
                         onClick={() => toggleToken.mutate(t.id)}
                       >
                         {t.isDisabled ? <TbToggleLeft size={15} /> : <TbToggleRight size={15} />}
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label={copiedId === t.id ? 'Tersalin!' : 'Copy token ke clipboard'}>
+                      <ActionIcon
+                        size="sm" variant="subtle"
+                        color={copiedId === t.id ? 'teal' : 'gray'}
+                        aria-label="Copy token"
+                        loading={copyToken.isPending && copyToken.variables === t.id}
+                        onClick={() => copyToken.mutate(t.id)}
+                      >
+                        {copiedId === t.id ? <TbCheck size={13} /> : <TbCopy size={13} />}
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Rotate (ganti nilai token)">
+                      <ActionIcon
+                        size="sm" variant="subtle" color="yellow"
+                        aria-label="Rotate token"
+                        loading={rotateToken.isPending && rotateToken.variables === t.id}
+                        onClick={() => confirmRotate(t.id, t.name)}
+                      >
+                        <TbRefresh size={13} />
                       </ActionIcon>
                     </Tooltip>
                     <Tooltip label="Lihat cara penggunaan">
