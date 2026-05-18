@@ -683,15 +683,38 @@ esac
 
 URL="${origin}/download/cli/$PLATFORM"
 DEST="\${ENVMAN_DEST:-/usr/local/bin/envman}"
+TMP="/tmp/envman-download.$$"
 
-echo "Downloading envman for $PLATFORM..."
-curl -fsSL "$URL" -o /tmp/envman-download
-chmod +x /tmp/envman-download
+trap 'rm -f "$TMP"' EXIT INT TERM
+
+attempt=1
+max_attempts=5
+while [ $attempt -le $max_attempts ]; do
+  echo "Downloading envman for $PLATFORM... (attempt $attempt/$max_attempts)"
+  # --compressed asks for gzip transport (~60% smaller payload via Content-Encoding);
+  # --retry handles transient errors within one curl run, outer loop handles fatal disconnects.
+  # Resume (-C -) not used because Range + Content-Encoding: gzip is not interoperable.
+  if curl -fL --compressed --progress-bar --retry 3 --retry-all-errors --retry-delay 2 "$URL" -o "$TMP"; then
+    break
+  fi
+  attempt=$((attempt+1))
+  if [ $attempt -le $max_attempts ]; then
+    echo "Connection interrupted, retrying in 2s..."
+    sleep 2
+  fi
+done
+
+if [ $attempt -gt $max_attempts ]; then
+  echo "Error: Failed to download after $max_attempts attempts"
+  exit 1
+fi
+
+chmod +x "$TMP"
 
 if [ -w "$(dirname $DEST)" ]; then
-  mv /tmp/envman-download "$DEST"
+  mv "$TMP" "$DEST"
 else
-  sudo mv /tmp/envman-download "$DEST"
+  sudo mv "$TMP" "$DEST"
 fi
 
 echo "Installed envman to $DEST"
@@ -700,7 +723,7 @@ echo "Run: envman login ${origin} --token <your-token>"
         return new Response(script, { headers: { 'Content-Type': 'text/plain' } })
       })
 
-      .get('/download/cli/:platform', async ({ params, set }) => {
+      .get('/download/cli/:platform', async ({ params, request, set }) => {
         const platforms: Record<string, string> = {
           'linux-x64':    'envman-linux-x64',
           'linux-arm64':  'envman-linux-arm64',
@@ -710,13 +733,34 @@ echo "Run: envman login ${origin} --token <your-token>"
         }
         const filename = platforms[params.platform]
         if (!filename) { set.status = 404; return new Response('Unknown platform', { status: 404 }) }
-        const filePath = `${process.cwd()}/dist/cli/${filename}`
-        const file = Bun.file(filePath)
+
+        const acceptsGzip = (request.headers.get('accept-encoding') ?? '').toLowerCase().includes('gzip')
+        if (acceptsGzip) {
+          const gzFile = Bun.file(`${process.cwd()}/dist/cli/${filename}.gz`)
+          if (await gzFile.exists()) {
+            return new Response(gzFile, {
+              headers: {
+                'Content-Disposition': `attachment; filename="${filename}"`,
+                'Content-Type': 'application/octet-stream',
+                'Content-Encoding': 'gzip',
+                'Vary': 'Accept-Encoding',
+              },
+            })
+          }
+        }
+
+        const file = Bun.file(`${process.cwd()}/dist/cli/${filename}`)
         if (!(await file.exists())) {
           set.status = 404
           return new Response('Binary not built yet. Run: bun run build:cli', { status: 404 })
         }
-        return new Response(file, { headers: { 'Content-Disposition': `attachment; filename="${filename}"`, 'Content-Type': 'application/octet-stream' } })
+        return new Response(file, {
+          headers: {
+            'Content-Disposition': `attachment; filename="${filename}"`,
+            'Content-Type': 'application/octet-stream',
+            'Vary': 'Accept-Encoding',
+          },
+        })
       })
 
       // ─── Public Docs (raw markdown for AI / crawlers) ─────

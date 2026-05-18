@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
-import { mkdirSync } from 'fs'
+import { mkdirSync, statSync, writeFileSync } from 'fs'
+import { gzipSync } from 'zlib'
 import { join } from 'path'
 
 const OUT_DIR = join(import.meta.dir, '..', 'dist', 'cli')
@@ -23,7 +24,16 @@ for (const { target, out } of targets) {
     console.error(`Failed to build ${out}`)
     process.exit(1)
   }
+
+  const raw = Bun.file(outFile)
+  const buf = Buffer.from(await raw.arrayBuffer())
+  const gz = gzipSync(buf, { level: 9 })
+  const gzPath = `${outFile}.gz`
+  writeFileSync(gzPath, gz)
+  const before = statSync(outFile).size
+  const after = statSync(gzPath).size
+  console.log(`  gzip: ${(before / 1024 / 1024).toFixed(1)}MB → ${(after / 1024 / 1024).toFixed(1)}MB (${Math.round(100 - after * 100 / before)}% smaller)`)
 }
 
-console.log(`\nAll binaries built to dist/cli/`)
+console.log(`\nAll binaries built to dist/cli/ (with .gz variants)`)
 console.log('Run `bun run start` to serve them at /download/cli/<platform>')
