@@ -30,6 +30,7 @@ import {
   TbClock,
   TbFolders,
   TbNote,
+  TbTerminal2,
   TbPencil,
   TbPlus,
   TbSearch,
@@ -43,6 +44,7 @@ import {
 import { NoteFormModal, NoteViewModal } from '@/frontend/components/slug/NoteModals'
 import type { Note } from '@/frontend/components/slug/NotesPanel'
 import { NotesPanel } from '@/frontend/components/slug/NotesPanel'
+import { AliasesPanel } from '@/frontend/components/slug/AliasesPanel'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -395,6 +397,9 @@ function ProjectDetailPage() {
             <Tabs.Tab value="notes" leftSection={<TbNote size={14} />}>
               Notes
             </Tabs.Tab>
+            <Tabs.Tab value="aliases" leftSection={<TbTerminal2 size={14} />}>
+              Aliases
+            </Tabs.Tab>
           </Tabs.List>
 
           {/* ── Environments tab ─────────────── */}
@@ -624,6 +629,11 @@ function ProjectDetailPage() {
               viewNote={noteView}
               setViewNote={setNoteView}
             />
+          </Tabs.Panel>
+
+          {/* ── Aliases tab ──────────────────── */}
+          <Tabs.Panel value="aliases">
+            <AliasesPanel slug={slug} isOwner={isOwner} />
           </Tabs.Panel>
         </Tabs>
       )}

@@ -19,7 +19,7 @@ React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Rou
 - `envmanager.tokens.lazy.tsx` — `/envmanager/tokens` API token management; filter by project (`MultiSelect`)
 - `envmanager.connections.tsx` — `/envmanager/connections` global Portainer connection CRUD
 - `envmanager.$slug.tsx` — `/envmanager/:slug` pure `<Outlet />` layout
-- `envmanager.$slug.index.tsx` — project detail content (environments + members tabs, `?tab=`)
+- `envmanager.$slug.index.tsx` — project detail content (environments + notes + aliases tabs, `?tab=environments|notes|aliases`)
 - `envmanager.$slug.$env.tsx` — `/envmanager/:slug/:env` env vars page
 - `profile.tsx` — User profile (all authenticated users)
 - `blocked.tsx` — Blocked user info page
@@ -31,6 +31,7 @@ React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Rou
 - `PortainerSync.tsx` — Portainer sync UI
 - `NotFound.tsx` — 404 page
 - `ErrorPage.tsx` — Error boundary page
+- `slug/AliasesPanel.tsx` — aliases tab untuk project detail; OWNER bisa create/edit/delete; semua member bisa list dan copy CLI invocation (`envman run slug:name`)
 
 ## Hooks
 

@@ -15,6 +15,7 @@ PostgreSQL via Prisma v6. Client generated to `./generated/prisma` (gitignored).
 - `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
 - `ApiToken` (id, userId, name, token, scopes[], canWrite, lastUsedAt?, expiresAt?, createdAt)
+- `ProjectAlias` (id, projectId, name, args, description?, tags[], createdBy, timestamps) — unique(projectId, name)
 - `PortainerConnection` (id, name, portainerUrl, apiToken, createdById, timestamps) — global, reusable
 - `PortainerConfig` (id, projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?, timestamps) — `connectionId` FK preferred; legacy fields nullable
 
@@ -40,6 +41,31 @@ bun run db:generate   # bunx prisma generate
 bun run db:studio     # bunx prisma studio
 bun run db:push       # bunx prisma db push
 ```
+
+## Test Database (WAJIB terpisah dari dev)
+
+`tests/helpers.ts:cleanupTestData()` memanggil `deleteMany()` di SELURUH tabel sebagai bagian dari test lifecycle.
+Jika dijalankan terhadap DB dev/prod, **semua data user hilang**. Untuk itu helpers punya guard runtime
+yang refuse-to-run kalau database name di `DATABASE_URL` tidak diakhiri `_test`.
+
+Setup sekali:
+
+```bash
+# Buat DB terpisah
+createdb envman_test
+
+# Push schema (tanpa migration history, untuk test fixtures)
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bunx prisma db push
+```
+
+Jalankan test:
+
+```bash
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bun run test
+```
+
+Tip: simpan URL test di shell alias atau `direnv`. Jangan masukkan `TEST_DATABASE_URL` ke `.env`
+karena `.env` auto-loaded oleh Bun dan bisa overwrite DATABASE_URL development.
 
 ## Secret Encryption
 

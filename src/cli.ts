@@ -6,7 +6,7 @@ import { spawnSync } from 'child_process'
 
 const CONFIG_DIR = join(homedir(), '.config', 'envman')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
-const VERSION = '1.0.0'
+const VERSION = '1.1.0'
 
 interface Config {
   server: string
@@ -169,6 +169,53 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean)
   process.exit(result.status ?? 0)
 }
 
+// ─── Run alias ───────────────────────────────────────────────────────────────
+
+async function cmdAlias(args: string[]) {
+  const ref = args[0]
+  if (!ref || !ref.includes(':')) {
+    console.error('Usage: envman run <project>:<alias>')
+    process.exit(1)
+  }
+
+  const cfg = resolveAuth({})
+  const data = await apiFetch(cfg, `/api/envman/aliases/resolve/${encodeURIComponent(ref)}`)
+  const storedArgs: string = data.args
+
+  const parts = storedArgs.split(/\s+/).filter(Boolean)
+  const sepIdx = parts.indexOf('--')
+  if (sepIdx === -1) {
+    console.error(`[envman] Alias "${ref}" has no -- separator in stored args: ${storedArgs}`)
+    process.exit(1)
+  }
+
+  const flagParts = parts.slice(0, sepIdx)
+  const command = parts.slice(sepIdx + 1)
+  if (command.length === 0) {
+    console.error(`[envman] Alias "${ref}" stores no command after --`)
+    process.exit(1)
+  }
+
+  const sources: string[] = []
+  let serverWins = false
+  let i = 0
+  while (i < flagParts.length) {
+    const flag = flagParts[i]
+    if (flag === '-e') {
+      const val = flagParts[i + 1]
+      if (!val) { console.error('-e requires a value'); process.exit(1) }
+      sources.push(val); i += 2
+    } else if (flag === '--server-wins') {
+      serverWins = true; i++
+    } else {
+      console.error(`Unknown flag in alias: ${flag}`)
+      process.exit(1)
+    }
+  }
+
+  await cmdRun(sources, command, serverWins)
+}
+
 // ─── Help ─────────────────────────────────────────────────────────────────────
 
 function printHelp() {
@@ -178,6 +225,7 @@ USAGE:
   envman login <server-url> --token <token>   Save credentials to config file
   envman logout                                Remove saved credentials
   envman whoami                                Show current authenticated user
+  envman run <project>:<alias>                 Expand stored alias and execute
   envman [options] -- <command>                Inject env vars and run command
 
 OPTIONS:
@@ -237,6 +285,7 @@ async function main() {
     case 'login':  await cmdLogin(args.slice(1)); return
     case 'logout': await cmdLogout(); return
     case 'whoami': await cmdWhoami(); return
+    case 'run':    await cmdAlias(args.slice(1)); return
   }
 
   // Run mode — collect all flags before --

@@ -7,6 +7,7 @@ import {
   CopyButton,
   Group,
   Kbd,
+  Pagination,
   Paper,
   Select,
   SimpleGrid,
@@ -20,7 +21,7 @@ import {
 import { useDebouncedValue, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   TbAlertTriangle,
   TbBookmark,
@@ -370,6 +371,12 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
     return list
   }, [notes, debouncedSearch, tagFilter, sort])
 
+  const NOTES_PER_PAGE = 12
+  const [page, setPage] = useState(1)
+  useEffect(() => setPage(1), [debouncedSearch, tagFilter, sort])
+  const totalPages = Math.ceil(filtered.length / NOTES_PER_PAGE)
+  const paginated = filtered.slice((page - 1) * NOTES_PER_PAGE, page * NOTES_PER_PAGE)
+
   const pinnedCount = notes.filter(n => n.pinned).length
   const myCount = notes.filter(n => n.author.id === myUserId).length
   const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0
@@ -615,39 +622,53 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
           </Button>
         </Card>
       ) : !isError && view === 'list' ? (
-        <Stack gap="xs">
-          {filtered.map(note => (
-            <NoteCardList
-              key={note.id}
-              note={note}
-              canEdit={canEdit}
-              isOwner={isOwner}
-              myUserId={myUserId}
-              onView={() => setViewNote(note)}
-              onEdit={() => setOpenModal(note)}
-              onDelete={() => deleteNote(note)}
-              onPin={() => togglePin(note)}
-              onTagClick={addTagFilter}
-            />
-          ))}
-        </Stack>
+        <>
+          <Stack gap="xs">
+            {paginated.map(note => (
+              <NoteCardList
+                key={note.id}
+                note={note}
+                canEdit={canEdit}
+                isOwner={isOwner}
+                myUserId={myUserId}
+                onView={() => setViewNote(note)}
+                onEdit={() => setOpenModal(note)}
+                onDelete={() => deleteNote(note)}
+                onPin={() => togglePin(note)}
+                onTagClick={addTagFilter}
+              />
+            ))}
+          </Stack>
+          {totalPages > 1 && (
+            <Group justify="center" mt="sm">
+              <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
+            </Group>
+          )}
+        </>
       ) : !isError ? (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
-          {filtered.map(note => (
-            <NoteCardGrid
-              key={note.id}
-              note={note}
-              canEdit={canEdit}
-              isOwner={isOwner}
-              myUserId={myUserId}
-              onView={() => setViewNote(note)}
-              onEdit={() => setOpenModal(note)}
-              onDelete={() => deleteNote(note)}
-              onPin={() => togglePin(note)}
-              onTagClick={addTagFilter}
-            />
-          ))}
-        </SimpleGrid>
+        <>
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
+            {paginated.map(note => (
+              <NoteCardGrid
+                key={note.id}
+                note={note}
+                canEdit={canEdit}
+                isOwner={isOwner}
+                myUserId={myUserId}
+                onView={() => setViewNote(note)}
+                onEdit={() => setOpenModal(note)}
+                onDelete={() => deleteNote(note)}
+                onPin={() => togglePin(note)}
+                onTagClick={addTagFilter}
+              />
+            ))}
+          </SimpleGrid>
+          {totalPages > 1 && (
+            <Group justify="center" mt="sm">
+              <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
+            </Group>
+          )}
+        </>
       ) : null}
     </Stack>
   )

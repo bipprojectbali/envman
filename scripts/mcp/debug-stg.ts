@@ -498,6 +498,40 @@ server.registerTool(
   },
 )
 
+// ── Aliases ───────────────────────────────────────────────────────────────────
+
+server.registerTool(
+  'stg_alias_list',
+  {
+    title: '[STG] List project aliases',
+    description: 'List all aliases for a project by slug di stg',
+    inputSchema: { slug: z.string().describe('Project slug') },
+  },
+  async (args) => {
+    try {
+      return ok(await stgCall('alias_list', args))
+    } catch (e) {
+      return err(String(e))
+    }
+  },
+)
+
+server.registerTool(
+  'stg_alias_get',
+  {
+    title: '[STG] Get project alias',
+    description: 'Fetch a single alias by project slug and alias name di stg',
+    inputSchema: { slug: z.string(), name: z.string() },
+  },
+  async (args) => {
+    try {
+      return ok(await stgCall('alias_get', args))
+    } catch (e) {
+      return err(String(e))
+    }
+  },
+)
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 const transport = new StdioServerTransport()

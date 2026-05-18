@@ -44,7 +44,7 @@ Session-based (HttpOnly cookie + DB). `POST /api/auth/login` → bcrypt verify �
 /envmanager                    → project list
 /envmanager/tokens             → tokens page
 /envmanager/connections        → global Portainer connections
-/envmanager/:slug              → project detail (?tab=environments|members OK)
+/envmanager/:slug              → project detail (?tab=environments|notes|aliases OK)
 /envmanager/:slug/:env         → vars page
 ```
 
@@ -122,13 +122,31 @@ Session-based (HttpOnly cookie + DB). `POST /api/auth/login` → bcrypt verify �
 
 ## Testing
 
+**🛑 PERINGATAN MUTLAK — Test DB Safety**
+
+`tests/helpers.ts` melakukan `deleteMany()` ke seluruh tabel saat `cleanupTestData()`.
+Test **WAJIB** dijalankan terhadap database dengan nama yang diakhiri `_test` (mis. `envman_test`).
+`tests/helpers.ts` punya guard runtime — kalau `DATABASE_URL` menunjuk DB non-test, semua test akan
+refuse-to-run dengan error explisit. Jangan disable guard ini.
+
 ```bash
-bun run test              # all tests
-bun run test:unit         # tests/unit/
-bun run test:integration  # tests/integration/ — via app.handle(), no server needed
+# Setup sekali (buat DB test terpisah dari dev):
+createdb envman_test
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bunx prisma db push
+
+# Run test (dengan env override):
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bun run test
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bun run test:unit
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bun run test:integration
 ```
 
-`tests/helpers.ts` — `createTestApp()`, `seedTestUser()`, `createTestSession()`, `cleanupTestData()`
+**AI helper notes:**
+- Jangan pernah jalankan `bun test` tanpa override DATABASE_URL ke DB `_test`.
+- Jika user tidak punya DB test, tawarkan buatkan setup — JANGAN reuse DB dev.
+- `bun run typecheck` aman dijalankan kapan saja (tidak sentuh DB).
+
+`tests/helpers.ts` — `createTestApp()`, `seedTestUser()`, `createTestSession()`, `cleanupTestData()`,
+guard `assertTestDb()` (refuse non-test DB).
 
 ## Bun APIs Used
 

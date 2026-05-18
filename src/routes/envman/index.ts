@@ -3,6 +3,7 @@ import { tokensRouter } from './tokens'
 import { projectsRouter } from './projects'
 import { portainerRouter } from './portainer'
 import { notesRouter } from './notes'
+import { aliasesRouter } from './aliases'
 import { gistsRouter } from './gists'
 import { databaseRouter } from './database'
 import { adminUsersRouter } from './admin-users'
@@ -50,6 +51,7 @@ export const envmanRouter = new Elysia()
   .use(projectsRouter)
   .use(portainerRouter)
   .use(notesRouter)
+  .use(aliasesRouter)
   .use(gistsRouter)
   .use(databaseRouter)
   .use(adminUsersRouter)

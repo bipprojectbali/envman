@@ -13,6 +13,7 @@ import {
   Loader,
   Menu,
   Modal,
+  Pagination,
   Paper,
   PasswordInput,
   RingProgress,
@@ -30,10 +31,10 @@ import {
 } from '@mantine/core'
 import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { PortainerSync } from '@/frontend/components/PortainerSync'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
 import {
@@ -124,6 +125,8 @@ function VarsPage() {
   const [filterType, setFilterType] = useState<FilterType>('all')
   const [filterDisabled, setFilterDisabled] = useState<'all' | 'active' | 'disabled'>('all')
   const [sort, setSort] = useState<'key-asc' | 'key-desc' | 'newest' | 'oldest'>('key-asc')
+  const [varsPage, setVarsPage] = useState(1)
+  const VARS_LIMIT = 50
   const [copiedAll, setCopiedAll] = useState(false)
   const [copiedSelected, setCopiedSelected] = useState(false)
 
@@ -137,10 +140,13 @@ function VarsPage() {
     queryFn: () => apiFetch('/api/envman/status'),
     staleTime: 60000,
   })
+  useEffect(() => { setVarsPage(1) }, [search])
+
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ['envman', 'vars', slug, env],
-    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`),
+    queryKey: ['envman', 'vars', slug, env, varsPage, search],
+    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars?limit=${VARS_LIMIT}&offset=${(varsPage - 1) * VARS_LIMIT}${search ? `&search=${encodeURIComponent(search)}` : ''}`),
     refetchInterval: 15000,
+    placeholderData: keepPreviousData,
   })
 
   const { data: portainerData } = useQuery({
@@ -160,10 +166,12 @@ function VarsPage() {
   const canEdit = myRole === 'OWNER' || myRole === 'EDITOR'
   const encryptionEnabled: boolean = statusData?.encryptionEnabled ?? false
   const vars: EnvVar[] = data?.vars ?? []
+  const varsTotal: number = data?.total ?? vars.length
+  const varsTotalPages = Math.ceil(varsTotal / VARS_LIMIT)
 
   const filteredVars = useMemo(() => {
     let list = [...vars]
-    if (search) list = list.filter(v => v.key.toLowerCase().includes(search.toLowerCase()) || v.value.toLowerCase().includes(search.toLowerCase()))
+    // search sudah di-handle server — hanya filter client-side yang tersisa
     if (filterType === 'plain') list = list.filter(v => !v.isSecret)
     if (filterType === 'secret') list = list.filter(v => v.isSecret)
     if (filterDisabled === 'active') list = list.filter(v => !v.isDisabled)
@@ -173,7 +181,7 @@ function VarsPage() {
     if (sort === 'newest') list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     if (sort === 'oldest') list.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())
     return list
-  }, [vars, search, filterType, filterDisabled, sort])
+  }, [vars, filterType, filterDisabled, sort])
 
   const plainCount = vars.filter(v => !v.isSecret).length
   const secretCount = vars.filter(v => v.isSecret).length
@@ -1246,10 +1254,15 @@ function VarsPage() {
           </Table>
           {filteredVars.length > 0 && (
             <Box px="sm" py={6} style={{ borderTop: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
-              <Text size="xs" c="dimmed">
-                <strong>{filteredVars.length}</strong> dari <strong>{vars.length}</strong> variabel
-                {activeCount < vars.length && <> · <strong>{activeCount}</strong> aktif · <strong>{disabledCount}</strong> disabled</>}
-              </Text>
+              <Group justify="space-between" wrap="wrap" gap="xs">
+                <Text size="xs" c="dimmed">
+                  <strong>{varsTotal}</strong> variabel total
+                  {activeCount < vars.length && <> · <strong>{activeCount}</strong> aktif · <strong>{disabledCount}</strong> disabled</>}
+                </Text>
+                {varsTotalPages > 1 && (
+                  <Pagination value={varsPage} onChange={setVarsPage} total={varsTotalPages} size="xs" />
+                )}
+              </Group>
             </Box>
           )}
         </Paper>

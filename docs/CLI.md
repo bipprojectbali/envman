@@ -38,8 +38,16 @@ Script bash yang di-curl pipe ke bash punya **retry + transparent gzip**:
 envman login <server-url> --token <token>   # Save to ~/.config/envman/config.json
 envman logout                                # Remove config file
 envman whoami                                # Show authenticated user
+envman run <project>:<alias>                 # Expand stored alias and execute
 envman [options] -- <command>               # Inject vars and run command
 ```
+
+### Alias Expansion
+
+`envman run myapp:deploy` fetches stored args via `GET /api/envman/aliases/resolve/myapp:deploy`,
+then re-parses them as if typed directly after `envman`. The stored args contain the full flag
+suffix, e.g. `-e myapp:production -- docker compose up -d`. Auth resolution uses the same priority
+chain (system env → config file) — no local `-e` file needed for `run`.
 
 ## Options
 

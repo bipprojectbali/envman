@@ -41,7 +41,7 @@ Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI). `requir
 - `POST /api/envman/projects` — create project (ADMIN+); body: `{slug, name, description?, tags?[]}`
 - `PATCH /api/envman/projects/:slug` — update project (OWNER); body: `{name?, description?, tags?[]}`
 - `GET /api/envman/projects/:slug` — project detail + members + environments
-- `GET /api/envman/projects/:slug/environments/:env/vars` — list vars (VIEWER: secrets masked as `***`)
+- `GET /api/envman/projects/:slug/environments/:env/vars` — list vars (VIEWER: secrets masked as `***`); supports `?search=KEY&limit=50&offset=0`; returns `{ vars, total, limit, offset, hasMore }`
 - `GET /api/envman/projects/:slug/environments/:env/vars/export` — all vars decrypted (EDITOR+)
 - `POST /api/envman/projects/:slug/environments/:env/vars` — create/update var (EDITOR+)
 - `PUT /api/envman/projects/:slug/environments/:env/vars/:key` — update var (EDITOR+)
@@ -62,6 +62,13 @@ Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI). `requir
 - `PUT /api/envman/projects/:slug/environments/:env/portainer` — save config (connectionId + stackId)
 - `DELETE /api/envman/projects/:slug/environments/:env/portainer` — remove config
 - `POST /api/envman/projects/:slug/environments/:env/portainer/sync` — push vars to stack
+
+### Aliases
+- `GET /api/envman/projects/:slug/aliases` — list aliases (VIEWER+); returns `{ aliases[] }` dengan id/name/args/description/tags/creator/timestamps; cached 60s
+- `POST /api/envman/projects/:slug/aliases` — create alias (OWNER); body: `{name, args, description?, tags?[]}`; name di-slugify otomatis
+- `PATCH /api/envman/projects/:slug/aliases/:name` — update alias (OWNER); body: `{args?, description?, tags?[]}`
+- `DELETE /api/envman/projects/:slug/aliases/:name` — delete alias (OWNER)
+- `GET /api/envman/aliases/resolve/:ref` — resolve `project:alias` ref (any member); returns `{ args, project, alias }`; dipakai CLI
 
 ### Tokens
 - `GET /api/envman/tokens` — list your tokens (metadata only — token value tidak pernah di-return)

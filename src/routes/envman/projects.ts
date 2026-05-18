@@ -4,8 +4,9 @@ import { requireEnvAuth, unauthorized, forbidden } from '../../lib/auth-middlewa
 import { getProjectAccess, getEnvironmentAccess, tokenScopeAllows } from '../../lib/access'
 import { hasCapability } from '../../lib/permissions'
 import { decryptSecret, encryptSecret, hasMasterKey } from '../../lib/crypto'
-import { withCache, invalidateCache, cacheKeys } from '../../lib/cache'
+import { withCache, invalidateProjectCaches, cacheKeys } from '../../lib/cache'
 import { notDeleted, softDelete } from '../../lib/db-helpers'
+import { parsePagination } from '../../lib/pagination'
 import { triggerAutoSync } from './portainer'
 
 export const projectsRouter = new Elysia()
@@ -42,7 +43,7 @@ export const projectsRouter = new Elysia()
     const project = await prisma.project.create({
       data: { slug, name: body.name, description: body.description ?? null, tags: Array.isArray(body.tags) ? body.tags : [], members: { create: { userId: auth.userId, role: 'OWNER' } } },
     })
-    await invalidateCache(cacheKeys.projectList(auth.userId))
+    await invalidateProjectCaches(slug)
     return { project }
       })
 
@@ -63,6 +64,7 @@ export const projectsRouter = new Elysia()
     if (!access || access === 'VIEWER' || access === 'EDITOR') { set.status = 403; return { error: 'Owner required' } }
     const body = await request.json().catch(() => null)
     const project = await prisma.project.update({ where: { slug: params.slug }, data: { name: body?.name, description: body?.description, ...(body?.tags !== undefined ? { tags: body.tags } : {}) } })
+    await invalidateProjectCaches(params.slug)
     return { project }
       })
 
@@ -71,8 +73,8 @@ export const projectsRouter = new Elysia()
     if (!auth) { set.status = 401; return { error: 'Unauthorized' } }
     const access = await getProjectAccess(auth.userId, auth.role, params.slug)
     if (!access || access !== 'OWNER') { set.status = 403; return { error: 'Owner required' } }
+    await invalidateProjectCaches(params.slug)
     await prisma.project.update({ where: { slug: params.slug }, data: softDelete() })
-    await invalidateCache(cacheKeys.projectList(auth.userId), cacheKeys.projectDetail(params.slug))
     return { ok: true }
       })
 
@@ -92,6 +94,7 @@ export const projectsRouter = new Elysia()
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
     const member = await prisma.projectMember.upsert({ where: { userId_projectId: { userId: user.id, projectId: project.id } }, update: { role: body.role }, create: { userId: user.id, projectId: project.id, role: body.role } })
+    await invalidateProjectCaches(params.slug)
     return { member }
       })
 
@@ -113,10 +116,7 @@ export const projectsRouter = new Elysia()
       }
     }
     const member = await prisma.projectMember.update({ where: { userId_projectId: { userId: params.userId, projectId: project.id } }, data: { role: body.role } })
-    await invalidateCache(
-      cacheKeys.projectAccess(params.userId, params.slug),
-      cacheKeys.projectDetail(params.slug),
-    )
+    await invalidateProjectCaches(params.slug)
     return { member }
       })
 
@@ -134,6 +134,8 @@ export const projectsRouter = new Elysia()
       if (ownerCount === 1) { set.status = 400; return { error: 'Tidak bisa menghapus owner terakhir.' } }
     }
     await prisma.projectMember.delete({ where: { userId_projectId: { userId: params.userId, projectId: project.id } } })
+    // extraUserIds: invalidate the removed user's cache too — they're no longer in members[] after delete
+    await invalidateProjectCaches(params.slug, [params.userId])
     return { ok: true }
       })
 
@@ -151,6 +153,7 @@ export const projectsRouter = new Elysia()
     const existing = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: envName } } })
     if (existing) { set.status = 400; return { error: 'Environment name already exists' } }
     const environment = await prisma.environment.create({ data: { name: envName, projectId: project.id } })
+    await invalidateProjectCaches(params.slug)
     return { environment }
       })
 
@@ -162,6 +165,7 @@ export const projectsRouter = new Elysia()
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
     await prisma.environment.delete({ where: { projectId_name: { projectId: project.id, name: params.envName } } })
+    await invalidateProjectCaches(params.slug)
     return { ok: true }
       })
 
@@ -186,11 +190,12 @@ export const projectsRouter = new Elysia()
       where: { projectId_name: { projectId: project.id, name: params.envName } },
       data: { name: newName },
     })
+    await invalidateProjectCaches(params.slug)
     return { environment }
       })
 
       // ─── Env Vars ─────────────────────────────────────────
-  .get('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set }) => {
+  .get('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set, query }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
     const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
@@ -198,16 +203,26 @@ export const projectsRouter = new Elysia()
     if (caller.scopes.length > 0 && !tokenScopeAllows(caller.scopes, params.slug, params.envName)) { set.status = 403; return { error: 'Token tidak memiliki akses ke project/env ini' } }
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) { set.status = 404; return { error: 'Project not found' } }
-    const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } }, include: { vars: { orderBy: { key: 'asc' } } } })
+    const environment = await prisma.environment.findUnique({ where: { projectId_name: { projectId: project.id, name: params.envName } } })
     if (!environment) { set.status = 404; return { error: 'Environment not found' } }
+    const search = (query.search as string | undefined) ?? ''
+    const { limit, offset } = parsePagination(query as Record<string, unknown>, 50, 200)
+    const where = {
+      environmentId: environment.id,
+      ...(search ? { key: { contains: search, mode: 'insensitive' as const } } : {}),
+    }
+    const [total, rawVars] = await Promise.all([
+      prisma.envVar.count({ where }),
+      prisma.envVar.findMany({ where, orderBy: { key: 'asc' }, take: limit, skip: offset }),
+    ])
     const canReadSecrets = access === 'OWNER' || access === 'EDITOR'
-    const vars = environment.vars.map(v => ({
+    const vars = rawVars.map(v => ({
       id: v.id, key: v.key, isSecret: v.isSecret, isDisabled: v.isDisabled, updatedAt: v.updatedAt,
       value: v.isSecret
         ? (canReadSecrets ? decryptSecret(v.value) : '***')
         : v.value,
     }))
-    return { vars }
+    return { vars, total, limit, offset, hasMore: offset + limit < total }
       })
 
   .get('/api/envman/projects/:slug/environments/:envName/vars/export', async ({ request, params, set }) => {

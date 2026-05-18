@@ -11,10 +11,12 @@ import {
   CopyButton,
   Divider,
   Group,
+  HoverCard,
   Kbd,
   Modal,
   Paper,
   SegmentedControl,
+  Pagination,
   Select,
   SimpleGrid,
   Skeleton,
@@ -28,8 +30,8 @@ import {
 import { useDebouncedValue, useDisclosure, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createLazyFileRoute } from '@tanstack/react-router'
-import { useMemo, useRef, useState } from 'react'
+import { Link, createLazyFileRoute } from '@tanstack/react-router'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
@@ -123,6 +125,32 @@ const HOVER_STYLES = `
   box-shadow: var(--mantine-shadow-sm);
 }
 `
+
+// ── Scope Badge (clickable link to associated env vars page) ───────────────
+
+function ScopeBadge({ scope, size = 'xs' }: { scope: string; size?: 'xs' | 'sm' }) {
+  const idx = scope.indexOf(':')
+  const linkable = idx > 0 && idx < scope.length - 1
+  if (!linkable) {
+    return <Badge size={size} variant="default" style={{ fontFamily: 'monospace' }}>{scope}</Badge>
+  }
+  const slug = scope.slice(0, idx)
+  const env = scope.slice(idx + 1)
+  return (
+    <Tooltip label={`Buka /envmanager/${slug}/${env}`} openDelay={400} withinPortal>
+      <Link to="/envmanager/$slug/$env" params={{ slug, env }} style={{ textDecoration: 'none' }}>
+        <Badge
+          size={size}
+          variant="dot"
+          color="violet"
+          style={{ fontFamily: 'monospace', cursor: 'pointer' }}
+        >
+          {scope}
+        </Badge>
+      </Link>
+    </Tooltip>
+  )
+}
 
 // ── Scope Selector ──────────────────────────────────────────────────────────
 
@@ -332,6 +360,12 @@ function TokensPage() {
     // default 'terbaru': already sorted by server desc
     return list
   }, [tokens, debouncedSearch, filterStatus, filterProjects, sort])
+
+  const TOKENS_PER_PAGE = 20
+  const [tokensPage, setTokensPage] = useState(1)
+  useEffect(() => setTokensPage(1), [debouncedSearch, filterStatus, filterProjects, sort])
+  const tokensTotalPages = Math.ceil(filteredTokens.length / TOKENS_PER_PAGE)
+  const paginatedTokens = filteredTokens.slice((tokensPage - 1) * TOKENS_PER_PAGE, tokensPage * TOKENS_PER_PAGE)
 
   const createToken = useMutation({
     mutationFn: (body: typeof form) =>
@@ -840,8 +874,9 @@ function TokensPage() {
           </Button>
         </Card>
       ) : !isError && view === 'grid' ? (
+        <>
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          {filteredTokens.map((t) => {
+          {paginatedTokens.map((t) => {
             const expiry = expiryStatus(t.expiresAt)
             const isExpired = expiry === 'expired'
             return (
@@ -928,9 +963,30 @@ function TokensPage() {
                     </Badge>
                   )}
                 </Group>
-                <Text size="xs" c="dimmed" mb={4} lineClamp={2}>
-                  {t.scopes.length === 0 ? 'semua project' : t.scopes.join(', ')}
-                </Text>
+                <Group gap={4} mb={4} wrap="wrap">
+                  {t.scopes.length === 0 ? (
+                    <Badge size="xs" variant="default">semua project</Badge>
+                  ) : (
+                    <>
+                      {t.scopes.slice(0, 3).map(s => <ScopeBadge key={s} scope={s} />)}
+                      {t.scopes.length > 3 && (
+                        <HoverCard width={260} shadow="md" withinPortal position="bottom-start">
+                          <HoverCard.Target>
+                            <Badge size="xs" variant="default" style={{ cursor: 'pointer' }}>+{t.scopes.length - 3}</Badge>
+                          </HoverCard.Target>
+                          <HoverCard.Dropdown>
+                            <Stack gap={4}>
+                              <Text size="xs" c="dimmed">Scope lainnya:</Text>
+                              <Group gap={4} wrap="wrap">
+                                {t.scopes.slice(3).map(s => <ScopeBadge key={s} scope={s} />)}
+                              </Group>
+                            </Stack>
+                          </HoverCard.Dropdown>
+                        </HoverCard>
+                      )}
+                    </>
+                  )}
+                </Group>
                 <Tooltip label={t.lastUsedAt ? `Terakhir dipakai ${absoluteTime(t.lastUsedAt)}` : 'Belum pernah dipakai'}>
                   <Text size="xs" c="dimmed">
                     Digunakan: {t.lastUsedAt ? relativeTime(t.lastUsedAt) : <Text component="span" c="dimmed" fs="italic">belum pernah</Text>}
@@ -975,9 +1031,16 @@ function TokensPage() {
             )
           })}
         </SimpleGrid>
+        {tokensTotalPages > 1 && (
+          <Group justify="center" mt="sm">
+            <Pagination value={tokensPage} onChange={setTokensPage} total={tokensTotalPages} size="sm" />
+          </Group>
+        )}
+        </>
       ) : !isError ? (
+        <>
         <Stack gap="xs">
-          {filteredTokens.map((t) => {
+          {paginatedTokens.map((t) => {
             const expiry = expiryStatus(t.expiresAt)
             const isExpired = expiry === 'expired'
             return (
@@ -1015,13 +1078,21 @@ function TokensPage() {
                           <Badge size="xs" variant="default">semua project</Badge>
                         ) : (
                           <>
-                            {t.scopes.slice(0, 4).map(s => (
-                              <Badge key={s} size="xs" variant="dot" color="violet" style={{ fontFamily: 'monospace' }}>{s}</Badge>
-                            ))}
+                            {t.scopes.slice(0, 4).map(s => <ScopeBadge key={s} scope={s} />)}
                             {t.scopes.length > 4 && (
-                              <Tooltip label={t.scopes.slice(4).join(', ')}>
-                                <Badge size="xs" variant="default">+{t.scopes.length - 4}</Badge>
-                              </Tooltip>
+                              <HoverCard width={260} shadow="md" withinPortal position="bottom-start">
+                                <HoverCard.Target>
+                                  <Badge size="xs" variant="default" style={{ cursor: 'pointer' }}>+{t.scopes.length - 4}</Badge>
+                                </HoverCard.Target>
+                                <HoverCard.Dropdown>
+                                  <Stack gap={4}>
+                                    <Text size="xs" c="dimmed">Scope lainnya:</Text>
+                                    <Group gap={4} wrap="wrap">
+                                      {t.scopes.slice(4).map(s => <ScopeBadge key={s} scope={s} />)}
+                                    </Group>
+                                  </Stack>
+                                </HoverCard.Dropdown>
+                              </HoverCard>
                             )}
                           </>
                         )}
@@ -1146,6 +1217,12 @@ function TokensPage() {
             )
           })}
         </Stack>
+        {tokensTotalPages > 1 && (
+          <Group justify="center" mt="sm">
+            <Pagination value={tokensPage} onChange={setTokensPage} total={tokensTotalPages} size="sm" />
+          </Group>
+        )}
+        </>
       ) : null}
 
       {/* ─── Create modal ───────────────────── */}

@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia'
 import { prisma } from '../../lib/db'
 import { requireSuperAdmin } from '../../lib/auth-middleware'
-import { invalidateCache, cacheKeys } from '../../lib/cache'
+import { invalidateCache, invalidateProjectCaches, cacheKeys } from '../../lib/cache'
 import type { ProjectRole } from '../../lib/access'
 import { isValidCapability } from '../../lib/permissions'
 
@@ -142,11 +142,8 @@ export const adminUsersRouter = new Elysia()
       })
     }
 
-    await invalidateCache(
-      cacheKeys.projectAccess(params.userId, params.slug),
-      cacheKeys.projectDetail(params.slug),
-      cacheKeys.projectList(params.userId),
-    )
+    // extraUserIds: target user may be added/removed; include them to cover both cases.
+    await invalidateProjectCaches(params.slug, [params.userId])
     return { ok: true, role: body.role }
   })
 

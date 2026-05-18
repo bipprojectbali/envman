@@ -10,6 +10,7 @@ import { presenceTools } from './tools/presence'
 import { projectTools } from './tools/project'
 import { redisTools } from './tools/redis'
 import { ticketTools } from './tools/tickets'
+import { aliasReadonlyTools, aliasAdminTools } from './tools/aliases'
 import type { McpScope, ToolModule } from './tools/shared'
 
 export type { McpScope }
@@ -21,6 +22,7 @@ const READONLY_MODULES: ToolModule[] = [
   healthTools,
   projectTools,
   codeTools,
+  aliasReadonlyTools,
 ]
 
 const ADMIN_MODULES: ToolModule[] = [
@@ -30,6 +32,7 @@ const ADMIN_MODULES: ToolModule[] = [
   devTools,
   redisTools,
   ticketTools,
+  aliasAdminTools,
 ]
 
 export function createMcpServer(scope: McpScope = 'admin'): McpServer {

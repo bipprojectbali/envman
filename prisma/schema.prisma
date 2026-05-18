@@ -61,6 +61,7 @@ model User {
   envMemberships        EnvironmentMember[]
   apiTokens             ApiToken[]
   notes                 ProjectNote[]
+  projectAliases        ProjectAlias[]  @relation("ProjectAliasCreator")
   gists                 Gist[]
 
   @@map("user")
@@ -225,6 +226,25 @@ model ProjectNote {
   @@map("project_note")
 }
 
+model ProjectAlias {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  args        String
+  description String?
+  tags        String[] @default([])
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User    @relation("ProjectAliasCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("project_alias")
+}
+
 model Project {
   id          String    @id @default(uuid())
   slug        String    @unique
@@ -239,6 +259,7 @@ model Project {
   environments      Environment[]
   portainerConfigs  PortainerConfig[]
   notes             ProjectNote[]
+  aliases           ProjectAlias[]
 
   @@index([deletedAt])
   @@map("project")

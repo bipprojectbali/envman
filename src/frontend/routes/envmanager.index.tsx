@@ -11,6 +11,7 @@ import {
   Modal,
   Paper,
   Select,
+  Pagination,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -24,7 +25,7 @@ import { useDebouncedValue, useDisclosure, useHotkeys, useLocalStorage } from '@
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   TbAlertTriangle,
   TbArrowsSort,
@@ -268,6 +269,13 @@ function ProjectListPage() {
     })
   }, [projects, debouncedSearch, tagFilter, sort, pinned])
 
+  const PAGE_SIZE = 24
+  const [page, setPage] = useState(1)
+  useEffect(() => setPage(1), [debouncedSearch, tagFilter, sort])
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   const ownerCount = projects.filter(p => p.myRole === 'OWNER').length
   const totalEnvs = projects.reduce((s, p) => s + p._count.environments, 0)
   const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0
@@ -470,37 +478,44 @@ function ProjectListPage() {
 
       {/* ─── Project list / grid ────────────── */}
       {!isError && filtered.length > 0 && (
-        view === 'list' ? (
-          <Stack gap="xs">
-            {filtered.map((p) => (
-              <ProjectListCard
-                key={p.slug}
-                project={p}
-                isPinned={pinned.includes(p.slug)}
-                onPin={() => togglePin(p.slug)}
-                onEdit={() => setEditTarget(p)}
-                onDelete={() => deleteProject(p.slug, p.name)}
-                onTagClick={addTagFilter}
-                onClick={() => openProject(p.slug)}
-              />
-            ))}
-          </Stack>
-        ) : (
-          <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
-            {filtered.map((p) => (
-              <ProjectGridCard
-                key={p.slug}
-                project={p}
-                isPinned={pinned.includes(p.slug)}
-                onPin={() => togglePin(p.slug)}
-                onEdit={() => setEditTarget(p)}
-                onDelete={() => deleteProject(p.slug, p.name)}
-                onTagClick={addTagFilter}
-                onClick={() => openProject(p.slug)}
-              />
-            ))}
-          </SimpleGrid>
-        )
+        <>
+          {view === 'list' ? (
+            <Stack gap="xs">
+              {paginated.map((p) => (
+                <ProjectListCard
+                  key={p.slug}
+                  project={p}
+                  isPinned={pinned.includes(p.slug)}
+                  onPin={() => togglePin(p.slug)}
+                  onEdit={() => setEditTarget(p)}
+                  onDelete={() => deleteProject(p.slug, p.name)}
+                  onTagClick={addTagFilter}
+                  onClick={() => openProject(p.slug)}
+                />
+              ))}
+            </Stack>
+          ) : (
+            <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
+              {paginated.map((p) => (
+                <ProjectGridCard
+                  key={p.slug}
+                  project={p}
+                  isPinned={pinned.includes(p.slug)}
+                  onPin={() => togglePin(p.slug)}
+                  onEdit={() => setEditTarget(p)}
+                  onDelete={() => deleteProject(p.slug, p.name)}
+                  onTagClick={addTagFilter}
+                  onClick={() => openProject(p.slug)}
+                />
+              ))}
+            </SimpleGrid>
+          )}
+          {totalPages > 1 && (
+            <Group justify="center" mt="lg">
+              <Pagination value={page} onChange={setPage} total={totalPages} />
+            </Group>
+          )}
+        </>
       )}
 
       {/* ─── Create modal ───────────────────── */}
