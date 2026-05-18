@@ -892,6 +892,19 @@ function TokensPage() {
                         <TbRefresh size={12} />
                       </ActionIcon>
                     </Tooltip>
+                    <Tooltip label="Lihat cara penggunaan">
+                      <ActionIcon
+                        size="xs" variant="subtle" color="gray"
+                        aria-label="Lihat cara penggunaan"
+                        onClick={() => setExpandedUsage(prev => {
+                          const s = new Set(prev)
+                          s.has(t.id) ? s.delete(t.id) : s.add(t.id)
+                          return s
+                        })}
+                      >
+                        <TbTerminal size={12} />
+                      </ActionIcon>
+                    </Tooltip>
                     <Tooltip label="Edit token">
                       <ActionIcon size="xs" variant="subtle" color="gray" aria-label="Edit token" onClick={() => openEditModal(t)}>
                         <TbPencil size={12} />
@@ -923,6 +936,41 @@ function TokensPage() {
                     Digunakan: {t.lastUsedAt ? relativeTime(t.lastUsedAt) : <Text component="span" c="dimmed" fs="italic">belum pernah</Text>}
                   </Text>
                 </Tooltip>
+
+                <Collapse in={expandedUsage.has(t.id)}>
+                  <Divider my="xs" />
+                  <Stack gap={6}>
+                    {(() => {
+                      const origin = window.location.origin
+                      const scope = t.scopes.length > 0 ? t.scopes[0] : 'myapp:production'
+                      const [scopeProject, scopeEnv] = scope.includes(':') ? scope.split(':') : [scope, 'production']
+                      return [
+                        { label: 'Login & simpan config', cmd: `envman login ${origin} --token <TOKEN>` },
+                        { label: `Inject vars (${scopeProject}:${scopeEnv})`, cmd: `envman -e ${scopeProject}:${scopeEnv} -- bun start` },
+                        { label: 'CI/CD tanpa login', cmd: `ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<TOKEN> envman -e ${scopeProject}:${scopeEnv} -- bun start` },
+                      ].map(({ label, cmd }) => (
+                        <Box key={label}>
+                          <Text size="xs" c="dimmed" mb={2}>{label}</Text>
+                          <Group gap={4} align="center">
+                            <Code fz="xs" style={{ flex: 1, wordBreak: 'break-all', userSelect: 'all' }}>{cmd}</Code>
+                            <CopyButton value={cmd}>
+                              {({ copied, copy }) => (
+                                <Tooltip label={copied ? 'Copied!' : 'Copy'}>
+                                  <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                                    {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
+                                  </ActionIcon>
+                                </Tooltip>
+                              )}
+                            </CopyButton>
+                          </Group>
+                        </Box>
+                      ))
+                    })()}
+                    {t.scopes.length === 0 && (
+                      <Text size="xs" c="dimmed">Token ini punya akses ke semua project. Ganti <Code fz="xs">myapp:production</Code> dengan project:env yang sesuai.</Text>
+                    )}
+                  </Stack>
+                </Collapse>
               </Card>
             )
           })}

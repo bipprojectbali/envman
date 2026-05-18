@@ -64,8 +64,12 @@ Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI). `requir
 - `POST /api/envman/projects/:slug/environments/:env/portainer/sync` — push vars to stack
 
 ### Tokens
-- `GET /api/envman/tokens` — list your tokens
-- `POST /api/envman/tokens` — create token
+- `GET /api/envman/tokens` — list your tokens (metadata only — token value tidak pernah di-return)
+- `POST /api/envman/tokens` — create token (response satu-satunya yang berisi nilai token saat create)
+- `PATCH /api/envman/tokens/:id` — update name/scopes/canWrite/expiresAt
+- `PATCH /api/envman/tokens/:id/toggle` — enable/disable token
+- `GET /api/envman/tokens/:id/reveal` — return nilai token (owner only, audit `TOKEN_REVEALED`)
+- `POST /api/envman/tokens/:id/rotate` — generate nilai token baru, reset `lastUsedAt`, audit `TOKEN_ROTATED`
 - `DELETE /api/envman/tokens/:id` — delete token
 - `GET /api/envman/whoami` — verify token, return user info
 
