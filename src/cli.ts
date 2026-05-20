@@ -301,22 +301,28 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
 async function cmdAlias(args: string[]) {
   // Parse extra -e flags and optional --server-wins from command line.
   // The non-flag argument is the alias ref (project:alias).
+  // Everything AFTER the ref is collected as extra args passed through to the command.
   const extraSources: string[] = []
+  const passthroughArgs: string[] = []
   let ref = ''
   let extraServerWins = false
+  let refFound = false
   let i = 0
   while (i < args.length) {
     const a = args[i]
-    if (a === '-e') {
+    if (refFound) {
+      // After ref: everything is passed through to the command
+      passthroughArgs.push(a); i++
+    } else if (a === '-e') {
       const val = args[i + 1]
       if (!val) { console.error('-e requires a value'); process.exit(1) }
       extraSources.push(val); i += 2
     } else if (a === '--server-wins') {
       extraServerWins = true; i++
     } else if (!a.startsWith('-')) {
-      ref = a; i++
+      ref = a; refFound = true; i++
     } else {
-      console.error(`Unknown flag: ${a}\nUsage: envman run [-e <source>]... <project>:<alias>`)
+      console.error(`Unknown flag: ${a}\nUsage: envman run [-e <source>]... <project>:<alias> [args...]`)
       process.exit(1)
     }
   }
@@ -368,7 +374,8 @@ async function cmdAlias(args: string[]) {
   const mergedSources = [...extraSources, ...storedSources]
   // Pass alias project slug as hint so files: can resolve even with no -e project:env source
   const aliasProject = ref.split(':')[0]
-  await cmdRun(mergedSources, command, extraServerWins || storedServerWins, aliasProject)
+  // Append passthrough args to command (e.g. envman run project:alias --flag value)
+  await cmdRun(mergedSources, [...command, ...passthroughArgs], extraServerWins || storedServerWins, aliasProject)
 }
 
 // ─── Update ──────────────────────────────────────────────────────────────────
@@ -417,7 +424,7 @@ USAGE:
   envman logout                                Remove saved credentials
   envman whoami                                Show current authenticated user
   envman update                                Update CLI to latest version
-  envman run [-e <source>]... <project>:<alias>    Expand alias, merge extra sources
+  envman run [-e <source>]... <project>:<alias> [args...]  Expand alias + passthrough args
   envman -e <project:env> -- <cmd> files:<prefix>[/<file>]  Execute project file via stdin
   envman [options] -- <command>                Inject env vars and run command
 
