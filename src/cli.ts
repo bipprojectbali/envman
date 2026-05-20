@@ -84,17 +84,21 @@ function showUpdateNoticeFromCache() {
   try {
     if (!existsSync(UPDATE_CACHE_FILE)) return
     const cache = JSON.parse(readFileSync(UPDATE_CACHE_FILE, 'utf8'))
-    if (cache.latestVersion && cache.latestVersion !== VERSION) {
-      console.error(`\n╔══ Update tersedia ══════════════════════════════════════╗`)
-      console.error(`║  envman v${VERSION} → v${cache.latestVersion}`)
-      console.error(`║  Jalankan: envman update`)
-      console.error(`╚════════════════════════════════════════════════════════╝\n`)
+
+    if (cache.autoUpdated && cache.latestVersion) {
+      // Binary was replaced in background — show success notice and clear flag
+      console.error(`\n✓ envman diperbarui ke v${cache.latestVersion} di background.\n`)
+      writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({
+        checkedAt: cache.checkedAt,
+        latestVersion: cache.latestVersion,
+        autoUpdated: false,
+      }))
     }
   } catch {}
 }
 
 // Spawn detached subprocess to refresh update cache (doesn't block parent)
-function spawnUpdateCheck(serverUrl: string, token: string) {
+function spawnUpdateCheck(serverUrl: string, _token: string) {
   try {
     if (!existsSync(UPDATE_CACHE_FILE)) {
       // First run — force check
@@ -102,7 +106,7 @@ function spawnUpdateCheck(serverUrl: string, token: string) {
       const cache = JSON.parse(readFileSync(UPDATE_CACHE_FILE, 'utf8'))
       if (Date.now() - (cache.checkedAt ?? 0) < UPDATE_CHECK_INTERVAL_MS) return
     }
-    const child = spawn(process.execPath, ['--_update-check', serverUrl, token], {
+    const child = spawn(process.execPath, ['--_update-check', serverUrl, process.execPath], {
       detached: true,
       stdio: 'ignore',
     })
@@ -463,16 +467,47 @@ Manage projects at: <server-url>/envmanager
 async function main() {
   const args = process.argv.slice(2)
 
-  // Hidden flag: background update cache refresh (spawned detached from main process)
+  // Hidden flag: background auto-update (spawned detached, runs silently after main process exits)
   if (args[0] === '--_update-check') {
-    const [, serverUrl, token] = args
+    const [, serverUrl, binaryPath] = args
     try {
-      const res = await fetch(`${serverUrl.replace(/\/$/, '')}/download/cli/version`)
-      if (res.ok) {
-        const { version: latest } = await res.json() as { version: string }
-        if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true })
+      const server = serverUrl.replace(/\/$/, '')
+      const res = await fetch(`${server}/download/cli/version`)
+      if (!res.ok) process.exit(0)
+      const { version: latest } = await res.json() as { version: string }
+
+      if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true })
+
+      if (latest === VERSION) {
+        // Already up to date — just refresh the check timestamp
         writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({ checkedAt: Date.now(), latestVersion: latest }))
+        process.exit(0)
       }
+
+      // Download new binary to .new temp file
+      const platform = detectPlatform()
+      const dlRes = await fetch(`${server}/download/cli/${platform}`, {
+        headers: { 'Accept-Encoding': 'gzip' },
+      })
+      if (!dlRes.ok) process.exit(0)
+
+      const buf = Buffer.from(await dlRes.arrayBuffer())
+      if (buf.length < 1_000_000) process.exit(0)  // sanity: < 1MB = likely corrupt
+
+      const tmpBin = `${binaryPath}.new`
+      writeFileSync(tmpBin, buf, { mode: 0o755 })
+
+      // Atomic replace: remove old, rename new → final
+      const { renameSync } = await import('fs')
+      rmSync(binaryPath, { force: true })
+      renameSync(tmpBin, binaryPath)
+
+      // Mark as auto-updated so next run shows a notice
+      writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({
+        checkedAt: Date.now(),
+        latestVersion: latest,
+        autoUpdated: true,
+      }))
     } catch {}
     process.exit(0)
   }
