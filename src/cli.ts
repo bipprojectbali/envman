@@ -2,11 +2,13 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { homedir, tmpdir } from 'os'
 import { basename, join } from 'path'
-import { spawnSync } from 'child_process'
+import { spawn, spawnSync } from 'child_process'
 
 const CONFIG_DIR = join(homedir(), '.config', 'envman')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
+const UPDATE_CACHE_FILE = join(CONFIG_DIR, 'update-check.json')
 const VERSION = '1.3.0'
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000  // 1 jam
 
 interface Config {
   server: string
@@ -65,6 +67,47 @@ function resolveAuth(localVars: Record<string, string>): Config {
     '  3. Add ENVMAN_SERVER and ENVMAN_TOKEN to a local file passed with -e'
   )
   process.exit(1)
+}
+
+// ─── Update check ────────────────────────────────────────────────────────────
+
+function detectPlatform(): string {
+  const os = process.platform
+  const arch = process.arch
+  if (os === 'darwin') return arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64'
+  if (os === 'win32') return 'windows-x64'
+  return arch === 'arm64' ? 'linux-arm64' : 'linux-x64'
+}
+
+// Read cached update state and print notice if update available (no network, instant)
+function showUpdateNoticeFromCache() {
+  try {
+    if (!existsSync(UPDATE_CACHE_FILE)) return
+    const cache = JSON.parse(readFileSync(UPDATE_CACHE_FILE, 'utf8'))
+    if (cache.latestVersion && cache.latestVersion !== VERSION) {
+      console.error(`\n╔══ Update tersedia ══════════════════════════════════════╗`)
+      console.error(`║  envman v${VERSION} → v${cache.latestVersion}`)
+      console.error(`║  Jalankan: envman update`)
+      console.error(`╚════════════════════════════════════════════════════════╝\n`)
+    }
+  } catch {}
+}
+
+// Spawn detached subprocess to refresh update cache (doesn't block parent)
+function spawnUpdateCheck(serverUrl: string, token: string) {
+  try {
+    if (!existsSync(UPDATE_CACHE_FILE)) {
+      // First run — force check
+    } else {
+      const cache = JSON.parse(readFileSync(UPDATE_CACHE_FILE, 'utf8'))
+      if (Date.now() - (cache.checkedAt ?? 0) < UPDATE_CHECK_INTERVAL_MS) return
+    }
+    const child = spawn(process.execPath, ['--_update-check', serverUrl, token], {
+      detached: true,
+      stdio: 'ignore',
+    })
+    child.unref()
+  } catch {}
 }
 
 // ─── API fetch ────────────────────────────────────────────────────────────────
@@ -324,6 +367,42 @@ async function cmdAlias(args: string[]) {
   await cmdRun(mergedSources, command, extraServerWins || storedServerWins, aliasProject)
 }
 
+// ─── Update ──────────────────────────────────────────────────────────────────
+
+async function cmdUpdate() {
+  const cfg = resolveAuth({})
+  const server = cfg.server.replace(/\/$/, '')
+  console.log(`Memeriksa update...`)
+  const res = await fetch(`${server}/download/cli/version`).catch(() => null)
+  if (!res?.ok) { console.error('Tidak bisa cek versi dari server.'); process.exit(1) }
+  const { version: latest } = await res.json() as { version: string }
+  if (latest === VERSION) {
+    console.log(`✓ envman v${VERSION} sudah versi terbaru.`)
+    // Update cache
+    if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true })
+    writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({ checkedAt: Date.now(), latestVersion: latest }))
+    return
+  }
+  console.log(`Update tersedia: v${VERSION} → v${latest}`)
+  console.log(`Mengunduh dan menginstall...`)
+  const platform = detectPlatform()
+  const installUrl = `${server}/download/cli/${platform}`
+  const binaryPath = process.execPath
+  // Download binary langsung ke path yang sama (replace current binary)
+  const tmpBin = `${binaryPath}.new`
+  const dlRes = await fetch(installUrl, { headers: { 'Accept-Encoding': 'gzip' } })
+  if (!dlRes.ok) { console.error(`Download gagal: HTTP ${dlRes.status}`); process.exit(1) }
+  const buf = Buffer.from(await dlRes.arrayBuffer())
+  writeFileSync(tmpBin, buf, { mode: 0o755 })
+  rmSync(binaryPath, { force: true })
+  // rename: tmp → final
+  const { renameSync } = await import('fs')
+  renameSync(tmpBin, binaryPath)
+  // Update cache
+  writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({ checkedAt: Date.now(), latestVersion: latest }))
+  console.log(`✓ envman diupdate ke v${latest}. Restart terminal jika perlu.`)
+}
+
 // ─── Help ─────────────────────────────────────────────────────────────────────
 
 function printHelp() {
@@ -333,6 +412,7 @@ USAGE:
   envman login <server-url> --token <token>   Save credentials to config file
   envman logout                                Remove saved credentials
   envman whoami                                Show current authenticated user
+  envman update                                Update CLI to latest version
   envman run [-e <source>]... <project>:<alias>    Expand alias, merge extra sources
   envman -e <project:env> -- <cmd> files:<prefix>[/<file>]  Execute project file via stdin
   envman [options] -- <command>                Inject env vars and run command
@@ -383,6 +463,20 @@ Manage projects at: <server-url>/envmanager
 async function main() {
   const args = process.argv.slice(2)
 
+  // Hidden flag: background update cache refresh (spawned detached from main process)
+  if (args[0] === '--_update-check') {
+    const [, serverUrl, token] = args
+    try {
+      const res = await fetch(`${serverUrl.replace(/\/$/, '')}/download/cli/version`)
+      if (res.ok) {
+        const { version: latest } = await res.json() as { version: string }
+        if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true })
+        writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({ checkedAt: Date.now(), latestVersion: latest }))
+      }
+    } catch {}
+    process.exit(0)
+  }
+
   if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
     printHelp(); return
   }
@@ -394,8 +488,12 @@ async function main() {
     case 'login':  await cmdLogin(args.slice(1)); return
     case 'logout': await cmdLogout(); return
     case 'whoami': await cmdWhoami(); return
+    case 'update': await cmdUpdate(); return
     case 'run':    await cmdAlias(args.slice(1)); return
   }
+
+  // Show notice from cache (instant, no network) + queue background refresh
+  showUpdateNoticeFromCache()
 
   // Run mode — collect all flags before --
   const sepIdx = args.indexOf('--')
@@ -429,6 +527,18 @@ async function main() {
     console.error('Specify at least one -e source.\nUsage: envman -e project:env -- command')
     process.exit(1)
   }
+
+  // Queue background update check (detached, doesn't block command execution)
+  const localVarsForAuth: Record<string, string> = {}
+  for (const src of sources) {
+    if (!src.includes(':') && !src.startsWith('files:')) {
+      try { Object.assign(localVarsForAuth, parseEnvFile(src)) } catch {}
+    }
+  }
+  try {
+    const cfg = resolveAuth(localVarsForAuth)
+    spawnUpdateCheck(cfg.server, cfg.token)
+  } catch {}
 
   await cmdRun(sources, command, serverWins)
 }
