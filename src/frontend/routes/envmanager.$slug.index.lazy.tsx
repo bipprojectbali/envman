@@ -278,20 +278,21 @@ function ProjectDetailPage() {
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
-      {/* ─── Header ─────────────────────────── */}
-      <Group mb="sm" gap={4} wrap="nowrap">
+      {/* ─── Breadcrumb ─────────────────────── */}
+      <Group mb="md" gap={6} wrap="nowrap" align="center">
         <Button
-          variant="subtle" size="xs" px={6} color="gray"
+          variant="subtle" size="xs" px={8} color="gray"
           component={Link} to="/envmanager"
-          leftSection={<TbArrowLeft size={13} />}
+          leftSection={<TbArrowLeft size={12} />}
+          styles={{ root: { fontWeight: 400 } }}
         >
           Projects
         </Button>
-        <Text size="sm" c="dimmed">/</Text>
+        <TbChevronRight size={13} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
         {isLoading ? (
-          <Skeleton height={16} width={120} />
+          <Skeleton height={14} width={100} />
         ) : (
-          <Text size="sm" c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <Text size="sm" fw={500} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {project?.name ?? slug}
           </Text>
         )}
@@ -318,64 +319,84 @@ function ProjectDetailPage() {
           </Group>
         </Card>
       ) : project && (
-        <Paper withBorder radius="md" p="md" mb="md">
+        <Paper
+          withBorder radius="lg" p="lg" mb="lg"
+          style={{ borderLeft: `3px solid var(--mantine-color-${roleColor[myRole as keyof typeof roleColor] ?? 'gray'}-5)` }}
+        >
           <Group gap="md" wrap="nowrap" align="flex-start">
-            <ThemeIcon size={48} radius="md" variant="light" color={roleColor[myRole as keyof typeof roleColor] ?? 'gray'}>
+            <ThemeIcon
+              size={52} radius="lg" variant="gradient"
+              gradient={{ from: `${roleColor[myRole as keyof typeof roleColor] ?? 'gray'}.6`, to: `${roleColor[myRole as keyof typeof roleColor] ?? 'gray'}.4`, deg: 135 }}
+            >
               <TbFolders size={26} />
             </ThemeIcon>
+
             <Box style={{ flex: 1, minWidth: 0 }}>
-              <Group gap="xs" mb={4} wrap="nowrap">
-                <Text fw={700} size="xl" lh={1.2} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {/* Name + slug + role */}
+              <Group gap="xs" mb={6} wrap="nowrap" align="center">
+                <Text fw={800} size="xl" lh={1.2} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {project.name}
                 </Text>
-                <Code fz="xs" c="dimmed">{slug}</Code>
-                <Badge size="sm" variant="dot" color={roleColor[myRole as keyof typeof roleColor] ?? 'gray'}>
+                <Code fz="xs" style={{ flexShrink: 0 }}>{slug}</Code>
+                <Badge
+                  size="sm"
+                  variant="filled"
+                  color={roleColor[myRole as keyof typeof roleColor] ?? 'gray'}
+                  style={{ flexShrink: 0 }}
+                >
                   {myRole}
                 </Badge>
               </Group>
-              {project.description ? (
-                <Text size="sm" c="dimmed" mb="sm" lh={1.5}>
-                  {project.description}
-                </Text>
-              ) : (
-                <Text size="sm" c="dimmed" fs="italic" mb="sm">
-                  Belum ada deskripsi
-                </Text>
-              )}
+
+              {/* Description */}
+              <Text size="sm" c={project.description ? undefined : 'dimmed'} fs={project.description ? undefined : 'italic'} mb="sm" lh={1.6}>
+                {project.description || 'Belum ada deskripsi'}
+              </Text>
+
+              {/* Tags */}
               {projectTags.length > 0 && (
                 <Group gap={4} mb="sm">
-                  <TbTag size={12} style={{ color: 'var(--mantine-color-dimmed)' }} />
                   {projectTags.map(t => (
-                    <Badge key={t} size="xs" variant="light" color={tagColor(t)}>{t}</Badge>
+                    <Badge key={t} size="xs" variant="light" color={tagColor(t)} leftSection={<TbTag size={9} />}>{t}</Badge>
                   ))}
                 </Group>
               )}
-              <Group gap="lg">
-                <Tooltip label={`${envs.length} environment`}>
-                  <Group gap={4}>
-                    <TbVariable size={13} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                    <Text size="xs" c="dimmed">{envs.length} env</Text>
+
+              {/* Stats row */}
+              <Group gap={0} style={{ borderTop: '1px solid var(--mantine-color-default-border)', paddingTop: 10, marginTop: 4 }}>
+                <Tooltip label={`${envs.length} environment`} withArrow>
+                  <Group gap={5} px={12} style={{ cursor: 'default' }}>
+                    <TbVariable size={13} color="var(--mantine-color-violet-5)" />
+                    <Text size="xs" fw={600}>{envs.length}</Text>
+                    <Text size="xs" c="dimmed">env</Text>
                   </Group>
                 </Tooltip>
-                <Tooltip label={`${totalVars} variabel total di semua env`}>
-                  <Group gap={4}>
-                    <Box w={3} h={3} bg="var(--mantine-color-dimmed)" style={{ borderRadius: '50%' }} />
-                    <Text size="xs" c="dimmed">{totalVars} vars</Text>
+                <Box w={1} h={16} bg="var(--mantine-color-default-border)" />
+                <Tooltip label={`${totalVars} variabel di semua environment`} withArrow>
+                  <Group gap={5} px={12} style={{ cursor: 'default' }}>
+                    <Box w={6} h={6} bg="var(--mantine-color-teal-5)" style={{ borderRadius: 2 }} />
+                    <Text size="xs" fw={600}>{totalVars}</Text>
+                    <Text size="xs" c="dimmed">vars</Text>
                   </Group>
                 </Tooltip>
-                <Tooltip label={`${memberCount} anggota`}>
-                  <Group gap={4}>
-                    <TbUsers size={13} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                    <Text size="xs" c="dimmed">{memberCount} member</Text>
+                <Box w={1} h={16} bg="var(--mantine-color-default-border)" />
+                <Tooltip label={`${memberCount} anggota project`} withArrow>
+                  <Group gap={5} px={12} style={{ cursor: 'default' }}>
+                    <TbUsers size={13} color="var(--mantine-color-blue-5)" />
+                    <Text size="xs" fw={600}>{memberCount}</Text>
+                    <Text size="xs" c="dimmed">member</Text>
                   </Group>
                 </Tooltip>
                 {project.createdAt && (
-                  <Tooltip label={`Dibuat ${new Date(project.createdAt).toLocaleString('id-ID')}`}>
-                    <Group gap={4} style={{ marginLeft: 'auto' }}>
-                      <TbClock size={13} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                      <Text size="xs" c="dimmed">{relativeDate(project.createdAt)}</Text>
-                    </Group>
-                  </Tooltip>
+                  <>
+                    <Box w={1} h={16} bg="var(--mantine-color-default-border)" />
+                    <Tooltip label={`Dibuat ${new Date(project.createdAt).toLocaleString('id-ID')}`} withArrow>
+                      <Group gap={5} px={12} style={{ marginLeft: 'auto', cursor: 'default' }}>
+                        <TbClock size={12} color="var(--mantine-color-dimmed)" />
+                        <Text size="xs" c="dimmed">{relativeDate(project.createdAt)}</Text>
+                      </Group>
+                    </Tooltip>
+                  </>
                 )}
               </Group>
             </Box>
@@ -385,24 +406,24 @@ function ProjectDetailPage() {
 
       {/* ─── Tabs ───────────────────────────── */}
       {!isError && (
-        <Tabs value={tab} onChange={v => setTab(v ?? 'environments')}>
-          <Tabs.List mb="md">
+        <Tabs value={tab} onChange={v => setTab(v ?? 'environments')} variant="pills">
+          <Tabs.List mb="lg" gap={4}>
             <Tabs.Tab
               value="environments"
-              leftSection={<TbVariable size={14} />}
+              leftSection={<TbVariable size={13} />}
               rightSection={!isLoading && envs.length > 0 ? (
                 <Badge size="xs" variant="filled" color="violet" circle>{envs.length}</Badge>
               ) : undefined}
             >
               Environments
             </Tabs.Tab>
-            <Tabs.Tab value="notes" leftSection={<TbNote size={14} />}>
+            <Tabs.Tab value="notes" leftSection={<TbNote size={13} />}>
               Notes
             </Tabs.Tab>
-            <Tabs.Tab value="aliases" leftSection={<TbTerminal2 size={14} />}>
+            <Tabs.Tab value="aliases" leftSection={<TbTerminal2 size={13} />}>
               Aliases
             </Tabs.Tab>
-            <Tabs.Tab value="files" leftSection={<TbFiles size={14} />}>
+            <Tabs.Tab value="files" leftSection={<TbFiles size={13} />}>
               Files
             </Tabs.Tab>
           </Tabs.List>
@@ -496,64 +517,74 @@ function ProjectDetailPage() {
                     </Card>
                   ) : filteredEnvs.map(e => {
                     const color = getEnvColor(e.name)
+                    const varCount = e._count?.vars ?? 0
                     const goTo = () => navigate({ to: '/envmanager/$slug/$env', params: { slug, env: e.name } })
                     return (
                       <Card
                         key={e.name}
                         withBorder
+                        padding="sm"
+                        radius="md"
                         className="envman-env-card"
                         role="link"
                         tabIndex={0}
                         aria-label={`Kelola environment ${e.name}`}
                         onClick={goTo}
                         onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); goTo() } }}
-                        style={{ cursor: 'pointer' }}
+                        style={{
+                          cursor: 'pointer',
+                          borderLeft: `3px solid var(--mantine-color-${color}-5)`,
+                        }}
                       >
-                        <Group justify="space-between" wrap="nowrap">
+                        <Group justify="space-between" wrap="nowrap" gap="sm">
                           <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
-                            <ThemeIcon size={36} radius="md" variant="light" color={color}>
-                              <TbVariable size={18} />
+                            <ThemeIcon size={40} radius="md" variant="light" color={color}>
+                              <TbVariable size={20} />
                             </ThemeIcon>
                             <Box style={{ flex: 1, minWidth: 0 }}>
-                              <Group gap="xs" mb={2} wrap="nowrap">
-                                <Text fw={700} size="sm">{e.name}</Text>
-                                <Tooltip label={`${e._count?.vars ?? 0} variabel`}>
-                                  <Badge size="xs" variant="light" color={color}>
-                                    {e._count?.vars ?? 0} vars
-                                  </Badge>
-                                </Tooltip>
+                              <Group gap={6} mb={3} wrap="nowrap" align="center">
+                                <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {e.name}
+                                </Text>
+                                <Badge
+                                  size="xs"
+                                  variant="filled"
+                                  color={color}
+                                  style={{ flexShrink: 0 }}
+                                >
+                                  {varCount} vars
+                                </Badge>
                               </Group>
-                              <Group gap="md">
-                                <Code fz="xs" c="dimmed">{slug}:{e.name}</Code>
+                              <Group gap="xs" wrap="nowrap">
+                                <Code fz="xs">{slug}:{e.name}</Code>
                                 {e.createdAt && (
-                                  <Tooltip label={`Dibuat ${new Date(e.createdAt).toLocaleString('id-ID')}`}>
-                                    <Group gap={4}>
-                                      <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                                      <Text size="xs" c="dimmed">{relativeDate(e.createdAt)}</Text>
-                                    </Group>
+                                  <Tooltip label={`Dibuat ${new Date(e.createdAt).toLocaleString('id-ID')}`} withArrow>
+                                    <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+                                      {relativeDate(e.createdAt)}
+                                    </Text>
                                   </Tooltip>
                                 )}
                               </Group>
                             </Box>
                           </Group>
 
-                          <Group gap="xs" wrap="nowrap" onClick={ev => ev.stopPropagation()}>
+                          <Group gap={6} wrap="nowrap" onClick={ev => ev.stopPropagation()}>
                             {isOwner && (
                               <>
-                                <Tooltip label="Rename environment" position="left">
+                                <Tooltip label="Rename" position="left" withArrow>
                                   <ActionIcon
-                                    size="sm" variant="subtle" color="blue"
+                                    size="sm" variant="subtle" color="gray"
                                     aria-label="Rename environment"
-                                    onClick={ev => { ev.stopPropagation(); renameEnv(e.name, e._count?.vars ?? 0) }}
+                                    onClick={ev => { ev.stopPropagation(); renameEnv(e.name, varCount) }}
                                   >
                                     <TbPencil size={13} />
                                   </ActionIcon>
                                 </Tooltip>
-                                <Tooltip label="Hapus environment" position="left">
+                                <Tooltip label="Hapus" position="left" withArrow>
                                   <ActionIcon
                                     size="sm" variant="subtle" color="red"
                                     aria-label="Hapus environment"
-                                    onClick={ev => { ev.stopPropagation(); deleteEnv(e.name, e._count?.vars ?? 0) }}
+                                    onClick={ev => { ev.stopPropagation(); deleteEnv(e.name, varCount) }}
                                   >
                                     <TbTrash size={13} />
                                   </ActionIcon>
@@ -562,12 +593,13 @@ function ProjectDetailPage() {
                             )}
                             <Button
                               size="xs"
-                              variant="light"
+                              variant="filled"
                               color={color}
                               rightSection={<TbChevronRight size={12} />}
                               onClick={ev => { ev.stopPropagation(); goTo() }}
+                              style={{ flexShrink: 0 }}
                             >
-                              Manage
+                              Open
                             </Button>
                           </Group>
                         </Group>
@@ -579,25 +611,28 @@ function ProjectDetailPage() {
             )}
 
             {canEdit && (
-              <Paper withBorder radius="md" p="sm" mt="md" bg="var(--mantine-color-default-hover)">
+              <Paper withBorder radius="md" p="sm" mt="md">
                 <Group gap="xs" align="flex-start">
                   <Box style={{ flex: 1 }}>
                     <TextInput
-                      size="xs"
-                      placeholder="Nama environment baru (mis. production, staging-eu)..."
+                      size="sm"
+                      placeholder="Nama environment baru, mis. production, staging-eu..."
                       value={newEnvName}
                       onChange={ev => setNewEnvName(ev.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                       onKeyDown={ev => { if (ev.key === 'Enter' && newEnvValid && !newEnvDuplicate) addEnv.mutate(newEnvName) }}
-                      leftSection={<TbVariable size={13} />}
+                      leftSection={<TbVariable size={14} />}
                       error={newEnvError ?? undefined}
+                      styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
                     />
                     {envs.length > 0 && envs.length < ENV_PRESETS.length && (
-                      <Group gap={4} mt="xs">
-                        <Text size="xs" c="dimmed">Quick add:</Text>
+                      <Group gap={6} mt={8}>
+                        <Text size="xs" c="dimmed">Preset:</Text>
                         {ENV_PRESETS.filter(p => !envs.some(e => e.name === p)).map(preset => (
                           <Badge
                             key={preset}
-                            size="sm" variant="light" color={getEnvColor(preset)}
+                            size="sm"
+                            variant="outline"
+                            color={getEnvColor(preset)}
                             style={{ cursor: 'pointer' }}
                             onClick={() => addEnv.mutate(preset)}
                           >
@@ -608,8 +643,8 @@ function ProjectDetailPage() {
                     )}
                   </Box>
                   <Button
-                    size="xs"
-                    leftSection={<TbPlus size={13} />}
+                    size="sm"
+                    leftSection={<TbPlus size={14} />}
                     onClick={() => addEnv.mutate(newEnvName)}
                     loading={addEnv.isPending}
                     disabled={!newEnvValid || newEnvDuplicate}
