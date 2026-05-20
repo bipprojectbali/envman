@@ -611,40 +611,28 @@ function TokensPage() {
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
       {/* ─── Header ─────────────────────────── */}
-      <Group justify="space-between" mb="md" wrap="nowrap" align="flex-start">
-        <Group gap="sm" style={{ minWidth: 0 }}>
-          <ThemeIcon size={38} radius="md" variant="light" color="violet">
-            <TbKey size={20} />
-          </ThemeIcon>
-          <Box style={{ minWidth: 0 }}>
-            <Text fw={700} size="lg" lh={1.2}>API Tokens</Text>
-            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-              {isLoading
-                ? 'Memuat...'
-                : tokens.length === 0
-                  ? 'Belum ada token'
-                  : <>
-                      {tokens.length} total · {activeTokens.length} aktif
-                      {expiredTokens.length > 0 && ` · ${expiredTokens.length} expired`}
-                      {disabledTokens.length > 0 && ` · ${disabledTokens.length} disabled`}
-                    </>}
+      <Group justify="space-between" mb="md" wrap="nowrap" align="center">
+        <Box style={{ minWidth: 0 }}>
+          <Text fw={800} size="xl" lh={1.2}>API Tokens</Text>
+          {!isLoading && tokens.length > 0 && (
+            <Text size="xs" c="dimmed" mt={2}>
+              {tokens.length} total · {activeTokens.length} aktif
+              {expiredTokens.length > 0 && ` · ${expiredTokens.length} expired`}
+              {disabledTokens.length > 0 && ` · ${disabledTokens.length} disabled`}
             </Text>
-          </Box>
-        </Group>
+          )}
+        </Box>
         <Group gap="xs" wrap="nowrap">
           {tokens.length > 0 && (
             <Tooltip label={view === 'list' ? 'Tampilan grid' : 'Tampilan list'}>
-              <ActionIcon
-                size="lg" variant="default"
-                aria-label="Ganti tampilan"
-                onClick={() => setView(v => v === 'list' ? 'grid' : 'list')}
-              >
-                {view === 'list' ? <TbLayoutGrid size={16} /> : <TbLayoutList size={16} />}
+              <ActionIcon size="md" variant="default" radius="md" aria-label="Ganti tampilan"
+                onClick={() => setView(v => v === 'list' ? 'grid' : 'list')}>
+                {view === 'list' ? <TbLayoutGrid size={15} /> : <TbLayoutList size={15} />}
               </ActionIcon>
             </Tooltip>
           )}
           {canCreateToken && (
-            <Button size="sm" leftSection={<TbPlus size={14} />} color="violet" onClick={openCreate}>
+            <Button size="sm" leftSection={<TbPlus size={14} />} color="violet" radius="md" onClick={openCreate}>
               Buat Token
             </Button>
           )}
@@ -653,7 +641,7 @@ function TokensPage() {
 
       {/* ─── Toolbar ────────────────────────── */}
       {!isError && tokens.length > 0 && (
-        <Paper withBorder radius="md" p="xs" mb="md">
+        <Box mb="md">
           <Group gap="xs" wrap="wrap">
             <TextInput
               ref={searchRef}
@@ -740,31 +728,30 @@ function TokensPage() {
             </Group>
           )}
           {hasFilter && (
-            <Group justify="space-between" mt="xs" gap="xs" wrap="nowrap">
+            <Group justify="space-between" mt={6} gap="xs" wrap="nowrap">
               <Text size="xs" c="dimmed">
                 {filteredTokens.length === tokens.length
-                  ? `Menampilkan semua ${tokens.length} token`
+                  ? `${tokens.length} token`
                   : `${filteredTokens.length} dari ${tokens.length} token`}
               </Text>
-              <Button
-                size="compact-xs" variant="subtle" color="gray"
-                leftSection={<TbX size={11} />}
-                onClick={resetFilter}
-              >
-                Reset filter
+              <Button size="compact-xs" variant="subtle" color="gray" leftSection={<TbX size={11} />} onClick={resetFilter}>
+                Reset
               </Button>
             </Group>
           )}
-        </Paper>
+        </Box>
       )}
 
-      <Alert color="gray" p="xs" mb="md" icon={<TbShieldCheck size={14} />}>
+      <Group gap="xs" mb="md" align="center">
+        <TbShieldCheck size={13} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
         <Text size="xs" c="dimmed">
-          Token digunakan CLI untuk autentikasi tanpa password.
-          Token <strong>read-only</strong> hanya bisa pull vars · Token <strong>read-write</strong> bisa push vars ke environment.
-          Scope kosong = akses ke semua project yang kamu miliki.
+          Token CLI untuk autentikasi tanpa password.
+          <Text span c="dimmed"> · </Text>
+          <Text span fw={600} c="dimmed">read-only</Text> = pull vars ·{' '}
+          <Text span fw={600} c="dimmed">read-write</Text> = push vars ·{' '}
+          Scope kosong = akses semua project
         </Text>
-      </Alert>
+      </Group>
 
       {/* ─── New token banner ───────────────── */}
       {newToken && (
@@ -881,89 +868,72 @@ function TokensPage() {
             const isExpired = expiry === 'expired'
             return (
               <Card
-                key={t.id}
-                withBorder
-                p="sm"
+                key={t.id} withBorder radius="lg" p="sm"
                 className={`envman-token-card ${t.isDisabled ? 'is-disabled' : ''} ${isExpired ? 'is-expired' : ''}`}
                 style={{
-                  opacity: t.isDisabled ? 0.5 : isExpired ? 0.6 : 1,
-                  borderColor: t.isDisabled ? 'var(--mantine-color-gray-5)' : isExpired ? 'var(--mantine-color-red-3)' : undefined,
+                  opacity: t.isDisabled ? 0.55 : isExpired ? 0.65 : 1,
+                  borderColor: isExpired ? 'var(--mantine-color-red-3)' : undefined,
                 }}
               >
-                <Group justify="space-between" mb="xs" wrap="nowrap">
-                  <ThemeIcon size={32} radius="md" variant="light" color={t.canWrite ? 'orange' : 'blue'}>
-                    {t.canWrite ? <TbLockOpen size={15} /> : <TbLock size={15} />}
-                  </ThemeIcon>
-                  <Group gap={4}>
-                    <Tooltip label={t.isDisabled ? 'Aktifkan' : 'Nonaktifkan'}>
-                      <ActionIcon
-                        size="xs" variant="subtle"
-                        color={t.isDisabled ? 'gray' : 'teal'}
-                        aria-label={t.isDisabled ? 'Aktifkan token' : 'Nonaktifkan token'}
+                {/* Top: access icon + actions */}
+                <Group justify="space-between" mb={8} wrap="nowrap">
+                  <Group gap={6} align="center">
+                    <ThemeIcon size={28} radius="md" variant="light" color={t.canWrite ? 'orange' : 'blue'}>
+                      <TbKey size={14} />
+                    </ThemeIcon>
+                    <Badge size="xs" variant="light" color={t.canWrite ? 'orange' : 'blue'}>
+                      {t.canWrite ? 'rw' : 'ro'}
+                    </Badge>
+                    {t.isDisabled && <Badge size="xs" color="gray" variant="filled">off</Badge>}
+                    {isExpired && <Badge size="xs" color="red" variant="filled">expired</Badge>}
+                    {expiry === 'soon' && t.expiresAt && (
+                      <Badge size="xs" color="yellow" variant="light">{daysUntil(t.expiresAt)}h</Badge>
+                    )}
+                  </Group>
+                  <Group gap={2}>
+                    <Tooltip label={t.isDisabled ? 'Aktifkan' : 'Nonaktifkan'} withArrow>
+                      <ActionIcon size="xs" variant="subtle" color={t.isDisabled ? 'gray' : 'teal'}
                         loading={toggleToken.isPending && toggleToken.variables === t.id}
-                        onClick={() => toggleToken.mutate(t.id)}
-                      >
+                        onClick={() => toggleToken.mutate(t.id)}>
                         {t.isDisabled ? <TbToggleLeft size={13} /> : <TbToggleRight size={13} />}
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label={copiedId === t.id ? 'Tersalin!' : 'Copy token'}>
-                      <ActionIcon
-                        size="xs" variant="subtle"
-                        color={copiedId === t.id ? 'teal' : 'gray'}
-                        aria-label="Copy token"
+                    <Tooltip label={copiedId === t.id ? 'Tersalin!' : 'Copy token'} withArrow>
+                      <ActionIcon size="xs" variant="subtle" color={copiedId === t.id ? 'teal' : 'gray'}
                         loading={copyToken.isPending && copyToken.variables === t.id}
-                        onClick={() => copyToken.mutate(t.id)}
-                      >
+                        onClick={() => copyToken.mutate(t.id)}>
                         {copiedId === t.id ? <TbCheck size={12} /> : <TbCopy size={12} />}
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Rotate token">
-                      <ActionIcon
-                        size="xs" variant="subtle" color="yellow"
-                        aria-label="Rotate token"
+                    <Tooltip label="Rotate" withArrow>
+                      <ActionIcon size="xs" variant="subtle" color="yellow"
                         loading={rotateToken.isPending && rotateToken.variables === t.id}
-                        onClick={() => confirmRotate(t.id, t.name)}
-                      >
+                        onClick={() => confirmRotate(t.id, t.name)}>
                         <TbRefresh size={12} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Lihat cara penggunaan">
-                      <ActionIcon
-                        size="xs" variant="subtle" color="gray"
-                        aria-label="Lihat cara penggunaan"
-                        onClick={() => setExpandedUsage(prev => {
-                          const s = new Set(prev)
-                          s.has(t.id) ? s.delete(t.id) : s.add(t.id)
-                          return s
-                        })}
-                      >
+                    <Tooltip label="Usage" withArrow>
+                      <ActionIcon size="xs" variant="subtle" color="gray"
+                        onClick={() => setExpandedUsage(prev => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}>
                         <TbTerminal size={12} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Edit token">
-                      <ActionIcon size="xs" variant="subtle" color="gray" aria-label="Edit token" onClick={() => openEditModal(t)}>
+                    <Tooltip label="Edit" withArrow>
+                      <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => openEditModal(t)}>
                         <TbPencil size={12} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Revoke token">
-                      <ActionIcon size="xs" variant="subtle" color="red" aria-label="Revoke token" onClick={() => revokeToken(t.id, t.name)}>
+                    <Tooltip label="Revoke" withArrow>
+                      <ActionIcon size="xs" variant="subtle" color="red" onClick={() => revokeToken(t.id, t.name)}>
                         <TbTrash size={12} />
                       </ActionIcon>
                     </Tooltip>
                   </Group>
                 </Group>
-                <Text fw={700} size="sm" mb={2} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</Text>
-                <Group gap="xs" mb="xs" wrap="wrap">
-                  <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light">{t.canWrite ? 'read-write' : 'read-only'}</Badge>
-                  {t.isDisabled && <Badge size="xs" color="gray" variant="filled">disabled</Badge>}
-                  {isExpired && <Badge size="xs" color="red" variant="filled">expired</Badge>}
-                  {expiry === 'soon' && t.expiresAt && (
-                    <Badge size="xs" color="yellow" variant="light" leftSection={<TbClock size={9} />}>
-                      {daysUntil(t.expiresAt)}h lagi
-                    </Badge>
-                  )}
-                </Group>
-                <Group gap={4} mb={4} wrap="wrap">
+
+                {/* Token name — primary element */}
+                <Text fw={700} size="sm" mb={6} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</Text>
+                <Group gap={4} mb={6} wrap="wrap">
                   {t.scopes.length === 0 ? (
                     <Badge size="xs" variant="default">semua project</Badge>
                   ) : (
@@ -987,10 +957,13 @@ function TokensPage() {
                     </>
                   )}
                 </Group>
-                <Tooltip label={t.lastUsedAt ? `Terakhir dipakai ${absoluteTime(t.lastUsedAt)}` : 'Belum pernah dipakai'}>
-                  <Text size="xs" c="dimmed">
-                    Digunakan: {t.lastUsedAt ? relativeTime(t.lastUsedAt) : <Text component="span" c="dimmed" fs="italic">belum pernah</Text>}
-                  </Text>
+                <Tooltip label={t.lastUsedAt ? `Terakhir dipakai ${absoluteTime(t.lastUsedAt)}` : 'Belum pernah dipakai'} withArrow>
+                  <Group gap={4} style={{ cursor: 'default' }}>
+                    <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
+                    <Text size="xs" c="dimmed">
+                      {t.lastUsedAt ? relativeTime(t.lastUsedAt) : <Text component="span" fs="italic">belum dipakai</Text>}
+                    </Text>
+                  </Group>
                 </Tooltip>
 
                 <Collapse in={expandedUsage.has(t.id)}>
@@ -1045,30 +1018,30 @@ function TokensPage() {
             const isExpired = expiry === 'expired'
             return (
               <Card
-                key={t.id}
-                withBorder
-                p="sm"
+                key={t.id} withBorder radius="md" p="sm"
                 className={`envman-token-card ${t.isDisabled ? 'is-disabled' : ''} ${isExpired ? 'is-expired' : ''}`}
                 style={{
-                  opacity: t.isDisabled ? 0.5 : isExpired ? 0.6 : 1,
-                  borderColor: t.isDisabled ? 'var(--mantine-color-gray-5)' : isExpired ? 'var(--mantine-color-red-3)' : undefined,
+                  opacity: t.isDisabled ? 0.55 : isExpired ? 0.65 : 1,
+                  borderColor: isExpired ? 'var(--mantine-color-red-3)' : undefined,
                 }}
               >
-                <Group justify="space-between" wrap="nowrap">
-                  <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
+                <Group justify="space-between" wrap="nowrap" gap="sm">
+                  <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
                     <ThemeIcon size={32} radius="md" variant="light" color={t.canWrite ? 'orange' : 'blue'}>
-                      {t.canWrite ? <TbLockOpen size={14} /> : <TbLock size={14} />}
+                      <TbKey size={15} />
                     </ThemeIcon>
                     <Box style={{ flex: 1, minWidth: 0 }}>
-                      <Group gap="xs" mb={2} wrap="wrap">
+                      <Group gap={6} mb={3} wrap="nowrap" align="center">
                         <Text size="sm" fw={700} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</Text>
-                        <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light">{t.canWrite ? 'read-write' : 'read-only'}</Badge>
-                        {t.isDisabled && <Badge size="xs" color="gray" variant="filled">disabled</Badge>}
-                        {expiry === 'expired' && <Badge size="xs" color="red" variant="filled">expired</Badge>}
+                        <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light" style={{ flexShrink: 0 }}>
+                          {t.canWrite ? 'rw' : 'ro'}
+                        </Badge>
+                        {t.isDisabled && <Badge size="xs" color="gray" variant="filled" style={{ flexShrink: 0 }}>off</Badge>}
+                        {expiry === 'expired' && <Badge size="xs" color="red" variant="filled" style={{ flexShrink: 0 }}>expired</Badge>}
                         {expiry === 'soon' && t.expiresAt && (
-                          <Tooltip label={`Expired ${absoluteTime(t.expiresAt)}`}>
-                            <Badge size="xs" color="yellow" variant="light" leftSection={<TbClock size={9} />}>
-                              {daysUntil(t.expiresAt)} hari lagi
+                          <Tooltip label={`Expired ${absoluteTime(t.expiresAt)}`} withArrow>
+                            <Badge size="xs" color="yellow" variant="light" style={{ flexShrink: 0 }}>
+                              {daysUntil(t.expiresAt)}h
                             </Badge>
                           </Tooltip>
                         )}
@@ -1096,14 +1069,16 @@ function TokensPage() {
                             )}
                           </>
                         )}
-                        <Text size="xs" c="dimmed">·</Text>
-                        <Tooltip label={t.lastUsedAt ? `Terakhir dipakai ${absoluteTime(t.lastUsedAt)}` : 'Belum pernah dipakai'}>
-                          <Text size="xs" c="dimmed">
-                            digunakan: {t.lastUsedAt ? relativeTime(t.lastUsedAt) : <Text component="span" fs="italic">belum pernah</Text>}
-                          </Text>
+                        <Tooltip label={t.lastUsedAt ? `Terakhir dipakai ${absoluteTime(t.lastUsedAt)}` : 'Belum pernah dipakai'} withArrow>
+                          <Group gap={3} style={{ cursor: 'default' }}>
+                            <TbClock size={10} style={{ color: 'var(--mantine-color-dimmed)' }} />
+                            <Text size="xs" c="dimmed">
+                              {t.lastUsedAt ? relativeTime(t.lastUsedAt) : <Text component="span" fs="italic">belum dipakai</Text>}
+                            </Text>
+                          </Group>
                         </Tooltip>
-                        <Tooltip label={`Dibuat ${absoluteTime(t.createdAt)}`}>
-                          <Text size="xs" c="dimmed">dibuat: {relativeTime(t.createdAt)}</Text>
+                        <Tooltip label={`Dibuat ${absoluteTime(t.createdAt)}`} withArrow>
+                          <Text size="xs" c="dimmed" style={{ cursor: 'default' }}>{relativeTime(t.createdAt)}</Text>
                         </Tooltip>
                         {t.expiresAt && !isExpired && (
                           <Tooltip label={absoluteTime(t.expiresAt)}>
@@ -1120,60 +1095,42 @@ function TokensPage() {
                       </Group>
                     </Box>
                   </Group>
-                  <Group gap="xs" wrap="nowrap">
-                    <Tooltip label={t.isDisabled ? 'Aktifkan token' : 'Nonaktifkan token'}>
-                      <ActionIcon
-                        size="sm" variant="subtle"
-                        color={t.isDisabled ? 'gray' : 'teal'}
-                        aria-label={t.isDisabled ? 'Aktifkan token' : 'Nonaktifkan token'}
+                  <Group gap={2} wrap="nowrap" style={{ flexShrink: 0 }}>
+                    <Tooltip label={t.isDisabled ? 'Aktifkan' : 'Nonaktifkan'} withArrow>
+                      <ActionIcon size="sm" variant="subtle" color={t.isDisabled ? 'gray' : 'teal'}
                         loading={toggleToken.isPending && toggleToken.variables === t.id}
-                        onClick={() => toggleToken.mutate(t.id)}
-                      >
+                        onClick={() => toggleToken.mutate(t.id)}>
                         {t.isDisabled ? <TbToggleLeft size={15} /> : <TbToggleRight size={15} />}
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label={copiedId === t.id ? 'Tersalin!' : 'Copy token ke clipboard'}>
-                      <ActionIcon
-                        size="sm" variant="subtle"
-                        color={copiedId === t.id ? 'teal' : 'gray'}
-                        aria-label="Copy token"
+                    <Tooltip label={copiedId === t.id ? 'Tersalin!' : 'Copy token'} withArrow>
+                      <ActionIcon size="sm" variant="subtle" color={copiedId === t.id ? 'teal' : 'gray'}
                         loading={copyToken.isPending && copyToken.variables === t.id}
-                        onClick={() => copyToken.mutate(t.id)}
-                      >
+                        onClick={() => copyToken.mutate(t.id)}>
                         {copiedId === t.id ? <TbCheck size={13} /> : <TbCopy size={13} />}
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Rotate (ganti nilai token)">
-                      <ActionIcon
-                        size="sm" variant="subtle" color="yellow"
-                        aria-label="Rotate token"
+                    <Tooltip label="Rotate" withArrow>
+                      <ActionIcon size="sm" variant="subtle" color="yellow"
                         loading={rotateToken.isPending && rotateToken.variables === t.id}
-                        onClick={() => confirmRotate(t.id, t.name)}
-                      >
+                        onClick={() => confirmRotate(t.id, t.name)}>
                         <TbRefresh size={13} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Lihat cara penggunaan">
-                      <ActionIcon
-                        size="sm" variant="subtle" color="gray"
-                        aria-label="Lihat cara penggunaan"
-                        onClick={() => setExpandedUsage(prev => {
-                          const s = new Set(prev)
-                          s.has(t.id) ? s.delete(t.id) : s.add(t.id)
-                          return s
-                        })}
-                      >
+                    <Tooltip label="Usage" withArrow>
+                      <ActionIcon size="sm" variant="subtle" color="gray"
+                        onClick={() => setExpandedUsage(prev => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}>
                         <TbTerminal size={13} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Edit token">
-                      <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Edit token" onClick={() => openEditModal(t)}>
+                    <Tooltip label="Edit" withArrow>
+                      <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEditModal(t)}>
                         <TbPencil size={13} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Revoke token">
-                      <ActionIcon size="sm" variant="subtle" color="red" aria-label="Revoke token" onClick={() => revokeToken(t.id, t.name)}>
-                        <TbTrash size={14} />
+                    <Tooltip label="Revoke" withArrow>
+                      <ActionIcon size="sm" variant="subtle" color="red" onClick={() => revokeToken(t.id, t.name)}>
+                        <TbTrash size={13} />
                       </ActionIcon>
                     </Tooltip>
                   </Group>
