@@ -532,6 +532,40 @@ server.registerTool(
   },
 )
 
+// ── Project Files ─────────────────────────────────────────────────────────────
+
+server.registerTool(
+  'stg_project_file_list',
+  {
+    title: '[STG] List project files',
+    description: 'List all files for a project by slug di stg',
+    inputSchema: { slug: z.string().describe('Project slug') },
+  },
+  async (args) => {
+    try {
+      return ok(await stgCall('project_file_list', args))
+    } catch (e) {
+      return err(String(e))
+    }
+  },
+)
+
+server.registerTool(
+  'stg_project_file_get',
+  {
+    title: '[STG] Get project file',
+    description: 'Fetch a single project file by id di stg',
+    inputSchema: { slug: z.string(), id: z.string() },
+  },
+  async (args) => {
+    try {
+      return ok(await stgCall('project_file_get', args))
+    } catch (e) {
+      return err(String(e))
+    }
+  },
+)
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 const transport = new StdioServerTransport()

@@ -62,6 +62,7 @@ model User {
   apiTokens             ApiToken[]
   notes                 ProjectNote[]
   projectAliases        ProjectAlias[]  @relation("ProjectAliasCreator")
+  projectFiles          ProjectFile[]   @relation("ProjectFileAuthor")
   gists                 Gist[]
 
   @@map("user")
@@ -245,6 +246,25 @@ model ProjectAlias {
   @@map("project_alias")
 }
 
+model ProjectFile {
+  id          String   @id @default(uuid())
+  projectId   String
+  authorId    String
+  title       String
+  description String   @default("")
+  files       Json
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User    @relation("ProjectFileAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([authorId])
+  @@map("project_file")
+}
+
 model Project {
   id          String    @id @default(uuid())
   slug        String    @unique
@@ -260,6 +280,7 @@ model Project {
   portainerConfigs  PortainerConfig[]
   notes             ProjectNote[]
   aliases           ProjectAlias[]
+  projectFiles      ProjectFile[]
 
   @@index([deletedAt])
   @@map("project")

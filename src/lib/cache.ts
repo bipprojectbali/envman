@@ -33,6 +33,7 @@ export const cacheKeys = {
   projectAccess: (userId: string, slug: string) => `access:${userId}:${slug}`,
   tokenList: (userId: string) => `tokens:user:${userId}`,
   projectAliases: (slug: string) => `project:${slug}:aliases`,
+  projectFiles: (slug: string) => `project:${slug}:files`,
 }
 
 /**

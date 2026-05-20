@@ -63,6 +63,12 @@ Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI). `requir
 - `DELETE /api/envman/projects/:slug/environments/:env/portainer` — remove config
 - `POST /api/envman/projects/:slug/environments/:env/portainer/sync` — push vars to stack
 
+### Project Files
+- `GET /api/envman/projects/:slug/files` — list files (VIEWER+); returns `{ files[] }` dengan id/title/description/files/tags/author/timestamps; cached 60s
+- `POST /api/envman/projects/:slug/files` — create file (EDITOR+); body: `{title, description?, files[{filename,content,language}], tags?[]}`
+- `PUT /api/envman/projects/:slug/files/:id` — update file (EDITOR own / OWNER all); body: partial
+- `DELETE /api/envman/projects/:slug/files/:id` — delete file (EDITOR own / OWNER all)
+
 ### Aliases
 - `GET /api/envman/projects/:slug/aliases` — list aliases (VIEWER+); returns `{ aliases[] }` dengan id/name/args/description/tags/creator/timestamps; cached 60s
 - `POST /api/envman/projects/:slug/aliases` — create alias (OWNER); body: `{name, args, description?, tags?[]}`; name di-slugify otomatis

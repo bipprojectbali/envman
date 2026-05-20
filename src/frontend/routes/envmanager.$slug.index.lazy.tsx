@@ -30,6 +30,7 @@ import {
   TbClock,
   TbFolders,
   TbNote,
+  TbFiles,
   TbTerminal2,
   TbPencil,
   TbPlus,
@@ -45,6 +46,7 @@ import { NoteFormModal, NoteViewModal } from '@/frontend/components/slug/NoteMod
 import type { Note } from '@/frontend/components/slug/NotesPanel'
 import { NotesPanel } from '@/frontend/components/slug/NotesPanel'
 import { AliasesPanel } from '@/frontend/components/slug/AliasesPanel'
+import { FilesPanel } from '@/frontend/components/slug/FilesPanel'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -400,6 +402,9 @@ function ProjectDetailPage() {
             <Tabs.Tab value="aliases" leftSection={<TbTerminal2 size={14} />}>
               Aliases
             </Tabs.Tab>
+            <Tabs.Tab value="files" leftSection={<TbFiles size={14} />}>
+              Files
+            </Tabs.Tab>
           </Tabs.List>
 
           {/* ── Environments tab ─────────────── */}
@@ -634,6 +639,11 @@ function ProjectDetailPage() {
           {/* ── Aliases tab ──────────────────── */}
           <Tabs.Panel value="aliases">
             <AliasesPanel slug={slug} isOwner={isOwner} />
+          </Tabs.Panel>
+
+          {/* ── Files tab ────────────────────── */}
+          <Tabs.Panel value="files">
+            <FilesPanel slug={slug} isOwner={isOwner} myUserId={myUserId ?? ''} canEdit={canEdit} />
           </Tabs.Panel>
         </Tabs>
       )}

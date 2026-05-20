@@ -32,6 +32,7 @@ React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Rou
 - `NotFound.tsx` — 404 page
 - `ErrorPage.tsx` — Error boundary page
 - `slug/AliasesPanel.tsx` — aliases tab untuk project detail; OWNER bisa create/edit/delete; semua member bisa list dan copy CLI invocation (`envman run slug:name`)
+- `slug/FilesPanel.tsx` — files tab untuk project detail; mirip Gist tapi per-project; EDITOR+ bisa create/edit/delete milik sendiri; OWNER bisa edit semua; mendukung multi-file, preview Markdown, search, tag filter, pagination
 
 ## Hooks
 
