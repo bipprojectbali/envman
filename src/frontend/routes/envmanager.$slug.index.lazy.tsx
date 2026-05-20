@@ -10,6 +10,7 @@ import {
   Kbd,
   Paper,
   Select,
+  ScrollArea,
   Skeleton,
   Stack,
   Tabs,
@@ -386,7 +387,8 @@ function ProjectDetailPage() {
       {/* ─── Tabs ───────────────────────────── */}
       {!isError && (
         <Tabs value={tab} onChange={v => setTab(v ?? 'environments')}>
-          <Tabs.List mb="md">
+          <ScrollArea type="scroll" mb="md" styles={{ scrollbar: { display: 'none' } }}>
+          <Tabs.List style={{ flexWrap: 'nowrap' }}>
             <Tabs.Tab
               value="environments"
               leftSection={<TbVariable size={14} />}
@@ -406,6 +408,7 @@ function ProjectDetailPage() {
               Files
             </Tabs.Tab>
           </Tabs.List>
+          </ScrollArea>
 
           {/* ── Environments tab ─────────────── */}
           <Tabs.Panel value="environments">
