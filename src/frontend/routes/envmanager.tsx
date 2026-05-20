@@ -305,7 +305,6 @@ function EnvManagerLayout() {
                       background: item.active
                         ? 'linear-gradient(135deg, var(--mantine-color-violet-light), var(--mantine-color-grape-light))'
                         : undefined,
-                      borderLeft: item.active ? '2px solid var(--mantine-color-violet-6)' : '2px solid transparent',
                       transition: 'all 0.15s',
                     }}
                     onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
@@ -328,7 +327,6 @@ function EnvManagerLayout() {
                     background: item.active
                       ? 'linear-gradient(135deg, var(--mantine-color-violet-light), var(--mantine-color-grape-light))'
                       : undefined,
-                    borderLeft: item.active ? '3px solid var(--mantine-color-violet-6)' : '3px solid transparent',
                     transition: 'all 0.15s ease',
                   }}
                   onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
@@ -404,7 +402,6 @@ function EnvManagerLayout() {
                     minHeight: 38,
                     borderRadius: 8,
                     background: item.active ? 'var(--mantine-color-violet-light)' : undefined,
-                    borderLeft: item.active ? '3px solid var(--mantine-color-violet-6)' : '3px solid transparent',
                     transition: 'all 0.15s',
                   }}
                   onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
