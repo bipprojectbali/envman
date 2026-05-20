@@ -6,7 +6,7 @@ import { spawnSync } from 'child_process'
 
 const CONFIG_DIR = join(homedir(), '.config', 'envman')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
-const VERSION = '1.1.0'
+const VERSION = '1.2.0'
 
 interface Config {
   server: string
@@ -172,9 +172,30 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean)
 // ─── Run alias ───────────────────────────────────────────────────────────────
 
 async function cmdAlias(args: string[]) {
-  const ref = args[0]
+  // Parse extra -e flags and optional --server-wins from command line.
+  // The non-flag argument is the alias ref (project:alias).
+  const extraSources: string[] = []
+  let ref = ''
+  let extraServerWins = false
+  let i = 0
+  while (i < args.length) {
+    const a = args[i]
+    if (a === '-e') {
+      const val = args[i + 1]
+      if (!val) { console.error('-e requires a value'); process.exit(1) }
+      extraSources.push(val); i += 2
+    } else if (a === '--server-wins') {
+      extraServerWins = true; i++
+    } else if (!a.startsWith('-')) {
+      ref = a; i++
+    } else {
+      console.error(`Unknown flag: ${a}\nUsage: envman run [-e <source>]... <project>:<alias>`)
+      process.exit(1)
+    }
+  }
+
   if (!ref || !ref.includes(':')) {
-    console.error('Usage: envman run <project>:<alias>')
+    console.error('Usage: envman run [-e <source>]... <project>:<alias>')
     process.exit(1)
   }
 
@@ -196,24 +217,29 @@ async function cmdAlias(args: string[]) {
     process.exit(1)
   }
 
-  const sources: string[] = []
-  let serverWins = false
-  let i = 0
-  while (i < flagParts.length) {
-    const flag = flagParts[i]
+  // Parse stored sources from the alias
+  const storedSources: string[] = []
+  let storedServerWins = false
+  let j = 0
+  while (j < flagParts.length) {
+    const flag = flagParts[j]
     if (flag === '-e') {
-      const val = flagParts[i + 1]
+      const val = flagParts[j + 1]
       if (!val) { console.error('-e requires a value'); process.exit(1) }
-      sources.push(val); i += 2
+      storedSources.push(val); j += 2
     } else if (flag === '--server-wins') {
-      serverWins = true; i++
+      storedServerWins = true; j++
     } else {
       console.error(`Unknown flag in alias: ${flag}`)
       process.exit(1)
     }
   }
 
-  await cmdRun(sources, command, serverWins)
+  // Extra sources (command line) go first; stored sources override them.
+  // e.g. envman run -e .env open-marina:dev
+  //      → loads .env first, then server sources win
+  const mergedSources = [...extraSources, ...storedSources]
+  await cmdRun(mergedSources, command, extraServerWins || storedServerWins)
 }
 
 // ─── Help ─────────────────────────────────────────────────────────────────────
@@ -225,7 +251,7 @@ USAGE:
   envman login <server-url> --token <token>   Save credentials to config file
   envman logout                                Remove saved credentials
   envman whoami                                Show current authenticated user
-  envman run <project>:<alias>                 Expand stored alias and execute
+  envman run [-e <source>]... <project>:<alias>  Expand alias, merge extra sources
   envman [options] -- <command>                Inject env vars and run command
 
 OPTIONS:
