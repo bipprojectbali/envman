@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   Code,
+  Divider,
   Group,
   SimpleGrid,
   Skeleton,
@@ -22,8 +23,8 @@ import {
   TbBrandGithub,
   TbChevronRight,
   TbClock,
-  TbDashboard,
   TbFileCode,
+  TbFolders,
   TbGlobe,
   TbKey,
   TbLock,
@@ -86,6 +87,19 @@ const envColor = (name: string) => {
   return 'violet'
 }
 
+function ProjectInitial({ name }: { name: string }) {
+  const initial = (name.trim()[0] ?? '?').toUpperCase()
+  return (
+    <Box style={{
+      width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+      background: 'var(--mantine-color-blue-6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <Text size="xs" fw={800} c="white" lh={1}>{initial}</Text>
+    </Box>
+  )
+}
+
 function StatCard({
   icon: Icon,
   label,
@@ -115,25 +129,20 @@ function StatCard({
       aria-label={clickable ? `Buka ${label}` : undefined}
       onClick={onClick}
       onKeyDown={clickable ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } } : undefined}
-      style={{
-        cursor: clickable ? 'pointer' : undefined,
-        borderLeft: `3px solid var(--mantine-color-${color}-5)`,
-      }}
+      style={{ cursor: clickable ? 'pointer' : undefined }}
     >
-      <Group justify="space-between" align="flex-start" mb={{ base: 6, sm: 'sm' }}>
-        <ThemeIcon size={36} radius="md" variant="light" color={color}>
-          <Icon size={18} />
+      <Group justify="space-between" align="center" mb={8}>
+        <ThemeIcon size={32} radius="md" variant="light" color={color}>
+          <Icon size={16} />
         </ThemeIcon>
-        {loading ? (
-          <Skeleton height={28} width={40} />
-        ) : (
-          <Text fw={800} size="xl" lh={1}>{value}</Text>
-        )}
-      </Group>
-      <Group justify="space-between" align="center">
-        <Text size="sm" fw={600}>{label}</Text>
         {clickable && <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)' }} />}
       </Group>
+      {loading ? (
+        <Skeleton height={26} width={48} mb={4} />
+      ) : (
+        <Text fw={800} size="xl" lh={1} mb={4}>{value}</Text>
+      )}
+      <Text size="xs" fw={600} c="dimmed">{label}</Text>
       {sub && <Text size="xs" c="dimmed" mt={2} lineClamp={1}>{sub}</Text>}
     </Card>
   )
@@ -206,30 +215,25 @@ function OverviewPage() {
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
       {/* ─── Header ─────────────────────── */}
-      <Group justify="space-between" mb={{ base: 'md', sm: 'xl' }} wrap="nowrap" align="flex-start">
-        <Group gap="sm" style={{ minWidth: 0 }}>
-          <ThemeIcon size={38} radius="md" variant="light" color="violet">
-            <TbDashboard size={20} />
-          </ThemeIcon>
-          <Box style={{ minWidth: 0 }}>
-            <Text fw={700} size="lg" lh={1.2}>Overview</Text>
-            <Tooltip label={dataUpdatedAt ? `Diperbarui ${absoluteTime(new Date(dataUpdatedAt).toISOString())}` : 'Ringkasan seluruh resources'}>
-              <Text size="xs" c="dimmed">
-                Ringkasan seluruh resources yang kamu kelola
-                {dataUpdatedAt > 0 && <> · {relativeTime(new Date(dataUpdatedAt).toISOString())}</>}
+      <Group justify="space-between" mb={{ base: 'md', sm: 'xl' }} wrap="nowrap" align="center">
+        <Box>
+          <Text fw={800} size="xl" lh={1.2}>Overview</Text>
+          {dataUpdatedAt > 0 && (
+            <Tooltip label={`Diperbarui ${absoluteTime(new Date(dataUpdatedAt).toISOString())}`} withArrow>
+              <Text size="xs" c="dimmed" mt={2} style={{ cursor: 'default' }}>
+                Diperbarui {relativeTime(new Date(dataUpdatedAt).toISOString())}
               </Text>
             </Tooltip>
-          </Box>
-        </Group>
-        <Tooltip label="Refresh data">
+          )}
+        </Box>
+        <Tooltip label="Refresh data" withArrow>
           <ActionIcon
-            size="lg"
-            variant="default"
+            size="md" variant="default" radius="md"
             aria-label="Refresh data"
             loading={isLoading}
             onClick={() => refetchProjects()}
           >
-            <TbRefresh size={16} />
+            <TbRefresh size={15} />
           </ActionIcon>
         </Tooltip>
       </Group>
@@ -299,21 +303,19 @@ function OverviewPage() {
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: 'sm', md: 'md' }}>
 
         {/* ─── Projects list ──────────────── */}
-        <Card withBorder p="md">
+        <Card withBorder p="md" radius="md">
           <Group justify="space-between" mb="md">
             <Group gap="xs">
               <ThemeIcon size={24} radius="sm" variant="light" color="violet">
-                <TbVariable size={13} />
+                <TbFolders size={13} />
               </ThemeIcon>
               <Text fw={600} size="sm">Projects</Text>
+              {!loadingProjects && projects.length > 0 && (
+                <Badge size="xs" variant="light" color="violet" circle>{projects.length}</Badge>
+              )}
             </Group>
-            <Button
-              size="compact-xs"
-              variant="subtle"
-              color="violet"
-              rightSection={<TbArrowRight size={12} />}
-              onClick={() => navigate({ to: '/envmanager' })}
-            >
+            <Button size="compact-xs" variant="subtle" color="violet" rightSection={<TbArrowRight size={12} />}
+              onClick={() => navigate({ to: '/envmanager' })}>
               Lihat semua
             </Button>
           </Group>
@@ -330,7 +332,7 @@ function OverviewPage() {
               </Button>
             </Card>
           ) : (
-            <Stack gap="xs">
+            <Stack gap={6}>
               {recentProjects.map((p: any) => {
                 const envs: any[] = p.environments ?? []
                 const goTo = () => navigate({ to: '/envmanager/$slug', params: { slug: p.slug }, search: { tab: 'environments' } })
@@ -339,40 +341,40 @@ function OverviewPage() {
                     key={p.slug}
                     justify="space-between"
                     p="sm"
+                    gap="sm"
                     className="envman-overview-row"
-                    role="link"
-                    tabIndex={0}
+                    role="link" tabIndex={0}
                     aria-label={`Buka project ${p.name}`}
                     onClick={goTo}
                     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTo() } }}
                     style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
                   >
-                    <Box style={{ flex: 1, minWidth: 0 }}>
-                      <Group gap="xs" mb={4}>
-                        <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {p.name}
-                        </Text>
-                        <Code fz="xs" c="dimmed">{p.slug}</Code>
-                      </Group>
-                      <Group gap={4} wrap="wrap">
-                        {envs.slice(0, 4).map((e: any) => (
-                          <Badge key={e.name} size="xs" variant="dot" color={envColor(e.name)}>
-                            {e.name}
-                            {e._count?.vars != null && <Text span c="dimmed"> · {e._count.vars}</Text>}
-                          </Badge>
-                        ))}
-                        {envs.length > 4 && <Text size="xs" c="dimmed">+{envs.length - 4}</Text>}
-                        {envs.length === 0 && <Text size="xs" c="dimmed">belum ada environment</Text>}
-                      </Group>
-                    </Box>
+                    <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
+                      <ProjectInitial name={p.name} />
+                      <Box style={{ flex: 1, minWidth: 0 }}>
+                        <Group gap={6} mb={3} wrap="nowrap">
+                          <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.name}
+                          </Text>
+                          <Code fz="xs" style={{ flexShrink: 0 }}>{p.slug}</Code>
+                        </Group>
+                        <Group gap={4} wrap="wrap">
+                          {envs.slice(0, 4).map((e: any) => (
+                            <Badge key={e.name} size="xs" variant="light" color={envColor(e.name)}>
+                              {e.name}{e._count?.vars != null && ` · ${e._count.vars}`}
+                            </Badge>
+                          ))}
+                          {envs.length > 4 && <Text size="xs" c="dimmed">+{envs.length - 4}</Text>}
+                          {envs.length === 0 && <Text size="xs" c="dimmed" fs="italic">belum ada env</Text>}
+                        </Group>
+                      </Box>
+                    </Group>
                     <TbChevronRight size={14} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
                   </Group>
                 )
               })}
               {projects.length > 5 && (
-                <Text size="xs" c="dimmed" ta="center" mt={4}>
-                  +{projects.length - 5} project lainnya
-                </Text>
+                <Text size="xs" c="dimmed" ta="center" mt={2}>+{projects.length - 5} project lainnya</Text>
               )}
             </Stack>
           )}
@@ -382,7 +384,7 @@ function OverviewPage() {
         <Stack gap="md">
 
           {/* Gists */}
-          <Card withBorder p="md">
+          <Card withBorder p="md" radius="md">
             <Group justify="space-between" mb="md">
               <Group gap="xs">
                 <ThemeIcon size={24} radius="sm" variant="light" color="grape">
@@ -390,13 +392,8 @@ function OverviewPage() {
                 </ThemeIcon>
                 <Text fw={600} size="sm">Gists Terbaru</Text>
               </Group>
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                color="grape"
-                rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/gists' })}
-              >
+              <Button size="compact-xs" variant="subtle" color="grape" rightSection={<TbArrowRight size={12} />}
+                onClick={() => navigate({ to: '/envmanager/gists' })}>
                 Lihat semua
               </Button>
             </Group>
@@ -406,36 +403,33 @@ function OverviewPage() {
             ) : gists.length === 0 ? (
               <Text size="xs" c="dimmed" ta="center" py="sm">Belum ada gist</Text>
             ) : (
-              <Stack gap="xs">
+              <Stack gap={6}>
                 {recentGists.map((g: any) => (
                   <Group
-                    key={g.id}
-                    justify="space-between"
-                    p="xs"
+                    key={g.id} justify="space-between" p="xs" gap="sm"
                     className="envman-overview-row"
-                    role="link"
-                    tabIndex={0}
-                    aria-label={`Buka gist ${g.title}`}
+                    role="link" tabIndex={0}
                     onClick={() => navigate({ to: '/envmanager/gists' })}
                     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate({ to: '/envmanager/gists' }) } }}
                     style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
                   >
-                    <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                    <Group gap="xs" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
                       <TbFileCode size={14} style={{ color: 'var(--mantine-color-grape-5)', flexShrink: 0 }} />
                       <Box style={{ flex: 1, minWidth: 0 }}>
                         <Text size="xs" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {g.title}
                         </Text>
-                        <Group gap={4}>
+                        <Group gap={4} mt={2}>
                           <Text size="xs" c="dimmed">{g.files?.length ?? 0} file</Text>
-                          {g.isPublic
-                            ? <Badge size="xs" variant="dot" color="teal" leftSection={<TbGlobe size={8} />}>public</Badge>
-                            : <Badge size="xs" variant="dot" color="gray" leftSection={<TbLock size={8} />}>private</Badge>
-                          }
+                          <Badge size="xs" variant="light" color={g.isPublic ? 'teal' : 'gray'}
+                            leftSection={g.isPublic ? <TbGlobe size={8} /> : <TbLock size={8} />}>
+                            {g.isPublic ? 'public' : 'private'}
+                          </Badge>
                           <Text size="xs" c="dimmed">{relativeTime(g.updatedAt)}</Text>
                         </Group>
                       </Box>
                     </Group>
+                    <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
                   </Group>
                 ))}
                 {gists.length > 4 && (
@@ -446,7 +440,7 @@ function OverviewPage() {
           </Card>
 
           {/* Tokens */}
-          <Card withBorder p="md">
+          <Card withBorder p="md" radius="md">
             <Group justify="space-between" mb="md">
               <Group gap="xs">
                 <ThemeIcon size={24} radius="sm" variant="light" color="orange">
@@ -454,13 +448,8 @@ function OverviewPage() {
                 </ThemeIcon>
                 <Text fw={600} size="sm">API Tokens</Text>
               </Group>
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                color="orange"
-                rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/tokens' })}
-              >
+              <Button size="compact-xs" variant="subtle" color="orange" rightSection={<TbArrowRight size={12} />}
+                onClick={() => navigate({ to: '/envmanager/tokens' })}>
                 Kelola
               </Button>
             </Group>
@@ -471,37 +460,43 @@ function OverviewPage() {
               <Text size="xs" c="dimmed" ta="center" py="sm">Belum ada token</Text>
             ) : (
               <Stack gap="xs">
-                <Group gap="md" p="xs" style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 8 }}>
-                  <Group gap="xs">
+                {/* Stats summary */}
+                <Group gap="lg">
+                  <Group gap={5}>
                     <TbShieldCheck size={13} style={{ color: 'var(--mantine-color-teal-6)' }} />
-                    <Text size="xs">{activeTokens.length} aktif</Text>
+                    <Text size="xs" fw={600}>{activeTokens.length}</Text>
+                    <Text size="xs" c="dimmed">aktif</Text>
                   </Group>
-                  <Group gap="xs">
-                    <TbLock size={13} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                    <Text size="xs">{tokens.filter((t: any) => t.canWrite).length} read-write</Text>
+                  <Group gap={5}>
+                    <TbLockOpen size={13} style={{ color: 'var(--mantine-color-orange-5)' }} />
+                    <Text size="xs" fw={600}>{tokens.filter((t: any) => t.canWrite).length}</Text>
+                    <Text size="xs" c="dimmed">read-write</Text>
                   </Group>
                   {tokens.some((t: any) => t.isDisabled) && (
-                    <Text size="xs" c="dimmed">{tokens.filter((t: any) => t.isDisabled).length} disabled</Text>
+                    <Group gap={5}>
+                      <Text size="xs" fw={600} c="dimmed">{tokens.filter((t: any) => t.isDisabled).length}</Text>
+                      <Text size="xs" c="dimmed">disabled</Text>
+                    </Group>
                   )}
                 </Group>
+
                 {recentTokens.length > 0 && (
                   <>
+                    <Divider />
                     <Text size="xs" c="dimmed" fw={500}>Terakhir digunakan</Text>
                     {recentTokens.map((t: any) => (
-                      <Group key={t.id} justify="space-between" px="xs">
-                        <Group gap="xs">
-                          <Tooltip label={t.canWrite ? 'Read-write' : 'Read-only'}>
-                            <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light" leftSection={t.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
-                              {t.canWrite ? 'rw' : 'ro'}
-                            </Badge>
-                          </Tooltip>
-                          <Text size="xs" fw={500} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>{t.name}</Text>
+                      <Group key={t.id} justify="space-between">
+                        <Group gap={6}>
+                          <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light"
+                            leftSection={t.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
+                            {t.canWrite ? 'rw' : 'ro'}
+                          </Badge>
+                          <Text size="xs" fw={500} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>
+                            {t.name}
+                          </Text>
                         </Group>
-                        <Tooltip label={`Terakhir dipakai ${absoluteTime(t.lastUsedAt)}`}>
-                          <Group gap="xs">
-                            <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                            <Text size="xs" c="dimmed">{relativeTime(t.lastUsedAt)}</Text>
-                          </Group>
+                        <Tooltip label={`Terakhir dipakai ${absoluteTime(t.lastUsedAt)}`} withArrow>
+                          <Text size="xs" c="dimmed">{relativeTime(t.lastUsedAt)}</Text>
                         </Tooltip>
                       </Group>
                     ))}
@@ -512,7 +507,7 @@ function OverviewPage() {
           </Card>
 
           {/* Connections */}
-          <Card withBorder p="md">
+          <Card withBorder p="md" radius="md">
             <Group justify="space-between" mb="md">
               <Group gap="xs">
                 <ThemeIcon size={24} radius="sm" variant="light" color="teal">
@@ -520,13 +515,8 @@ function OverviewPage() {
                 </ThemeIcon>
                 <Text fw={600} size="sm">Portainer Connections</Text>
               </Group>
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                color="teal"
-                rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/connections' })}
-              >
+              <Button size="compact-xs" variant="subtle" color="teal" rightSection={<TbArrowRight size={12} />}
+                onClick={() => navigate({ to: '/envmanager/connections' })}>
                 Kelola
               </Button>
             </Group>
@@ -536,16 +526,14 @@ function OverviewPage() {
             ) : connections.length === 0 ? (
               <Text size="xs" c="dimmed" ta="center" py="sm">Belum ada connection</Text>
             ) : (
-              <Stack gap="xs">
+              <Stack gap={6}>
                 {connections.map((c: any) => (
-                  <Group key={c.id} justify="space-between" px="xs">
-                    <Group gap="xs">
-                      <ThemeIcon size={20} radius="sm" variant="light" color="teal">
-                        <TbPlugConnected size={11} />
-                      </ThemeIcon>
+                  <Group key={c.id} justify="space-between" align="center">
+                    <Group gap={8}>
+                      <Box style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--mantine-color-teal-5)', flexShrink: 0 }} />
                       <Text size="xs" fw={500}>{c.name}</Text>
                     </Group>
-                    <Badge size="xs" variant="outline" color="gray">{c._count?.configs ?? 0} env</Badge>
+                    <Badge size="xs" variant="light" color="teal">{c._count?.configs ?? 0} env</Badge>
                   </Group>
                 ))}
               </Stack>

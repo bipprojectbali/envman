@@ -404,7 +404,7 @@ function ProjectDetailPage() {
       {/* ─── Tabs ───────────────────────────── */}
       {!isError && (
         <Tabs value={tab} onChange={v => setTab(v ?? 'environments')} variant="pills">
-          <Tabs.List mb="lg" gap={4}>
+          <Tabs.List mb="lg">
             <Tabs.Tab
               value="environments"
               leftSection={<TbVariable size={13} />}
