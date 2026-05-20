@@ -61,6 +61,7 @@ export interface ProjectFile {
   id: string
   title: string
   description: string
+  prefix: string | null
   files: FileEntry[]
   tags: string[]
   createdAt: string
@@ -152,10 +153,16 @@ const HOVER_STYLES = `
 
 // ─── FileForm ─────────────────────────────────────────────────────────────────
 
+function slugifyPrefix(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
 function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; onClose: () => void }) {
   const qc = useQueryClient()
   const [title, setTitle] = useState(file?.title ?? '')
   const [description, setDescription] = useState(file?.description ?? '')
+  const [prefix, setPrefix] = useState(file?.prefix ?? '')
+  const [prefixManual, setPrefixManual] = useState(!!file?.prefix)
   const [tags, setTags] = useState<string[]>(file?.tags ?? [])
   const [tagInput, setTagInput] = useState('')
   const [files, setFiles] = useState<FileEntry[]>(
@@ -164,9 +171,14 @@ function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; o
   const [activeFile, setActiveFile] = useState(0)
   const [preview, setPreview] = useState<'write' | 'preview'>('write')
 
+  const handleTitleChange = (val: string) => {
+    setTitle(val)
+    if (!prefixManual) setPrefix(slugifyPrefix(val))
+  }
+
   const save = useMutation({
     mutationFn: () => {
-      const body = { title, description, files, tags }
+      const body = { title, description, prefix: prefix.trim() || null, files, tags }
       return file
         ? apiFetch(`/api/envman/projects/${slug}/files/${file.id}`, { method: 'PUT', body: JSON.stringify(body) })
         : apiFetch(`/api/envman/projects/${slug}/files`, { method: 'POST', body: JSON.stringify(body) })
@@ -222,10 +234,23 @@ function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; o
           label="Judul"
           placeholder="Nama file (contoh: Docker Compose production)"
           value={title}
-          onChange={e => setTitle(e.target.value)}
+          onChange={e => handleTitleChange(e.target.value)}
           autoFocus={!file}
           onKeyDown={e => { if (e.key === 'Enter') e.preventDefault() }}
           required
+        />
+        <TextInput
+          label="Prefix CLI"
+          description={
+            prefix
+              ? <span>CLI path: <Code fz="xs">files:{prefix}</Code> atau <Code fz="xs">files:{prefix}/filename</Code></span>
+              : 'Auto-generate dari judul. Tidak berubah saat rename judul.'
+          }
+          placeholder="compose-dev"
+          value={prefix}
+          onChange={e => { setPrefixManual(true); setPrefix(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')) }}
+          onKeyDown={e => { if (e.key === 'Enter') e.preventDefault() }}
+          styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
         />
         <TextInput
           label="Deskripsi"
@@ -453,6 +478,32 @@ function FileCard({ file, canManage, onEdit, onDelete, onView, onTagClick }: {
         </Group>
       </Group>
 
+      {/* Prefix + per-file copy path */}
+      {file.prefix && (
+        <Group gap={4} mb={6} wrap="wrap" align="center" onClick={e => e.stopPropagation()}>
+          <Code fz="xs" c="dimmed">files:{file.prefix}</Code>
+          {file.files.map(f => {
+            const path = `files:${file.prefix}/${f.filename}`
+            return (
+              <CopyButton key={f.filename} value={path} timeout={2000}>
+                {({ copied, copy }) => (
+                  <Tooltip label={copied ? 'Disalin!' : path} withArrow>
+                    <Badge
+                      size="xs" variant={copied ? 'filled' : 'light'} color={copied ? 'teal' : getLangColor(f.language)}
+                      style={{ cursor: 'pointer' }}
+                      rightSection={copied ? <TbCheck size={9} /> : <TbCopy size={9} />}
+                      onClick={e => { e.stopPropagation(); copy() }}
+                    >
+                      {f.filename}
+                    </Badge>
+                  </Tooltip>
+                )}
+              </CopyButton>
+            )
+          })}
+        </Group>
+      )}
+
       {firstFile && (
         <Code block style={{ fontSize: 11, maxHeight: 80, overflow: 'hidden', marginBottom: 6 }}>
           {firstFile.content.split('\n').slice(0, 4).join('\n') || '(kosong)'}
@@ -460,7 +511,7 @@ function FileCard({ file, canManage, onEdit, onDelete, onView, onTagClick }: {
       )}
 
       <Group gap={4} wrap="wrap" align="center">
-        {file.files.slice(0, 3).map(f => (
+        {!file.prefix && file.files.slice(0, 3).map(f => (
           <Tooltip key={f.filename} label={`${f.language} · ${f.content.split('\n').length} baris`}>
             <Badge size="xs" variant="dot" color={getLangColor(f.language)}>{f.filename}</Badge>
           </Tooltip>

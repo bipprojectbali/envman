@@ -42,6 +42,34 @@ envman run [-e <source>]... <project>:<alias> # Expand alias + merge extra sourc
 envman [options] -- <command>               # Inject vars and run command
 ```
 
+### File Execution
+
+Script di ProjectFiles bisa dieksekusi langsung dari CLI tanpa menyimpan ke disk — konten di-pipe ke stdin interpreter:
+
+```bash
+# Satu file entry (prefix cukup)
+envman -e open-marina:dev -- bash files:deploy
+
+# Multi-file entry (perlu filename)
+envman -e open-marina:dev -- bun files:ts-utils/migrate.ts
+
+# Explicit project slug (jika berbeda dari -e source)
+envman -- bash files:open-marina/deploy/deploy.sh
+
+# Via alias (alias menyimpan files: di args-nya)
+envman run open-marina:dev
+# stored: -e open-marina:dev -- bash files:deploy
+```
+
+**Format referensi:**
+- `files:prefix` — single-file entry, project diinfer dari `-e project:env` pertama
+- `files:prefix/filename` — multi-file entry
+- `files:slug/prefix/filename` — explicit project slug
+
+**Interpreter support (zero disk write via stdin):** `bash`, `sh`, `zsh`, `bun`, `node`, `python3`, `python`, `deno`. Interpreter lain: fallback ke temp file dengan permission `0600`, dihapus segera setelah eksekusi.
+
+**Prefix** diset per entry di UI (Files tab dalam project detail). Auto-generate dari judul, bisa diedit manual, tidak berubah saat rename judul.
+
 ### Alias Expansion
 
 `envman run myapp:deploy` fetches stored args via `GET /api/envman/aliases/resolve/myapp:deploy`,

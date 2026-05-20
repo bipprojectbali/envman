@@ -253,6 +253,7 @@ model ProjectFile {
   title       String
   description String   @default("")
   files       Json
+  prefix      String?
   tags        String[] @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -260,6 +261,7 @@ model ProjectFile {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author  User    @relation("ProjectFileAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
+  @@unique([projectId, prefix])
   @@index([projectId])
   @@index([authorId])
   @@map("project_file")

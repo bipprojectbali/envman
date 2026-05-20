@@ -64,9 +64,10 @@ Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI). `requir
 - `POST /api/envman/projects/:slug/environments/:env/portainer/sync` — push vars to stack
 
 ### Project Files
-- `GET /api/envman/projects/:slug/files` — list files (VIEWER+); returns `{ files[] }` dengan id/title/description/files/tags/author/timestamps; cached 60s
-- `POST /api/envman/projects/:slug/files` — create file (EDITOR+); body: `{title, description?, files[{filename,content,language}], tags?[]}`
-- `PUT /api/envman/projects/:slug/files/:id` — update file (EDITOR own / OWNER all); body: partial
+- `GET /api/envman/projects/:slug/files` — list files (VIEWER+); returns `{ files[] }` dengan id/title/description/prefix/files/tags/author/timestamps; cached 60s
+- `GET /api/envman/projects/:slug/files/resolve?prefix=<p>[&filename=<f>]` — resolve file by prefix for CLI (VIEWER+); returns `{ content, filename, language, entryTitle }`
+- `POST /api/envman/projects/:slug/files` — create file (EDITOR+); body: `{title, description?, prefix?, files[{filename,content,language}], tags?[]}`
+- `PUT /api/envman/projects/:slug/files/:id` — update file (EDITOR own / OWNER all); body: partial (includes `prefix?`)
 - `DELETE /api/envman/projects/:slug/files/:id` — delete file (EDITOR own / OWNER all)
 
 ### Aliases

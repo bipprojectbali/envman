@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { homedir } from 'os'
-import { join } from 'path'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { homedir, tmpdir } from 'os'
+import { basename, join } from 'path'
 import { spawnSync } from 'child_process'
 
 const CONFIG_DIR = join(homedir(), '.config', 'envman')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
-const VERSION = '1.2.0'
+const VERSION = '1.3.0'
 
 interface Config {
   server: string
@@ -118,6 +118,28 @@ async function cmdWhoami() {
   console.log(`Server: ${cfg.server}`)
 }
 
+// ─── Files: stdin command builder ────────────────────────────────────────────
+
+function buildStdinCommand(cmd: string[]): string[] | null {
+  const name = basename(cmd[0])
+  const rest = cmd.slice(1)
+  switch (name) {
+    case 'bash': case 'sh': case 'zsh':
+      return [cmd[0], '-s', ...rest]           // bash -s reads from stdin, $@ preserved
+    case 'bun':
+      if (rest[0] === 'run') return [cmd[0], 'run', '-', ...rest.slice(1)]
+      return [cmd[0], 'run', '-', ...rest]     // bun run -
+    case 'node':
+      return [cmd[0], ...rest]                 // node reads JS from stdin
+    case 'python3': case 'python':
+      return [cmd[0], '-', ...rest]            // python3 -
+    case 'deno':
+      return [cmd[0], 'run', '-', ...rest]
+    default:
+      return null                              // fallback: secure temp file
+  }
+}
+
 // ─── Run ─────────────────────────────────────────────────────────────────────
 
 async function cmdRun(sources: string[], command: string[], serverWins: boolean) {
@@ -126,7 +148,7 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean)
   // Step 1: Parse all local files first (needed for auth resolution)
   const localVars: Record<string, string> = {}
   for (const src of sources) {
-    if (!src.includes(':')) {
+    if (!src.includes(':') && !src.startsWith('files:')) {
       Object.assign(localVars, parseEnvFile(src))
     }
   }
@@ -135,38 +157,96 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean)
   const cfg = resolveAuth(localVars)
 
   // Step 3: Fetch server envs and merge all sources in order
-  // Later sources override earlier ones
   let merged: Record<string, string> = {}
   for (const src of sources) {
+    if (src.startsWith('files:')) continue  // handled separately below
     if (src.includes(':')) {
-      // Server env: project:env
       const [project, env] = src.split(':')
       if (!env) { console.error(`Invalid format: '${src}' — expected project:env`); process.exit(1) }
       const data = await apiFetch(cfg, `/api/envman/projects/${project}/environments/${env}/vars/export`)
       Object.assign(merged, data.vars)
     } else {
-      // Local file: already parsed, but re-merge in order (excluding auth keys)
       const fileVars = parseEnvFile(src)
-      // Strip auth keys from injection — no need to leak them into the child process
       const { ENVMAN_SERVER: _s, ENVMAN_TOKEN: _t, ...rest } = fileVars
       Object.assign(merged, rest)
     }
   }
 
   // Step 4: Final merge with process.env
-  // default:      system < merged (server+local ordered)
-  // --server-wins handled by source order, this flag flips system vs merged
   const finalEnv = serverWins
-    ? { ...merged, ...process.env }   // system overrides everything
-    : { ...process.env, ...merged }   // merged overrides system
+    ? { ...merged, ...process.env }
+    : { ...process.env, ...merged }
 
-  const result = spawnSync(command[0], command.slice(1), {
-    env: finalEnv,
-    stdio: 'inherit',
-    shell: false,
-  })
+  // Step 5: Resolve files: reference in command args (zero disk write via stdin)
+  let fileContent: string | null = null
+  let fileRef = ''
+  let resolvedFilename = ''
+  const transformedCommand = [...command]
+  const fileArgIdx = transformedCommand.findIndex(a => a.startsWith('files:'))
 
-  process.exit(result.status ?? 0)
+  if (fileArgIdx !== -1) {
+    fileRef = transformedCommand[fileArgIdx]
+    transformedCommand.splice(fileArgIdx, 1)  // remove files: from command
+
+    const refBody = fileRef.slice(6)  // strip "files:"
+    const parts = refBody.split('/')
+
+    // Infer project slug from first project:env source
+    const inferredSlug = sources.find(s => s.includes(':') && !s.startsWith('files:'))?.split(':')[0] ?? ''
+
+    let slug: string
+    let prefix: string
+    if (parts.length >= 3) {
+      slug = parts[0]; prefix = parts[1]; resolvedFilename = parts.slice(2).join('/')
+    } else if (parts.length === 2) {
+      slug = inferredSlug; prefix = parts[0]; resolvedFilename = parts[1]
+    } else {
+      slug = inferredSlug; prefix = parts[0]; resolvedFilename = ''
+    }
+
+    if (!slug) {
+      console.error(`[envman] Cannot infer project slug for "${fileRef}". Add a -e project:env source or use files:slug/prefix/filename.`)
+      process.exit(1)
+    }
+
+    const qs = resolvedFilename
+      ? `prefix=${encodeURIComponent(prefix)}&filename=${encodeURIComponent(resolvedFilename)}`
+      : `prefix=${encodeURIComponent(prefix)}`
+    const data = await apiFetch(cfg, `/api/envman/projects/${slug}/files/resolve?${qs}`)
+    fileContent = data.content
+    if (!resolvedFilename) resolvedFilename = data.filename  // for temp file name fallback
+  }
+
+  // Step 6: Spawn
+  if (fileContent !== null) {
+    const stdinCmd = buildStdinCommand(transformedCommand)
+    if (stdinCmd) {
+      const result = spawnSync(stdinCmd[0], stdinCmd.slice(1), {
+        env: finalEnv,
+        stdio: ['pipe', 'inherit', 'inherit'],
+        input: fileContent,
+        shell: false,
+      })
+      process.exit(result.status ?? 0)
+    } else {
+      // Secure temp file fallback for unknown interpreters (mode 0600, cleanup on exit)
+      const tmpDir = mkdtempSync(join(tmpdir(), 'envman-'))
+      const tmpFile = join(tmpDir, basename(resolvedFilename || 'script'))
+      writeFileSync(tmpFile, fileContent, { mode: 0o600 })
+      const cleanup = () => { try { rmSync(tmpDir, { recursive: true, force: true }) } catch {} }
+      process.on('exit', cleanup)
+      const result = spawnSync(transformedCommand[0], [tmpFile, ...transformedCommand.slice(1)], {
+        env: finalEnv, stdio: 'inherit', shell: false,
+      })
+      cleanup()
+      process.exit(result.status ?? 0)
+    }
+  } else {
+    const result = spawnSync(command[0], command.slice(1), {
+      env: finalEnv, stdio: 'inherit', shell: false,
+    })
+    process.exit(result.status ?? 0)
+  }
 }
 
 // ─── Run alias ───────────────────────────────────────────────────────────────
@@ -251,7 +331,8 @@ USAGE:
   envman login <server-url> --token <token>   Save credentials to config file
   envman logout                                Remove saved credentials
   envman whoami                                Show current authenticated user
-  envman run [-e <source>]... <project>:<alias>  Expand alias, merge extra sources
+  envman run [-e <source>]... <project>:<alias>    Expand alias, merge extra sources
+  envman -e <project:env> -- <cmd> files:<prefix>[/<file>]  Execute project file via stdin
   envman [options] -- <command>                Inject env vars and run command
 
 OPTIONS:

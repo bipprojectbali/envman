@@ -15,6 +15,7 @@ const fileSelect = {
   id: true,
   title: true,
   description: true,
+  prefix: true,
   files: true,
   tags: true,
   createdAt: true,
@@ -27,6 +28,10 @@ function isValidFiles(files: unknown): files is FileEntry[] {
     files.every(f => typeof f === 'object' && f !== null &&
       typeof (f as any).filename === 'string' &&
       typeof (f as any).content === 'string')
+}
+
+export function slugifyPrefix(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
 export const filesRouter = new Elysia()
@@ -49,6 +54,34 @@ export const filesRouter = new Elysia()
     return { files }
   })
 
+  // GET /api/envman/projects/:slug/files/resolve — resolve file by prefix for CLI
+  .get('/api/envman/projects/:slug/files/resolve', async ({ request, params, set, query }) => {
+    const authResult = await requireEnvAuth(request)
+    if (!authResult) return unauthorized(set)
+    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    if (!access) return forbidden(set)
+    const prefix = (query.prefix as string | undefined)?.trim()
+    const filename = (query.filename as string | undefined)?.trim()
+    if (!prefix) { set.status = 400; return { error: 'prefix wajib diisi' } }
+    const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
+    if (!project) { set.status = 404; return { error: 'Project tidak ditemukan' } }
+    const entry = await prisma.projectFile.findFirst({ where: { projectId: project.id, prefix } })
+    if (!entry) { set.status = 404; return { error: `File dengan prefix "${prefix}" tidak ditemukan di project ${params.slug}` } }
+    const fileList = entry.files as unknown as FileEntry[]
+    let resolved: FileEntry | undefined
+    if (filename) {
+      resolved = fileList.find(f => f.filename === filename)
+      if (!resolved) { set.status = 404; return { error: `Filename "${filename}" tidak ditemukan di entry "${entry.title}"` } }
+    } else {
+      if (fileList.length > 1) {
+        set.status = 400
+        return { error: `Entry "${entry.title}" punya ${fileList.length} file. Tentukan filename: files:${prefix}/<filename>. Files: ${fileList.map(f => f.filename).join(', ')}` }
+      }
+      resolved = fileList[0]
+    }
+    return { content: resolved.content, filename: resolved.filename, language: resolved.language, entryTitle: entry.title }
+  })
+
   // POST /api/envman/projects/:slug/files — create file (EDITOR+)
   .post('/api/envman/projects/:slug/files', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
@@ -57,15 +90,21 @@ export const filesRouter = new Elysia()
     if (!access || access === 'VIEWER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) { set.status = 404; return { error: 'Project tidak ditemukan' } }
-    const body = await request.json().catch(() => null) as { title?: string; description?: string; files?: unknown; tags?: string[] } | null
+    const body = await request.json().catch(() => null) as { title?: string; description?: string; files?: unknown; tags?: string[]; prefix?: string } | null
     if (!body?.title?.trim()) { set.status = 400; return { error: 'title wajib diisi' } }
     if (!isValidFiles(body?.files)) { set.status = 400; return { error: 'files harus berisi minimal satu file' } }
+    const prefix = body.prefix?.trim() || null
+    if (prefix) {
+      const dup = await prisma.projectFile.findFirst({ where: { projectId: project.id, prefix } })
+      if (dup) { set.status = 400; return { error: `Prefix "${prefix}" sudah dipakai di project ini` } }
+    }
     const file = await prisma.projectFile.create({
       data: {
         projectId: project.id,
         authorId: authResult.userId,
         title: body.title.trim(),
         description: body.description?.trim() ?? '',
+        prefix,
         files: body.files as any,
         tags: body.tags ?? [],
       },
@@ -86,13 +125,21 @@ export const filesRouter = new Elysia()
     const existing = await prisma.projectFile.findUnique({ where: { id: params.id } })
     if (!existing || existing.projectId !== project.id) { set.status = 404; return { error: 'File tidak ditemukan' } }
     if (access === 'EDITOR' && existing.authorId !== authResult.userId) return forbidden(set)
-    const body = await request.json().catch(() => null) as { title?: string; description?: string; files?: unknown; tags?: string[] } | null
+    const body = await request.json().catch(() => null) as { title?: string; description?: string; files?: unknown; tags?: string[]; prefix?: string } | null
     if (body?.files !== undefined && !isValidFiles(body.files)) { set.status = 400; return { error: 'files harus berisi minimal satu file' } }
+    if (body?.prefix !== undefined) {
+      const newPrefix = body.prefix.trim() || null
+      if (newPrefix && newPrefix !== existing.prefix) {
+        const dup = await prisma.projectFile.findFirst({ where: { projectId: project.id, prefix: newPrefix } })
+        if (dup) { set.status = 400; return { error: `Prefix "${newPrefix}" sudah dipakai di project ini` } }
+      }
+    }
     const updated = await prisma.projectFile.update({
       where: { id: existing.id },
       data: {
         ...(body?.title !== undefined ? { title: body.title.trim() } : {}),
         ...(body?.description !== undefined ? { description: body.description.trim() } : {}),
+        ...(body?.prefix !== undefined ? { prefix: body.prefix.trim() || null } : {}),
         ...(body?.files !== undefined ? { files: body.files as any } : {}),
         ...(body?.tags !== undefined ? { tags: body.tags } : {}),
       },

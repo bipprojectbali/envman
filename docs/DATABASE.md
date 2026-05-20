@@ -16,7 +16,7 @@ PostgreSQL via Prisma v6. Client generated to `./generated/prisma` (gitignored).
 - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
 - `ApiToken` (id, userId, name, token, scopes[], canWrite, lastUsedAt?, expiresAt?, createdAt)
 - `ProjectAlias` (id, projectId, name, args, description?, tags[], createdBy, timestamps) — unique(projectId, name)
-- `ProjectFile` (id, projectId, authorId, title, description, files Json, tags[], timestamps)
+- `ProjectFile` (id, projectId, authorId, title, description, prefix?, files Json, tags[], timestamps) — unique(projectId, prefix) where prefix not null
 - `PortainerConnection` (id, name, portainerUrl, apiToken, createdById, timestamps) — global, reusable
 - `PortainerConfig` (id, projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?, timestamps) — `connectionId` FK preferred; legacy fields nullable
 

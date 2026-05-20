@@ -74,16 +74,17 @@ export const fileAdminTools: ToolModule = {
           authorEmail: z.string().email(),
           files: z.array(z.object({ filename: z.string(), content: z.string(), language: z.string() })).min(1),
           description: z.string().optional(),
+          prefix: z.string().optional().describe('CLI prefix for files: reference'),
           tags: z.array(z.string()).optional(),
         },
       },
-      async ({ slug, title, authorEmail, files, description, tags }) => {
+      async ({ slug, title, authorEmail, files, description, prefix, tags }) => {
         const project = await prisma.project.findFirst({ where: { slug, ...notDeleted } })
         if (!project) return errText('Project not found')
         const user = await prisma.user.findUnique({ where: { email: authorEmail } })
         if (!user) return errText('User not found')
         const file = await prisma.projectFile.create({
-          data: { projectId: project.id, authorId: user.id, title, description: description ?? '', files: files as any, tags: tags ?? [] },
+          data: { projectId: project.id, authorId: user.id, title, description: description ?? '', prefix: prefix?.trim() || null, files: files as any, tags: tags ?? [] },
           select: fileSelect,
         }).catch((e: Error) => e)
         if (file instanceof Error) return errText(file.message)
