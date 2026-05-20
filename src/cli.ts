@@ -142,7 +142,7 @@ function buildStdinCommand(cmd: string[]): string[] | null {
 
 // ─── Run ─────────────────────────────────────────────────────────────────────
 
-async function cmdRun(sources: string[], command: string[], serverWins: boolean) {
+async function cmdRun(sources: string[], command: string[], serverWins: boolean, projectSlugHint = '') {
   if (command.length === 0) { console.error('No command specified after --'); process.exit(1) }
 
   // Step 1: Parse all local files first (needed for auth resolution)
@@ -192,7 +192,7 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean)
     const parts = refBody.split('/')
 
     // Infer project slug from first project:env source
-    const inferredSlug = sources.find(s => s.includes(':') && !s.startsWith('files:'))?.split(':')[0] ?? ''
+    const inferredSlug = sources.find(s => s.includes(':') && !s.startsWith('files:'))?.split(':')[0] ?? projectSlugHint
 
     let slug: string
     let prefix: string
@@ -319,7 +319,9 @@ async function cmdAlias(args: string[]) {
   // e.g. envman run -e .env open-marina:dev
   //      → loads .env first, then server sources win
   const mergedSources = [...extraSources, ...storedSources]
-  await cmdRun(mergedSources, command, extraServerWins || storedServerWins)
+  // Pass alias project slug as hint so files: can resolve even with no -e project:env source
+  const aliasProject = ref.split(':')[0]
+  await cmdRun(mergedSources, command, extraServerWins || storedServerWins, aliasProject)
 }
 
 // ─── Help ─────────────────────────────────────────────────────────────────────
