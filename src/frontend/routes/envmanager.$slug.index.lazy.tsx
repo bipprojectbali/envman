@@ -319,10 +319,7 @@ function ProjectDetailPage() {
           </Group>
         </Card>
       ) : project && (
-        <Paper
-          withBorder radius="lg" p="lg" mb="lg"
-          style={{ borderLeft: `3px solid var(--mantine-color-${roleColor[myRole as keyof typeof roleColor] ?? 'gray'}-5)` }}
-        >
+        <Paper withBorder radius="lg" p="lg" mb="lg">
           <Group gap="md" wrap="nowrap" align="flex-start">
             <ThemeIcon
               size={52} radius="lg" variant="gradient"
@@ -531,10 +528,7 @@ function ProjectDetailPage() {
                         aria-label={`Kelola environment ${e.name}`}
                         onClick={goTo}
                         onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); goTo() } }}
-                        style={{
-                          cursor: 'pointer',
-                          borderLeft: `3px solid var(--mantine-color-${color}-5)`,
-                        }}
+                        style={{ cursor: 'pointer' }}
                       >
                         <Group justify="space-between" wrap="nowrap" gap="sm">
                           <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
