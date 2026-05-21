@@ -9,7 +9,7 @@ const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const UPDATE_CACHE_FILE = join(CONFIG_DIR, 'update-check.json')
 import { version as PKG_VERSION } from '../package.json'
 const VERSION = PKG_VERSION
-const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000  // 1 jam
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000  // 15 menit
 
 interface Config {
   server: string
@@ -420,6 +420,43 @@ async function cmdAlias(args: string[]) {
   await cmdRun(mergedSources, [...command, ...passthroughArgs], extraServerWins || storedServerWins, aliasProject)
 }
 
+// ─── Download helper: streaming with progress + timeout ──────────────────────
+
+async function downloadBinary(url: string, timeoutMs = 10 * 60 * 1000, showProgress = false): Promise<Buffer | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      headers: { 'Accept-Encoding': 'gzip' },
+      signal: controller.signal,
+    })
+    if (!res.ok || !res.body) { clearTimeout(timer); return null }
+
+    const chunks: Buffer[] = []
+    const reader = res.body.getReader()
+    let received = 0
+    let lastMb = 0
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(Buffer.from(value))
+      received += value.length
+      if (showProgress) {
+        const mb = Math.floor(received / (1024 * 1024))
+        if (mb > lastMb) { process.stdout.write('.'); lastMb = mb }
+      }
+    }
+    clearTimeout(timer)
+    if (showProgress) process.stdout.write(` ${(received / 1024 / 1024).toFixed(1)}MB\n`)
+    return Buffer.concat(chunks)
+  } catch (e) {
+    clearTimeout(timer)
+    if ((e as Error).name === 'AbortError') return null
+    throw e
+  }
+}
+
 // ─── Update ──────────────────────────────────────────────────────────────────
 
 async function cmdUpdate() {
@@ -437,13 +474,11 @@ async function cmdUpdate() {
     return
   }
   console.log(`Update tersedia: v${VERSION} → v${latest}`)
-  console.log(`Mengunduh...`)
+  process.stdout.write('Mengunduh')
   const platform = detectPlatform()
-  const dlRes = await fetch(`${server}/download/cli/${platform}`, { headers: { 'Accept-Encoding': 'gzip' } })
-  if (!dlRes.ok) { console.error(`Download gagal: HTTP ${dlRes.status}`); process.exit(1) }
-  const buf = Buffer.from(await dlRes.arrayBuffer())
+  const buf = await downloadBinary(`${server}/download/cli/${platform}`, 10 * 60 * 1000, true)
+  if (!buf) { console.error('Download gagal atau timeout. Cek koneksi ke server.'); process.exit(1) }
 
-  // Download ke /tmp dulu — hindari masalah permission di /usr/local/bin
   const tmpBin = join(tmpdir(), `envman-update-${Date.now()}`)
   writeFileSync(tmpBin, buf, { mode: 0o755 })
 
@@ -553,17 +588,11 @@ async function main() {
         process.exit(0)
       }
 
-      // Download new binary to .new temp file
+      // Download new binary (silent, 8-min timeout)
       const platform = detectPlatform()
-      const dlRes = await fetch(`${server}/download/cli/${platform}`, {
-        headers: { 'Accept-Encoding': 'gzip' },
-      })
-      if (!dlRes.ok) process.exit(0)
+      const buf = await downloadBinary(`${server}/download/cli/${platform}`, 8 * 60 * 1000, false)
+      if (!buf || buf.length < 1_000_000) process.exit(0)  // sanity: null or < 1MB = skip
 
-      const buf = Buffer.from(await dlRes.arrayBuffer())
-      if (buf.length < 1_000_000) process.exit(0)  // sanity: < 1MB = likely corrupt
-
-      // Download ke /tmp — hindari masalah permission di /usr/local/bin
       const tmpBin = join(tmpdir(), `envman-bg-${Date.now()}`)
       writeFileSync(tmpBin, buf, { mode: 0o755 })
 
