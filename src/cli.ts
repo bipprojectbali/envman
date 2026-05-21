@@ -178,6 +178,18 @@ async function cmdWhoami() {
   console.log(`Server: ${cfg.server}`)
 }
 
+// ─── Project file ref detection ──────────────────────────────────────────────
+// Disambiguate project:env vs project:path/file.ext in command args.
+// Rules (both must NOT apply to be treated as env):
+//   - Contains "/" after colon → path ref (env names never have slashes)
+//   - Has a file extension after colon → file ref (env names don't have dots)
+function isProjectFileRef(arg: string): boolean {
+  if (!arg.includes(':')) return false
+  const after = arg.slice(arg.indexOf(':') + 1)
+  if (!after) return false
+  return after.includes('/') || /\.[a-zA-Z0-9]+$/.test(after)
+}
+
 // ─── Files: stdin command builder ────────────────────────────────────────────
 
 function buildStdinCommand(cmd: string[]): string[] | null {
@@ -237,35 +249,52 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
     ? { ...merged, ...process.env }
     : { ...process.env, ...merged }
 
-  // Step 5: Resolve files: reference in command args (zero disk write via stdin)
+  // Step 5: Resolve file reference in command args (zero disk write via stdin)
+  // Supports two syntaxes:
+  //   files:prefix[/filename]          — explicit prefix (project inferred from -e source)
+  //   files:slug/prefix[/filename]     — explicit slug + prefix
+  //   project:prefix/filename.ext      — new: slug:path, disambiguated by "/" or extension
+  //   project:file.ext                 — new: slug:file, disambiguated by extension
   let fileContent: string | null = null
-  let fileRef = ''
   let resolvedFilename = ''
   const transformedCommand = [...command]
-  const fileArgIdx = transformedCommand.findIndex(a => a.startsWith('files:'))
+  const fileArgIdx = transformedCommand.findIndex(a => a.startsWith('files:') || isProjectFileRef(a))
 
   if (fileArgIdx !== -1) {
-    fileRef = transformedCommand[fileArgIdx]
-    transformedCommand.splice(fileArgIdx, 1)  // remove files: from command
-
-    const refBody = fileRef.slice(6)  // strip "files:"
-    const parts = refBody.split('/')
-
-    // Infer project slug from first project:env source
-    const inferredSlug = sources.find(s => s.includes(':') && !s.startsWith('files:'))?.split(':')[0] ?? projectSlugHint
+    const fileRef = transformedCommand[fileArgIdx]
+    transformedCommand.splice(fileArgIdx, 1)
 
     let slug: string
     let prefix: string
-    if (parts.length >= 3) {
-      slug = parts[0]; prefix = parts[1]; resolvedFilename = parts.slice(2).join('/')
-    } else if (parts.length === 2) {
-      slug = inferredSlug; prefix = parts[0]; resolvedFilename = parts[1]
+
+    if (fileRef.startsWith('files:')) {
+      // Legacy files: syntax
+      const refBody = fileRef.slice(6)
+      const parts = refBody.split('/')
+      const inferredSlug = sources.find(s => s.includes(':') && !s.startsWith('files:'))?.split(':')[0] ?? projectSlugHint
+      if (parts.length >= 3) {
+        slug = parts[0]; prefix = parts[1]; resolvedFilename = parts.slice(2).join('/')
+      } else if (parts.length === 2) {
+        slug = inferredSlug; prefix = parts[0]; resolvedFilename = parts[1]
+      } else {
+        slug = inferredSlug; prefix = parts[0]; resolvedFilename = ''
+      }
     } else {
-      slug = inferredSlug; prefix = parts[0]; resolvedFilename = ''
+      // New project:path syntax — slug is always explicit (before colon)
+      const colonIdx = fileRef.indexOf(':')
+      slug = fileRef.slice(0, colonIdx)
+      const filePath = fileRef.slice(colonIdx + 1)
+      const parts = filePath.split('/')
+      if (parts.length >= 2) {
+        prefix = parts[0]; resolvedFilename = parts.slice(1).join('/')
+      } else {
+        // e.g. "project:deploy.sh" — treat whole segment as prefix (single-file entry)
+        prefix = filePath; resolvedFilename = ''
+      }
     }
 
     if (!slug) {
-      console.error(`[envman] Cannot infer project slug for "${fileRef}". Add a -e project:env source or use files:slug/prefix/filename.`)
+      console.error(`[envman] Cannot infer project slug for "${fileRef}". Use project:path/file.ext syntax or add -e project:env.`)
       process.exit(1)
     }
 
@@ -274,7 +303,7 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
       : `prefix=${encodeURIComponent(prefix)}`
     const data = await apiFetch(cfg, `/api/envman/projects/${slug}/files/resolve?${qs}`)
     fileContent = data.content
-    if (!resolvedFilename) resolvedFilename = data.filename  // for temp file name fallback
+    if (!resolvedFilename) resolvedFilename = data.filename
   }
 
   // Step 6: Spawn
@@ -452,13 +481,19 @@ USAGE:
   envman whoami                                Show current authenticated user
   envman update                                Update CLI to latest version
   envman run [-e <source>]... <project>:<alias> [args...]  Expand alias + passthrough args
-  envman -e <project:env> -- <cmd> files:<prefix>[/<file>]  Execute project file via stdin
   envman [options] -- <command>                Inject env vars and run command
+  envman -- <interpreter> <project>:<path/file.ext>  Execute project file (no -e needed)
 
 OPTIONS:
   -e <project>:<env>   Fetch vars from server environment (project:env)
   -e <file>            Load vars from local file (.env, .env.local, etc.)
   --server-wins        System env overrides merged vars (default: merged wins)
+
+FILE REFERENCE (in command args, after --)
+  project:prefix/file.ext   Short form — slug:path disambiguated by "/" or extension
+  project:file.ext           Short form — slug:file (single-file entry)
+  files:prefix[/file]        Explicit prefix form (project inferred from -e source)
+  files:slug/prefix[/file]   Explicit prefix form with slug
 
 AUTHENTICATION (highest priority first):
   1. ENVMAN_SERVER + ENVMAN_TOKEN in a local -e file
@@ -475,19 +510,19 @@ EXAMPLES:
   # Multiple server envs (later overrides earlier)
   envman -e myapp:base -e myapp:production -- bun dev
 
-  # Local file only
-  envman -e .env.local -- bun dev
-
   # Mix server + local (local overrides server)
   envman -e myapp:production -e .env.local -- bun dev
+
+  # Execute project file — no -e needed, slug embedded in arg
+  envman -- bash myapp:scripts/deploy.sh
+  envman -- bun myapp:utils/seed.ts
+
+  # Execute project file + inject env vars
+  envman -e myapp:production -- bash myapp:scripts/deploy.sh
 
   # Auth from env vars — no login needed (CI/CD, container)
   ENVMAN_SERVER=https://envman.example.com ENVMAN_TOKEN=em_xxx \\
     envman -e myapp:production -- bun start
-
-  # Auth from local file — useful for Portainer / team setups
-  # .env.local contains: ENVMAN_SERVER=... ENVMAN_TOKEN=...
-  envman -e .env.local -e myapp:production -- bun start
 
 PRIORITY (default, later -e wins):
   system env  →  server vars  →  local file vars
@@ -602,8 +637,8 @@ async function main() {
     }
   }
 
-  if (sources.length === 0) {
-    console.error('Specify at least one -e source.\nUsage: envman -e project:env -- command')
+  if (sources.length === 0 && !command.some(a => a.startsWith('files:') || isProjectFileRef(a))) {
+    console.error('Specify at least one -e source, or reference a project file directly.\nUsage: envman -e project:env -- command\n       envman -- bash myapp:scripts/deploy.sh')
     process.exit(1)
   }
 

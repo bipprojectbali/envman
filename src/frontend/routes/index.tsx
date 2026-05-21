@@ -537,9 +537,10 @@ DEBUG=true`}
                   code={`envman run -e .env.local myapp:deploy --dry-run`}
                 />
                 <CodeBlock
-                  label="Project Files — eksekusi script dari server (stdin, zero disk)"
-                  code={`envman -e myapp:dev -- bash files:scripts/migrate.sh
-envman -e myapp:dev -- bun files:ts-utils/seed.ts`}
+                  label="Project Files — eksekusi script dari server (tanpa -e, slug embedded)"
+                  code={`envman -- bash myapp:scripts/migrate.sh
+envman -- bun myapp:ts-utils/seed.ts
+envman -e myapp:production -- bash myapp:scripts/deploy.sh`}
                 />
               </Stack>
             </Timeline.Item>
@@ -610,8 +611,9 @@ envman run -e .env myapp:deploy          # tambah source ekstra
 envman run myapp:deploy --flag arg       # passthrough args ke command
 
 # Project Files — eksekusi script dari server (zero disk write)
-envman -e myapp:dev -- bash files:deploy       # single file entry
-envman -e myapp:dev -- bun files:utils/run.ts  # multi-file entry
+envman -- bash myapp:scripts/deploy.sh         # slug:path, tanpa -e
+envman -- bun myapp:utils/seed.ts              # slug:file.ts
+envman -e myapp:production -- bash myapp:scripts/deploy.sh  # + inject env vars
 
 # Flag
 --server-wins    system env menang vs merged vars (default: merged wins)`}

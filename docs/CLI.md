@@ -47,24 +47,34 @@ envman [options] -- <command>               # Inject vars and run command
 Script di ProjectFiles bisa dieksekusi langsung dari CLI tanpa menyimpan ke disk — konten di-pipe ke stdin interpreter:
 
 ```bash
-# Satu file entry (prefix cukup)
-envman -e open-marina:dev -- bash files:deploy
+# Syntax baru: slug:path/file.ext — tidak perlu -e, slug embedded di arg
+envman -- bash myapp:scripts/deploy.sh
+envman -- bun myapp:utils/seed.ts
 
-# Multi-file entry (perlu filename)
+# Dengan inject env vars sekaligus
+envman -e myapp:production -- bash myapp:scripts/deploy.sh
+
+# Syntax lama (files:) — tetap didukung
+envman -e open-marina:dev -- bash files:deploy        # prefix, project dari -e
 envman -e open-marina:dev -- bun files:ts-utils/migrate.ts
+envman -- bash files:open-marina/deploy/deploy.sh     # explicit slug di files:
 
-# Explicit project slug (jika berbeda dari -e source)
-envman -- bash files:open-marina/deploy/deploy.sh
-
-# Via alias (alias menyimpan files: di args-nya)
+# Via alias
 envman run open-marina:dev
-# stored: -e open-marina:dev -- bash files:deploy
+# stored: -e open-marina:dev -- bash myapp:scripts/deploy.sh
 ```
 
-**Format referensi:**
-- `files:prefix` — single-file entry, project diinfer dari `-e project:env` pertama
-- `files:prefix/filename` — multi-file entry
-- `files:slug/prefix/filename` — explicit project slug
+**Format referensi (command arg setelah --):**
+
+| Syntax | Keterangan |
+|--------|-----------|
+| `slug:prefix/file.ext` | Slug eksplisit, ada `/` → **file** |
+| `slug:file.ext` | Slug eksplisit, ada extension → **file** |
+| `slug:env` | Tidak ada `/` dan tidak ada extension → **environment** (untuk -e) |
+| `files:prefix[/file]` | Lama, project diinfer dari `-e project:env` |
+| `files:slug/prefix[/file]` | Lama, slug eksplisit |
+
+**Disambiguasi `slug:env` vs `slug:path`:** cukup lihat bagian setelah colon — ada `/` atau ada extension → file reference; sisanya → environment name.
 
 **Interpreter support (zero disk write via stdin):** `bash`, `sh`, `zsh`, `bun`, `node`, `python3`, `python`, `deno`. Interpreter lain: fallback ke temp file dengan permission `0600`, dihapus segera setelah eksekusi.
 
