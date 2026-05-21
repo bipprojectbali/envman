@@ -7,7 +7,8 @@ import { spawn, spawnSync } from 'child_process'
 const CONFIG_DIR = join(homedir(), '.config', 'envman')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const UPDATE_CACHE_FILE = join(CONFIG_DIR, 'update-check.json')
-const VERSION = '1.3.0'
+import { version as PKG_VERSION } from '../package.json'
+const VERSION = PKG_VERSION
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000  // 1 jam
 
 interface Config {

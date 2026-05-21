@@ -723,7 +723,10 @@ echo "Run: envman login ${origin} --token <your-token>"
         return new Response(script, { headers: { 'Content-Type': 'text/plain' } })
       })
 
-      .get('/download/cli/version', () => ({ version: '1.3.0' }))
+      .get('/download/cli/version', () => {
+        const pkg = require('../package.json')
+        return { version: pkg.version as string }
+      })
 
       .get('/download/cli/:platform', async ({ params, request, set }) => {
         const platforms: Record<string, string> = {
