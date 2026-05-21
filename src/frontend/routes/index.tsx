@@ -311,7 +311,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
             {[
               { label: 'AES-256-GCM', sub: 'enkripsi secret' },
               { label: 'Multi-env', sub: 'per project' },
-              { label: 'CLI binary', sub: 'tanpa npm' },
+              { label: versionData?.version ? `v${versionData.version}` : '—', sub: 'CLI terbaru' },
             ].map(stat => (
               <Stack key={stat.label} align="center" gap={2}>
                 <Text fw={700} size="md">{stat.label}</Text>
