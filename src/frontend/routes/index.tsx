@@ -26,13 +26,17 @@ import {
   TbCode,
   TbCopy,
   TbDownload,
+  TbFiles,
   TbKey,
   TbLayoutDashboard,
   TbLogin,
+  TbNote,
   TbPlayerPlay,
+  TbRefresh,
   TbServer,
   TbShield,
   TbTerminal,
+  TbTerminal2,
   TbUsers,
   TbVariable,
 } from 'react-icons/tb'
@@ -59,6 +63,27 @@ const features = [
       'envman -e myapp:production -- bun start. Tidak ada perubahan di kode aplikasi, tidak ada library tambahan.',
   },
   {
+    icon: TbTerminal2,
+    color: 'indigo',
+    title: 'Aliases & Scripts',
+    description:
+      'Simpan perintah panjang sebagai alias. envman run myapp:deploy — expand dan eksekusi. Script bisa langsung dari project Files tanpa menyentuh disk.',
+  },
+  {
+    icon: TbFiles,
+    color: 'blue',
+    title: 'Project Files',
+    description:
+      'Simpan scripts, config, dan template per project. Eksekusi langsung: envman -e myapp:dev -- bash files:deploy. Konten di-pipe via stdin, zero disk write.',
+  },
+  {
+    icon: TbNote,
+    color: 'grape',
+    title: 'Notes & Docs',
+    description:
+      'Dokumentasi runbook, deployment guide, atau apapun per project. Markdown support, tag, dan search.',
+  },
+  {
     icon: TbUsers,
     color: 'teal',
     title: 'Role-Based Access',
@@ -78,6 +103,13 @@ const features = [
     title: 'API Tokens',
     description:
       'Token ter-scope per project:env atau global. Pilih read-only atau read-write, tambahkan expiry date.',
+  },
+  {
+    icon: TbRefresh,
+    color: 'teal',
+    title: 'Auto-Update CLI',
+    description:
+      'Binary CLI auto-update di background setiap ada versi baru. Tidak perlu reinstall manual — envman update jika butuh update paksa.',
   },
   {
     icon: TbServer,
@@ -142,21 +174,17 @@ function HomePage() {
   const user = sessionData?.user
 
   const installCmds = {
-    'linux-x64': `curl -sL ${origin}/download/cli/linux-x64 -o envman
-chmod +x envman
-sudo mv envman /usr/local/bin/
+    'linux-x64': `curl --compressed -fsSL ${origin}/download/cli/linux-x64 -o envman
+chmod +x envman && sudo mv envman /usr/local/bin/
 envman --version`,
-    'linux-arm64': `curl -sL ${origin}/download/cli/linux-arm64 -o envman
-chmod +x envman
-sudo mv envman /usr/local/bin/
+    'linux-arm64': `curl --compressed -fsSL ${origin}/download/cli/linux-arm64 -o envman
+chmod +x envman && sudo mv envman /usr/local/bin/
 envman --version`,
-    'darwin-arm64': `curl -sL ${origin}/download/cli/darwin-arm64 -o envman
-chmod +x envman
-sudo mv envman /usr/local/bin/
+    'darwin-arm64': `curl --compressed -fsSL ${origin}/download/cli/darwin-arm64 -o envman
+chmod +x envman && sudo mv envman /usr/local/bin/
 envman --version`,
-    'darwin-x64': `curl -sL ${origin}/download/cli/darwin-x64 -o envman
-chmod +x envman
-sudo mv envman /usr/local/bin/
+    'darwin-x64': `curl --compressed -fsSL ${origin}/download/cli/darwin-x64 -o envman
+chmod +x envman && sudo mv envman /usr/local/bin/
 envman --version`,
     'windows-x64': `# PowerShell
 Invoke-WebRequest -Uri "${origin}/download/cli/windows-x64" \`
@@ -493,6 +521,32 @@ DEBUG=true`}
             {/* Step 5 */}
             <Timeline.Item
               bullet={<Text fw={800} size="sm" c="white">5</Text>}
+              title={<Text fw={700} size="sm">Aliases — simpan perintah panjang</Text>}
+            >
+              <Text size="sm" c="dimmed" mb="sm" mt={4}>
+                Buat alias di dashboard → project → tab <Code fz="xs">Aliases</Code>.
+                Jalankan dengan <Code fz="xs">envman run project:alias</Code>. Bisa tambah extra source dan passthrough args.
+              </Text>
+              <Stack gap="xs">
+                <CodeBlock
+                  label="Jalankan alias"
+                  code={`envman run myapp:deploy`}
+                />
+                <CodeBlock
+                  label="Alias + extra source + passthrough args"
+                  code={`envman run -e .env.local myapp:deploy --dry-run`}
+                />
+                <CodeBlock
+                  label="Project Files — eksekusi script dari server (stdin, zero disk)"
+                  code={`envman -e myapp:dev -- bash files:scripts/migrate.sh
+envman -e myapp:dev -- bun files:ts-utils/seed.ts`}
+                />
+              </Stack>
+            </Timeline.Item>
+
+            {/* Step 6 */}
+            <Timeline.Item
+              bullet={<Text fw={800} size="sm" c="white">6</Text>}
               title={<Text fw={700} size="sm">Logout</Text>}
             >
               <Text size="sm" c="dimmed" mb="sm" mt={4}>
@@ -541,19 +595,23 @@ DEBUG=true`}
 envman login ${origin} --token <TOKEN>   # simpan config
 envman logout                             # hapus config
 envman whoami                             # cek status login
+envman update                             # update CLI ke versi terbaru
 
-# Inject (single source)
+# Inject env vars
 envman -e myapp:production -- <command>
+envman -e myapp:base -e myapp:production -- <command>   # later overrides
+envman -e myapp:production -e .env.local -- <command>   # mix server + local
+ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<t> \\
+  envman -e myapp:production -- <command>                # CI/CD tanpa login
 
-# Inject (multiple sources, later overrides earlier)
-envman -e myapp:base -e myapp:production -- <command>
+# Aliases — simpan perintah panjang
+envman run myapp:deploy                  # expand alias dan eksekusi
+envman run -e .env myapp:deploy          # tambah source ekstra
+envman run myapp:deploy --flag arg       # passthrough args ke command
 
-# Mix remote + local file
-envman -e myapp:production -e .env.local -- <command>
-
-# CI/CD (tanpa login, auth dari env vars)
-ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<TOKEN> \\
-  envman -e myapp:production -- <command>
+# Project Files — eksekusi script dari server (zero disk write)
+envman -e myapp:dev -- bash files:deploy       # single file entry
+envman -e myapp:dev -- bun files:utils/run.ts  # multi-file entry
 
 # Flag
 --server-wins    system env menang vs merged vars (default: merged wins)`}
