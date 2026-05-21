@@ -97,15 +97,15 @@ function showUpdateNoticeFromCache() {
   try {
     if (!existsSync(UPDATE_CACHE_FILE)) return
     const cache = JSON.parse(readFileSync(UPDATE_CACHE_FILE, 'utf8'))
+    if (!cache.latestVersion || cache.latestVersion === VERSION) return
 
-    if (cache.autoUpdated && cache.latestVersion) {
-      // Binary was replaced in background — show success notice and clear flag
+    if (cache.autoUpdated === true) {
+      // Binary berhasil di-replace di background
       console.error(`\n✓ envman diperbarui ke v${cache.latestVersion} di background.\n`)
-      writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({
-        checkedAt: cache.checkedAt,
-        latestVersion: cache.latestVersion,
-        autoUpdated: false,
-      }))
+      writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({ ...cache, autoUpdated: false }))
+    } else if (cache.autoUpdated === false && cache.latestVersion !== VERSION) {
+      // Update tersedia tapi bg replace gagal (butuh sudo) — minta user update manual
+      console.error(`\n[envman] Update tersedia: v${VERSION} → v${cache.latestVersion}. Jalankan: envman update\n`)
     }
   } catch {}
 }
@@ -408,23 +408,37 @@ async function cmdUpdate() {
     return
   }
   console.log(`Update tersedia: v${VERSION} → v${latest}`)
-  console.log(`Mengunduh dan menginstall...`)
+  console.log(`Mengunduh...`)
   const platform = detectPlatform()
-  const installUrl = `${server}/download/cli/${platform}`
-  const binaryPath = process.execPath
-  // Download binary langsung ke path yang sama (replace current binary)
-  const tmpBin = `${binaryPath}.new`
-  const dlRes = await fetch(installUrl, { headers: { 'Accept-Encoding': 'gzip' } })
+  const dlRes = await fetch(`${server}/download/cli/${platform}`, { headers: { 'Accept-Encoding': 'gzip' } })
   if (!dlRes.ok) { console.error(`Download gagal: HTTP ${dlRes.status}`); process.exit(1) }
   const buf = Buffer.from(await dlRes.arrayBuffer())
+
+  // Download ke /tmp dulu — hindari masalah permission di /usr/local/bin
+  const tmpBin = join(tmpdir(), `envman-update-${Date.now()}`)
   writeFileSync(tmpBin, buf, { mode: 0o755 })
-  rmSync(binaryPath, { force: true })
-  // rename: tmp → final
+
+  const binaryPath = process.execPath
   const { renameSync } = await import('fs')
-  renameSync(tmpBin, binaryPath)
-  // Update cache
+  try {
+    rmSync(binaryPath, { force: true })
+    renameSync(tmpBin, binaryPath)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'EACCES') {
+      // Binary di direktori protected (mis. /usr/local/bin) — butuh sudo
+      console.log(`Membutuhkan izin sudo untuk install ke ${binaryPath}...`)
+      const r = spawnSync('sudo', ['mv', '-f', tmpBin, binaryPath], { stdio: 'inherit' })
+      if (r.status !== 0) {
+        console.error(`Update gagal. Coba manual:\n  sudo mv ${tmpBin} ${binaryPath}`)
+        process.exit(1)
+      }
+    } else {
+      throw e
+    }
+  }
+
   writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({ checkedAt: Date.now(), latestVersion: latest }))
-  console.log(`✓ envman diupdate ke v${latest}. Restart terminal jika perlu.`)
+  console.log(`✓ envman diupdate ke v${latest}.`)
 }
 
 // ─── Help ─────────────────────────────────────────────────────────────────────
@@ -514,19 +528,27 @@ async function main() {
       const buf = Buffer.from(await dlRes.arrayBuffer())
       if (buf.length < 1_000_000) process.exit(0)  // sanity: < 1MB = likely corrupt
 
-      const tmpBin = `${binaryPath}.new`
+      // Download ke /tmp — hindari masalah permission di /usr/local/bin
+      const tmpBin = join(tmpdir(), `envman-bg-${Date.now()}`)
       writeFileSync(tmpBin, buf, { mode: 0o755 })
 
-      // Atomic replace: remove old, rename new → final
-      const { renameSync } = await import('fs')
-      rmSync(binaryPath, { force: true })
-      renameSync(tmpBin, binaryPath)
+      // Coba replace binary — jika EACCES (protected dir), skip replace
+      // tapi tetap update cache sehingga notice muncul dan user bisa run 'envman update'
+      let replaced = false
+      try {
+        const { renameSync } = await import('fs')
+        rmSync(binaryPath, { force: true })
+        renameSync(tmpBin, binaryPath)
+        replaced = true
+      } catch {
+        // Cleanup temp file jika replace gagal
+        rmSync(tmpBin, { force: true })
+      }
 
-      // Mark as auto-updated so next run shows a notice
       writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({
         checkedAt: Date.now(),
         latestVersion: latest,
-        autoUpdated: true,
+        autoUpdated: replaced,  // true = replaced in bg, false = needs manual 'envman update'
       }))
     } catch {}
     process.exit(0)
