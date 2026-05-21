@@ -243,7 +243,7 @@ function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; o
           label="Prefix CLI"
           description={
             prefix
-              ? <span>CLI path: <Code fz="xs">files:{prefix}</Code> atau <Code fz="xs">files:{prefix}/filename</Code></span>
+              ? <span>CLI path: <Code fz="xs">{slug}:prefix/filename.ext</Code> atau <Code fz="xs">files:{prefix}/filename</Code></span>
               : 'Auto-generate dari judul. Tidak berubah saat rename judul.'
           }
           placeholder="compose-dev"
@@ -427,8 +427,8 @@ function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; o
 
 // ─── FileCard ─────────────────────────────────────────────────────────────────
 
-function FileCard({ file, canManage, onEdit, onDelete, onView, onTagClick }: {
-  file: ProjectFile; canManage: boolean
+function FileCard({ file, slug, canManage, onEdit, onDelete, onView, onTagClick }: {
+  file: ProjectFile; slug: string; canManage: boolean
   onEdit: () => void; onDelete: () => void; onView: () => void
   onTagClick?: (tag: string) => void
 }) {
@@ -481,9 +481,9 @@ function FileCard({ file, canManage, onEdit, onDelete, onView, onTagClick }: {
       {/* Prefix + per-file copy path */}
       {file.prefix && (
         <Group gap={4} mb={6} wrap="wrap" align="center" onClick={e => e.stopPropagation()}>
-          <Code fz="xs" c="dimmed">files:{file.prefix}</Code>
+          <Code fz="xs" c="dimmed">{slug}:{file.prefix}/…</Code>
           {file.files.map(f => {
-            const path = `files:${file.prefix}/${f.filename}`
+            const path = `${slug}:${file.prefix}/${f.filename}`
             return (
               <CopyButton key={f.filename} value={path} timeout={2000}>
                 {({ copied, copy }) => (
@@ -842,14 +842,14 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
           {view === 'grid' ? (
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
               {paginated.map(f => (
-                <FileCard key={f.id} file={f} canManage={canManageFile(f.author.id)}
+                <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
                   onView={() => setViewFile(f)} onEdit={() => openEdit(f)} onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
               ))}
             </SimpleGrid>
           ) : (
             <Stack gap="xs">
               {paginated.map(f => (
-                <FileCard key={f.id} file={f} canManage={canManageFile(f.author.id)}
+                <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
                   onView={() => setViewFile(f)} onEdit={() => openEdit(f)} onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
               ))}
             </Stack>
