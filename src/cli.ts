@@ -69,6 +69,18 @@ function resolveAuth(localVars: Record<string, string>): Config {
   process.exit(1)
 }
 
+// Returns saved server URL without calling process.exit (for background update check)
+function getSavedServerUrl(): string | null {
+  try {
+    if (process.env.ENVMAN_SERVER) return process.env.ENVMAN_SERVER
+    if (existsSync(CONFIG_FILE)) {
+      const cfg = JSON.parse(readFileSync(CONFIG_FILE, 'utf8'))
+      if (cfg.server) return cfg.server
+    }
+  } catch {}
+  return null
+}
+
 // ─── Update check ────────────────────────────────────────────────────────────
 
 function detectPlatform(): string {
@@ -519,6 +531,11 @@ async function main() {
     process.exit(0)
   }
 
+  // Always: show notice from cache (instant) + queue background refresh
+  showUpdateNoticeFromCache()
+  const savedServer = getSavedServerUrl()
+  if (savedServer) spawnUpdateCheck(savedServer, '')
+
   if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
     printHelp(); return
   }
@@ -533,9 +550,6 @@ async function main() {
     case 'update': await cmdUpdate(); return
     case 'run':    await cmdAlias(args.slice(1)); return
   }
-
-  // Show notice from cache (instant, no network) + queue background refresh
-  showUpdateNoticeFromCache()
 
   // Run mode — collect all flags before --
   const sepIdx = args.indexOf('--')
@@ -569,18 +583,6 @@ async function main() {
     console.error('Specify at least one -e source.\nUsage: envman -e project:env -- command')
     process.exit(1)
   }
-
-  // Queue background update check (detached, doesn't block command execution)
-  const localVarsForAuth: Record<string, string> = {}
-  for (const src of sources) {
-    if (!src.includes(':') && !src.startsWith('files:')) {
-      try { Object.assign(localVarsForAuth, parseEnvFile(src)) } catch {}
-    }
-  }
-  try {
-    const cfg = resolveAuth(localVarsForAuth)
-    spawnUpdateCheck(cfg.server, cfg.token)
-  } catch {}
 
   await cmdRun(sources, command, serverWins)
 }

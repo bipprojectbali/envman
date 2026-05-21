@@ -17,6 +17,7 @@ import {
   Title,
   Tooltip,
 } from '@mantine/core'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   TbBrandDocker,
@@ -133,6 +134,11 @@ function CodeBlock({ code, label }: { code: string; label?: string }) {
 function HomePage() {
   const origin = window.location.origin
   const { data: sessionData } = useSession()
+  const { data: versionData } = useQuery({
+    queryKey: ['cli-version'],
+    queryFn: () => fetch('/download/cli/version').then(r => r.json()) as Promise<{ version: string }>,
+    staleTime: 5 * 60_000,
+  })
   const user = sessionData?.user
 
   const installCmds = {
@@ -301,6 +307,16 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
                 <TbDownload size={22} />
               </ThemeIcon>
               <Title order={2} ta="center" fw={700}>Install CLI</Title>
+              {versionData?.version && (
+                <Group justify="center" gap="xs">
+                  <Badge variant="light" color="violet" size="sm">
+                    CLI v{versionData.version}
+                  </Badge>
+                  <Badge variant="outline" color="gray" size="sm">
+                    auto-update built-in
+                  </Badge>
+                </Group>
+              )}
               <Text c="dimmed" ta="center" maw={480}>
                 Binary standalone — tidak perlu Node.js, npm, atau runtime apapun.
                 Satu file, langsung jalan.
