@@ -43,3 +43,6 @@ prisma/seed-dev.ts
 .claude/scheduled_tasks.lock
 /*.png
 .playwright-screenshots/
+
+# Scratch notes
+xnote.md
