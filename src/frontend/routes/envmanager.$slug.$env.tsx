@@ -656,214 +656,226 @@ function VarsPage() {
         </Paper>
       )}
 
-      {/* ─── Toolbar ───────────────────────── */}
-      <Group mb="xs" justify="space-between" gap="xs" wrap="wrap">
+      {/* ─── Toolbar ─────────────────────────
+          3 zona: [Search + filter status] | [View tools — icon] | [Write actions — button]
+      ─────────────────────────────────── */}
+      <Paper withBorder mb="xs" p={6} radius="md">
+        <Group justify="space-between" gap={8} wrap="wrap" align="center">
 
-        {/* Search + filter badge */}
-        <Group gap="xs" style={{ flex: 1, minWidth: isMobile ? '100%' : 160 }}>
-          <TextInput
-            size="xs"
-            placeholder={isMobile ? 'Cari...' : 'Cari key atau value...'}
-            leftSection={<TbSearch size={13} />}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            rightSection={search ? (
-              <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setSearch('')}>
-                <TbX size={12} />
-              </ActionIcon>
-            ) : undefined}
-            style={{ flex: 1, maxWidth: isMobile ? undefined : 260 }}
-          />
-          {(search || filterType !== 'all' || filterDisabled !== 'all') && (
-            <Tooltip label="Reset semua filter">
-              <Badge
-                size="sm" variant="light" color="blue"
-                rightSection={<TbX size={10} />}
-                style={{ cursor: 'pointer' }}
-                onClick={() => { setSearch(''); setFilterType('all'); setFilterDisabled('all') }}
-              >
-                {filteredVars.length}/{vars.length}
-              </Badge>
-            </Tooltip>
-          )}
-        </Group>
+          {/* ── ZONA 1: Search + filter status ── */}
+          <Group gap={6} style={{ flex: 1, minWidth: isMobile ? '100%' : 220 }} align="center">
+            <TextInput
+              size="xs"
+              placeholder={isMobile ? 'Cari...' : 'Cari key atau value...'}
+              leftSection={<TbSearch size={13} />}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              rightSection={search ? (
+                <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setSearch('')}>
+                  <TbX size={12} />
+                </ActionIcon>
+              ) : undefined}
+              style={{ flex: 1, maxWidth: isMobile ? undefined : 280 }}
+            />
+            {(search || filterType !== 'all' || filterDisabled !== 'all') && (
+              <Tooltip label="Klik untuk reset semua filter">
+                <Badge
+                  size="sm" variant="light" color="blue"
+                  leftSection={<TbFilter size={10} />}
+                  rightSection={<TbX size={10} />}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => { setSearch(''); setFilterType('all'); setFilterDisabled('all') }}
+                >
+                  {filteredVars.length} dari {vars.length}
+                </Badge>
+              </Tooltip>
+            )}
+          </Group>
 
-        {/* Aksi kanan */}
-        <Group gap={6} wrap="nowrap">
+          {/* ── ZONA 2 & 3: tools (kanan) ── */}
+          <Group gap={4} wrap="nowrap" align="center">
 
-          {/* Sort — icon-only di mobile */}
-          {vars.length > 0 && (
-            isMobile ? (
-              <Menu shadow="md" width={160} position="bottom-end">
-                <Menu.Target>
-                  <ActionIcon size={34} variant="subtle" color="gray">
-                    <TbSortAscending size={16} />
-                  </ActionIcon>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Label>Urutan</Menu.Label>
-                  {[
-                    { label: 'A → Z', value: 'key-asc' },
-                    { label: 'Z → A', value: 'key-desc' },
-                    { label: 'Terbaru', value: 'newest' },
-                    { label: 'Terlama', value: 'oldest' },
-                  ].map(o => (
-                    <Menu.Item key={o.value} onClick={() => setSort(o.value as typeof sort)}
-                      rightSection={sort === o.value ? <TbCheck size={13} /> : undefined}>
-                      {o.label}
-                    </Menu.Item>
-                  ))}
-                </Menu.Dropdown>
-              </Menu>
-            ) : (
-              <Select
-                size="xs" w={120}
-                leftSection={<TbSortAscending size={13} />}
-                value={sort}
-                onChange={v => setSort((v ?? 'key-asc') as typeof sort)}
-                data={[
-                  { label: 'A → Z', value: 'key-asc' },
-                  { label: 'Z → A', value: 'key-desc' },
-                  { label: 'Terbaru', value: 'newest' },
-                  { label: 'Terlama', value: 'oldest' },
-                ]}
-                allowDeselect={false}
-              />
-            )
-          )}
+            {/* ── ZONA 2: View tools (icon-only, equal weight) ── */}
+            {vars.length > 0 && (
+              <Group gap={2} wrap="nowrap">
+                {/* Sort */}
+                {isMobile ? (
+                  <Menu shadow="md" width={160} position="bottom-end">
+                    <Menu.Target>
+                      <Tooltip label="Urutkan">
+                        <ActionIcon size={30} variant="subtle" color="gray">
+                          <TbSortAscending size={15} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Label>Urutan</Menu.Label>
+                      {[
+                        { label: 'A → Z', value: 'key-asc' },
+                        { label: 'Z → A', value: 'key-desc' },
+                        { label: 'Terbaru', value: 'newest' },
+                        { label: 'Terlama', value: 'oldest' },
+                      ].map(o => (
+                        <Menu.Item key={o.value} onClick={() => setSort(o.value as typeof sort)}
+                          rightSection={sort === o.value ? <TbCheck size={13} /> : undefined}>
+                          {o.label}
+                        </Menu.Item>
+                      ))}
+                    </Menu.Dropdown>
+                  </Menu>
+                ) : (
+                  <Select
+                    size="xs" w={110}
+                    leftSection={<TbSortAscending size={13} />}
+                    value={sort}
+                    onChange={v => setSort((v ?? 'key-asc') as typeof sort)}
+                    data={[
+                      { label: 'A → Z', value: 'key-asc' },
+                      { label: 'Z → A', value: 'key-desc' },
+                      { label: 'Terbaru', value: 'newest' },
+                      { label: 'Terlama', value: 'oldest' },
+                    ]}
+                    allowDeselect={false}
+                  />
+                )}
 
-          {/* Copy dropdown */}
-          {vars.length > 0 && (
-            <Tooltip label="Export .env">
-              <Menu shadow="md" width={210} position="bottom-end">
-                <Menu.Target>
-                  <ActionIcon size={34} variant="subtle" color={copiedAll || copiedSelected ? 'teal' : 'gray'}>
-                    {copiedAll || copiedSelected ? <TbCheck size={15} /> : <TbCopy size={15} />}
-                  </ActionIcon>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Label>Export sebagai .env</Menu.Label>
-                  <Menu.Item
-                    leftSection={<TbCopy size={14} />}
-                    rightSection={<Badge size="xs" variant="light" color="gray">{vars.length}</Badge>}
-                    onClick={() => copyToClipboard(toEnvText(vars), setCopiedAll)}
-                  >
-                    Semua variabel
-                  </Menu.Item>
-                  {filteredVars.length < vars.length && (
-                    <Menu.Item
-                      leftSection={<TbFilter size={14} />}
-                      rightSection={<Badge size="xs" variant="light" color="blue">{filteredVars.length}</Badge>}
-                      onClick={() => copyToClipboard(toEnvText(filteredVars), setCopiedAll)}
-                    >
-                      Hasil filter
-                    </Menu.Item>
-                  )}
-                  <Menu.Item
-                    leftSection={<TbCopy size={14} />}
-                    rightSection={<Badge size="xs" variant="light" color={selectedIds.size > 0 ? 'blue' : 'gray'}>{selectedIds.size}</Badge>}
-                    disabled={selectedIds.size === 0}
-                    onClick={() => copyToClipboard(toEnvText(vars.filter(v => selectedIds.has(v.id))), setCopiedSelected)}
-                  >
-                    Yang dipilih
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
-            </Tooltip>
-          )}
-
-          {/* Compare — semua role, butuh ada vars di server */}
-          {vars.length > 0 && (
-            <Tooltip label="Bandingkan dengan .env local">
-              <Button
-                size="xs" variant="light" color="grape"
-                leftSection={<TbGitCompare size={13} />}
-                onClick={openCompare}
-                px={isMobile ? 8 : undefined}
-              >
-                {isMobile ? '' : 'Compare'}
-              </Button>
-            </Tooltip>
-          )}
-
-          {canEdit && (
-            <>
-              {/* .env menu */}
-              <Menu shadow="md" width={220} position="bottom-end">
-                <Menu.Target>
-                  <Button size="xs" variant="light" color="gray"
-                    leftSection={<TbFileImport size={13} />}
-                    rightSection={<TbChevronDown size={11} />}
-                    px={isMobile ? 8 : undefined}
-                  >
-                    {isMobile ? '' : '.env'}
-                  </Button>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Label>File .env</Menu.Label>
-                  <Menu.Item leftSection={<TbFileImport size={14} />} onClick={openBulk}>
-                    Paste .env
-                    <Text size="xs" c="dimmed">Import dari clipboard</Text>
-                  </Menu.Item>
-                  {vars.length > 0 && (
-                    <Menu.Item leftSection={<TbPencil size={14} />} onClick={openEditEnvModal}>
-                      Edit .env
-                      <Text size="xs" c="dimmed">Edit semua vars sekaligus</Text>
-                    </Menu.Item>
-                  )}
-                </Menu.Dropdown>
-              </Menu>
-
-              {/* Tambah Var — CTA */}
-              <Button size="xs" leftSection={<TbPlus size={13} />} onClick={openAdd} px={isMobile ? 8 : undefined}>
-                {isMobile ? '' : 'Tambah Var'}
-              </Button>
-
-              {/* More actions */}
-              {vars.length > 0 && (
-                <Menu shadow="md" width={230} position="bottom-end">
+                {/* Copy export */}
+                <Menu shadow="md" width={210} position="bottom-end">
                   <Menu.Target>
-                    <ActionIcon size={34} variant="subtle" color="gray">
-                      <TbDots size={15} />
-                    </ActionIcon>
+                    <Tooltip label="Export .env ke clipboard">
+                      <ActionIcon size={30} variant="subtle" color={copiedAll || copiedSelected ? 'teal' : 'gray'}>
+                        {copiedAll || copiedSelected ? <TbCheck size={14} /> : <TbCopy size={14} />}
+                      </ActionIcon>
+                    </Tooltip>
                   </Menu.Target>
                   <Menu.Dropdown>
-                    <Menu.Label>Konversi tipe</Menu.Label>
-                    {plainCount > 0 && (
-                      <Menu.Item
-                        leftSection={<TbLock size={14} />}
-                        rightSection={<Badge size="xs" variant="light" color="red">{plainCount}</Badge>}
-                        onClick={() => confirmBulkToggle(true)}
-                      >
-                        Semua plain → Secret
-                      </Menu.Item>
-                    )}
-                    {secretCount > 0 && vars.every(v => !v.isSecret || v.value !== '***') && (
-                      <Menu.Item
-                        leftSection={<TbLockOpen size={14} />}
-                        rightSection={<Badge size="xs" variant="light" color="gray">{secretCount}</Badge>}
-                        onClick={() => confirmBulkToggle(false)}
-                      >
-                        Semua secret → Plain
-                      </Menu.Item>
-                    )}
-                    <Menu.Divider />
-                    <Menu.Label c="red">Zona berbahaya</Menu.Label>
+                    <Menu.Label>Export sebagai .env</Menu.Label>
                     <Menu.Item
-                      color="red"
-                      leftSection={<TbTrash size={14} />}
-                      rightSection={<Badge size="xs" variant="light" color="red">{vars.length}</Badge>}
-                      onClick={confirmClearAll}
+                      leftSection={<TbCopy size={14} />}
+                      rightSection={<Badge size="xs" variant="light" color="gray">{vars.length}</Badge>}
+                      onClick={() => copyToClipboard(toEnvText(vars), setCopiedAll)}
                     >
-                      Hapus semua vars
+                      Semua variabel
+                    </Menu.Item>
+                    {filteredVars.length < vars.length && (
+                      <Menu.Item
+                        leftSection={<TbFilter size={14} />}
+                        rightSection={<Badge size="xs" variant="light" color="blue">{filteredVars.length}</Badge>}
+                        onClick={() => copyToClipboard(toEnvText(filteredVars), setCopiedAll)}
+                      >
+                        Hasil filter
+                      </Menu.Item>
+                    )}
+                    <Menu.Item
+                      leftSection={<TbCopy size={14} />}
+                      rightSection={<Badge size="xs" variant="light" color={selectedIds.size > 0 ? 'blue' : 'gray'}>{selectedIds.size}</Badge>}
+                      disabled={selectedIds.size === 0}
+                      onClick={() => copyToClipboard(toEnvText(vars.filter(v => selectedIds.has(v.id))), setCopiedSelected)}
+                    >
+                      Yang dipilih
                     </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
-              )}
-            </>
-          )}
+
+                {/* Compare */}
+                <Tooltip label="Bandingkan dengan .env local">
+                  <ActionIcon size={30} variant="subtle" color="grape" onClick={openCompare}>
+                    <TbGitCompare size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+            )}
+
+            {/* ── Divider antara view tools dan write actions ── */}
+            {vars.length > 0 && canEdit && (
+              <Divider orientation="vertical" mx={4} />
+            )}
+
+            {/* ── ZONA 3: Write actions ── */}
+            {canEdit && (
+              <Group gap={4} wrap="nowrap">
+                {/* .env menu (utility) */}
+                <Menu shadow="md" width={220} position="bottom-end">
+                  <Menu.Target>
+                    <Tooltip label="Import / edit .env">
+                      <ActionIcon size={30} variant="subtle" color="gray">
+                        <TbFileImport size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Label>File .env</Menu.Label>
+                    <Menu.Item leftSection={<TbFileImport size={14} />} onClick={openBulk}>
+                      Paste .env
+                      <Text size="xs" c="dimmed">Import dari clipboard</Text>
+                    </Menu.Item>
+                    {vars.length > 0 && (
+                      <Menu.Item leftSection={<TbPencil size={14} />} onClick={openEditEnvModal}>
+                        Edit .env
+                        <Text size="xs" c="dimmed">Edit semua vars sekaligus</Text>
+                      </Menu.Item>
+                    )}
+                  </Menu.Dropdown>
+                </Menu>
+
+                {/* Tambah Var — CTA primary */}
+                <Button
+                  size="xs"
+                  leftSection={<TbPlus size={13} />}
+                  onClick={openAdd}
+                  px={isMobile ? 8 : 12}
+                >
+                  {isMobile ? '' : 'Tambah Var'}
+                </Button>
+
+                {/* More actions — overflow */}
+                {vars.length > 0 && (
+                  <Menu shadow="md" width={230} position="bottom-end">
+                    <Menu.Target>
+                      <Tooltip label="Lebih banyak aksi">
+                        <ActionIcon size={30} variant="subtle" color="gray">
+                          <TbDots size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Label>Konversi tipe</Menu.Label>
+                      {plainCount > 0 && (
+                        <Menu.Item
+                          leftSection={<TbLock size={14} />}
+                          rightSection={<Badge size="xs" variant="light" color="red">{plainCount}</Badge>}
+                          onClick={() => confirmBulkToggle(true)}
+                        >
+                          Semua plain → Secret
+                        </Menu.Item>
+                      )}
+                      {secretCount > 0 && vars.every(v => !v.isSecret || v.value !== '***') && (
+                        <Menu.Item
+                          leftSection={<TbLockOpen size={14} />}
+                          rightSection={<Badge size="xs" variant="light" color="gray">{secretCount}</Badge>}
+                          onClick={() => confirmBulkToggle(false)}
+                        >
+                          Semua secret → Plain
+                        </Menu.Item>
+                      )}
+                      <Menu.Divider />
+                      <Menu.Label c="red">Zona berbahaya</Menu.Label>
+                      <Menu.Item
+                        color="red"
+                        leftSection={<TbTrash size={14} />}
+                        rightSection={<Badge size="xs" variant="light" color="red">{vars.length}</Badge>}
+                        onClick={confirmClearAll}
+                      >
+                        Hapus semua vars
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                )}
+              </Group>
+            )}
+          </Group>
         </Group>
-      </Group>
+      </Paper>
 
       {/* ─── Selection bar ─────────────────── */}
       {selectedIds.size > 0 && (
