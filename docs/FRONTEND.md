@@ -20,7 +20,7 @@ React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Rou
 - `envmanager.connections.tsx` — `/envmanager/connections` global Portainer connection CRUD
 - `envmanager.$slug.tsx` — `/envmanager/:slug` pure `<Outlet />` layout
 - `envmanager.$slug.index.tsx` — project detail content (environments + notes + aliases tabs, `?tab=environments|notes|aliases`)
-- `envmanager.$slug.$env.tsx` — `/envmanager/:slug/:env` env vars page
+- `envmanager.$slug.$env.tsx` — `/envmanager/:slug/:env` env vars page. Portainer + History bukan tab lagi — diakses via tombol "Integrasi" di header yang membuka Drawer dari kanan. Indicator dot di tombol: teal=connected, orange=unsynced, abu=disconnected. State drawer persist via `?integrations=true` (sama dengan `?compare=true` untuk modal Compare).
 - `profile.tsx` — User profile (all authenticated users)
 - `blocked.tsx` — Blocked user info page
 

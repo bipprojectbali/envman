@@ -1,4 +1,5 @@
 import {
+  Accordion,
   ActionIcon,
   Alert,
   Anchor,
@@ -9,7 +10,9 @@ import {
   Code,
   CopyButton,
   Divider,
+  Drawer,
   Group,
+  Indicator,
   Loader,
   Menu,
   Modal,
@@ -21,7 +24,6 @@ import {
   Select,
   Stack,
   Table,
-  Tabs,
   Text,
   Textarea,
   TextInput,
@@ -29,7 +31,7 @@ import {
   Timeline,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
@@ -61,23 +63,28 @@ import {
   TbSquareCheckFilled,
   TbToggleLeft,
   TbToggleRight,
-  TbCloud,
   TbHistory,
   TbTrash,
   TbVariable,
   TbX,
   TbSortAscending,
   TbGitCompare,
+  TbPlugConnected,
+  TbBrandDocker,
 } from 'react-icons/tb'
 
 interface EnvSearch {
   compare?: boolean
+  integrations?: boolean
 }
+
+const truthy = (v: unknown) => v === true || v === 'true' || v === '1'
 
 export const Route = createFileRoute('/envmanager/$slug/$env')({
   component: VarsPage,
   validateSearch: (search: Record<string, unknown>): EnvSearch => ({
-    compare: search.compare === true || search.compare === 'true' || search.compare === '1' ? true : undefined,
+    compare: truthy(search.compare) ? true : undefined,
+    integrations: truthy(search.integrations) ? true : undefined,
   }),
 })
 
@@ -109,10 +116,6 @@ function VarsPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const isMobile = useMediaQuery('(max-width: 48em)')
-  const [activeTab, setActiveTab] = useLocalStorage<string>({
-    key: `envman:tab:${slug}:${env}`,
-    defaultValue: 'env',
-  })
 
   // modals
   const [addOpen, { open: openAdd, close: closeAdd }] = useDisclosure(false)
@@ -120,10 +123,15 @@ function VarsPage() {
   const [editEnvOpen, { open: openEditEnv, close: closeEditEnv }] = useDisclosure(false)
 
   // Compare modal — state disinkron dengan ?compare=1 di URL agar reload tidak menutup modal
-  const { compare: compareSearch } = Route.useSearch()
+  const { compare: compareSearch, integrations: integrationsSearch } = Route.useSearch()
   const compareOpen = compareSearch === true
   const openCompare = () => navigate({ to: '.', params: { slug, env }, search: prev => ({ ...prev, compare: true }), replace: true })
   const closeCompare = () => navigate({ to: '.', params: { slug, env }, search: prev => ({ ...prev, compare: undefined }), replace: true })
+
+  // Integrations drawer — juga via query agar reload tidak menutup
+  const integrationsOpen = integrationsSearch === true
+  const openIntegrations = () => navigate({ to: '.', params: { slug, env }, search: prev => ({ ...prev, integrations: true }), replace: true })
+  const closeIntegrations = () => navigate({ to: '.', params: { slug, env }, search: prev => ({ ...prev, integrations: undefined }), replace: true })
 
   // form state
   const [form, setForm] = useState({ key: '', value: '', isSecret: false })
@@ -173,7 +181,7 @@ function VarsPage() {
   const { data: historyData } = useQuery({
     queryKey: ['portainer', 'history', slug, env],
     queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/history`),
-    enabled: activeTab === 'history' && !!portainerData?.config,
+    enabled: integrationsOpen && !!portainerData?.config,
     staleTime: 30000,
   })
 
@@ -414,7 +422,7 @@ function VarsPage() {
           <Badge size="sm" variant="filled" color="blue" radius="sm" style={{ flexShrink: 0 }}>{env}</Badge>
         </Group>
 
-        {/* Kanan: status badge + refresh */}
+        {/* Kanan: status badge + integrations + refresh */}
         <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
           <Tooltip label={encryptionEnabled ? 'AES-256-GCM aktif' : 'MASTER_KEY belum di-set — plaintext mode'}>
             <Badge
@@ -429,6 +437,33 @@ function VarsPage() {
                 : (encryptionEnabled ? 'Encrypted' : 'Plaintext')}
             </Badge>
           </Tooltip>
+
+          {/* Integrations — Portainer dll. */}
+          <Tooltip label={
+            portainerData?.config
+              ? `Portainer tersambung${portainerData.unsyncedCount > 0 ? ` · ${portainerData.unsyncedCount} belum di-sync` : ''}`
+              : 'Sambungkan ke Portainer (opsional)'
+          }>
+            <Indicator
+              color={portainerData?.config ? (portainerData.unsyncedCount > 0 ? 'orange' : 'teal') : 'gray'}
+              size={8}
+              offset={4}
+              processing={!!portainerData?.config && portainerData.unsyncedCount > 0}
+              disabled={!portainerData?.config}
+            >
+              <Button
+                size="compact-xs"
+                variant={portainerData?.config ? 'light' : 'subtle'}
+                color={portainerData?.config ? 'cyan' : 'gray'}
+                leftSection={<TbPlugConnected size={12} />}
+                onClick={openIntegrations}
+                px={isMobile ? 6 : 8}
+              >
+                {isMobile ? '' : 'Integrasi'}
+              </Button>
+            </Indicator>
+          </Tooltip>
+
           <Tooltip label="Refresh">
             <ActionIcon size="sm" variant="subtle" color="gray" loading={isFetching} onClick={() => refetch()}>
               <TbRefresh size={14} />
@@ -437,86 +472,6 @@ function VarsPage() {
         </Group>
       </Group>
 
-      {/* ─── Tabs ──────────────────────────── */}
-      <Tabs value={activeTab} onChange={v => setActiveTab(v ?? 'env')} mb="sm">
-        <Tabs.List>
-          <Tabs.Tab value="env" leftSection={<TbVariable size={14} />}>
-            Env Vars
-            {vars.length > 0 && (
-              <Badge size="xs" variant="light" color="blue" ml="xs">{vars.length}</Badge>
-            )}
-          </Tabs.Tab>
-          <Tabs.Tab value="portainer" leftSection={<TbCloud size={14} />}>
-            Portainer
-            {portainerData?.config && portainerData.unsyncedCount > 0 && (
-              <Tooltip label={`${portainerData.unsyncedCount} var belum disync ke Portainer`}>
-                <Badge size="xs" variant="filled" color="orange" ml="xs">{portainerData.unsyncedCount}</Badge>
-              </Tooltip>
-            )}
-          </Tabs.Tab>
-          {portainerData?.config && (
-            <Tabs.Tab value="history" leftSection={<TbHistory size={14} />}>
-              History
-            </Tabs.Tab>
-          )}
-        </Tabs.List>
-      </Tabs>
-
-      {/* ─── Tab: Portainer ─────────────────── */}
-      {activeTab === 'portainer' && (
-        <PortainerSync slug={slug} env={env} canEdit={canEdit} secretCount={secretCount} />
-      )}
-
-      {/* ─── Tab: History ───────────────────── */}
-      {activeTab === 'history' && (
-        <Stack gap="md">
-          <Group justify="space-between">
-            <Text fw={600} size="sm">Sync History</Text>
-            <Badge size="sm" variant="light" color="gray">{historyData?.logs?.length ?? 0} entri</Badge>
-          </Group>
-          {!historyData ? (
-            <Group justify="center" py="xl"><Loader size="sm" /></Group>
-          ) : historyData.logs?.length === 0 ? (
-            <Paper withBorder p="xl" ta="center" radius="md">
-              <ThemeIcon size={40} variant="light" color="gray" radius="xl" mx="auto" mb="sm"><TbHistory size={20} /></ThemeIcon>
-              <Text size="sm" c="dimmed">Belum ada riwayat sync.</Text>
-            </Paper>
-          ) : (
-            <Timeline bulletSize={24} lineWidth={2}>
-              {(historyData.logs as any[]).map((log: any) => (
-                <Timeline.Item
-                  key={log.id}
-                  bullet={log.ok ? <TbCheck size={12} /> : <TbAlertTriangle size={12} />}
-                  color={log.ok ? 'teal' : 'red'}
-                  title={
-                    <Group gap="xs">
-                      <Badge size="xs" color={log.ok ? 'teal' : 'red'} variant="light">
-                        {log.ok ? 'Berhasil' : 'Gagal'}
-                      </Badge>
-                      <Badge size="xs" variant="outline" color="gray">
-                        {log.triggeredBy === 'auto' ? 'auto-sync' : 'manual'}
-                      </Badge>
-                    </Group>
-                  }
-                >
-                  <Text size="xs" c="dimmed" mt={4}>
-                    {new Date(log.createdAt).toLocaleString('id-ID')}
-                    {log.user && ` · ${log.user.name}`}
-                    {` · ${log.varsCount} vars`}
-                    {log.durationMs && ` · ${log.durationMs}ms`}
-                  </Text>
-                  {log.error && (
-                    <Text size="xs" c="red" mt={2}>{log.error}</Text>
-                  )}
-                </Timeline.Item>
-              ))}
-            </Timeline>
-          )}
-        </Stack>
-      )}
-
-      {/* ─── Tab: Env Vars ─────────────────── */}
-      {activeTab === 'env' && <>
 
       {/* ─── Warning enkripsi ──────────────── */}
       {!encryptionEnabled && secretCount > 0 && (
@@ -1526,8 +1481,6 @@ function VarsPage() {
         </Stack>
       </Modal>
 
-      </>}
-
       {/* Compare modal — VIEWER+ */}
       <CompareModal
         opened={compareOpen}
@@ -1536,6 +1489,109 @@ function VarsPage() {
         env={env}
         canEdit={canEdit}
       />
+
+      {/* ─── Integrations Drawer (Portainer dll.) ──────── */}
+      <Drawer
+        opened={integrationsOpen}
+        onClose={closeIntegrations}
+        position="right"
+        size={isMobile ? '100%' : 'xl'}
+        title={
+          <Group gap="xs">
+            <ThemeIcon size="sm" variant="light" color="cyan" radius="sm">
+              <TbPlugConnected size={14} />
+            </ThemeIcon>
+            <Text fw={600}>Integrasi</Text>
+            <Badge size="xs" variant="light" color="gray">{slug}:{env}</Badge>
+          </Group>
+        }
+      >
+        <Stack gap="md">
+          {/* Portainer integration card */}
+          <Paper withBorder p="md" radius="md">
+            <Group justify="space-between" mb="xs" wrap="nowrap">
+              <Group gap="xs" wrap="nowrap">
+                <ThemeIcon size={28} variant="light" color="cyan" radius="md">
+                  <TbBrandDocker size={16} />
+                </ThemeIcon>
+                <Box>
+                  <Text size="sm" fw={600} lh={1.2}>Portainer</Text>
+                  <Text size="xs" c="dimmed" lh={1.2}>Push vars ke Docker stack</Text>
+                </Box>
+              </Group>
+              <Badge
+                size="sm"
+                variant="light"
+                color={portainerData?.config ? 'teal' : 'gray'}
+                leftSection={portainerData?.config ? <TbCheck size={11} /> : undefined}
+              >
+                {portainerData?.config ? 'Tersambung' : 'Belum tersambung'}
+              </Badge>
+            </Group>
+            <Divider mb="md" />
+            <PortainerSync slug={slug} env={env} canEdit={canEdit} secretCount={secretCount} />
+          </Paper>
+
+          {/* History accordion — hanya muncul jika config ada */}
+          {portainerData?.config && (
+            <Accordion variant="separated" radius="md">
+              <Accordion.Item value="history">
+                <Accordion.Control icon={<TbHistory size={16} />}>
+                  <Group justify="space-between" pr="md">
+                    <Text size="sm" fw={600}>Riwayat Sync</Text>
+                    <Badge size="xs" variant="light" color="gray">{historyData?.logs?.length ?? 0} entri</Badge>
+                  </Group>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  {!historyData ? (
+                    <Group justify="center" py="md"><Loader size="sm" /></Group>
+                  ) : historyData.logs?.length === 0 ? (
+                    <Stack align="center" py="md" gap={4}>
+                      <TbHistory size={24} opacity={0.3} />
+                      <Text size="xs" c="dimmed">Belum ada riwayat sync.</Text>
+                    </Stack>
+                  ) : (
+                    <Timeline bulletSize={22} lineWidth={2}>
+                      {(historyData.logs as any[]).map((log: any) => (
+                        <Timeline.Item
+                          key={log.id}
+                          bullet={log.ok ? <TbCheck size={11} /> : <TbAlertTriangle size={11} />}
+                          color={log.ok ? 'teal' : 'red'}
+                          title={
+                            <Group gap="xs">
+                              <Badge size="xs" color={log.ok ? 'teal' : 'red'} variant="light">
+                                {log.ok ? 'Berhasil' : 'Gagal'}
+                              </Badge>
+                              <Badge size="xs" variant="outline" color="gray">
+                                {log.triggeredBy === 'auto' ? 'auto-sync' : 'manual'}
+                              </Badge>
+                            </Group>
+                          }
+                        >
+                          <Text size="xs" c="dimmed" mt={4}>
+                            {new Date(log.createdAt).toLocaleString('id-ID')}
+                            {log.user && ` · ${log.user.name}`}
+                            {` · ${log.varsCount} vars`}
+                            {log.durationMs && ` · ${log.durationMs}ms`}
+                          </Text>
+                          {log.error && <Text size="xs" c="red" mt={2}>{log.error}</Text>}
+                        </Timeline.Item>
+                      ))}
+                    </Timeline>
+                  )}
+                </Accordion.Panel>
+              </Accordion.Item>
+            </Accordion>
+          )}
+
+          {/* Placeholder untuk integrasi masa depan */}
+          <Alert color="gray" variant="light" radius="md" icon={<TbPlugConnected size={14} />}>
+            <Text size="xs">
+              Integrasi lain (Vault, Doppler, Kubernetes) akan tersedia di rilis berikutnya.
+            </Text>
+          </Alert>
+        </Stack>
+      </Drawer>
 
     </Box>
   )
