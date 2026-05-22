@@ -70,8 +70,15 @@ import {
   TbGitCompare,
 } from 'react-icons/tb'
 
+interface EnvSearch {
+  compare?: boolean
+}
+
 export const Route = createFileRoute('/envmanager/$slug/$env')({
   component: VarsPage,
+  validateSearch: (search: Record<string, unknown>): EnvSearch => ({
+    compare: search.compare === true || search.compare === 'true' || search.compare === '1' ? true : undefined,
+  }),
 })
 
 interface EnvVar {
@@ -111,7 +118,12 @@ function VarsPage() {
   const [addOpen, { open: openAdd, close: closeAdd }] = useDisclosure(false)
   const [bulkOpen, { open: openBulk, close: closeBulk }] = useDisclosure(false)
   const [editEnvOpen, { open: openEditEnv, close: closeEditEnv }] = useDisclosure(false)
-  const [compareOpen, { open: openCompare, close: closeCompare }] = useDisclosure(false)
+
+  // Compare modal — state disinkron dengan ?compare=1 di URL agar reload tidak menutup modal
+  const { compare: compareSearch } = Route.useSearch()
+  const compareOpen = compareSearch === true
+  const openCompare = () => navigate({ to: '.', params: { slug, env }, search: prev => ({ ...prev, compare: true }), replace: true })
+  const closeCompare = () => navigate({ to: '.', params: { slug, env }, search: prev => ({ ...prev, compare: undefined }), replace: true })
 
   // form state
   const [form, setForm] = useState({ key: '', value: '', isSecret: false })
