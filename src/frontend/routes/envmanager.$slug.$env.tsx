@@ -34,6 +34,7 @@ import { modals } from '@mantine/modals'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { PortainerSync } from '@/frontend/components/PortainerSync'
+import { CompareModal } from '@/frontend/components/env/CompareModal'
 import { useEffect, useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
@@ -66,6 +67,7 @@ import {
   TbVariable,
   TbX,
   TbSortAscending,
+  TbGitCompare,
 } from 'react-icons/tb'
 
 export const Route = createFileRoute('/envmanager/$slug/$env')({
@@ -109,6 +111,7 @@ function VarsPage() {
   const [addOpen, { open: openAdd, close: closeAdd }] = useDisclosure(false)
   const [bulkOpen, { open: openBulk, close: closeBulk }] = useDisclosure(false)
   const [editEnvOpen, { open: openEditEnv, close: closeEditEnv }] = useDisclosure(false)
+  const [compareOpen, { open: openCompare, close: closeCompare }] = useDisclosure(false)
 
   // form state
   const [form, setForm] = useState({ key: '', value: '', isSecret: false })
@@ -754,6 +757,20 @@ function VarsPage() {
                   </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
+            </Tooltip>
+          )}
+
+          {/* Compare — semua role, butuh ada vars di server */}
+          {vars.length > 0 && (
+            <Tooltip label="Bandingkan dengan .env local">
+              <Button
+                size="xs" variant="light" color="grape"
+                leftSection={<TbGitCompare size={13} />}
+                onClick={openCompare}
+                px={isMobile ? 8 : undefined}
+              >
+                {isMobile ? '' : 'Compare'}
+              </Button>
             </Tooltip>
           )}
 
@@ -1486,6 +1503,15 @@ function VarsPage() {
       </Modal>
 
       </>}
+
+      {/* Compare modal — VIEWER+ */}
+      <CompareModal
+        opened={compareOpen}
+        onClose={closeCompare}
+        slug={slug}
+        env={env}
+        canEdit={canEdit}
+      />
 
     </Box>
   )

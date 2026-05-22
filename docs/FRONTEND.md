@@ -33,6 +33,7 @@ React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Rou
 - `ErrorPage.tsx` — Error boundary page
 - `slug/AliasesPanel.tsx` — aliases tab untuk project detail; OWNER bisa create/edit/delete; semua member bisa list dan copy CLI invocation (`envman run slug:name`)
 - `slug/FilesPanel.tsx` — files tab untuk project detail; mirip Gist tapi per-project; EDITOR+ bisa create/edit/delete milik sendiri; OWNER bisa edit semua; mendukung multi-file, preview Markdown, search, tag filter, pagination
+- `env/CompareModal.tsx` — bandingkan .env local (paste) dengan vars di envman. Kategori: diff, only_local, only_envman, sync, uncertain (untuk secret yang masked). EDITOR+ bisa bulk add/update; VIEWER hanya read-only diff. Pakai `/vars/export` (EDITOR+) atau `/vars?limit=10000` (VIEWER).
 
 ## Hooks
 
