@@ -12,6 +12,8 @@ import { Server } from './server'
 import { log } from './logger'
 import { ProcessManager, ApiError as PmApiError } from './process-manager'
 import { tailFile } from './log-tailer'
+import { StateStore, StateStoreCorruptError } from './state-store'
+import { resurrectProcesses } from './resurrect'
 import type { DaemonHealth } from '../shared/types'
 
 // Bundled daemon version — separate dari CLI version supaya bisa track schema changes.
@@ -56,9 +58,33 @@ export async function runDaemon(): Promise<void> {
   // Generate atau load auth token
   const token = ensureToken(p.token)
 
-  // ProcessManager (Phase 2-3)
-  const pm = new ProcessManager({ logsDir: p.logsDir })
+  // StateStore (Phase 4) — load BEFORE creating ProcessManager
+  const stateStore = new StateStore(p.processesFile, p.processesBackup)
+  let initialState
+  try {
+    initialState = stateStore.load()
+    if (initialState.processes.length > 0) {
+      log.info('loaded persisted state', { count: initialState.processes.length })
+    }
+  } catch (e: any) {
+    if (e instanceof StateStoreCorruptError) {
+      log.error('STATE FILE CORRUPT — refusing to start with empty state')
+      log.error(e.message)
+      pidFile.release()
+      process.exit(3)
+    }
+    throw e
+  }
+
+  // ProcessManager (Phase 2-4)
+  const pm = new ProcessManager({ logsDir: p.logsDir, stateStore })
   pm.startRotator()
+
+  // Resurrect persisted processes (after rotator + manager ready)
+  if (initialState.processes.length > 0) {
+    const result = await resurrectProcesses(pm, initialState.processes)
+    log.info('resurrect result', result)
+  }
 
   // Wrapper untuk catch ApiError → mapped HTTP error response
   function handlePmError(e: unknown, requestId: string): Response {
@@ -162,6 +188,16 @@ export async function runDaemon(): Promise<void> {
     }
   })
 
+  // State persistence endpoints (Phase 4)
+  router.add('POST', '/v1/state/save', async (ctx) => {
+    try {
+      stateStore.saveSync(pm.getPersistedState())
+      return okResponse({ saved: true, count: pm.count() }, ctx.requestId)
+    } catch (e: any) {
+      return errorResponse('INTERNAL', `Save failed: ${e.message}`, ctx.requestId)
+    }
+  })
+
   // Logs endpoint — Phase 3. Disambiguated by query string:
   //   ?tail=100&stream=err/out — snapshot last N lines
   //   ?stream=true              — SSE live stream
@@ -259,6 +295,13 @@ async function gracefulShutdown(
   ctx: { server: Server; pidFile: PidFile; pm: ProcessManager },
 ): Promise<void> {
   log.info('shutting down', { reason })
+
+  // 0. Flush state — save sebelum kill children (untuk resurrect nanti)
+  try {
+    await ctx.pm.flushSaves()
+  } catch (e: any) {
+    log.error('flush saves failed', { error: e.message })
+  }
 
   // 1. Stop semua managed processes dulu (SIGTERM children)
   try {

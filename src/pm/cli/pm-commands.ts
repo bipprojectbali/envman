@@ -189,6 +189,12 @@ export async function cmdPmList(): Promise<void> {
   printTable(res.processes)
 }
 
+export async function cmdPmSave(): Promise<void> {
+  const client = new DaemonClient()
+  const res = await client.post<{ ok: true; saved: boolean; count: number }>('/v1/state/save', {})
+  console.log(`Saved ${res.count} processes`)
+}
+
 export async function cmdPmLogs(args: string[]): Promise<void> {
   // Parse: envman pm logs <name> [-f|--follow] [-n|--lines N] [--err|--out]
   let target = ''
@@ -332,6 +338,7 @@ export async function cmdPm(args: string[]): Promise<void> {
       case 'describe':
       case 'show':     await cmdPmDescribe(args.slice(1)); return
       case 'logs':     await cmdPmLogs(args.slice(1)); return
+      case 'save':     await cmdPmSave(); return
       case undefined:
       case '--help':
       case '-h':
@@ -340,6 +347,7 @@ export async function cmdPm(args: string[]): Promise<void> {
         console.log('  envman pm ls                                    List all managed processes')
         console.log('  envman pm describe <name>                       Show process detail')
         console.log('  envman pm logs <name> [-f] [-n N] [--out|--err]  Tail process logs')
+        console.log('  envman pm save                                   Force persist state to disk')
         console.log('  envman pm stop <name>                           Stop a process')
         console.log('  envman pm restart <name>                        Restart a process')
         console.log('  envman pm reset <name>                          Reset quarantined process')

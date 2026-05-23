@@ -11,10 +11,14 @@ import { log } from './logger'
 import { ProcessContainer, type ProcessConfig, type ProcessSnapshot } from './process-container'
 import { LogRotator } from './log-rotator'
 import type { LogWriter } from './log-writer'
+import type { PersistedProcess, PersistedState, StateStore } from './state-store'
+import { STATE_SCHEMA_VERSION } from './state-store'
 
 export interface ProcessManagerOptions {
   /** Direktori untuk log files (~/.config/envman/run/logs) */
   logsDir: string
+  /** Optional state store untuk auto-save persistence (Phase 4) */
+  stateStore?: StateStore
 }
 
 export class ProcessManager {
@@ -42,6 +46,51 @@ export class ProcessManager {
     if (this.logRotator) {
       this.logRotator.stop()
       this.logRotator = null
+    }
+  }
+
+  /**
+   * Serialize current state untuk persistence.
+   */
+  getPersistedState(): PersistedState {
+    const processes: PersistedProcess[] = [...this.byId.values()].map(c => {
+      const snap = c.snapshot()
+      return {
+        id: c.config.id,
+        name: c.config.name,
+        command: [...c.config.command],
+        cwd: c.config.cwd,
+        staticEnv: c.config.staticEnv,
+        envmanEnv: c.config.envmanEnv,
+        logOutPath: c.config.logOutPath,
+        logErrPath: c.config.logErrPath,
+        options: c.config.options,
+        lastPid: snap.pid,
+        lastStartEpochMs: snap.startedAt,
+      }
+    })
+    return {
+      version: STATE_SCHEMA_VERSION,
+      savedAt: Date.now(),
+      processes,
+    }
+  }
+
+  /**
+   * Trigger debounced state save (kalau stateStore configured).
+   */
+  private triggerSave(): void {
+    if (this.opts.stateStore) {
+      this.opts.stateStore.scheduleSave(() => this.getPersistedState())
+    }
+  }
+
+  /**
+   * Force flush pending saves (saat daemon shutdown).
+   */
+  async flushSaves(): Promise<void> {
+    if (this.opts.stateStore) {
+      await this.opts.stateStore.flushPending(() => this.getPersistedState())
     }
   }
 
@@ -83,6 +132,7 @@ export class ProcessManager {
     }
 
     log.info('process created', { id, name: input.name })
+    this.triggerSave()
     return container.snapshot()
   }
 
@@ -109,18 +159,21 @@ export class ProcessManager {
   async stop(idOrName: string): Promise<ProcessSnapshot> {
     const c = this.get(idOrName)
     await c.stop()
+    this.triggerSave()
     return c.snapshot()
   }
 
   async restart(idOrName: string): Promise<ProcessSnapshot> {
     const c = this.get(idOrName)
     await c.restart()
+    this.triggerSave()
     return c.snapshot()
   }
 
   async reset(idOrName: string): Promise<ProcessSnapshot> {
     const c = this.get(idOrName)
     await c.reset()
+    this.triggerSave()
     return c.snapshot()
   }
 
@@ -134,6 +187,7 @@ export class ProcessManager {
     this.byName.delete(c.config.name)
     this.logWriters.delete(c.config.id)
     log.info('process removed', { id: c.config.id, name: c.config.name })
+    this.triggerSave()
   }
 
   list(): ProcessSnapshot[] {
