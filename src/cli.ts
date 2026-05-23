@@ -562,6 +562,7 @@ USAGE:
   envman [options] -- <command>                Inject env vars and run command
   envman -- <interpreter> <project>:<path/file.ext>  Execute project file (no -e needed)
   envman daemon <start|stop|status>            Manage the process manager daemon
+  envman pm <start|stop|ls|restart|...>        Manage long-running processes (requires daemon)
 
 OPTIONS:
   -e <project>:<env>   Fetch vars from server environment (project:env)
@@ -687,6 +688,10 @@ async function main() {
     case 'daemon': {
       const { cmdDaemon } = await import('./pm/cli/daemon-control')
       await cmdDaemon(args.slice(1)); return
+    }
+    case 'pm': {
+      const { cmdPm } = await import('./pm/cli/pm-commands')
+      await cmdPm(args.slice(1)); return
     }
     case 'daemon-internal': {
       // Hidden subcommand — di-spawn oleh `envman daemon start`.

@@ -7,9 +7,10 @@ import { existsSync, mkdirSync } from 'fs'
 import { paths } from '../shared/paths'
 import { ensureToken } from '../shared/token'
 import { PidFile, getProcessStartEpoch } from './pidfile'
-import { Router, okResponse } from './router'
+import { Router, okResponse, errorResponse } from './router'
 import { Server } from './server'
 import { log } from './logger'
+import { ProcessManager, ApiError as PmApiError } from './process-manager'
 import type { DaemonHealth } from '../shared/types'
 
 // Bundled daemon version — separate dari CLI version supaya bisa track schema changes.
@@ -54,28 +55,109 @@ export async function runDaemon(): Promise<void> {
   // Generate atau load auth token
   const token = ensureToken(p.token)
 
-  // Build router + register health endpoint
+  // ProcessManager (Phase 2)
+  const pm = new ProcessManager()
+
+  // Wrapper untuk catch ApiError → mapped HTTP error response
+  function handlePmError(e: unknown, requestId: string): Response {
+    if (e instanceof PmApiError) {
+      return errorResponse(e.code, e.message, requestId)
+    }
+    log.error('unexpected pm error', { error: (e as any)?.message ?? String(e) })
+    return errorResponse('INTERNAL', (e as any)?.message ?? 'Internal error', requestId)
+  }
+
+  // Build router + register endpoints
   const router = new Router()
+
   router.add('GET', '/v1/daemon/health', (ctx) => {
     const body: Omit<DaemonHealth, 'ok'> = {
       version: DAEMON_VERSION,
       pid: process.pid,
       uptimeMs: Date.now() - startedAt,
       startedAt,
-      processCount: 0,  // Phase 2+ akan update
+      processCount: pm.count(),
       diskFull: false,  // Phase 3+ akan update
     }
     return okResponse(body, ctx.requestId)
   })
 
-  // Shutdown endpoint — graceful via IPC
   router.add('POST', '/v1/daemon/shutdown', async (ctx) => {
     log.info('shutdown requested via IPC')
-    // Schedule shutdown setelah response keluar
     setTimeout(() => {
-      void gracefulShutdown('ipc-request', { server, pidFile })
+      void gracefulShutdown('ipc-request', { server, pidFile, pm })
     }, 50)
     return okResponse({ shuttingDown: true }, ctx.requestId)
+  })
+
+  // Process management endpoints (Phase 2)
+  router.add('POST', '/v1/process/start', async (ctx) => {
+    try {
+      const body = ctx.body
+      if (!body || typeof body !== 'object') {
+        return errorResponse('BAD_REQUEST', 'body required', ctx.requestId)
+      }
+      const snapshot = await pm.start({
+        name: body.name,
+        command: body.command,
+        cwd: body.cwd,
+        staticEnv: body.staticEnv,
+        envmanEnv: body.envmanEnv,
+        options: body.options,
+      })
+      return okResponse({ process: snapshot }, ctx.requestId)
+    } catch (e) {
+      return handlePmError(e, ctx.requestId)
+    }
+  })
+
+  router.add('GET', '/v1/process', (ctx) => {
+    return okResponse({ processes: pm.list() }, ctx.requestId)
+  })
+
+  router.add('GET', '/v1/process/:id', (ctx, params) => {
+    try {
+      const c = pm.get(params.id)
+      return okResponse({ process: c.snapshot() }, ctx.requestId)
+    } catch (e) {
+      return handlePmError(e, ctx.requestId)
+    }
+  })
+
+  router.add('POST', '/v1/process/:id/stop', async (ctx, params) => {
+    try {
+      const snap = await pm.stop(params.id)
+      return okResponse({ process: snap }, ctx.requestId)
+    } catch (e) {
+      return handlePmError(e, ctx.requestId)
+    }
+  })
+
+  router.add('POST', '/v1/process/:id/restart', async (ctx, params) => {
+    try {
+      const snap = await pm.restart(params.id)
+      return okResponse({ process: snap }, ctx.requestId)
+    } catch (e) {
+      return handlePmError(e, ctx.requestId)
+    }
+  })
+
+  router.add('POST', '/v1/process/:id/reset', async (ctx, params) => {
+    try {
+      const snap = await pm.reset(params.id)
+      return okResponse({ process: snap }, ctx.requestId)
+    } catch (e) {
+      return handlePmError(e, ctx.requestId)
+    }
+  })
+
+  router.add('DELETE', '/v1/process/:id', async (ctx, params) => {
+    try {
+      await pm.remove(params.id)
+      return okResponse({ removed: true }, ctx.requestId)
+    } catch (e) {
+      return handlePmError(e, ctx.requestId)
+    }
   })
 
   // Start server
@@ -90,7 +172,7 @@ export async function runDaemon(): Promise<void> {
       process.exit(1)
     }
     shuttingDown = true
-    void gracefulShutdown(signal, { server, pidFile })
+    void gracefulShutdown(signal, { server, pidFile, pm })
   }
   process.on('SIGTERM', handler)
   process.on('SIGINT', handler)
@@ -102,7 +184,7 @@ export async function runDaemon(): Promise<void> {
   // Unhandled error guards
   process.on('uncaughtException', (err) => {
     log.error('uncaughtException', { error: err.message, stack: err.stack })
-    void gracefulShutdown('uncaught', { server, pidFile })
+    void gracefulShutdown('uncaught', { server, pidFile, pm })
   })
   process.on('unhandledRejection', (reason: any) => {
     log.error('unhandledRejection', { reason: String(reason) })
@@ -113,19 +195,31 @@ export async function runDaemon(): Promise<void> {
 
 async function gracefulShutdown(
   reason: string,
-  ctx: { server: Server; pidFile: PidFile },
+  ctx: { server: Server; pidFile: PidFile; pm: ProcessManager },
 ): Promise<void> {
   log.info('shutting down', { reason })
+
+  // 1. Stop semua managed processes dulu (SIGTERM children)
+  try {
+    await ctx.pm.shutdownAll()
+  } catch (e: any) {
+    log.error('process shutdown failed', { error: e.message })
+  }
+
+  // 2. Stop server (drain in-flight requests)
   try {
     await ctx.server.stop(5000)
   } catch (e: any) {
     log.error('server stop failed', { error: e.message })
   }
+
+  // 3. Release PID file
   try {
     ctx.pidFile.release()
   } catch (e: any) {
     log.error('pidfile release failed', { error: e.message })
   }
+
   log.info('shutdown complete')
   process.exit(0)
 }
