@@ -44,5 +44,6 @@ prisma/seed-dev.ts
 /*.png
 .playwright-screenshots/
 
-# Scratch notes
+# Scratch notes & test files
 xnote.md
+xtest.ts
