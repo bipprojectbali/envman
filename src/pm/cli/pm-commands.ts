@@ -1,7 +1,7 @@
 // CLI: `envman pm <subcommand>` — process management.
 
 import { DaemonClient, DaemonNotRunningError } from './client'
-import type { ProcessSnapshot } from '../daemon/process-container'
+import type { ProcessSnapshot, EnvSource } from '../daemon/process-container'
 
 interface ListResponse {
   ok: true
@@ -77,18 +77,19 @@ function printTable(processes: ProcessSnapshot[]): void {
 }
 
 export async function cmdPmStart(args: string[]): Promise<void> {
-  // Parse: envman pm start <name> [--cwd path] [-e KEY=VAL]... -- <cmd> <arg>...
-  // Atau: envman pm start --name <name> -- <cmd>
+  // Parse: envman pm start [--name N] [--cwd path] [-e KEY=VAL]... [-s source]... -- <cmd>
+  // -s source bisa berupa "project:env" (envman) atau path file
+  // -e KEY=VAL adalah static env (sama dengan -e di docker run)
   let name = ''
   let cwd: string | undefined
   const staticEnv: Record<string, string> = {}
+  const envSources: EnvSource[] = []
   let i = 0
   const command: string[] = []
 
-  // Cari -- separator
   const sepIdx = args.indexOf('--')
   if (sepIdx === -1) {
-    console.error("Missing -- separator. Usage: envman pm start --name <n> -- <cmd>")
+    console.error("Missing -- separator. Usage: envman pm start --name <n> [-s project:env]... -- <cmd>")
     process.exit(1)
   }
   const flagArgs = args.slice(0, sepIdx)
@@ -103,7 +104,6 @@ export async function cmdPmStart(args: string[]): Promise<void> {
       cwd = flagArgs[i + 1]
       i += 2
     } else if (flag === '-e') {
-      // KEY=VAL
       const kv = flagArgs[i + 1] ?? ''
       const eq = kv.indexOf('=')
       if (eq === -1) {
@@ -111,6 +111,16 @@ export async function cmdPmStart(args: string[]): Promise<void> {
         process.exit(1)
       }
       staticEnv[kv.slice(0, eq)] = kv.slice(eq + 1)
+      i += 2
+    } else if (flag === '-s' || flag === '--source') {
+      const src = flagArgs[i + 1] ?? ''
+      if (!src) { console.error('-s requires a value'); process.exit(1) }
+      // Format: "project:env" → envman, atau path file
+      if (src.includes(':') && !src.startsWith('/') && !src.startsWith('.')) {
+        envSources.push({ type: 'envman', ref: src })
+      } else {
+        envSources.push({ type: 'file', ref: src })
+      }
       i += 2
     } else {
       console.error(`Unknown flag: ${flag}`)
@@ -127,15 +137,82 @@ export async function cmdPmStart(args: string[]): Promise<void> {
     process.exit(1)
   }
 
+  // Kalau ada envSources, resolve dulu di CLI side (daemon nanti juga bisa resolve
+  // saat sync). Kirim hasil resolve sebagai envmanEnv awal.
+  let envmanEnv: Record<string, string> | undefined
+  if (envSources.length > 0) {
+    try {
+      envmanEnv = await resolveSourcesCli(envSources)
+    } catch (e: any) {
+      console.error(`Env resolve failed: ${e.message}`)
+      process.exit(1)
+    }
+  }
+
   const client = new DaemonClient()
   const res = await client.post<OneResponse>('/v1/process/start', {
     name,
     command,
     cwd,
     staticEnv,
+    envmanEnv,
+    envSources,
   })
   const p = res.process
   console.log(`Started "${p.name}" (PID ${p.pid}, status=${p.status})`)
+  if (envSources.length > 0) {
+    console.log(`  Env sources: ${envSources.map(s => s.ref).join(', ')}`)
+    console.log(`  Use 'envman pm sync ${name}' to re-fetch env from server`)
+  }
+}
+
+/**
+ * Resolve env sources di CLI side (envman server perlu auth dari config.json).
+ * Pakai existing apiFetch pattern.
+ */
+async function resolveSourcesCli(sources: EnvSource[]): Promise<Record<string, string>> {
+  const { paths } = await import('../shared/paths')
+  const { readFileSync, existsSync } = await import('fs')
+  const p = paths()
+  if (!existsSync(p.config)) {
+    throw new Error('envman server not configured (run `envman login`)')
+  }
+  const cfg = JSON.parse(readFileSync(p.config, 'utf8'))
+  if (!cfg.server || !cfg.token) throw new Error('invalid config.json')
+  const server = cfg.server.replace(/\/$/, '')
+
+  const merged: Record<string, string> = {}
+  for (const src of sources) {
+    if (src.type === 'envman') {
+      const [project, env] = src.ref.split(':')
+      const url = `${server}/api/envman/projects/${encodeURIComponent(project)}/environments/${encodeURIComponent(env)}/vars/export`
+      const res = await fetch(url, {
+        headers: { authorization: `Bearer ${cfg.token}` },
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${src.ref}`)
+      const data = await res.json() as { vars: Record<string, string> }
+      Object.assign(merged, data.vars)
+    } else {
+      const text = readFileSync(src.ref, 'utf8')
+      for (const line of text.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith('#')) continue
+        const eq = trimmed.indexOf('=')
+        if (eq === -1) continue
+        let key = trimmed.slice(0, eq).trim()
+        if (key.startsWith('export ')) key = key.slice(7).trim()
+        let value = trimmed.slice(eq + 1).trim()
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1)
+        }
+        if (key !== 'ENVMAN_TOKEN' && key !== 'ENVMAN_SERVER') {
+          merged[key] = value
+        }
+      }
+    }
+  }
+  return merged
 }
 
 export async function cmdPmStop(args: string[]): Promise<void> {
@@ -187,6 +264,31 @@ export async function cmdPmList(): Promise<void> {
   const client = new DaemonClient()
   const res = await client.get<ListResponse>('/v1/process')
   printTable(res.processes)
+}
+
+export async function cmdPmSync(args: string[]): Promise<void> {
+  const name = args.find(a => !a.startsWith('-'))
+  const dryRun = args.includes('--dry-run')
+  const client = new DaemonClient({ timeoutMs: 30_000 })  // sync bisa lambat
+  const res = await client.post<{
+    ok: true
+    checked: number
+    updated: string[]
+    unchanged: string[]
+    failed: { name: string; error: string }[]
+  }>('/v1/sync', { name, dryRun })
+
+  console.log(`Checked ${res.checked} process(es)${dryRun ? ' (dry-run)' : ''}`)
+  if (res.updated.length > 0) {
+    console.log(`  ${dryRun ? 'Would update' : 'Updated'}: ${res.updated.join(', ')}`)
+  }
+  if (res.unchanged.length > 0) {
+    console.log(`  Unchanged: ${res.unchanged.join(', ')}`)
+  }
+  if (res.failed.length > 0) {
+    console.error(`  Failed:`)
+    for (const f of res.failed) console.error(`    ${f.name}: ${f.error}`)
+  }
 }
 
 export async function cmdPmSave(): Promise<void> {
@@ -339,6 +441,7 @@ export async function cmdPm(args: string[]): Promise<void> {
       case 'show':     await cmdPmDescribe(args.slice(1)); return
       case 'logs':     await cmdPmLogs(args.slice(1)); return
       case 'save':     await cmdPmSave(); return
+      case 'sync':     await cmdPmSync(args.slice(1)); return
       case undefined:
       case '--help':
       case '-h':
@@ -348,6 +451,7 @@ export async function cmdPm(args: string[]): Promise<void> {
         console.log('  envman pm describe <name>                       Show process detail')
         console.log('  envman pm logs <name> [-f] [-n N] [--out|--err]  Tail process logs')
         console.log('  envman pm save                                   Force persist state to disk')
+        console.log('  envman pm sync [name] [--dry-run]                Re-fetch env from server + restart changed')
         console.log('  envman pm stop <name>                           Stop a process')
         console.log('  envman pm restart <name>                        Restart a process')
         console.log('  envman pm reset <name>                          Reset quarantined process')

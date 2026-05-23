@@ -71,6 +71,7 @@ export async function resurrectProcesses(
           cwd: proc.cwd,
           staticEnv: proc.staticEnv,
           envmanEnv: proc.envmanEnv,
+          envSources: proc.envSources,
           logOutPath: proc.logOutPath,
           logErrPath: proc.logErrPath,
           options: proc.options,

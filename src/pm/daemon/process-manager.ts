@@ -19,6 +19,8 @@ export interface ProcessManagerOptions {
   logsDir: string
   /** Optional state store untuk auto-save persistence (Phase 4) */
   stateStore?: StateStore
+  /** Optional audit emitter (Phase 5) — fire-and-forget */
+  onAudit?: (event: { action: string; detail?: string; processName?: string; processId?: string }) => void
 }
 
 export class ProcessManager {
@@ -62,6 +64,7 @@ export class ProcessManager {
         cwd: c.config.cwd,
         staticEnv: c.config.staticEnv,
         envmanEnv: c.config.envmanEnv,
+        envSources: c.config.envSources,
         logOutPath: c.config.logOutPath,
         logErrPath: c.config.logErrPath,
         options: c.config.options,
@@ -133,7 +136,13 @@ export class ProcessManager {
 
     log.info('process created', { id, name: input.name })
     this.triggerSave()
+    this.emitAudit('PM_PROCESS_STARTED', { processId: id, processName: input.name })
     return container.snapshot()
+  }
+
+  private emitAudit(action: string, info: { processId?: string; processName?: string; detail?: string }): void {
+    if (!this.opts.onAudit) return
+    try { this.opts.onAudit({ action, ...info }) } catch {}
   }
 
   /**
@@ -160,6 +169,7 @@ export class ProcessManager {
     const c = this.get(idOrName)
     await c.stop()
     this.triggerSave()
+    this.emitAudit('PM_PROCESS_STOPPED', { processId: c.config.id, processName: c.config.name })
     return c.snapshot()
   }
 
@@ -167,6 +177,7 @@ export class ProcessManager {
     const c = this.get(idOrName)
     await c.restart()
     this.triggerSave()
+    this.emitAudit('PM_PROCESS_RESTARTED', { processId: c.config.id, processName: c.config.name })
     return c.snapshot()
   }
 
@@ -188,6 +199,7 @@ export class ProcessManager {
     this.logWriters.delete(c.config.id)
     log.info('process removed', { id: c.config.id, name: c.config.name })
     this.triggerSave()
+    this.emitAudit('PM_PROCESS_DELETED', { processId: c.config.id, processName: c.config.name })
   }
 
   list(): ProcessSnapshot[] {

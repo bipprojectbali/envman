@@ -25,6 +25,7 @@ export interface PersistedProcess {
   cwd?: string
   staticEnv?: Record<string, string>
   envmanEnv?: Record<string, string>
+  envSources?: { type: 'envman' | 'file'; ref: string }[]
   logOutPath?: string
   logErrPath?: string
   options?: any
@@ -99,6 +100,7 @@ function validateProcess(raw: any): PersistedProcess {
     cwd: raw.cwd,
     staticEnv: raw.staticEnv,
     envmanEnv: raw.envmanEnv,
+    envSources: Array.isArray(raw.envSources) ? raw.envSources : undefined,
     logOutPath: raw.logOutPath,
     logErrPath: raw.logErrPath,
     options: raw.options,

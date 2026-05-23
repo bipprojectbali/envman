@@ -14,6 +14,8 @@ import { ProcessManager, ApiError as PmApiError } from './process-manager'
 import { tailFile } from './log-tailer'
 import { StateStore, StateStoreCorruptError } from './state-store'
 import { resurrectProcesses } from './resurrect'
+import { EnvmanServerClient, ServerNotConfiguredError, ServerAuthError } from './envman-client'
+import { syncContainers } from './env-syncer'
 import type { DaemonHealth } from '../shared/types'
 
 // Bundled daemon version — separate dari CLI version supaya bisa track schema changes.
@@ -76,9 +78,29 @@ export async function runDaemon(): Promise<void> {
     throw e
   }
 
-  // ProcessManager (Phase 2-4)
-  const pm = new ProcessManager({ logsDir: p.logsDir, stateStore })
+  // ProcessManager (Phase 2-5)
+  // Audit emitter: fire-and-forget post ke envman server kalau config ada.
+  let serverClient: EnvmanServerClient | null = null
+  try {
+    serverClient = new EnvmanServerClient()
+  } catch (e: any) {
+    if (e instanceof ServerNotConfiguredError) {
+      log.info('envman server not configured — sync/audit disabled', {
+        hint: 'run `envman login` to enable',
+      })
+    } else {
+      log.warn('envman server client init failed', { error: e.message })
+    }
+  }
+  const onAudit = serverClient
+    ? (ev: { action: string; detail?: string; processName?: string; processId?: string }) => {
+        serverClient!.postAudit(ev).catch(() => {})  // suppress in fire-and-forget
+      }
+    : undefined
+
+  const pm = new ProcessManager({ logsDir: p.logsDir, stateStore, onAudit })
   pm.startRotator()
+  if (serverClient) serverClient.postAudit({ action: 'PM_DAEMON_STARTED' }).catch(() => {})
 
   // Resurrect persisted processes (after rotator + manager ready)
   if (initialState.processes.length > 0) {
@@ -113,7 +135,7 @@ export async function runDaemon(): Promise<void> {
   router.add('POST', '/v1/daemon/shutdown', async (ctx) => {
     log.info('shutdown requested via IPC')
     setTimeout(() => {
-      void gracefulShutdown('ipc-request', { server, pidFile, pm })
+      void gracefulShutdown('ipc-request', { server, pidFile, pm, serverClient })
     }, 50)
     return okResponse({ shuttingDown: true }, ctx.requestId)
   })
@@ -131,6 +153,7 @@ export async function runDaemon(): Promise<void> {
         cwd: body.cwd,
         staticEnv: body.staticEnv,
         envmanEnv: body.envmanEnv,
+        envSources: body.envSources,
         options: body.options,
       })
       return okResponse({ process: snapshot }, ctx.requestId)
@@ -195,6 +218,41 @@ export async function runDaemon(): Promise<void> {
       return okResponse({ saved: true, count: pm.count() }, ctx.requestId)
     } catch (e: any) {
       return errorResponse('INTERNAL', `Save failed: ${e.message}`, ctx.requestId)
+    }
+  })
+
+  // Sync endpoint (Phase 5) — re-fetch env dari server, restart yang berubah
+  router.add('POST', '/v1/sync', async (ctx) => {
+    try {
+      if (!serverClient) throw new ServerNotConfiguredError()
+      const filterName = ctx.body?.name as string | undefined
+      const containers = filterName
+        ? [pm.get(filterName)]
+        : [...pm.list()].map(s => pm.get(s.id))
+      const result = await syncContainers({
+        containers,
+        client: serverClient,
+        dryRun: ctx.body?.dryRun === true,
+      })
+      // Audit
+      if (!ctx.body?.dryRun) {
+        serverClient.postAudit({
+          action: 'PM_SYNC_TRIGGERED',
+          detail: `checked=${result.checked} updated=${result.updated.length} unchanged=${result.unchanged.length} failed=${result.failed.length}`,
+        }).catch(() => {})
+      }
+      return okResponse(result, ctx.requestId)
+    } catch (e: any) {
+      if (e instanceof ServerNotConfiguredError) {
+        return errorResponse('BAD_REQUEST', e.message, ctx.requestId)
+      }
+      if (e instanceof ServerAuthError) {
+        return errorResponse('INVALID_AUTH', e.message, ctx.requestId)
+      }
+      if (e instanceof PmApiError) {
+        return handlePmError(e, ctx.requestId)
+      }
+      return errorResponse('INTERNAL', e.message ?? 'Sync failed', ctx.requestId)
     }
   })
 
@@ -269,7 +327,7 @@ export async function runDaemon(): Promise<void> {
       process.exit(1)
     }
     shuttingDown = true
-    void gracefulShutdown(signal, { server, pidFile, pm })
+    void gracefulShutdown(signal, { server, pidFile, pm, serverClient })
   }
   process.on('SIGTERM', handler)
   process.on('SIGINT', handler)
@@ -281,7 +339,7 @@ export async function runDaemon(): Promise<void> {
   // Unhandled error guards
   process.on('uncaughtException', (err) => {
     log.error('uncaughtException', { error: err.message, stack: err.stack })
-    void gracefulShutdown('uncaught', { server, pidFile, pm })
+    void gracefulShutdown('uncaught', { server, pidFile, pm, serverClient })
   })
   process.on('unhandledRejection', (reason: any) => {
     log.error('unhandledRejection', { reason: String(reason) })
@@ -292,9 +350,14 @@ export async function runDaemon(): Promise<void> {
 
 async function gracefulShutdown(
   reason: string,
-  ctx: { server: Server; pidFile: PidFile; pm: ProcessManager },
+  ctx: { server: Server; pidFile: PidFile; pm: ProcessManager; serverClient: EnvmanServerClient | null },
 ): Promise<void> {
   log.info('shutting down', { reason })
+
+  // 0a. Audit daemon stopping (fire-and-forget, sebelum network teardown)
+  if (ctx.serverClient) {
+    ctx.serverClient.postAudit({ action: 'PM_DAEMON_STOPPED', detail: reason }).catch(() => {})
+  }
 
   // 0. Flush state — save sebelum kill children (untuk resurrect nanti)
   try {

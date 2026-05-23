@@ -42,6 +42,11 @@ export const DEFAULT_PROCESS_OPTIONS: ProcessOptions = {
   backoff: DEFAULT_BACKOFF,
 }
 
+export interface EnvSource {
+  type: 'envman' | 'file'
+  ref: string  // "myapp:dev" atau "/path/.env"
+}
+
 export interface ProcessConfig {
   id: string
   name: string
@@ -51,6 +56,8 @@ export interface ProcessConfig {
   staticEnv?: Record<string, string>
   /** Env dari envman server resolve (Phase 5+ akan populate) */
   envmanEnv?: Record<string, string>
+  /** Sources untuk pm sync — dipakai untuk re-fetch env dari server */
+  envSources?: EnvSource[]
   /** Path untuk log files (out/err). Phase 3+ — required. */
   logOutPath?: string
   logErrPath?: string
