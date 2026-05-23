@@ -741,11 +741,17 @@ async function main() {
     process.exit(0)
   }
 
-  // Always: show notice from cache (instant) + queue background refresh + cleanup old run dirs
-  showUpdateNoticeFromCache()
+  // Cleanup stale run workspaces (cheap, always run)
   cleanupOldRunDirs()
-  const savedServer = getSavedServerUrl()
-  if (savedServer) spawnUpdateCheck(savedServer, '')
+
+  // Skip update notice + background check saat user run `envman update` —
+  // redundant karena foreground update sedang berjalan. Untuk command lain
+  // (login, whoami, --version, --help, run, dll), notice tetap berguna.
+  if (args[0] !== 'update') {
+    showUpdateNoticeFromCache()
+    const savedServer = getSavedServerUrl()
+    if (savedServer) spawnUpdateCheck(savedServer, '')
+  }
 
   if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
     printHelp(); return
