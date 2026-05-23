@@ -1,15 +1,12 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { homedir, tmpdir } from 'os'
 import { basename, join } from 'path'
 import { spawn, spawnSync } from 'child_process'
-import { randomUUID } from 'crypto'
 
 const CONFIG_DIR = join(homedir(), '.config', 'envman')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const UPDATE_CACHE_FILE = join(CONFIG_DIR, 'update-check.json')
-const RUN_DIR = join(CONFIG_DIR, 'run')
-const RUN_DIR_MAX_AGE_MS = 7 * 86400_000  // 7 hari
 import { version as PKG_VERSION } from '../package.json'
 const VERSION = PKG_VERSION
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000  // 15 menit
@@ -222,85 +219,6 @@ export function detectsNpmImports(content: string): boolean {
   return false
 }
 
-// ─── Isolated workspace for Bun scripts ──────────────────────────────────────
-// Bun's resolver walks up looking for node_modules. If user is inside a Node
-// project that doesn't have the imported packages, resolution fails. Solution:
-// run script in a fresh CWD at ~/.config/envman/run/<uuid>/ that symlinks user
-// files but excludes node_modules — Bun's walk-up finds no node_modules → auto
-// install kicks in → packages come from global cache.
-
-interface IsolatedWorkspace {
-  runDir: string
-  symlinkFailed: boolean  // true = Windows perm or similar → no `./file` access
-}
-
-// Entries di user CWD yang TIDAK di-symlink ke workspace. Tujuannya: cegah Bun
-// resolution algorithm (walk-up node_modules, baca lockfile, baca bunfig) bocor
-// ke project user. Auto-install hanya jalan kalau Bun gak ketemu lockfile/config
-// yang bilang "pakai deps yang sudah ada".
-const WORKSPACE_SKIP_ENTRIES = new Set([
-  'node_modules',       // resolution root
-  'package.json',       // declares deps Bun expects to find
-  'bun.lock',           // Bun lockfile (text)
-  'bun.lockb',          // Bun lockfile (binary, legacy)
-  'package-lock.json',  // npm lockfile
-  'yarn.lock',          // yarn lockfile
-  'pnpm-lock.yaml',     // pnpm lockfile
-  'bunfig.toml',        // bisa disable auto-install
-  '.bunfig.toml',       // dot-prefixed variant
-])
-
-function prepareIsolatedWorkspace(userCwd: string): IsolatedWorkspace | null {
-  try {
-    if (!existsSync(RUN_DIR)) mkdirSync(RUN_DIR, { recursive: true })
-    const runDir = join(RUN_DIR, randomUUID())
-    mkdirSync(runDir)
-
-    // Minimal package.json so Bun doesn't try to read user's package.json
-    // (which would declare deps it expects to find in node_modules).
-    writeFileSync(join(runDir, 'package.json'), '{"name":"envman-script","type":"module"}')
-
-    // Symlink top-level entries from user CWD, except resolution-affecting files.
-    let symlinkFailed = false
-    let entries: string[] = []
-    try { entries = readdirSync(userCwd) } catch { entries = [] }
-    for (const entry of entries) {
-      if (WORKSPACE_SKIP_ENTRIES.has(entry)) continue
-      try {
-        symlinkSync(join(userCwd, entry), join(runDir, entry))
-      } catch {
-        // Windows symlink perm denied, broken target, dll → fallback ke pure isolation
-        symlinkFailed = true
-        break
-      }
-    }
-    return { runDir, symlinkFailed }
-  } catch {
-    return null  // can't create runDir → caller falls back to user CWD
-  }
-}
-
-function cleanupRunDir(runDir: string) {
-  try { rmSync(runDir, { recursive: true, force: true }) } catch {}
-}
-
-// Auto-purge run dirs older than 7 days. Called on every CLI startup (cheap).
-function cleanupOldRunDirs() {
-  try {
-    if (!existsSync(RUN_DIR)) return
-    const now = Date.now()
-    for (const entry of readdirSync(RUN_DIR)) {
-      const path = join(RUN_DIR, entry)
-      try {
-        const stats = statSync(path)
-        if (now - stats.mtimeMs > RUN_DIR_MAX_AGE_MS) {
-          rmSync(path, { recursive: true, force: true })
-        }
-      } catch {}
-    }
-  } catch {}
-}
-
 // ─── Files: stdin command builder ────────────────────────────────────────────
 
 function buildStdinCommand(cmd: string[], opts: { bunAutoInstall?: boolean } = {}): string[] | null {
@@ -310,9 +228,12 @@ function buildStdinCommand(cmd: string[], opts: { bunAutoInstall?: boolean } = {
     case 'bash': case 'sh': case 'zsh':
       return [cmd[0], '-s', ...rest]           // bash -s reads from stdin, $@ preserved
     case 'bun': {
-      // --install=auto goes BEFORE `run` subcommand. Default Bun behavior is already
-      // auto, but we pass explicitly to override any user bunfig.toml that disables it.
-      const installFlag = opts.bunAutoInstall ? ['--install=auto'] : []
+      // --install=fallback: install missing packages ke global cache, bekerja
+      // bahkan kalau ada node_modules di walk-up (mis. user di dalam project Node,
+      // atau ada ~/node_modules accidental). Tidak pollute local node_modules
+      // karena Bun resolve dari global cache untuk package yang missing.
+      // Default 'auto' tidak cukup — hanya aktif kalau NO node_modules anywhere upward.
+      const installFlag = opts.bunAutoInstall ? ['--install=fallback'] : []
       if (rest[0] === 'run') return [cmd[0], ...installFlag, 'run', '-', ...rest.slice(1)]
       return [cmd[0], ...installFlag, 'run', '-', ...rest]
     }
@@ -427,34 +348,21 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
     const isBun = interpreterName === 'bun'
     const hasNpmImports = isBun && detectsNpmImports(fileContent)
 
-    // For Bun scripts: ALWAYS isolate in ~/.config/envman/run/<uuid>/ to decouple
-    // from user's node_modules. Symlinks to user files preserved (kecuali Windows
-    // perm fail). INIT_CWD env var = original CWD as fallback convention.
-    const userCwd = process.cwd()
-    const workspace = isBun ? prepareIsolatedWorkspace(userCwd) : null
-    if (workspace?.symlinkFailed) {
-      console.error('[envman] symlink terbatas (mungkin Windows tanpa dev mode) — pure isolation. Pakai $INIT_CWD/file untuk akses file user.')
-    } else if (workspace && hasNpmImports) {
-      console.error('[envman] npm imports terdeteksi — running in isolated workspace dengan auto-install.')
+    if (hasNpmImports) {
+      console.error('[envman] npm imports terdeteksi — pakai --install=fallback (cache global ~/.bun/install/cache).')
     }
 
     const stdinCmd = buildStdinCommand(transformedCommand, { bunAutoInstall: hasNpmImports })
     if (stdinCmd) {
-      const spawnEnv = { ...finalEnv, ...(workspace ? { INIT_CWD: userCwd } : {}) }
+      // Script jalan di CWD user — `./file` works natural, no isolation needed.
+      // --install=fallback handles missing npm packages via global cache without
+      // polluting user's local node_modules.
       const result = spawnSync(stdinCmd[0], stdinCmd.slice(1), {
-        env: spawnEnv,
-        cwd: workspace?.runDir,
+        env: finalEnv,
         stdio: ['pipe', 'inherit', 'inherit'],
         input: fileContent,
         shell: false,
       })
-      if (workspace) {
-        if (result.status === 0) {
-          cleanupRunDir(workspace.runDir)
-        } else {
-          console.error(`[envman] script gagal (exit ${result.status}). Workspace preserved untuk debug: ${workspace.runDir}`)
-        }
-      }
       process.exit(result.status ?? 0)
     } else {
       // Secure temp file fallback for unknown interpreters (mode 0600, cleanup on exit)
@@ -756,9 +664,6 @@ async function main() {
     } catch {}
     process.exit(0)
   }
-
-  // Cleanup stale run workspaces (cheap, always run)
-  cleanupOldRunDirs()
 
   // Skip update notice + background check saat user run `envman update` —
   // redundant karena foreground update sedang berjalan. Untuk command lain

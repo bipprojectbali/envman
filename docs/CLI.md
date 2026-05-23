@@ -80,46 +80,37 @@ envman run open-marina:dev
 
 **Prefix** diset per entry di UI (Files tab dalam project detail). Auto-generate dari judul, bisa diedit manual, tidak berubah saat rename judul.
 
-### Isolated Workspace untuk Bun Scripts
+### npm Imports untuk Bun Scripts
 
-Setiap kali script Bun dieksekusi via Files, CLI membuat **isolated workspace** di `~/.config/envman/run/<uuid>/` agar:
+Script Bun di Files bisa langsung import dari npm tanpa setup `node_modules` di mesin user. CLI mendeteksi bare-name imports (bukan relative, bukan `bun:`/`node:`, bukan Node built-in) dan otomatis pass flag `--install=fallback` ke Bun.
 
-1. **Tidak tergantung `node_modules` user** — Bun resolver walk-up dari workspace tidak ketemu `node_modules` apapun → auto-install mode aktif → packages dari global cache (`~/.bun/install/cache`)
-2. **Bisa baca file user via symlink** — semua file/folder di CWD user (kecuali `node_modules` dan `package.json`) di-symlink ke workspace, jadi `Bun.file("./config.json")` tetap jalan
-3. **Tidak pollute project user** — install ke global cache, bukan ke `node_modules` user
+**Cara kerja `--install=fallback`:**
+- Bun resolve package yang **ada** di local `node_modules` (kalau user di dalam project) → pakai itu
+- Package yang **tidak ada** di local `node_modules` → install ke global cache `~/.bun/install/cache`
+- **Tidak pollute** local `node_modules` user
+- Bekerja bahkan kalau user kebetulan punya `~/node_modules` (akibat global install accidental) atau di dalam project Node lain
 
 ```ts
 // files:scripts/migrate.ts
-import { z } from "zod@^3.22"                              // ✅ auto-install dari global cache
+import { z } from "zod@^3.22"                              // ✅ install ke global cache
 import _ from "lodash@4.17.21"                             // ✅ pinned version
 import fs from "node:fs"
 
 const env = z.object({ DATABASE_URL: z.string() }).parse(process.env)
-const cfg = await Bun.file("./config.json").json()         // ✅ via symlink
+const cfg = await Bun.file("./config.json").json()         // ✅ baca file user CWD
 const schema = await Bun.file("./prisma/schema.prisma").text()  // ✅
 ```
 
-**Auto-install flag**: kalau script ada bare npm imports → CLI tambah `--install=auto` (override user `bunfig.toml` yang mungkin disable).
+**Script jalan langsung di CWD user** — tidak ada workspace isolation, tidak ada symlink magic. Akses file relative path (`./config.json`) bekerja natural.
 
-**`INIT_CWD` env var**: selalu di-set ke user's original CWD. Berguna kalau:
-- Windows tanpa dev mode → symlink gagal → workspace tetap dibuat tapi tanpa symlinks → script perlu pakai `process.env.INIT_CWD/file`
-- Script butuh path absolute ke CWD asli
-
-**Cleanup behavior**:
-- Sukses (exit 0): workspace dihapus
-- Gagal (exit non-zero): workspace **preserved**, path di-log ke stderr untuk debug
-- Auto-purge workspace yang lebih dari 7 hari pada startup CLI berikutnya
-
-**Limitasi**:
-- Script import dari user's local code (`import "./src/db"`) yang bergantung pada user's `node_modules` (mis. `@prisma/client`) **tidak akan jalan** — local code itu butuh node_modules user yang sengaja di-isolate. Scope envman Files = self-contained utility scripts.
-- Windows tanpa Developer Mode/admin: symlink gagal → fallback ke pure isolation (no `./file` access, harus pakai `$INIT_CWD/file`)
-
-**Best practice — pin version inline:**
+**Saat dependency conflict**: kalau user's local `node_modules` punya version yang beda dengan yang script expect (mis. user pakai zod@2 tapi script `import { z } from "zod@^3"`), Bun pakai inline version pin untuk resolve ke cache global. Best practice: **pin version inline**:
 
 ```ts
-import { z } from "zod@^3.22"     // ✅ explicit version, reproducible
-import _ from "lodash"             // ⚠️ latest, bisa berubah di run berikut
+import { z } from "zod@^3.22"     // ✅ explicit, reproducible, bypass local version
+import _ from "lodash"             // ⚠️ pakai apapun yang ada di local atau latest
 ```
+
+**Cross-platform**: jalan di macOS/Linux/Windows tanpa perbedaan — tidak ada symlink permission issue.
 
 ### Alias Expansion
 
