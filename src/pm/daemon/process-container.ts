@@ -19,6 +19,8 @@ import {
   type BackoffConfig,
   DEFAULT_BACKOFF,
 } from './backoff'
+import { LogWriter } from './log-writer'
+import { LogTailer } from './log-tailer'
 
 export type ProcessStatus =
   | 'starting'      // proses sedang spawn / belum minUptime
@@ -49,6 +51,9 @@ export interface ProcessConfig {
   staticEnv?: Record<string, string>
   /** Env dari envman server resolve (Phase 5+ akan populate) */
   envmanEnv?: Record<string, string>
+  /** Path untuk log files (out/err). Phase 3+ — required. */
+  logOutPath?: string
+  logErrPath?: string
   options?: Partial<ProcessOptions>
 }
 
@@ -82,10 +87,24 @@ export class ProcessContainer {
   private opLock: Promise<void> = Promise.resolve()
   /** Cached env hash — bisa berubah saat Phase 5 sync update envmanEnv */
   private envHash: string
+  /** Log writer (Phase 3) — null kalau no log paths configured */
+  public readonly logWriter: LogWriter | null
+  /** Log tailer untuk multi-subscriber SSE */
+  public readonly logTailer: LogTailer = new LogTailer()
 
   constructor(public readonly config: ProcessConfig) {
     this.options = { ...DEFAULT_PROCESS_OPTIONS, ...(config.options ?? {}) }
     this.envHash = hashEnv(this.buildEnv())
+    if (config.logOutPath && config.logErrPath) {
+      this.logWriter = new LogWriter({
+        outPath: config.logOutPath,
+        errPath: config.logErrPath,
+        onOutLine: this.logTailer.onOutLine,
+        onErrLine: this.logTailer.onErrLine,
+      })
+    } else {
+      this.logWriter = null
+    }
   }
 
   /** Get current snapshot — safe to call any time, no side effects. */
@@ -227,6 +246,9 @@ export class ProcessContainer {
     if (this.status !== 'stopped' && this.status !== 'errored') {
       await this.stop('destroy')
     }
+    // Cleanup log resources (RL1)
+    this.logTailer.closeAll()
+    if (this.logWriter) this.logWriter.close()
   }
 
   // ─── private ─────────────────────────────────────────────────────────────
@@ -293,10 +315,48 @@ export class ProcessContainer {
       log.error('exited promise rejected', { name: this.config.name, error: e.message })
     })
 
-    // TODO Phase 3: pipe stdout/stderr ke log files
-    // Untuk sekarang biar buffer di-drop, tapi consume agar tidak deadlock
-    this.consumeStream(this.subprocess.stdout)
-    this.consumeStream(this.subprocess.stderr)
+    // Pipe stdout/stderr ke LogWriter (Phase 3)
+    if (this.logWriter) {
+      this.pipeToLog(this.subprocess.stdout, 'out')
+      this.pipeToLog(this.subprocess.stderr, 'err')
+    } else {
+      // No log writer — drain agar tidak deadlock di pipe
+      this.consumeStream(this.subprocess.stdout)
+      this.consumeStream(this.subprocess.stderr)
+    }
+  }
+
+  private async pipeToLog(
+    stream: ReadableStream<Uint8Array> | undefined | number,
+    which: 'out' | 'err',
+  ): Promise<void> {
+    if (!stream || typeof stream === 'number') return
+    if (!this.logWriter) return
+    const decoder = new TextDecoder('utf-8')
+    try {
+      const reader = stream.getReader()
+      try {
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          // stream:true untuk handle multibyte UTF-8 boundary di tengah chunk
+          const chunk = decoder.decode(value, { stream: true })
+          if (which === 'out') this.logWriter.writeOut(chunk)
+          else this.logWriter.writeErr(chunk)
+        }
+        // Flush final partial chunk
+        const tail = decoder.decode()
+        if (tail) {
+          if (which === 'out') this.logWriter.writeOut(tail)
+          else this.logWriter.writeErr(tail)
+        }
+        this.logWriter.flushRemainder()
+      } finally {
+        reader.releaseLock()
+      }
+    } catch (e: any) {
+      log.warn('log pipe error', { name: this.config.name, which, error: e.message })
+    }
   }
 
   private async consumeStream(stream: ReadableStream<Uint8Array> | undefined | number): Promise<void> {
@@ -304,7 +364,6 @@ export class ProcessContainer {
     try {
       const reader = stream.getReader()
       try {
-        // Drain — Phase 3 akan write ke log file. Untuk Phase 2: drop silently.
         while (true) {
           const { done } = await reader.read()
           if (done) break
@@ -313,7 +372,7 @@ export class ProcessContainer {
         reader.releaseLock()
       }
     } catch {
-      // ignore stream errors
+      // ignore
     }
   }
 

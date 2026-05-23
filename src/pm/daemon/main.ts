@@ -11,6 +11,7 @@ import { Router, okResponse, errorResponse } from './router'
 import { Server } from './server'
 import { log } from './logger'
 import { ProcessManager, ApiError as PmApiError } from './process-manager'
+import { tailFile } from './log-tailer'
 import type { DaemonHealth } from '../shared/types'
 
 // Bundled daemon version — separate dari CLI version supaya bisa track schema changes.
@@ -55,8 +56,9 @@ export async function runDaemon(): Promise<void> {
   // Generate atau load auth token
   const token = ensureToken(p.token)
 
-  // ProcessManager (Phase 2)
-  const pm = new ProcessManager()
+  // ProcessManager (Phase 2-3)
+  const pm = new ProcessManager({ logsDir: p.logsDir })
+  pm.startRotator()
 
   // Wrapper untuk catch ApiError → mapped HTTP error response
   function handlePmError(e: unknown, requestId: string): Response {
@@ -157,6 +159,65 @@ export async function runDaemon(): Promise<void> {
       return okResponse({ removed: true }, ctx.requestId)
     } catch (e) {
       return handlePmError(e, ctx.requestId)
+    }
+  })
+
+  // Logs endpoint — Phase 3. Disambiguated by query string:
+  //   ?tail=100&stream=err/out — snapshot last N lines
+  //   ?stream=true              — SSE live stream
+  router.add('GET', '/v1/process/:id/logs', async (ctx, params) => {
+    try {
+      const c = pm.get(params.id)
+      // ctx.body adalah null untuk GET — kita perlu URL parse dari raw request.
+      // Workaround: simpan URL search di handler context. Untuk sekarang baca dari
+      // process config — kalau SSE diminta, signal via custom path: /logs/stream
+      // Tapi karena router kita simple, pakai query parsing dari Request directly
+      // tidak gampang di handler signature kita. Add separate routes for clarity.
+      return okResponse({ message: 'use /logs/tail or /logs/stream' }, ctx.requestId)
+    } catch (e) {
+      return handlePmError(e, ctx.requestId)
+    }
+  })
+
+  router.add('GET', '/v1/process/:id/logs/tail', async (ctx, params) => {
+    try {
+      const c = pm.get(params.id)
+      // Default 100 lines, gabungan out+err interleaved by timestamp NOT supported MVP
+      // — return separate. Phase 3 design: dua field
+      if (!c.config.logOutPath || !c.config.logErrPath) {
+        return okResponse({ out: [], err: [] }, ctx.requestId)
+      }
+      const [outLines, errLines] = await Promise.all([
+        tailFile(c.config.logOutPath, 100),
+        tailFile(c.config.logErrPath, 100),
+      ])
+      return okResponse({ out: outLines, err: errLines }, ctx.requestId)
+    } catch (e) {
+      return handlePmError(e, ctx.requestId)
+    }
+  })
+
+  // SSE streaming endpoint — manual response, bypass okResponse
+  router.add('GET', '/v1/process/:id/logs/stream', async (ctx, params) => {
+    try {
+      const c = pm.get(params.id)
+      const stream = c.logTailer.subscribeSSE(ctx.signal)
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-cache',
+          'x-accel-buffering': 'no',
+        },
+      })
+    } catch (e: any) {
+      if (e instanceof PmApiError) {
+        return new Response(JSON.stringify({ ok: false, code: e.code, error: e.message }), {
+          status: e.code === 'NOT_FOUND' ? 404 : 500,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      throw e
     }
   })
 

@@ -1,18 +1,27 @@
 // Test ProcessManager + ProcessContainer in-process (tanpa daemon spawn).
 // Tujuan: verifikasi state machine, lock, lifecycle tanpa overhead IPC.
 
-import { describe, test, expect, afterEach } from 'bun:test'
+import { describe, test, expect, afterEach, beforeEach } from 'bun:test'
+import { mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 import { ProcessManager, ApiError } from '../../src/pm/daemon/process-manager'
 
 describe('ProcessManager', () => {
   let pm: ProcessManager
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'envman-pm-'))
+  })
 
   afterEach(async () => {
     if (pm) await pm.shutdownAll()
+    rmSync(tmpDir, { recursive: true, force: true })
   })
 
   test('start + list', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     const snap = await pm.start({
       name: 'sleeper-1',
       command: ['sleep', '30'],
@@ -27,7 +36,7 @@ describe('ProcessManager', () => {
   })
 
   test('duplicate name throws CONFLICT', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     await pm.start({ name: 'dup-test', command: ['sleep', '30'] })
     let err: any = null
     try {
@@ -40,7 +49,7 @@ describe('ProcessManager', () => {
   })
 
   test('empty command throws BAD_REQUEST', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     let err: any = null
     try {
       await pm.start({ name: 'empty', command: [] })
@@ -52,7 +61,7 @@ describe('ProcessManager', () => {
   })
 
   test('invalid name format throws BAD_REQUEST', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     let err: any = null
     try {
       await pm.start({ name: 'bad name with spaces', command: ['sleep', '30'] })
@@ -64,7 +73,7 @@ describe('ProcessManager', () => {
   })
 
   test('find by name and id', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     const snap = await pm.start({ name: 'findable', command: ['sleep', '30'] })
     expect(pm.find('findable')).not.toBeNull()
     expect(pm.find(snap.id)).not.toBeNull()
@@ -72,7 +81,7 @@ describe('ProcessManager', () => {
   })
 
   test('get throws NOT_FOUND for missing', () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     let err: any = null
     try {
       pm.get('nope')
@@ -84,7 +93,7 @@ describe('ProcessManager', () => {
   })
 
   test('stop and restart', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     await pm.start({ name: 'restartable', command: ['sleep', '30'] })
     const stopped = await pm.stop('restartable')
     expect(stopped.status).toBe('stopped')
@@ -93,7 +102,7 @@ describe('ProcessManager', () => {
   })
 
   test('remove deletes from manager', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     await pm.start({ name: 'removable', command: ['sleep', '30'] })
     await pm.remove('removable')
     expect(pm.find('removable')).toBeNull()
@@ -101,7 +110,7 @@ describe('ProcessManager', () => {
   })
 
   test('shutdownAll stops everything', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     await pm.start({ name: 'a', command: ['sleep', '30'] })
     await pm.start({ name: 'b', command: ['sleep', '30'] })
     await pm.start({ name: 'c', command: ['sleep', '30'] })
@@ -111,7 +120,7 @@ describe('ProcessManager', () => {
   })
 
   test('autorestart triggers after crash', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     // Process exits immediately
     const snap = await pm.start({
       name: 'crash',
@@ -134,7 +143,7 @@ describe('ProcessManager', () => {
   }, 5000)
 
   test('quarantine after 5 quick crashes', async () => {
-    pm = new ProcessManager()
+    pm = new ProcessManager({ logsDir: tmpDir })
     await pm.start({
       name: 'quaranteen',
       command: ['bash', '-c', 'exit 1'],

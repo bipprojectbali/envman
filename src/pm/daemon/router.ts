@@ -12,6 +12,8 @@ const MAX_BODY_SIZE = 1_000_000  // 1MB
 export type HandlerCtx = {
   requestId: string
   body: any                       // parsed JSON, atau null kalau GET/DELETE
+  signal?: AbortSignal            // request abort signal (untuk SSE cleanup)
+  url: URL                        // parsed URL (untuk query params)
 }
 
 export type Handler = (ctx: HandlerCtx) => Promise<Response> | Response
@@ -95,7 +97,7 @@ export class Router {
     }
 
     try {
-      return await route.handler({ requestId, body }, params)
+      return await route.handler({ requestId, body, signal: req.signal, url }, params)
     } catch (e: any) {
       log.error('handler threw', { path, error: e.message, stack: e.stack })
       return errorResponse('INTERNAL', e.message ?? 'Internal error', requestId)

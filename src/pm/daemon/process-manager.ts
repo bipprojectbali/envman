@@ -5,12 +5,45 @@
 //   R2 ✓ State machine container handles stop-during-start
 
 import { randomUUID } from 'crypto'
+import { join } from 'path'
+import { mkdirSync, existsSync } from 'fs'
 import { log } from './logger'
 import { ProcessContainer, type ProcessConfig, type ProcessSnapshot } from './process-container'
+import { LogRotator } from './log-rotator'
+import type { LogWriter } from './log-writer'
+
+export interface ProcessManagerOptions {
+  /** Direktori untuk log files (~/.config/envman/run/logs) */
+  logsDir: string
+}
 
 export class ProcessManager {
   private byId = new Map<string, ProcessContainer>()
   private byName = new Map<string, string>()  // name → id
+  private logRotator: LogRotator | null = null
+  private logWriters = new Map<string, LogWriter>()  // shared dengan LogRotator
+
+  constructor(private readonly opts: ProcessManagerOptions) {
+    if (!existsSync(opts.logsDir)) {
+      mkdirSync(opts.logsDir, { recursive: true, mode: 0o750 })
+    }
+  }
+
+  /**
+   * Start periodic log rotation (Phase 3).
+   */
+  startRotator(): void {
+    if (this.logRotator) return
+    this.logRotator = new LogRotator(this.logWriters)
+    this.logRotator.start()
+  }
+
+  stopRotator(): void {
+    if (this.logRotator) {
+      this.logRotator.stop()
+      this.logRotator = null
+    }
+  }
 
   /**
    * Create + start process. Throws DuplicateNameError kalau nama sudah ada.
@@ -30,10 +63,15 @@ export class ProcessManager {
     }
 
     const id = randomUUID()
-    const config: ProcessConfig = { ...input, id }
+    const logOutPath = input.logOutPath ?? join(this.opts.logsDir, `${input.name}-${id}.out.log`)
+    const logErrPath = input.logErrPath ?? join(this.opts.logsDir, `${input.name}-${id}.err.log`)
+    const config: ProcessConfig = { ...input, id, logOutPath, logErrPath }
     const container = new ProcessContainer(config)
     this.byId.set(id, container)
     this.byName.set(input.name, id)
+    if (container.logWriter) {
+      this.logWriters.set(id, container.logWriter)
+    }
 
     try {
       await container.start()
@@ -94,6 +132,7 @@ export class ProcessManager {
     await c.destroy()
     this.byId.delete(c.config.id)
     this.byName.delete(c.config.name)
+    this.logWriters.delete(c.config.id)
     log.info('process removed', { id: c.config.id, name: c.config.name })
   }
 
@@ -109,11 +148,13 @@ export class ProcessManager {
    * Cleanup semua proses (saat daemon shutdown). Stop semua bersamaan.
    */
   async shutdownAll(): Promise<void> {
+    this.stopRotator()
     const containers = [...this.byId.values()]
     log.info('shutting down all processes', { count: containers.length })
     await Promise.allSettled(containers.map(c => c.destroy()))
     this.byId.clear()
     this.byName.clear()
+    this.logWriters.clear()
   }
 }
 
