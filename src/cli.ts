@@ -348,10 +348,6 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
     const isBun = interpreterName === 'bun'
     const hasNpmImports = isBun && detectsNpmImports(fileContent)
 
-    if (hasNpmImports) {
-      console.error('[envman] npm imports terdeteksi — pakai --install=fallback (cache global ~/.bun/install/cache).')
-    }
-
     const stdinCmd = buildStdinCommand(transformedCommand, { bunAutoInstall: hasNpmImports })
     if (stdinCmd) {
       // Script jalan di CWD user — `./file` works natural, no isolation needed.
