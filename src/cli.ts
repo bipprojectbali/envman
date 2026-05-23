@@ -234,6 +234,22 @@ interface IsolatedWorkspace {
   symlinkFailed: boolean  // true = Windows perm or similar → no `./file` access
 }
 
+// Entries di user CWD yang TIDAK di-symlink ke workspace. Tujuannya: cegah Bun
+// resolution algorithm (walk-up node_modules, baca lockfile, baca bunfig) bocor
+// ke project user. Auto-install hanya jalan kalau Bun gak ketemu lockfile/config
+// yang bilang "pakai deps yang sudah ada".
+const WORKSPACE_SKIP_ENTRIES = new Set([
+  'node_modules',       // resolution root
+  'package.json',       // declares deps Bun expects to find
+  'bun.lock',           // Bun lockfile (text)
+  'bun.lockb',          // Bun lockfile (binary, legacy)
+  'package-lock.json',  // npm lockfile
+  'yarn.lock',          // yarn lockfile
+  'pnpm-lock.yaml',     // pnpm lockfile
+  'bunfig.toml',        // bisa disable auto-install
+  '.bunfig.toml',       // dot-prefixed variant
+])
+
 function prepareIsolatedWorkspace(userCwd: string): IsolatedWorkspace | null {
   try {
     if (!existsSync(RUN_DIR)) mkdirSync(RUN_DIR, { recursive: true })
@@ -244,12 +260,12 @@ function prepareIsolatedWorkspace(userCwd: string): IsolatedWorkspace | null {
     // (which would declare deps it expects to find in node_modules).
     writeFileSync(join(runDir, 'package.json'), '{"name":"envman-script","type":"module"}')
 
-    // Symlink top-level entries from user CWD, except node_modules + package.json.
+    // Symlink top-level entries from user CWD, except resolution-affecting files.
     let symlinkFailed = false
     let entries: string[] = []
     try { entries = readdirSync(userCwd) } catch { entries = [] }
     for (const entry of entries) {
-      if (entry === 'node_modules' || entry === 'package.json') continue
+      if (WORKSPACE_SKIP_ENTRIES.has(entry)) continue
       try {
         symlinkSync(join(userCwd, entry), join(runDir, entry))
       } catch {
