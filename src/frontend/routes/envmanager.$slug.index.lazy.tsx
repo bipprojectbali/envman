@@ -10,6 +10,7 @@ import {
   Kbd,
   Paper,
   Select,
+  SimpleGrid,
   Skeleton,
   Stack,
   Tabs,
@@ -18,7 +19,7 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDebouncedValue, useHotkeys } from '@mantine/hooks'
+import { useDebouncedValue, useHotkeys, useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, createLazyFileRoute, useNavigate } from '@tanstack/react-router'
@@ -29,6 +30,8 @@ import {
   TbChevronRight,
   TbClock,
   TbFolders,
+  TbLayoutGrid,
+  TbLayoutList,
   TbNote,
   TbFiles,
   TbTerminal2,
@@ -131,6 +134,10 @@ function ProjectDetailPage() {
   const [newEnvName, setNewEnvName] = useState('')
   const [envSearch, setEnvSearch] = useState('')
   const [envSort, setEnvSort] = useState<'name' | 'vars' | 'recent'>('name')
+  const [envView, setEnvView] = useLocalStorage<'list' | 'grid'>({
+    key: 'envman:environments:view',
+    defaultValue: 'list',
+  })
   const searchRef = useRef<HTMLInputElement>(null)
   const [debouncedSearch] = useDebouncedValue(envSearch, 120)
 
@@ -464,55 +471,69 @@ function ProjectDetailPage() {
               </Card>
             ) : (
               <>
-                {envs.length > 2 && (
-                  <Group mb="sm" gap="xs">
-                    <TextInput
-                      ref={searchRef}
-                      size="xs"
-                      placeholder="Cari environment..."
-                      leftSection={<TbSearch size={13} />}
-                      value={envSearch}
-                      onChange={e => setEnvSearch(e.target.value)}
-                      rightSection={
-                        envSearch ? (
-                          <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setEnvSearch('')}>
-                            <TbX size={11} />
-                          </ActionIcon>
-                        ) : (
-                          <Tooltip label="Tekan / untuk focus">
-                            <Kbd size="xs">/</Kbd>
-                          </Tooltip>
-                        )
-                      }
-                      rightSectionWidth={32}
-                      style={{ flex: 1 }}
-                    />
-                    <Select
-                      size="xs"
-                      w={150}
-                      leftSection={<TbSortAscending size={13} />}
-                      value={envSort}
-                      onChange={v => setEnvSort((v ?? 'name') as typeof envSort)}
-                      data={[
-                        { label: 'Nama A→Z', value: 'name' },
-                        { label: 'Terbanyak vars', value: 'vars' },
-                        { label: 'Terbaru', value: 'recent' },
-                      ]}
-                      allowDeselect={false}
-                    />
+                <Group mb="sm" gap="xs">
+                  {envs.length > 2 && (
+                    <>
+                      <TextInput
+                        ref={searchRef}
+                        size="xs"
+                        placeholder="Cari environment..."
+                        leftSection={<TbSearch size={13} />}
+                        value={envSearch}
+                        onChange={e => setEnvSearch(e.target.value)}
+                        rightSection={
+                          envSearch ? (
+                            <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setEnvSearch('')}>
+                              <TbX size={11} />
+                            </ActionIcon>
+                          ) : (
+                            <Tooltip label="Tekan / untuk focus">
+                              <Kbd size="xs">/</Kbd>
+                            </Tooltip>
+                          )
+                        }
+                        rightSectionWidth={32}
+                        style={{ flex: 1 }}
+                      />
+                      <Select
+                        size="xs"
+                        w={150}
+                        leftSection={<TbSortAscending size={13} />}
+                        value={envSort}
+                        onChange={v => setEnvSort((v ?? 'name') as typeof envSort)}
+                        data={[
+                          { label: 'Nama A→Z', value: 'name' },
+                          { label: 'Terbanyak vars', value: 'vars' },
+                          { label: 'Terbaru', value: 'recent' },
+                        ]}
+                        allowDeselect={false}
+                      />
+                    </>
+                  )}
+                  <Group gap={4} ml="auto">
+                    <Tooltip label="List view" withArrow>
+                      <ActionIcon size="sm" variant={envView === 'list' ? 'filled' : 'subtle'} color="blue" onClick={() => setEnvView('list')}>
+                        <TbLayoutList size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Grid view" withArrow>
+                      <ActionIcon size="sm" variant={envView === 'grid' ? 'filled' : 'subtle'} color="blue" onClick={() => setEnvView('grid')}>
+                        <TbLayoutGrid size={14} />
+                      </ActionIcon>
+                    </Tooltip>
                   </Group>
-                )}
-                <Stack gap="xs">
-                  {filteredEnvs.length === 0 ? (
-                    <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
-                      <Text size="sm" c="dimmed" mb="xs">
-                        Tidak ada environment yang cocok dengan "{envSearch}"
-                      </Text>
-                      <Button size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={() => setEnvSearch('')}>
-                        Reset pencarian
-                      </Button>
-                    </Card>
-                  ) : filteredEnvs.map(e => {
+                </Group>
+                {filteredEnvs.length === 0 ? (
+                  <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
+                    <Text size="sm" c="dimmed" mb="xs">
+                      Tidak ada environment yang cocok dengan "{envSearch}"
+                    </Text>
+                    <Button size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={() => setEnvSearch('')}>
+                      Reset pencarian
+                    </Button>
+                  </Card>
+                ) : (() => {
+                  const cards = filteredEnvs.map(e => {
                     const color = getEnvColor(e.name)
                     const varCount = e._count?.vars ?? 0
                     const goTo = () => navigate({ to: '/envmanager/$slug/$env', params: { slug, env: e.name } })
@@ -599,8 +620,13 @@ function ProjectDetailPage() {
                         </Group>
                       </Card>
                     )
-                  })}
-                </Stack>
+                  })
+                  return envView === 'grid' ? (
+                    <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{cards}</SimpleGrid>
+                  ) : (
+                    <Stack gap="xs">{cards}</Stack>
+                  )
+                })()}
               </>
             )}
 

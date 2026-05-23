@@ -56,7 +56,11 @@ export function MarkdownRenderer({ children, fontSize = 14 }: MarkdownRendererPr
   }, [])
 
   return (
-    <div ref={containerRef} className="markdown-body" style={{ fontSize }}>
+    <div
+      ref={containerRef}
+      className="markdown-body"
+      style={{ fontSize, minWidth: 0, maxWidth: '100%', overflowWrap: 'break-word', wordBreak: 'break-word' }}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSlug]}
@@ -71,13 +75,36 @@ export function MarkdownRenderer({ children, fontSize = 14 }: MarkdownRendererPr
               <SyntaxHighlighter
                 language={lang}
                 style={vscDarkPlus}
-                customStyle={{ borderRadius: 6, fontSize: 13, margin: '8px 0' }}
+                customStyle={{
+                  borderRadius: 6,
+                  fontSize: 13,
+                  margin: '8px 0',
+                  maxWidth: '100%',
+                  overflowX: 'auto',
+                }}
+                codeTagProps={{ style: { whiteSpace: 'pre' } }}
                 showLineNumbers={String(codeChildren).split('\n').length > 5}
               >
                 {String(codeChildren).trimEnd()}
               </SyntaxHighlighter>
             ) : (
-              <Code block style={{ fontSize: 13 }}>{String(codeChildren).trimEnd()}</Code>
+              <Code block style={{ fontSize: 13, maxWidth: '100%', overflowX: 'auto' }}>
+                {String(codeChildren).trimEnd()}
+              </Code>
+            )
+          },
+          table({ children: tableChildren, ...rest }) {
+            return (
+              <div style={{ maxWidth: '100%', overflowX: 'auto', margin: '8px 0' }}>
+                <table {...rest}>{tableChildren}</table>
+              </div>
+            )
+          },
+          pre({ children: preChildren, ...rest }) {
+            return (
+              <pre {...rest} style={{ maxWidth: '100%', overflowX: 'auto', margin: '8px 0' }}>
+                {preChildren}
+              </pre>
             )
           },
         }}

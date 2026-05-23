@@ -8,6 +8,7 @@ import {
   CopyButton,
   Group,
   Modal,
+  SimpleGrid,
   Skeleton,
   Stack,
   TagsInput,
@@ -17,11 +18,11 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { TbCheck, TbCopy, TbPencil, TbPlus, TbSearch, TbTag, TbTerminal2, TbTrash } from 'react-icons/tb'
+import { TbCheck, TbCopy, TbLayoutGrid, TbLayoutList, TbPencil, TbPlus, TbSearch, TbTag, TbTerminal2, TbTrash } from 'react-icons/tb'
 import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -159,6 +160,10 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
   const [editing, setEditing] = useState<Alias | null>(null)
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState<string[]>([])
+  const [view, setView] = useLocalStorage<'list' | 'grid'>({
+    key: `envman:aliases:${slug}:view`,
+    defaultValue: 'list',
+  })
 
   const { data, isLoading } = useQuery<{ aliases: Alias[] }>({
     queryKey: ['envman', 'aliases', slug],
@@ -251,11 +256,25 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
               disabled={allTags.length === 0}
             />
           </Group>
-          {isOwner && (
-            <Button size="xs" leftSection={<TbPlus size={14} />} onClick={openCreate}>
-              Tambah alias
-            </Button>
-          )}
+          <Group gap="xs" wrap="nowrap">
+            <Group gap={4}>
+              <Tooltip label="List view" withArrow>
+                <ActionIcon size="sm" variant={view === 'list' ? 'filled' : 'subtle'} color="blue" onClick={() => setView('list')}>
+                  <TbLayoutList size={14} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Grid view" withArrow>
+                <ActionIcon size="sm" variant={view === 'grid' ? 'filled' : 'subtle'} color="blue" onClick={() => setView('grid')}>
+                  <TbLayoutGrid size={14} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+            {isOwner && (
+              <Button size="xs" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+                Tambah alias
+              </Button>
+            )}
+          </Group>
         </Group>
 
         {tagFilter.length > 0 && (
@@ -284,7 +303,8 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
             <Text size="sm" c="dimmed">Tidak ada alias yang cocok dengan filter.</Text>
           </Card>
         ) : (
-          filtered.map(alias => (
+          (() => {
+            const cards = filtered.map(alias => (
             <Card key={alias.id} withBorder padding="sm" radius="md">
               <Group justify="space-between" wrap="nowrap" align="flex-start">
                 <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
@@ -343,7 +363,13 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                 )}
               </Group>
             </Card>
-          ))
+            ))
+            return view === 'grid' ? (
+              <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{cards}</SimpleGrid>
+            ) : (
+              <>{cards}</>
+            )
+          })()
         )}
       </Stack>
 
