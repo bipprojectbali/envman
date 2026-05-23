@@ -26,6 +26,7 @@ React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Rou
 
 ## Components (`src/frontend/components/`)
 
+- `CodeEditor.tsx` + `MonacoCodeEditor.tsx` — Monaco-based code editor wrapper. `CodeEditor` adalah public API: lazy-load Monaco (chunk terpisah ~1MB gzipped, hanya download saat dipakai), Suspense boundary, mobile fallback ke Mantine Textarea. `MonacoCodeEditor` adalah impl: setup web workers (typescript/json/css/html), sync theme dengan Mantine color scheme, language detection dari filename extension. Dipakai di: FilesPanel (slug + global Gists), Compose YAML editor di Portainer connection, NoteModals (markdown), Edit .env modal.
 - `ThemeToggle.tsx` — dark/light mode toggle (shared across all pages)
 - `TicketsPanel.tsx` — shared between `/dev` and `/dashboard`, QC-filtered for QC role
 - `PortainerSync.tsx` — Portainer sync UI

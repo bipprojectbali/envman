@@ -31,6 +31,7 @@ import {
   TbTag,
   TbTrash,
 } from 'react-icons/tb'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
 import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -90,25 +91,6 @@ function NoteForm({ slug, note, onClose }: { slug: string; note?: Note; onClose:
   const lineCount = body ? body.split('\n').length : 0
   const wordCount = body ? body.trim().split(/\s+/).filter(Boolean).length : 0
 
-  const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault()
-      if (canSave) save.mutate()
-      return
-    }
-    if (e.key === 'Tab' && !e.shiftKey) {
-      e.preventDefault()
-      const target = e.currentTarget
-      const start = target.selectionStart
-      const end = target.selectionEnd
-      const next = body.slice(0, start) + '  ' + body.slice(end)
-      setBody(next)
-      requestAnimationFrame(() => {
-        target.selectionStart = target.selectionEnd = start + 2
-      })
-    }
-  }
-
   return (
     <Stack gap="lg">
       {/* ── Identitas ── */}
@@ -147,15 +129,13 @@ function NoteForm({ slug, note, onClose }: { slug: string; note?: Note; onClose:
           />
         </Group>
         {preview === 'write' ? (
-          <Textarea
-            placeholder={`# Heading\n\nTulis catatan dalam format Markdown.\n\n- Bullet list\n- **bold**, *italic*, \`code\`\n\n\`\`\`bash\necho "code block"\n\`\`\``}
+          <CodeEditor
             value={body}
-            onChange={e => setBody(e.target.value)}
-            onKeyDown={handleBodyKeyDown}
-            minRows={12}
-            maxRows={20}
-            autosize
-            styles={{ input: { fontFamily: 'monospace', fontSize: 13, lineHeight: 1.6 } }}
+            onChange={setBody}
+            language="markdown"
+            filename="note.md"
+            placeholder="# Heading\n\nTulis catatan dalam format Markdown..."
+            height={360}
           />
         ) : (
           <Paper withBorder p="md" mih={240} style={{ overflow: 'auto', maxHeight: 480 }}>

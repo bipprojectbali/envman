@@ -44,6 +44,7 @@ import {
   TbTrash,
   TbX,
 } from 'react-icons/tb'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
 import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
 import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { apiFetch } from '@/frontend/lib/api'
@@ -206,23 +207,6 @@ function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; o
   const updateFile = (i: number, patch: Partial<FileEntry>) =>
     setFiles(f => f.map((x, idx) => idx === i ? { ...x, ...patch } : x))
 
-  const handleEditorKeyDown = (i: number, content: string) => (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault()
-      if (canSave) save.mutate()
-      return
-    }
-    if (e.key === 'Tab') {
-      e.preventDefault()
-      const target = e.currentTarget
-      const start = target.selectionStart
-      const end = target.selectionEnd
-      const next = content.slice(0, start) + '  ' + content.slice(end)
-      updateFile(i, { content: next })
-      setTimeout(() => { target.selectionStart = target.selectionEnd = start + 2 }, 0)
-    }
-  }
-
   const totalLines = files.reduce((sum, f) => sum + (f.content ? f.content.split('\n').length : 0), 0)
   const totalChars = files.reduce((sum, f) => sum + f.content.length, 0)
   const canSave = !!title.trim() && files.every(f => f.filename.trim())
@@ -338,22 +322,20 @@ function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; o
 
                 {preview === 'write' ? (
                   <Box>
-                    <Textarea
-                      placeholder={f.language === 'markdown' ? '# Heading\n\nKonten markdown...' : `Isi konten ${f.language} di sini...`}
+                    <CodeEditor
                       value={f.content}
-                      onChange={e => updateFile(i, { content: e.target.value })}
-                      onKeyDown={handleEditorKeyDown(i, f.content)}
-                      minRows={14}
-                      maxRows={26}
-                      autosize
-                      styles={{ input: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: 13, lineHeight: 1.6 } }}
+                      onChange={(v) => updateFile(i, { content: v })}
+                      language={f.language}
+                      filename={f.filename}
+                      placeholder={f.language === 'markdown' ? '# Heading\n\nKonten markdown...' : `Isi konten ${f.language} di sini...`}
+                      height={400}
                     />
                     <Group justify="space-between" mt={4} px={4}>
                       <Group gap="xs">
                         <Badge size="xs" variant="dot" color={getLangColor(f.language)}>{f.language}</Badge>
                         <Text size="xs" c="dimmed">{f.content ? `${f.content.split('\n').length} baris · ${f.content.length} karakter` : 'Kosong'}</Text>
                       </Group>
-                      <Text size="xs" c="dimmed"><Code fz={10}>Tab</Code> = indent · <Code fz={10}>⌘+Enter</Code> = simpan</Text>
+                      <Text size="xs" c="dimmed">Monaco editor · syntax highlight</Text>
                     </Group>
                   </Box>
                 ) : (

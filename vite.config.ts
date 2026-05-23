@@ -53,6 +53,12 @@ export default defineConfig({
           if (id.includes('node_modules/react-icons/')) {
             return 'icons'
           }
+          if (
+            id.includes('node_modules/monaco-editor/') ||
+            id.includes('node_modules/@monaco-editor/')
+          ) {
+            return 'monaco'
+          }
           if (id.includes('node_modules/')) {
             return 'vendor'
           }

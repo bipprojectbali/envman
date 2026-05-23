@@ -32,6 +32,7 @@ import { modals } from '@mantine/modals'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
@@ -1118,21 +1119,13 @@ function ConnectionDetailPage() {
                 </Group>
               </Group>
               <Paper withBorder radius="sm" style={{ overflow: 'hidden' }}>
-                <Textarea
+                <CodeEditor
                   value={composeContent}
-                  onChange={e => setComposeContent(e.target.value)}
+                  onChange={setComposeContent}
+                  language="yaml"
+                  filename="compose.yml"
                   readOnly={!composeEditing}
-                  autosize
-                  minRows={10}
-                  maxRows={30}
-                  styles={{
-                    input: {
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      background: composeEditing ? undefined : 'var(--mantine-color-default-hover)',
-                      lineHeight: 1.6,
-                    },
-                  }}
+                  height={480}
                 />
               </Paper>
               {composeEditing && (

@@ -35,6 +35,7 @@ import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
 import { PortainerSync } from '@/frontend/components/PortainerSync'
 import { CompareModal } from '@/frontend/components/env/CompareModal'
 import { useEffect, useMemo, useState } from 'react'
@@ -1371,16 +1372,18 @@ function VarsPage() {
               </Text>
             </Alert>
           )}
-          <Textarea
-            label="Konten .env"
-            description="Format KEY=value per baris. Komentar (#) diabaikan."
-            value={editEnvText}
-            onChange={e => setEditEnvText(e.target.value)}
-            autosize
-            minRows={isMobile ? 6 : 10}
-            maxRows={isMobile ? 16 : 24}
-            styles={{ input: { fontFamily: 'monospace', fontSize: isMobile ? 13 : 12 } }}
-          />
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>Konten .env</Text>
+            <Text size="xs" c="dimmed">Format KEY=value per baris. Komentar (#) diabaikan.</Text>
+            <CodeEditor
+              value={editEnvText}
+              onChange={setEditEnvText}
+              language="ini"
+              filename=".env"
+              height={400}
+              noMinimap
+            />
+          </Stack>
           <Group justify="space-between" align="center" wrap="wrap" gap="xs">
             {parsedEditEnv.length > 0 ? (
               <Badge variant="light" color="blue" leftSection={<TbCheck size={11} />}>

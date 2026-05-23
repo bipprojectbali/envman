@@ -31,6 +31,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 import { apiFetch } from '@/frontend/lib/api'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
 import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
 import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { useSession, hasCapability } from '@/frontend/hooks/useAuth'
@@ -217,27 +218,6 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
   const updateFile = (i: number, patch: Partial<GistFile>) =>
     setFiles(f => f.map((x, idx) => idx === i ? { ...x, ...patch } : x))
 
-  // Insert 2 spaces saat tab di textarea (bukan focus jump)
-  const handleEditorKeyDown = (i: number, content: string) => (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Cmd/Ctrl + Enter → save
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault()
-      if (canSave) save.mutate()
-      return
-    }
-    if (e.key === 'Tab') {
-      e.preventDefault()
-      const target = e.currentTarget
-      const start = target.selectionStart
-      const end = target.selectionEnd
-      const next = content.slice(0, start) + '  ' + content.slice(end)
-      updateFile(i, { content: next })
-      // Restore cursor after insert (setTimeout to wait for re-render)
-      setTimeout(() => {
-        target.selectionStart = target.selectionEnd = start + 2
-      }, 0)
-    }
-  }
 
   const totalLines = files.reduce((sum, f) => sum + (f.content ? f.content.split('\n').length : 0), 0)
   const totalChars = files.reduce((sum, f) => sum + f.content.length, 0)
@@ -388,7 +368,11 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
                 {/* Editor / Preview area */}
                 {preview === 'write' ? (
                   <Box>
-                    <Textarea
+                    <CodeEditor
+                      value={f.content}
+                      onChange={(v) => updateFile(i, { content: v })}
+                      language={f.language}
+                      filename={f.filename}
                       placeholder={
                         f.language === 'markdown'
                           ? '# Heading\n\nKonten markdown di sini...'
@@ -396,20 +380,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
                           ? '#!/usr/bin/env bash\nset -euo pipefail\n\n# script di sini...'
                           : `Isi konten ${f.language} di sini...`
                       }
-                      value={f.content}
-                      onChange={e => updateFile(i, { content: e.target.value })}
-                      onKeyDown={handleEditorKeyDown(i, f.content)}
-                      minRows={14}
-                      maxRows={26}
-                      autosize
-                      styles={{
-                        input: {
-                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                          fontSize: 13,
-                          lineHeight: 1.6,
-                          tabSize: 2,
-                        },
-                      }}
+                      height={400}
                     />
                     {/* Stats bar */}
                     <Group justify="space-between" mt={4} px={4}>
@@ -421,9 +392,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
                           {f.content ? `${f.content.split('\n').length} baris · ${f.content.length} karakter` : 'Kosong'}
                         </Text>
                       </Group>
-                      <Text size="xs" c="dimmed">
-                        <Code fz={10}>Tab</Code> = indent 2 spasi · <Code fz={10}>⌘ + Enter</Code> = simpan
-                      </Text>
+                      <Text size="xs" c="dimmed">Monaco editor · syntax highlight</Text>
                     </Group>
                   </Box>
                 ) : (
