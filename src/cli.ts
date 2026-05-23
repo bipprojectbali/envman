@@ -1,12 +1,15 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'fs'
 import { homedir, tmpdir } from 'os'
 import { basename, join } from 'path'
 import { spawn, spawnSync } from 'child_process'
+import { randomUUID } from 'crypto'
 
 const CONFIG_DIR = join(homedir(), '.config', 'envman')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const UPDATE_CACHE_FILE = join(CONFIG_DIR, 'update-check.json')
+const RUN_DIR = join(CONFIG_DIR, 'run')
+const RUN_DIR_MAX_AGE_MS = 7 * 86400_000  // 7 hari
 import { version as PKG_VERSION } from '../package.json'
 const VERSION = PKG_VERSION
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000  // 15 menit
@@ -190,17 +193,113 @@ function isProjectFileRef(arg: string): boolean {
   return after.includes('/') || /\.[a-zA-Z0-9]+$/.test(after)
 }
 
+// ─── npm import detection ────────────────────────────────────────────────────
+// Detect bare-name imports (not relative, not built-in, not bun:/node: prefix).
+// Used to decide whether to enable Bun --install=auto for piped scripts.
+const NODE_BUILTINS = new Set([
+  'fs', 'path', 'os', 'http', 'https', 'crypto', 'child_process', 'util',
+  'stream', 'events', 'url', 'querystring', 'buffer', 'process', 'zlib',
+  'net', 'dns', 'tls', 'cluster', 'worker_threads', 'readline', 'assert',
+  'console', 'timers', 'string_decoder', 'punycode', 'vm', 'v8', 'perf_hooks',
+])
+
+export function detectsNpmImports(content: string): boolean {
+  const patterns = [
+    /^\s*import\s+(?:[^'"]+?\s+from\s+)?["']([^"']+)["']/gm,  // ESM static import
+    /\brequire\s*\(\s*["']([^"']+)["']/g,                      // CJS require
+    /\bimport\s*\(\s*["']([^"']+)["']/g,                       // dynamic import()
+  ]
+  for (const re of patterns) {
+    for (const match of content.matchAll(re)) {
+      const spec = match[1]
+      if (!spec) continue
+      if (spec.startsWith('./') || spec.startsWith('../') || spec.startsWith('/')) continue
+      if (spec.startsWith('bun:') || spec.startsWith('node:')) continue
+      if (NODE_BUILTINS.has(spec)) continue
+      return true  // bare specifier = npm package
+    }
+  }
+  return false
+}
+
+// ─── Isolated workspace for Bun scripts ──────────────────────────────────────
+// Bun's resolver walks up looking for node_modules. If user is inside a Node
+// project that doesn't have the imported packages, resolution fails. Solution:
+// run script in a fresh CWD at ~/.config/envman/run/<uuid>/ that symlinks user
+// files but excludes node_modules — Bun's walk-up finds no node_modules → auto
+// install kicks in → packages come from global cache.
+
+interface IsolatedWorkspace {
+  runDir: string
+  symlinkFailed: boolean  // true = Windows perm or similar → no `./file` access
+}
+
+function prepareIsolatedWorkspace(userCwd: string): IsolatedWorkspace | null {
+  try {
+    if (!existsSync(RUN_DIR)) mkdirSync(RUN_DIR, { recursive: true })
+    const runDir = join(RUN_DIR, randomUUID())
+    mkdirSync(runDir)
+
+    // Minimal package.json so Bun doesn't try to read user's package.json
+    // (which would declare deps it expects to find in node_modules).
+    writeFileSync(join(runDir, 'package.json'), '{"name":"envman-script","type":"module"}')
+
+    // Symlink top-level entries from user CWD, except node_modules + package.json.
+    let symlinkFailed = false
+    let entries: string[] = []
+    try { entries = readdirSync(userCwd) } catch { entries = [] }
+    for (const entry of entries) {
+      if (entry === 'node_modules' || entry === 'package.json') continue
+      try {
+        symlinkSync(join(userCwd, entry), join(runDir, entry))
+      } catch {
+        // Windows symlink perm denied, broken target, dll → fallback ke pure isolation
+        symlinkFailed = true
+        break
+      }
+    }
+    return { runDir, symlinkFailed }
+  } catch {
+    return null  // can't create runDir → caller falls back to user CWD
+  }
+}
+
+function cleanupRunDir(runDir: string) {
+  try { rmSync(runDir, { recursive: true, force: true }) } catch {}
+}
+
+// Auto-purge run dirs older than 7 days. Called on every CLI startup (cheap).
+function cleanupOldRunDirs() {
+  try {
+    if (!existsSync(RUN_DIR)) return
+    const now = Date.now()
+    for (const entry of readdirSync(RUN_DIR)) {
+      const path = join(RUN_DIR, entry)
+      try {
+        const stats = statSync(path)
+        if (now - stats.mtimeMs > RUN_DIR_MAX_AGE_MS) {
+          rmSync(path, { recursive: true, force: true })
+        }
+      } catch {}
+    }
+  } catch {}
+}
+
 // ─── Files: stdin command builder ────────────────────────────────────────────
 
-function buildStdinCommand(cmd: string[]): string[] | null {
+function buildStdinCommand(cmd: string[], opts: { bunAutoInstall?: boolean } = {}): string[] | null {
   const name = basename(cmd[0])
   const rest = cmd.slice(1)
   switch (name) {
     case 'bash': case 'sh': case 'zsh':
       return [cmd[0], '-s', ...rest]           // bash -s reads from stdin, $@ preserved
-    case 'bun':
-      if (rest[0] === 'run') return [cmd[0], 'run', '-', ...rest.slice(1)]
-      return [cmd[0], 'run', '-', ...rest]     // bun run -
+    case 'bun': {
+      // --install=auto goes BEFORE `run` subcommand. Default Bun behavior is already
+      // auto, but we pass explicitly to override any user bunfig.toml that disables it.
+      const installFlag = opts.bunAutoInstall ? ['--install=auto'] : []
+      if (rest[0] === 'run') return [cmd[0], ...installFlag, 'run', '-', ...rest.slice(1)]
+      return [cmd[0], ...installFlag, 'run', '-', ...rest]
+    }
     case 'node':
       return [cmd[0], ...rest]                 // node reads JS from stdin
     case 'python3': case 'python':
@@ -308,14 +407,38 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
 
   // Step 6: Spawn
   if (fileContent !== null) {
-    const stdinCmd = buildStdinCommand(transformedCommand)
+    const interpreterName = basename(transformedCommand[0])
+    const isBun = interpreterName === 'bun'
+    const hasNpmImports = isBun && detectsNpmImports(fileContent)
+
+    // For Bun scripts: ALWAYS isolate in ~/.config/envman/run/<uuid>/ to decouple
+    // from user's node_modules. Symlinks to user files preserved (kecuali Windows
+    // perm fail). INIT_CWD env var = original CWD as fallback convention.
+    const userCwd = process.cwd()
+    const workspace = isBun ? prepareIsolatedWorkspace(userCwd) : null
+    if (workspace?.symlinkFailed) {
+      console.error('[envman] symlink terbatas (mungkin Windows tanpa dev mode) — pure isolation. Pakai $INIT_CWD/file untuk akses file user.')
+    } else if (workspace && hasNpmImports) {
+      console.error('[envman] npm imports terdeteksi — running in isolated workspace dengan auto-install.')
+    }
+
+    const stdinCmd = buildStdinCommand(transformedCommand, { bunAutoInstall: hasNpmImports })
     if (stdinCmd) {
+      const spawnEnv = { ...finalEnv, ...(workspace ? { INIT_CWD: userCwd } : {}) }
       const result = spawnSync(stdinCmd[0], stdinCmd.slice(1), {
-        env: finalEnv,
+        env: spawnEnv,
+        cwd: workspace?.runDir,
         stdio: ['pipe', 'inherit', 'inherit'],
         input: fileContent,
         shell: false,
       })
+      if (workspace) {
+        if (result.status === 0) {
+          cleanupRunDir(workspace.runDir)
+        } else {
+          console.error(`[envman] script gagal (exit ${result.status}). Workspace preserved untuk debug: ${workspace.runDir}`)
+        }
+      }
       process.exit(result.status ?? 0)
     } else {
       // Secure temp file fallback for unknown interpreters (mode 0600, cleanup on exit)
@@ -618,8 +741,9 @@ async function main() {
     process.exit(0)
   }
 
-  // Always: show notice from cache (instant) + queue background refresh
+  // Always: show notice from cache (instant) + queue background refresh + cleanup old run dirs
   showUpdateNoticeFromCache()
+  cleanupOldRunDirs()
   const savedServer = getSavedServerUrl()
   if (savedServer) spawnUpdateCheck(savedServer, '')
 
@@ -674,7 +798,10 @@ async function main() {
   await cmdRun(sources, command, serverWins)
 }
 
-main().catch(err => {
-  console.error('Fatal:', err.message)
-  process.exit(1)
-})
+// Guard with import.meta.main so helpers can be imported in tests without triggering CLI
+if (import.meta.main) {
+  main().catch(err => {
+    console.error('Fatal:', err.message)
+    process.exit(1)
+  })
+}

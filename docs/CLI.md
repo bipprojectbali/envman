@@ -80,6 +80,47 @@ envman run open-marina:dev
 
 **Prefix** diset per entry di UI (Files tab dalam project detail). Auto-generate dari judul, bisa diedit manual, tidak berubah saat rename judul.
 
+### Isolated Workspace untuk Bun Scripts
+
+Setiap kali script Bun dieksekusi via Files, CLI membuat **isolated workspace** di `~/.config/envman/run/<uuid>/` agar:
+
+1. **Tidak tergantung `node_modules` user** — Bun resolver walk-up dari workspace tidak ketemu `node_modules` apapun → auto-install mode aktif → packages dari global cache (`~/.bun/install/cache`)
+2. **Bisa baca file user via symlink** — semua file/folder di CWD user (kecuali `node_modules` dan `package.json`) di-symlink ke workspace, jadi `Bun.file("./config.json")` tetap jalan
+3. **Tidak pollute project user** — install ke global cache, bukan ke `node_modules` user
+
+```ts
+// files:scripts/migrate.ts
+import { z } from "zod@^3.22"                              // ✅ auto-install dari global cache
+import _ from "lodash@4.17.21"                             // ✅ pinned version
+import fs from "node:fs"
+
+const env = z.object({ DATABASE_URL: z.string() }).parse(process.env)
+const cfg = await Bun.file("./config.json").json()         // ✅ via symlink
+const schema = await Bun.file("./prisma/schema.prisma").text()  // ✅
+```
+
+**Auto-install flag**: kalau script ada bare npm imports → CLI tambah `--install=auto` (override user `bunfig.toml` yang mungkin disable).
+
+**`INIT_CWD` env var**: selalu di-set ke user's original CWD. Berguna kalau:
+- Windows tanpa dev mode → symlink gagal → workspace tetap dibuat tapi tanpa symlinks → script perlu pakai `process.env.INIT_CWD/file`
+- Script butuh path absolute ke CWD asli
+
+**Cleanup behavior**:
+- Sukses (exit 0): workspace dihapus
+- Gagal (exit non-zero): workspace **preserved**, path di-log ke stderr untuk debug
+- Auto-purge workspace yang lebih dari 7 hari pada startup CLI berikutnya
+
+**Limitasi**:
+- Script import dari user's local code (`import "./src/db"`) yang bergantung pada user's `node_modules` (mis. `@prisma/client`) **tidak akan jalan** — local code itu butuh node_modules user yang sengaja di-isolate. Scope envman Files = self-contained utility scripts.
+- Windows tanpa Developer Mode/admin: symlink gagal → fallback ke pure isolation (no `./file` access, harus pakai `$INIT_CWD/file`)
+
+**Best practice — pin version inline:**
+
+```ts
+import { z } from "zod@^3.22"     // ✅ explicit version, reproducible
+import _ from "lodash"             // ⚠️ latest, bisa berubah di run berikut
+```
+
 ### Alias Expansion
 
 `envman run myapp:deploy` fetches stored args via `GET /api/envman/aliases/resolve/myapp:deploy`,
