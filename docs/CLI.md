@@ -40,7 +40,122 @@ envman logout                                # Remove config file
 envman whoami                                # Show authenticated user
 envman run [-e <source>]... <project>:<alias> # Expand alias + merge extra sources
 envman [options] -- <command>               # Inject vars and run command
+envman daemon <start|stop|status>           # Manage process manager daemon
+envman pm <subcommand>                       # Manage long-running processes (requires daemon)
 ```
+
+## Process Manager (`envman pm`)
+
+Native Bun process manager built into the CLI binary. Single Unix-socket IPC + auth token. Daemon spawn pakai `Bun.spawn detached:true` (POC #37 validated).
+
+### File layout
+
+```
+~/.config/envman/
+  config.json                ← server + token (envman login)
+  daemon.token               ← daemon IPC auth secret (0600, auto-generated)
+  run/
+    daemon.pid               ← O_EXCL + start_epoch (PID-hijack guard)
+    daemon.sock              ← unix socket mode 0600
+    daemon.log               ← daemon's own stdout/stderr
+    processes.json           ← persisted state (atomic write tmp+rename)
+    processes.json.bak       ← previous state backup
+    logs/<name>-<id>.{out,err}.log   ← per-process logs, rotated 10MB × 5, gzipped
+```
+
+### Daemon
+
+```bash
+envman daemon start    # Spawn detached daemon, wait ready (5s timeout)
+envman daemon stop     # Graceful shutdown via IPC
+envman daemon status   # Show uptime, pid, version, processCount
+```
+
+### Process management
+
+```bash
+# Start managed process
+envman pm start --name api -- bun index.js
+envman pm start --name web --cwd /srv/app -- bun start
+envman pm start --name worker -e PORT=3000 -- node worker.js
+
+# Start with envman server env (sync-able)
+envman pm start --name api -s myapp:production -- bun index.js
+envman pm start --name api -s myapp:base -s myapp:prod -- bun index.js  # later wins
+envman pm start --name api -s myapp:prod -s .env.local -- bun index.js  # file source
+
+# Inspection
+envman pm ls                      # Table view (ANSI colored status)
+envman pm describe <name>         # Detail view (PID, uptime, env hash, etc)
+envman pm logs <name>             # Snapshot last 100 lines (out + err)
+envman pm logs <name> -f          # Follow live (SSE stream)
+envman pm logs <name> -n 500 --out # Custom count, stdout only
+
+# Lifecycle
+envman pm restart <name>          # Stop + start atomic
+envman pm stop <name>             # SIGTERM → SIGKILL after 5s
+envman pm reset <name>            # Reset quarantine flag
+envman pm delete <name>           # Stop + remove from management
+
+# Persistence
+envman pm save                    # Force persist state to disk
+                                  # (auto-save debounced 1s on each change)
+
+# Env sync from envman server
+envman pm sync                    # Re-fetch env for all processes dengan envSources
+envman pm sync <name>             # Sync hanya satu process
+envman pm sync --dry-run          # Report changes without restarting
+```
+
+### Supervisor behavior
+
+| Behavior | Default |
+|---|---|
+| Auto-restart on crash | enabled |
+| Restart backoff | exponential 1s → 60s cap, reset setelah 10s uptime |
+| Crash-loop quarantine | 5 restarts dalam 60s → `quarantined` |
+| SIGTERM kill timeout | 5s → escalate ke SIGKILL |
+| Env inherit | explicit allowlist: PATH, HOME, LANG, LC_*, TERM, TZ, USER, SHELL, LOGNAME |
+| Env strip always | ENVMAN_TOKEN, ENVMAN_SERVER, ENVMAN_PM_HOME |
+| Env metadata | ENVMAN_PM_ID, ENVMAN_PM_NAME injected |
+| Log rotation | 10MB × 5 files, oldest gzipped background |
+| State save | atomic tmp+rename, .bak fallback, both corrupt = refuse start |
+| Resurrect on daemon start | kill orphan child + respawn (no adopt) |
+
+### Audit trail
+
+Daemon mengirim event lifecycle ke server envman via `POST /api/envman/pm/audit`:
+
+- `PM_DAEMON_STARTED`, `PM_DAEMON_STOPPED`
+- `PM_PROCESS_STARTED`, `PM_PROCESS_STOPPED`, `PM_PROCESS_RESTARTED`, `PM_PROCESS_DELETED`
+- `PM_SYNC_TRIGGERED`
+
+Event tampil di dashboard envman → audit logs view. Fire-and-forget (kegagalan tidak mengganggu lifecycle).
+
+### Auth model (defense-in-depth)
+
+1. **Primary**: socket file `chmod 0600` — kernel-enforced UID gating
+2. **Secondary**: header token `X-Envman-Daemon-Auth` di setiap request (constant-time compare)
+
+POC #39 confirmed Bun belum expose SO_PEERCRED. Kombinasi 1+2 cukup untuk threat model personal/self-host.
+
+### Daemon control via API
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/v1/daemon/health` | uptime, pid, version, processCount, diskFull |
+| `POST` | `/v1/daemon/shutdown` | graceful shutdown (drain in-flight) |
+| `POST` | `/v1/process/start` | spawn new |
+| `GET` | `/v1/process` | list all |
+| `GET` | `/v1/process/:id` | detail |
+| `POST` | `/v1/process/:id/{stop,restart,reset}` | lifecycle |
+| `DELETE` | `/v1/process/:id` | remove |
+| `GET` | `/v1/process/:id/logs/tail` | snapshot last 100 (out + err) |
+| `GET` | `/v1/process/:id/logs/stream` | SSE live tail |
+| `POST` | `/v1/state/save` | force persist |
+| `POST` | `/v1/sync` | re-fetch env from server, restart changed |
+
+
 
 ### File Execution
 

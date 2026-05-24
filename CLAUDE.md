@@ -155,6 +155,21 @@ guard `assertTestDb()` (refuse non-test DB).
 - `Bun.file()` — static file serving in production
 - `crypto.randomUUID()` — session tokens
 
+## Process Manager (envman pm)
+
+Native Bun process manager built-in to CLI binary. Tidak wrap PM2/bm2 — own implementation.
+File di `src/pm/{shared,daemon,cli}/`, tests di `tests/pm/`. Daemon socket di
+`~/.config/envman/run/daemon.sock` (chmod 0600 + header token auth).
+
+Quick reference:
+- `envman daemon start|stop|status` — kelola daemon
+- `envman pm start --name X [-s project:env]... -- <cmd>` — start managed process
+- `envman pm {ls,describe,stop,restart,delete,reset,save,sync,logs} <name>` — lifecycle
+- Audit endpoint: `POST /api/envman/pm/audit` (lihat `src/routes/envman/pm-audit.ts`)
+
+Lihat @docs/CLI.md section "Process Manager" untuk usage detail dan @docs/PROCESS-MANAGER-PLAN.md
+untuk arsitektur lengkap (50+ bug mitigations terdokumentasi).
+
 ## Detail Docs
 
 - @docs/API.md — all API endpoints (Admin, Tickets, Envman, Auth, WebSocket)
@@ -165,6 +180,7 @@ guard `assertTestDb()` (refuse non-test DB).
 - @docs/AI-CONTRACT.md — aturan kerja AI di repo ini (wajib dibaca sebelum edit kode)
 - @docs/PERFORMANCE.md — panduan performa per layer: runtime, caching, bundle, infra (agnostik, bisa diterapkan di project serupa)
 - @docs/PRISMA7-MIGRATION.md — audit lengkap migrasi Prisma 6 → 7: breaking changes, solusi, potensi bug, urutan eksekusi
+- @docs/PROCESS-MANAGER-PLAN.md — perencanaan lengkap fitur envman pm: arsitektur, 50+ bug catalog + mitigasi, 7 fase implementasi
 
 ## Scaling Roadmap
 

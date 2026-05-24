@@ -561,6 +561,8 @@ USAGE:
   envman run [-e <source>]... <project>:<alias> [args...]  Expand alias + passthrough args
   envman [options] -- <command>                Inject env vars and run command
   envman -- <interpreter> <project>:<path/file.ext>  Execute project file (no -e needed)
+  envman daemon <start|stop|status>            Manage the process manager daemon
+  envman pm <start|stop|ls|restart|...>        Manage long-running processes (requires daemon)
 
 OPTIONS:
   -e <project>:<env>   Fetch vars from server environment (project:env)
@@ -683,6 +685,23 @@ async function main() {
     case 'whoami': await cmdWhoami(); return
     case 'update': await cmdUpdate(); return
     case 'run':    await cmdAlias(args.slice(1)); return
+    case 'daemon': {
+      const { cmdDaemon } = await import('./pm/cli/daemon-control')
+      await cmdDaemon(args.slice(1)); return
+    }
+    case 'pm': {
+      const { cmdPm } = await import('./pm/cli/pm-commands')
+      await cmdPm(args.slice(1)); return
+    }
+    case 'daemon-internal': {
+      // Hidden subcommand — di-spawn oleh `envman daemon start`.
+      // Tidak boleh dipanggil user secara langsung.
+      const { runDaemon } = await import('./pm/daemon/main')
+      await runDaemon()
+      // runDaemon tidak return — daemon hidup terus sampai signal.
+      // Tapi defensif: kalau kembali, exit error.
+      return
+    }
   }
 
   // Run mode — collect all flags before --
