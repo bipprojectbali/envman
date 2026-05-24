@@ -13,6 +13,7 @@ import { ticketTools } from './tools/tickets'
 import { aliasReadonlyTools, aliasAdminTools } from './tools/aliases'
 import { fileReadonlyTools, fileAdminTools } from './tools/files'
 import { pmReadonlyTools, pmAdminTools } from './tools/pm'
+import { mcpAuditTools } from './tools/mcp-audit'
 import type { McpScope, ToolModule } from './tools/shared'
 
 export type { McpScope }
@@ -27,6 +28,7 @@ const READONLY_MODULES: ToolModule[] = [
   aliasReadonlyTools,
   fileReadonlyTools,
   pmReadonlyTools,
+  mcpAuditTools,
 ]
 
 const ADMIN_MODULES: ToolModule[] = [

@@ -42,6 +42,7 @@ envman run [-e <source>]... <project>:<alias> # Expand alias + merge extra sourc
 envman [options] -- <command>               # Inject vars and run command
 envman pm daemon <start|stop|status>        # Manage pm daemon (supervisor)
 envman pm <subcommand>                       # Manage long-running processes
+envman mcp [--write] [--debug]               # MCP server for AI agents (Claude Code)
 ```
 
 ## Process Manager (`envman pm`)
@@ -267,3 +268,96 @@ envman -e .env.local -e myapp:production -- bun dev
 # Auth from local file (ENVMAN_SERVER/TOKEN inside .env.local)
 envman -e .env.local -e myapp:production -- bun dev
 ```
+
+## MCP Server (`envman mcp`)
+
+Stdio MCP (Model Context Protocol) server built into the CLI binary. Primary client: **Claude Code**. Lets AI agents introspect and operate envman without shell exec.
+
+### Setup with Claude Code
+
+Add to `.mcp.json` (project-scoped) or `~/.claude/mcp.json` (global):
+
+```json
+{
+  "mcpServers": {
+    "envman": {
+      "command": "envman",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+For write access (mutate vars, start/stop pm processes):
+
+```json
+{
+  "mcpServers": {
+    "envman": {
+      "command": "envman",
+      "args": ["mcp", "--write"]
+    }
+  }
+}
+```
+
+Token resolution (highest priority first):
+1. `ENVMAN_SERVER` + `ENVMAN_TOKEN` env vars (can set per-MCP via `"env": {...}` in mcp.json)
+2. `~/.config/envman/config.json` (from `envman login`)
+
+### Tools
+
+**Readonly (always loaded)** — 15 tools:
+
+- `whoami`, `server_info` — identity + MCP server self-description
+- `projects_list`, `project_get` — project discovery
+- `vars_list`, `vars_export`, `vars_diff` — environment variables (secrets masked by default)
+- `aliases_list`, `alias_resolve` — CLI aliases
+- `files_list`, `file_resolve` — project files (scripts)
+- `pm_daemon_status`, `pm_list`, `pm_describe`, `pm_logs` — pm daemon introspection
+
+**Write (requires `--write` AND token canWrite=true)** — 13 tools:
+
+- `var_set`, `var_delete` — environment variables
+- `alias_create`, `alias_update`, `alias_delete` — CLI aliases
+- `file_create` — project files
+- `pm_start`, `pm_stop`, `pm_restart`, `pm_reset`, `pm_delete`, `pm_sync` — process lifecycle
+- `pm_daemon_start`, `pm_daemon_stop` — daemon control
+
+All write tool calls emit `MCP_*` audit events to the envman server (visible in dashboard audit log with AI badge).
+
+### Tool annotations (for Claude Code approval UX)
+
+| Annotation | Effect |
+|---|---|
+| `readOnlyHint: true` | Eligible for auto-approve (user-configurable in Claude Code) |
+| `destructiveHint: true` | Always-ask in approval prompt |
+| `idempotentHint: true` | Claude may retry on transient failure |
+| `openWorldHint: true` | Tool reaches an external system (envman server) |
+
+Destructive tools: `var_delete`, `alias_delete`, `pm_delete`, `pm_daemon_stop`.
+
+### Security
+
+- Token resolution = same as CLI; MCP server does not generate or store credentials
+- `vars_export` defaults to masked secrets — pass `revealSecrets: true` for plaintext (audit logged)
+- All write tool calls audited (action prefix `MCP_*`)
+- Server name `envman-mcp-server` advertised to client
+- Stdout reserved for JSON-RPC; logs go to stderr (logger redacts `Bearer` + `em_*` tokens)
+
+### Troubleshooting
+
+```bash
+# Smoke test (manual)
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}' \
+  | envman mcp 2>/dev/null
+
+# Verbose logging
+envman mcp --debug
+
+# Version + help
+envman mcp --version
+envman mcp --help
+```
+
+Logs always go to stderr — safe to redirect (`2>~/envman-mcp.log`) without breaking the protocol.

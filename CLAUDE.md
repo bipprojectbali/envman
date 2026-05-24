@@ -170,6 +170,21 @@ Quick reference:
 Lihat @docs/CLI.md section "Process Manager" untuk usage detail dan @docs/PROCESS-MANAGER-PLAN.md
 untuk arsitektur lengkap (50+ bug mitigations terdokumentasi).
 
+## MCP Server (envman mcp)
+
+Stdio MCP server built-in untuk Claude Code (dan agent MCP-compatible lain). File di
+`src/mcp/`, tests di `tests/mcp/`. Reuses CLI auth chain — token resolution dari
+`ENVMAN_SERVER`/`ENVMAN_TOKEN` env atau `~/.config/envman/config.json`.
+
+Quick reference:
+- `envman mcp` — readonly MCP server (15 tools: projects/vars/aliases/files/pm introspection)
+- `envman mcp --write` — full mode (+13 tools: var_set, pm_start, dll), butuh token `canWrite=true`
+- Setup di `.mcp.json`: `{ "mcpServers": { "envman": { "command": "envman", "args": ["mcp"] } } }`
+- Audit endpoint: `POST /api/envman/mcp/audit` (lihat `src/routes/envman/mcp-audit.ts`)
+
+Lihat @docs/CLI.md section "MCP Server" untuk usage detail dan @docs/MCP-SERVER-PLAN.md
+untuk arsitektur lengkap (60+ bug mitigations terdokumentasi).
+
 ## Detail Docs
 
 - @docs/API.md — all API endpoints (Admin, Tickets, Envman, Auth, WebSocket)
