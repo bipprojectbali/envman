@@ -6,6 +6,7 @@
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { randomBytes } from 'crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { projectsModule } from '../../src/mcp/tools/projects'
 import { varsReadModule } from '../../src/mcp/tools/vars'
@@ -103,7 +104,7 @@ async function callTool(server: McpServer, name: string, args: unknown = {}): Pr
 let mock: MockState
 let server: McpServer
 const ctx = {
-  cfg: { server: '', token: 'test-token-mock' },
+  cfg: { server: '', token: randomBytes(16).toString('hex') },
   writeEnabled: false,
   hasDaemon: false,
 }
