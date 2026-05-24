@@ -41,7 +41,12 @@ function statusColor(status: string): string {
 
 function printTable(processes: ProcessSnapshot[]): void {
   if (processes.length === 0) {
-    console.log('No processes managed. Start one with: envman pm start "<cmd>" --name <name>')
+    console.log('No processes managed. Start one with:')
+    console.log('  envman pm start "<cmd>" --name <name>          (PM2 style)')
+    console.log('  envman pm start --name <name> -- <cmd>         (envman style)')
+    console.log('Examples:')
+    console.log('  envman pm start "bun index.js" --name api')
+    console.log('  envman pm start --name worker -s myapp:prod -- node worker.js')
     return
   }
 
@@ -76,24 +81,79 @@ function printTable(processes: ProcessSnapshot[]): void {
   }
 }
 
+/** Flag yang punya value di arg berikutnya (untuk parser positional detection) */
+const FLAGS_WITH_VALUE = new Set(['--name', '-n', '--cwd', '-e', '-s', '--source'])
+
+function printStartUsage(reason?: string): void {
+  if (reason) {
+    console.error(reason)
+    console.error('')
+  }
+  console.error('Usage:')
+  console.error('  envman pm start "<cmd args>" --name <n> [flags]       (PM2-style)')
+  console.error('  envman pm start --name <n> [flags] -- <cmd> [args]    (envman-style)')
+  console.error('')
+  console.error('Flags:')
+  console.error('  --name, -n <name>     Process name (required, unique, alphanumeric + - _)')
+  console.error('  --cwd <path>          Working directory')
+  console.error('  -e KEY=VAL            Static env var (repeatable)')
+  console.error('  -s, --source <ref>    Env source: "project:env" (envman) or path file (repeatable)')
+  console.error('')
+  console.error('Examples:')
+  console.error('  envman pm start "bun index.js" --name api')
+  console.error('  envman pm start --name api -- bun index.js')
+  console.error('  envman pm start "node server.js --port 3000" --name web --cwd /srv/app')
+  console.error('  envman pm start --name worker -s myapp:prod -e LOG=debug -- bun worker.ts')
+}
+
 export async function cmdPmStart(args: string[]): Promise<void> {
-  // Parse: envman pm start [--name N] [--cwd path] [-e KEY=VAL]... [-s source]... -- <cmd>
-  // -s source bisa berupa "project:env" (envman) atau path file
-  // -e KEY=VAL adalah static env (sama dengan -e di docker run)
+  // Dua bentuk supported:
+  //   1. PM2 style:    envman pm start "<cmd args>" --name X [flags]
+  //   2. envman style: envman pm start --name X [flags] -- <cmd> [args]
+  //
+  // Detection: kalau ada `--` separator → envman style. Kalau tidak → PM2 style
+  // (cari positional pertama, split by whitespace).
   let name = ''
   let cwd: string | undefined
   const staticEnv: Record<string, string> = {}
   const envSources: EnvSource[] = []
   let i = 0
   const command: string[] = []
+  let flagArgs: string[]
 
   const sepIdx = args.indexOf('--')
-  if (sepIdx === -1) {
-    console.error("Missing -- separator. Usage: envman pm start --name <n> [-s project:env]... -- <cmd>")
-    process.exit(1)
+  if (sepIdx !== -1) {
+    // envman style — flags sebelum --, command sesudah
+    flagArgs = args.slice(0, sepIdx)
+    command.push(...args.slice(sepIdx + 1))
+  } else {
+    // PM2 style — cari positional pertama (non-flag, bukan value dari flag)
+    let positionalIdx = -1
+    let j = 0
+    while (j < args.length) {
+      const a = args[j]
+      if (a.startsWith('-')) {
+        if (FLAGS_WITH_VALUE.has(a)) j += 2  // skip flag + value
+        else j++
+      } else {
+        positionalIdx = j
+        break
+      }
+    }
+    if (positionalIdx === -1) {
+      printStartUsage('No command provided')
+      process.exit(1)
+    }
+    const cmdStr = args[positionalIdx]
+    if (!cmdStr.trim()) {
+      printStartUsage('Empty command string')
+      process.exit(1)
+    }
+    // Split by whitespace — PM2 behavior. User yang butuh quoting kompleks pakai envman style (--).
+    command.push(...cmdStr.split(/\s+/).filter(Boolean))
+    // Sisanya = flags (exclude the positional we consumed)
+    flagArgs = args.filter((_, idx) => idx !== positionalIdx)
   }
-  const flagArgs = args.slice(0, sepIdx)
-  command.push(...args.slice(sepIdx + 1))
 
   while (i < flagArgs.length) {
     const flag = flagArgs[i]
@@ -129,11 +189,11 @@ export async function cmdPmStart(args: string[]): Promise<void> {
   }
 
   if (!name) {
-    console.error("--name is required. Usage: envman pm start --name <n> -- <cmd>")
+    printStartUsage('--name is required')
     process.exit(1)
   }
   if (command.length === 0) {
-    console.error("Missing command after --")
+    printStartUsage('Empty command')
     process.exit(1)
   }
 
@@ -446,7 +506,8 @@ export async function cmdPm(args: string[]): Promise<void> {
       case '--help':
       case '-h':
         console.log('Usage:')
-        console.log('  envman pm start --name <n> -- <cmd> [arg...]   Start a new managed process')
+        console.log('  envman pm start "<cmd>" --name <n>             Start (PM2 style — single quoted command)')
+        console.log('  envman pm start --name <n> -- <cmd> [args]     Start (envman style — -- separator)')
         console.log('  envman pm ls                                    List all managed processes')
         console.log('  envman pm describe <name>                       Show process detail')
         console.log('  envman pm logs <name> [-f] [-n N] [--out|--err]  Tail process logs')
