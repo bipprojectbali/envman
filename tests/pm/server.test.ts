@@ -2,18 +2,23 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, statSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import { randomBytes } from 'crypto'
 import { Server } from '../../src/pm/daemon/server'
 import { Router, okResponse } from '../../src/pm/daemon/router'
 import { AUTH_HEADER } from '../../src/pm/shared/token'
+
+const newToken = () => randomBytes(32).toString('hex')
 
 describe('Server', () => {
   let tmpDir: string
   let socketPath: string
   let server: Server | null = null
+  let token: string
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'envman-srv-'))
     socketPath = join(tmpDir, 'daemon.sock')
+    token = newToken()
   })
 
   afterEach(async () => {
@@ -31,7 +36,7 @@ describe('Server', () => {
   test('binds socket and sets mode 0600', async () => {
     const router = new Router()
     router.add('GET', '/ping', (ctx) => okResponse({ pong: true }, ctx.requestId))
-    server = new Server({ socketPath, token: 'test-token-1234567890', router })
+    server = new Server({ socketPath, token, router })
     await server.start()
 
     expect(existsSync(socketPath)).toBe(true)
@@ -42,7 +47,7 @@ describe('Server', () => {
   test('rejects request without auth header', async () => {
     const router = new Router()
     router.add('GET', '/ping', (ctx) => okResponse({}, ctx.requestId))
-    server = new Server({ socketPath, token: 'secret-token-1234567890', router })
+    server = new Server({ socketPath, token, router })
     await server.start()
 
     const res = await fetchSocket('/ping')
@@ -54,11 +59,11 @@ describe('Server', () => {
   test('rejects wrong auth token', async () => {
     const router = new Router()
     router.add('GET', '/ping', (ctx) => okResponse({}, ctx.requestId))
-    server = new Server({ socketPath, token: 'right-token-1234567890', router })
+    server = new Server({ socketPath, token, router })
     await server.start()
 
     const res = await fetchSocket('/ping', {
-      headers: { [AUTH_HEADER]: 'wrong-token' },
+      headers: { [AUTH_HEADER]: newToken() },
     })
     expect(res.status).toBe(401)
   })
@@ -66,7 +71,6 @@ describe('Server', () => {
   test('accepts correct auth token', async () => {
     const router = new Router()
     router.add('GET', '/ping', (ctx) => okResponse({ pong: true }, ctx.requestId))
-    const token = 'correct-secret-token-1234567890'
     server = new Server({ socketPath, token, router })
     await server.start()
 
@@ -85,7 +89,7 @@ describe('Server', () => {
 
     const router = new Router()
     router.add('GET', '/ping', (ctx) => okResponse({}, ctx.requestId))
-    server = new Server({ socketPath, token: 'token-1234567890', router })
+    server = new Server({ socketPath, token, router })
     await server.start()
 
     // Server harus replace file dengan socket beneran
@@ -94,14 +98,14 @@ describe('Server', () => {
     expect(mode).toBe(0o600)
     // Socket must be functional
     const res = await fetchSocket('/ping', {
-      headers: { [AUTH_HEADER]: 'token-1234567890' },
+      headers: { [AUTH_HEADER]: token },
     })
     expect(res.status).toBe(200)
   })
 
   test('stop removes socket file', async () => {
     const router = new Router()
-    server = new Server({ socketPath, token: 'token-1234567890', router })
+    server = new Server({ socketPath, token, router })
     await server.start()
     await server.stop(1000)
     server = null
