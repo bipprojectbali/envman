@@ -3,6 +3,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { ToolContext, ToolModule } from './shared'
 import { metaModule } from './tools/meta'
+import { projectsModule } from './tools/projects'
+import { varsReadModule } from './tools/vars'
+import { aliasesReadModule } from './tools/aliases'
+import { filesReadModule } from './tools/files'
+import { pmReadonlyModule } from './tools/pm-readonly'
 import { log } from './logger'
 
 export interface ServerOpts {
@@ -18,8 +23,15 @@ export interface ServerOpts {
 export function buildServer(opts: ServerOpts, ctx: ToolContext): McpServer {
   const server = new McpServer({ name: opts.name, version: opts.version })
 
-  const modules: ToolModule[] = [metaModule]
-  // Phase 1+ will append more modules conditionally based on ctx
+  const modules: ToolModule[] = [
+    metaModule,
+    projectsModule,
+    varsReadModule,
+    aliasesReadModule,
+    filesReadModule,
+    pmReadonlyModule,
+  ]
+  // Phase 2 will append write modules here conditionally on ctx.writeEnabled
 
   for (const mod of modules) {
     mod.register(server, ctx)

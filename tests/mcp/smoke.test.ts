@@ -171,6 +171,28 @@ describe('MCP server smoke test', () => {
         canWrite: true,
         scopes: [],
       }),
+      'GET /api/envman/projects': () => ({
+        projects: [
+          { id: 'p1', slug: 'myapp', name: 'My App', description: null, tags: ['web'], myRole: 'OWNER', environments: [{ name: 'dev' }, { name: 'prod' }], members: [] },
+          { id: 'p2', slug: 'other', name: 'Other', description: 'desc', tags: [], myRole: 'EDITOR', environments: [], members: [] },
+        ],
+      }),
+      'GET /api/envman/projects/myapp': () => ({
+        project: { id: 'p1', slug: 'myapp', name: 'My App', tags: [], myRole: 'OWNER', members: [], environments: [{ name: 'dev', _count: { vars: 5 } }] },
+      }),
+      'GET /api/envman/projects/myapp/environments/dev/vars?limit=50&offset=0': () => ({
+        vars: [
+          { id: 'v1', key: 'PORT', value: '3000', isSecret: false, isDisabled: false, updatedAt: '2026-05-01T00:00:00Z' },
+          { id: 'v2', key: 'API_KEY', value: '***', isSecret: true, isDisabled: false, updatedAt: '2026-05-01T00:00:00Z' },
+        ],
+        total: 2, limit: 50, offset: 0, hasMore: false,
+      }),
+      'GET /api/envman/projects/myapp/aliases': () => ({
+        aliases: [{ id: 'a1', name: 'deploy', args: '-e myapp:prod -- bash deploy.sh', description: null, tags: [] }],
+      }),
+      'GET /api/envman/projects/myapp/files': () => ({
+        files: [{ id: 'f1', title: 'Deploy script', prefix: 'deploy', tags: [], files: [{ filename: 'deploy.sh', language: 'bash' }] }],
+      }),
     })
   })
 
