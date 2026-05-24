@@ -563,6 +563,7 @@ USAGE:
   envman -- <interpreter> <project>:<path/file.ext>  Execute project file (no -e needed)
   envman pm daemon <start|stop|status>         Manage the pm daemon (supervisor)
   envman pm <start|stop|ls|restart|...>        Manage long-running processes
+  envman mcp [--write] [--debug]               Start MCP server for AI agents (Claude Code)
 
 OPTIONS:
   -e <project>:<env>   Fetch vars from server environment (project:env)
@@ -688,6 +689,10 @@ async function main() {
     case 'pm': {
       const { cmdPm } = await import('./pm/cli/pm-commands')
       await cmdPm(args.slice(1)); return
+    }
+    case 'mcp': {
+      const { runMcpServer } = await import('./mcp')
+      await runMcpServer(args.slice(1)); return
     }
     case 'daemon-internal': {
       // Hidden subcommand — di-spawn oleh `envman daemon start`.
