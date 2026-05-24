@@ -20,7 +20,7 @@ const FileCreateInputSchema = z.object({
   title: z.string().min(1).max(255).describe('Human-readable title for this file entry.'),
   description: z.string().optional(),
   prefix: z.string().min(1).max(128).optional()
-    .describe('Prefix slug for CLI reference (e.g., "deploy" → files:deploy/...). Must be unique per project.'),
+    .describe('Prefix slug for CLI reference. Used in canonical "<slug>:<prefix>/<filename>" syntax (e.g., prefix="deploy" → "envman -- bash myapp:deploy/script.sh"). Must be unique per project.'),
   files: z.array(FileEntrySchema).min(1).describe('One or more files in this entry.'),
   tags: z.array(z.string()).optional(),
 }).strict()

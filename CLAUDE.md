@@ -155,6 +155,47 @@ guard `assertTestDb()` (refuse non-test DB).
 - `Bun.file()` — static file serving in production
 - `crypto.randomUUID()` — session tokens
 
+## File Execution Syntax (Ketetapan Mutlak)
+
+Script di ProjectFiles (table `ProjectFile`) bisa di-execute langsung dari CLI tanpa write ke disk — content di-pipe ke stdin interpreter.
+
+### Canonical syntax — WAJIB dipakai di code baru, examples, docs
+
+```bash
+envman -- bash myapp:scripts/deploy.sh        # slug:prefix/file.ext
+envman -- bun myapp:utils/seed.ts              # slug embedded di arg, tanpa -e
+envman -e myapp:prod -- bash myapp:scripts/deploy.sh   # dengan env injection
+```
+
+Format: `slug:prefix/filename.ext` — slug eksplisit di arg, **tidak butuh** `-e` source untuk resolve.
+
+### Disambiguasi `slug:env` vs `slug:path`
+
+Setelah colon: ada `/` ATAU ada extension → **file reference**. Tidak ada `/` dan tidak ada extension → **environment name** (untuk `-e`).
+
+### Legacy syntax (`files:`) — JANGAN PAKAI di code baru
+
+```bash
+# JANGAN: outdated, hanya didukung untuk backward compat
+envman -e open-marina:dev -- bash files:deploy
+envman -- bash files:open-marina/deploy/deploy.sh
+```
+
+Server + CLI tetap support karena ada alias historis. Tapi **semua dokumentasi, MCP tool descriptions, examples, dan alias args baru WAJIB pakai canonical `slug:prefix/file` syntax**.
+
+### Larangan
+
+- ❌ Jangan tulis `files:X` di description MCP tool — Claude akan belajar pattern lama
+- ❌ Jangan tulis `files:X` di alias args baru — confuse user yang baca history
+- ❌ Jangan dokumentasikan `files:` sebagai "alternative" tanpa label jelas "legacy"
+
+### Behavior runtime (untuk konteks AI saat fix bug)
+
+- Single-file entry → stdin pipe (zero disk write)
+- Multi-file entry dengan filename → stdin pipe file itu (cross-file imports BELUM didukung — open question)
+- Interpreter tidak support stdin → temp file 0600, cleanup on exit
+- npm imports → Bun pakai `--install=fallback` ke global cache (~/.bun/install/cache)
+
 ## Process Manager (envman pm)
 
 Native Bun process manager built-in to CLI binary. Tidak wrap PM2/bm2 — own implementation.

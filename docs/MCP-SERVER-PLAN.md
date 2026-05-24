@@ -703,7 +703,7 @@ Scenarios:
 1. List my projects → harus return semua project yang user akses
 2. Compare PORT antara myapp:dev dan myapp:prod
 3. Why is api-server crashing → pm_describe + pm_logs
-4. Create alias `myapp:deploy` with args `-- bash files:deploy.sh`
+4. Create alias `myapp:deploy` with args `-- bash myapp:scripts/deploy.sh` (canonical `slug:prefix/file` syntax)
 5. Sync env after I update DATABASE_URL → pm_sync
 6. Revoke wrong token + retry → expect graceful error
 

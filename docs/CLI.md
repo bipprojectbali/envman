@@ -160,37 +160,46 @@ POC #39 confirmed Bun belum expose SO_PEERCRED. Kombinasi 1+2 cukup untuk threat
 
 ### File Execution
 
-Script di ProjectFiles bisa dieksekusi langsung dari CLI tanpa menyimpan ke disk — konten di-pipe ke stdin interpreter:
+Script di ProjectFiles bisa dieksekusi langsung dari CLI tanpa menyimpan ke disk — konten di-pipe ke stdin interpreter.
+
+#### Canonical syntax (WAJIB dipakai)
+
+Format `slug:prefix/file.ext` — slug eksplisit di command arg, tidak perlu `-e` source untuk resolve.
 
 ```bash
-# Syntax baru: slug:path/file.ext — tidak perlu -e, slug embedded di arg
+# Tanpa env injection
 envman -- bash myapp:scripts/deploy.sh
 envman -- bun myapp:utils/seed.ts
 
-# Dengan inject env vars sekaligus
+# Dengan env injection sekaligus
 envman -e myapp:production -- bash myapp:scripts/deploy.sh
 
-# Syntax lama (files:) — tetap didukung
-envman -e open-marina:dev -- bash files:deploy        # prefix, project dari -e
-envman -e open-marina:dev -- bun files:ts-utils/migrate.ts
-envman -- bash files:open-marina/deploy/deploy.sh     # explicit slug di files:
-
 # Via alias
-envman run open-marina:dev
-# stored: -e open-marina:dev -- bash myapp:scripts/deploy.sh
+envman run myapp:deploy
+# stored: -e myapp:production -- bash myapp:scripts/deploy.sh
 ```
 
-**Format referensi (command arg setelah --):**
+**Format reference:**
 
-| Syntax | Keterangan |
-|--------|-----------|
-| `slug:prefix/file.ext` | Slug eksplisit, ada `/` → **file** |
-| `slug:file.ext` | Slug eksplisit, ada extension → **file** |
-| `slug:env` | Tidak ada `/` dan tidak ada extension → **environment** (untuk -e) |
-| `files:prefix[/file]` | Lama, project diinfer dari `-e project:env` |
-| `files:slug/prefix[/file]` | Lama, slug eksplisit |
+| Syntax | Arti |
+|--------|------|
+| `slug:prefix/file.ext` | File di multi-file entry (slug eksplisit, ada `/` → file) |
+| `slug:file.ext` | File di single-file entry (slug eksplisit, ada extension → file) |
+| `slug:env` | Environment name (untuk `-e`; tidak ada `/` dan tidak ada extension) |
 
-**Disambiguasi `slug:env` vs `slug:path`:** cukup lihat bagian setelah colon — ada `/` atau ada extension → file reference; sisanya → environment name.
+**Disambiguasi `slug:env` vs `slug:path`:** lihat bagian setelah colon — ada `/` ATAU ada extension → file reference; sisanya → environment name.
+
+#### Legacy syntax (`files:` prefix) — DEPRECATED
+
+Backward compat saja. **Jangan dipakai di alias args baru, doc baru, atau MCP tool descriptions.**
+
+```bash
+# JANGAN — outdated:
+envman -e open-marina:dev -- bash files:deploy
+envman -- bash files:open-marina/deploy/deploy.sh
+```
+
+Server + CLI tetap parse format ini karena ada alias historis di production. Tidak akan dihapus untuk waktu dekat, tapi tidak ada feature baru di sini — semua improvement masuk ke canonical syntax.
 
 **Interpreter support (zero disk write via stdin):** `bash`, `sh`, `zsh`, `bun`, `node`, `python3`, `python`, `deno`. Interpreter lain: fallback ke temp file dengan permission `0600`, dihapus segera setelah eksekusi.
 

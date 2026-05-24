@@ -60,7 +60,7 @@ ERRORS:
 
 NOTES:
   - Each entry can contain multiple files. Use file_resolve to fetch content.
-  - "prefix" is used in CLI invocations (e.g., \`files:deploy/script.sh\`).`
+  - "prefix" is used in CLI invocations using canonical \`<slug>:<prefix>/<filename>\` syntax (e.g., \`envman -- bash myapp:deploy/script.sh\`). The legacy \`files:\` prefix is deprecated.`
 
 const RESOLVE_DESCRIPTION = `Fetch content of a specific file by prefix (+ optional filename). Used by CLI to pipe scripts to interpreters at runtime.
 

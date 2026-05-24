@@ -11,7 +11,7 @@ const AliasCreateInputSchema = z.object({
   slug: SlugRef,
   name: AliasName.describe('Alias name — will be slugified server-side.'),
   args: z.string().min(1, 'args must not be empty')
-    .describe('CLI args this alias expands to (e.g., "-e myapp:prod -- bash files:deploy.sh").'),
+    .describe('CLI args this alias expands to (e.g., "-e myapp:prod -- bash myapp:scripts/deploy.sh"). Use canonical "slug:prefix/file.ext" syntax for file refs — legacy "files:" prefix is deprecated.'),
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
 }).strict()
@@ -52,7 +52,7 @@ RETURNS:
   - alias: created alias object
 
 EXAMPLES:
-  - alias_create({ slug: "myapp", name: "deploy", args: "-e myapp:prod -- bash files:deploy.sh" })
+  - alias_create({ slug: "myapp", name: "deploy", args: "-e myapp:prod -- bash myapp:scripts/deploy.sh" })
 
 ERRORS:
   - 403: OWNER role required

@@ -50,8 +50,9 @@ ERRORS:
   - 403: no access to this project
 
 NOTES:
-  - Aliases store the CLI args string (e.g., "-e myapp:prod -- bash files:deploy.sh").
-  - Use alias_resolve to get expanded args for an alias.`
+  - Aliases store the CLI args string (e.g., "-e myapp:prod -- bash myapp:scripts/deploy.sh").
+  - Use alias_resolve to get expanded args for an alias.
+  - File refs use canonical "slug:prefix/file.ext" syntax. The legacy "files:" prefix is deprecated — do not generate it in new aliases.`
 
 const RESOLVE_DESCRIPTION = `Resolve a "slug:aliasName" reference to its stored args. Used by CLI internally for \`envman run\`.
 
@@ -59,7 +60,7 @@ ARGS:
   - ref: "slug:aliasName" string (e.g., "myapp:deploy")
 
 RETURNS:
-  - args: the stored CLI args (e.g., "-e myapp:prod -- bash files:deploy.sh")
+  - args: the stored CLI args (e.g., "-e myapp:prod -- bash myapp:scripts/deploy.sh")
   - project: slug
   - alias: alias name
 
