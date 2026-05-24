@@ -809,3 +809,4 @@ Fitur opt-in. Tidak ubah behavior existing CLI/server.
 | Tanggal | Versi | Perubahan |
 |---|---|---|
 | 2026-05-24 | v1 (draft) | Initial plan, ready for review |
+| 2026-05-24 | v2.0 | **MVP COMPLETE**. Phase 0-3 selesai dalam 1 sesi (AI pair). 242/242 MCP tests pass + 580/580 full suite. 28 tools total (15 readonly + 13 write). Server endpoint `/api/envman/mcp/audit` dengan 16-action allowlist. Contract test 190 assertions snapshot tool surface. Chaos tests verify stdout purity, 401 cache invalidation, schema strict rejection, error redaction. CLI: `envman mcp [--write] [--debug] [--version] [--help]`. Smoke test spawn binary, JSON-RPC handshake under 1s. Mitigasi 60+ bug terverifikasi: B1 (stdout pure), B4 (stdin EOF graceful), B5 (unhandledRejection no exit), A1 (non-exit auth), E1-E4 (typed errors mapped), Sec3 (audit fire-and-forget). |

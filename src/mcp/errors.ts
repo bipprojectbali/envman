@@ -43,7 +43,9 @@ function safeBody(body: string): string {
   // Redact known token patterns and truncate
   const cleaned = body
     .replace(/em_[a-f0-9]{16,}/gi, 'em_***')
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer ***')
     .replace(/"token"\s*:\s*"[^"]+"/gi, '"token":"***"')
+    .replace(/"password"\s*:\s*"[^"]+"/gi, '"password":"***"')
   return cleaned.length > REDACT_LIMIT ? cleaned.slice(0, REDACT_LIMIT) + '...' : cleaned
 }
 
