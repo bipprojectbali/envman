@@ -9,6 +9,7 @@ import { gistsRouter } from './gists'
 import { databaseRouter } from './database'
 import { adminUsersRouter } from './admin-users'
 import { pmAuditRouter } from './pm-audit'
+import { mcpAuditRouter } from './mcp-audit'
 
 // Misc envman routes (status, whoami, user lookup)
 import { prisma } from '../../lib/db'
@@ -59,3 +60,4 @@ export const envmanRouter = new Elysia()
   .use(databaseRouter)
   .use(adminUsersRouter)
   .use(pmAuditRouter)
+  .use(mcpAuditRouter)

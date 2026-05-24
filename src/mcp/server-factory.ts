@@ -8,6 +8,10 @@ import { varsReadModule } from './tools/vars'
 import { aliasesReadModule } from './tools/aliases'
 import { filesReadModule } from './tools/files'
 import { pmReadonlyModule } from './tools/pm-readonly'
+import { varsWriteModule } from './tools/vars-write'
+import { aliasesWriteModule } from './tools/aliases-write'
+import { filesWriteModule } from './tools/files-write'
+import { pmWriteModule } from './tools/pm-write'
 import { log } from './logger'
 
 export interface ServerOpts {
@@ -31,7 +35,9 @@ export function buildServer(opts: ServerOpts, ctx: ToolContext): McpServer {
     filesReadModule,
     pmReadonlyModule,
   ]
-  // Phase 2 will append write modules here conditionally on ctx.writeEnabled
+  if (ctx.writeEnabled) {
+    modules.push(varsWriteModule, aliasesWriteModule, filesWriteModule, pmWriteModule)
+  }
 
   for (const mod of modules) {
     mod.register(server, ctx)
