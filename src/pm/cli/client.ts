@@ -12,7 +12,7 @@ import type { ApiError } from '../shared/types'
 
 export class DaemonNotRunningError extends Error {
   constructor() {
-    super('Daemon is not running. Start with: envman daemon start')
+    super('Daemon is not running. Start with: envman pm daemon start')
   }
 }
 

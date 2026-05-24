@@ -162,7 +162,7 @@ File di `src/pm/{shared,daemon,cli}/`, tests di `tests/pm/`. Daemon socket di
 `~/.config/envman/run/daemon.sock` (chmod 0600 + header token auth).
 
 Quick reference:
-- `envman daemon start|stop|status` — kelola daemon
+- `envman pm daemon start|stop|status` — kelola daemon (supervisor)
 - `envman pm start --name X [-s project:env]... -- <cmd>` — start managed process
 - `envman pm {ls,describe,stop,restart,delete,reset,save,sync,logs} <name>` — lifecycle
 - Audit endpoint: `POST /api/envman/pm/audit` (lihat `src/routes/envman/pm-audit.ts`)

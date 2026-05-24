@@ -40,8 +40,8 @@ envman logout                                # Remove config file
 envman whoami                                # Show authenticated user
 envman run [-e <source>]... <project>:<alias> # Expand alias + merge extra sources
 envman [options] -- <command>               # Inject vars and run command
-envman daemon <start|stop|status>           # Manage process manager daemon
-envman pm <subcommand>                       # Manage long-running processes (requires daemon)
+envman pm daemon <start|stop|status>        # Manage pm daemon (supervisor)
+envman pm <subcommand>                       # Manage long-running processes
 ```
 
 ## Process Manager (`envman pm`)
@@ -66,9 +66,9 @@ Native Bun process manager built into the CLI binary. Single Unix-socket IPC + a
 ### Daemon
 
 ```bash
-envman daemon start    # Spawn detached daemon, wait ready (5s timeout)
-envman daemon stop     # Graceful shutdown via IPC
-envman daemon status   # Show uptime, pid, version, processCount
+envman pm daemon start    # Spawn detached daemon, wait ready (5s timeout)
+envman pm daemon stop     # Graceful shutdown via IPC
+envman pm daemon status   # Show uptime, pid, version, processCount
 ```
 
 ### Process management

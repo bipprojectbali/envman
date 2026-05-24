@@ -489,6 +489,10 @@ export async function cmdPm(args: string[]): Promise<void> {
   const sub = args[0]
   try {
     switch (sub) {
+      case 'daemon': {
+        const { cmdDaemon } = await import('./daemon-control')
+        await cmdDaemon(args.slice(1)); return
+      }
       case 'start':    await cmdPmStart(args.slice(1)); return
       case 'stop':     await cmdPmStop(args.slice(1)); return
       case 'restart':  await cmdPmRestart(args.slice(1)); return
@@ -506,6 +510,8 @@ export async function cmdPm(args: string[]): Promise<void> {
       case '--help':
       case '-h':
         console.log('Usage:')
+        console.log('  envman pm daemon <start|stop|status>            Manage the pm daemon (supervisor)')
+        console.log('')
         console.log('  envman pm start "<cmd>" --name <n>             Start (PM2 style — single quoted command)')
         console.log('  envman pm start --name <n> -- <cmd> [args]     Start (envman style — -- separator)')
         console.log('  envman pm ls                                    List all managed processes')

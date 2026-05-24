@@ -207,13 +207,13 @@ export async function cmdDaemon(args: string[]): Promise<void> {
     case '--help':
     case '-h':
       console.log('Usage:')
-      console.log('  envman daemon start   Start the process manager daemon')
-      console.log('  envman daemon stop    Stop the daemon (graceful)')
-      console.log('  envman daemon status  Show daemon status + uptime')
+      console.log('  envman pm daemon start   Start the process manager daemon')
+      console.log('  envman pm daemon stop    Stop the daemon (graceful)')
+      console.log('  envman pm daemon status  Show daemon status + uptime')
       return
     default:
       console.error(`Unknown daemon subcommand: ${sub}`)
-      console.error("Run 'envman daemon --help' for usage")
+      console.error("Run 'envman pm daemon --help' for usage")
       process.exit(1)
   }
 }

@@ -33,13 +33,13 @@ describe('daemon lifecycle', () => {
 
   afterEach(async () => {
     // best-effort stop
-    runCli(['daemon', 'stop'], home, 5000)
+    runCli(['pm', 'daemon', 'stop'], home, 5000)
     rmSync(home, { recursive: true, force: true })
   })
 
   test('full cycle: start → status → stop', async () => {
     // 1. start
-    const startResult = runCli(['daemon', 'start'], home)
+    const startResult = runCli(['pm', 'daemon', 'start'], home)
     expect(startResult.status).toBe(0)
     expect(startResult.stdout).toContain('Daemon ready')
 
@@ -58,7 +58,7 @@ describe('daemon lifecycle', () => {
     expect(tokenMode).toBe(0o600)
 
     // 3. status returns running
-    const statusResult = runCli(['daemon', 'status'], home)
+    const statusResult = runCli(['pm', 'daemon', 'status'], home)
     expect(statusResult.status).toBe(0)
     expect(statusResult.stdout).toContain('Daemon: running')
 
@@ -73,7 +73,7 @@ describe('daemon lifecycle', () => {
     expect(health.diskFull).toBe(false)
 
     // 5. stop
-    const stopResult = runCli(['daemon', 'stop'], home)
+    const stopResult = runCli(['pm', 'daemon', 'stop'], home)
     expect(stopResult.status).toBe(0)
     expect(stopResult.stdout).toContain('Daemon stopped')
 
@@ -83,26 +83,26 @@ describe('daemon lifecycle', () => {
   })
 
   test('double start is idempotent', async () => {
-    runCli(['daemon', 'start'], home)
-    const second = runCli(['daemon', 'start'], home)
+    runCli(['pm', 'daemon', 'start'], home)
+    const second = runCli(['pm', 'daemon', 'start'], home)
     expect(second.status).toBe(0)
     expect(second.stdout).toContain('already running')
   })
 
   test('status when stopped', () => {
-    const result = runCli(['daemon', 'status'], home)
+    const result = runCli(['pm', 'daemon', 'status'], home)
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('stopped')
   })
 
   test('stop when not running', () => {
-    const result = runCli(['daemon', 'stop'], home)
+    const result = runCli(['pm', 'daemon', 'stop'], home)
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('not running')
   })
 
   test('survives kill -9 → restart cleans up stale state', async () => {
-    runCli(['daemon', 'start'], home)
+    runCli(['pm', 'daemon', 'start'], home)
     // Read PID
     const fs = require('fs')
     const pid = parseInt(fs.readFileSync(join(home, 'run', 'daemon.pid'), 'utf8').split('\n')[0], 10)
@@ -115,14 +115,14 @@ describe('daemon lifecycle', () => {
     await new Promise(r => setTimeout(r, 200))
 
     // Restart should detect dead PID and clean up
-    const restartResult = runCli(['daemon', 'start'], home)
+    const restartResult = runCli(['pm', 'daemon', 'start'], home)
     expect(restartResult.status).toBe(0)
     expect(restartResult.stdout).toContain('Daemon ready')
     expect(restartResult.stdout).toContain('Cleaning up stale')
   })
 
   test('rejects invalid auth token via IPC', async () => {
-    runCli(['daemon', 'start'], home)
+    runCli(['pm', 'daemon', 'start'], home)
     const sockPath = join(home, 'run', 'daemon.sock')
 
     const client = new DaemonClient({ socketPath: sockPath, tokenOverride: 'wrong-token' })
@@ -137,7 +137,7 @@ describe('daemon lifecycle', () => {
   })
 
   test('rejects unknown route with 404', async () => {
-    runCli(['daemon', 'start'], home)
+    runCli(['pm', 'daemon', 'start'], home)
     const sockPath = join(home, 'run', 'daemon.sock')
     const tokenPath = join(home, 'daemon.token')
 
