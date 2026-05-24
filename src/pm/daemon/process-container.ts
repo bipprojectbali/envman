@@ -22,6 +22,24 @@ import {
 import { LogWriter } from './log-writer'
 import { LogTailer } from './log-tailer'
 
+/**
+ * Kirim signal ke seluruh process group (negative PID).
+ * Child di-spawn dengan detached:true di doSpawn() → child = pgroup leader.
+ * Signal ke -pid kena child + semua descendant dalam group.
+ *
+ * Fallback ke single-pid kill kalau pgkill error (mis. group sudah empty).
+ * Ignore ESRCH (process already dead) — idempotent.
+ */
+function killGroup(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal)
+  } catch (e: any) {
+    if (e.code === 'ESRCH') return  // group empty / no longer exists
+    // Fallback: coba kill single pid (mungkin detached failed dan child di-spawn flat)
+    try { process.kill(pid, signal) } catch {}
+  }
+}
+
 export type ProcessStatus =
   | 'starting'      // proses sedang spawn / belum minUptime
   | 'online'        // proses jalan stabil
@@ -177,28 +195,22 @@ export class ProcessContainer {
         return
       }
 
-      // Kirim SIGTERM, race dengan timeout
-      try {
-        proc.kill('SIGTERM')
-      } catch {
-        // process mungkin sudah mati
-      }
+      // Kirim SIGTERM ke PROCESS GROUP (negative PID) untuk kena seluruh tree
+      // (parent + grandchildren). Process group dibuat via detached:true di doSpawn.
+      // Fallback ke single-pid kill kalau pgkill error (mis. ESRCH = sudah mati).
+      killGroup(proc.pid, 'SIGTERM')
 
       const timeoutP = new Promise<'timeout'>(r => setTimeout(() => r('timeout'), this.options.killTimeoutMs))
       const exitedP = proc.exited.then(() => 'exited' as const)
       const winner = await Promise.race([exitedP, timeoutP])
 
       if (winner === 'timeout') {
-        log.warn('SIGTERM timeout, sending SIGKILL', {
+        log.warn('SIGTERM timeout, sending SIGKILL to group', {
           name: this.config.name,
           pid: proc.pid,
           timeoutMs: this.options.killTimeoutMs,
         })
-        try {
-          proc.kill('SIGKILL')
-        } catch {
-          // ignore
-        }
+        killGroup(proc.pid, 'SIGKILL')
         // Wait briefly for kernel to reap
         await Promise.race([proc.exited, new Promise(r => setTimeout(r, 500))])
       }
@@ -291,12 +303,16 @@ export class ProcessContainer {
     })
 
     try {
+      // detached:true → child = new session + new process group leader.
+      // Mengaktifkan kill -PGID di stop() untuk kena seluruh tree (P7 mitigation).
+      // POC #41 confirmed: bash -c 'sleep & wait' + kill(-PGID) → bash + sleep both dead.
       this.subprocess = Bun.spawn(this.config.command, {
         cwd: this.config.cwd,
         env,
         stdout: 'pipe',
         stderr: 'pipe',
         stdin: 'ignore',
+        detached: true,
       })
     } catch (e: any) {
       this.status = 'errored'

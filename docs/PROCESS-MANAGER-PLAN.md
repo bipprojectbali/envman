@@ -175,7 +175,7 @@ Disusun per kategori. **Setiap bug yang ditemukan di bm2 di-mitigasi eksplisit, 
 | P4 | Zombie children kalau daemon crash | Acceptable: di Linux PID1=systemd reap. Di macOS launchd. Untuk envman use case (user shell), tidak masalah. |
 | P5 | Daemon's `process.env` leak ke child (bm2 leak semua env) | **Explicit allowlist** untuk inherited env: `PATH`, `HOME`, `LANG`, `LC_*`, `TZ`, `USER`, `SHELL`, `TERM`. Lainnya **strip**. Child env = `[allowlist] + [resolved sources] + [ENVMAN_PM_ID, ENVMAN_PM_NAME]`. **Strip `ENVMAN_TOKEN`, `ENVMAN_SERVER`**. |
 | P6 | Force kill timeout race antara `process.exited` dan `setTimeout` | Adopt pola bm2 (yang sudah benar): `Promise.race([process.exited, sleep(killTimeoutMs)])`, kalau timeout → SIGKILL. |
-| P7 | `treeKill` pakai `pgrep` subprocess (bm2 `utils.ts:97`) lambat + Linux-only | MVP: tidak treeKill. Phase 2+: cross-platform via `/proc/<pid>/task/<tid>/children` (Linux) + `ps -o pid,ppid -ax` (macOS). |
+| P7 | `treeKill` pakai `pgrep` subprocess (bm2 `utils.ts:97`) lambat + Linux-only | ✅ ADDRESSED via **process group kill**: child di-spawn dengan `detached: true` (POC #41 confirmed), `stop()` kirim signal ke `process.kill(-pid, sig)` → kena seluruh tree atomic (kernel-enforced, no race). Tidak butuh `pgrep`/`ps` parsing, tidak platform-specific. |
 | P8 | Watch mode trigger restart storm (bm2 sudah debounce 1s) | Adopt: debounce file watch events 1 detik. |
 
 ### 3.4 Log Management
@@ -670,7 +670,7 @@ Semua bug class dari Section 3 catalog ter-cover di code dengan inline jsdoc ref
 |---|---|---|
 | D — Daemon lifecycle | D1-D7 | ✅ all addressed |
 | I — IPC | I1-I5 | ✅ all addressed |
-| P — Process supervisor | P1-P6, P8 | ✅ (P7 treeKill deferred — acceptable trade-off) |
+| P — Process supervisor | P1-P8 | ✅ all addressed (P7 via process group kill, POC #41 + 3 chaos tests) |
 | L — Log management | L1-L8 | ✅ all addressed |
 | S — State persistence | S1-S4 | ✅ all addressed |
 | E — Env integration | E1-E6 | ✅ all addressed |
@@ -738,3 +738,4 @@ ENVMAN_PM_HOME=/tmp/envman-linux-test bun src/cli.ts daemon stop
 | 2026-05-24 | v1 (draft) | Initial plan, approved, ready for Phase 0 POC |
 | 2026-05-24 | v1.1 | Phase 0 POC selesai (4/4). Hasil di Section 11. Section 2.3 + D6 + I1 di-update: drop SO_PEERCRED (tidak supported di Bun), pakai chmod 0600 + header token saja. |
 | 2026-05-24 | v2.0 | **MVP COMPLETE**. Phase 1-5 + 7 selesai dalam 1 sesi (estimasi awal 22-28 hari → aktual 1 hari karena AI pair programming). 160/160 tests pass. Lihat Section 12 untuk completion summary. |
+| 2026-05-24 | v2.1 | **P7 addressed via process group kill** (Opsi A). Child spawn `detached:true`, stop pakai `process.kill(-pid, sig)`. +5 chaos tests (`tests/pm/tree-kill-and-zombies.test.ts`): multi-grandchild kill, SIGKILL escalation untuk trap TERM, 30-cycle no-zombie. Total: 165/165 tests. POC #41 di `scripts/poc/pm/41-process-group.ts`. |
