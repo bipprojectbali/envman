@@ -1,6 +1,6 @@
 # Process Manager (envman pm) — Plan & Bug Mitigation
 
-Status: **Draft v1 — Plan Approved**. Belum mulai implementasi (menunggu hasil Phase 0 POC).
+Status: **MVP IMPLEMENTED** — Phase 0-5 + 7 selesai. 160/160 tests pass. Branch `feature/pm`.
 
 Dokumen ini adalah single source of truth untuk fitur `envman pm` (process manager native). Setiap keputusan, mitigasi bug, dan urutan kerja didokumentasikan di sini agar implementasi tidak ada surprise.
 
@@ -608,9 +608,133 @@ Dijalankan 2026-05-24 di macOS arm64 dengan Bun v1.3.14. POC scripts di `scripts
 
 ---
 
-## 12. Changelog Plan
+## 12. Completion Summary (MVP v2.0 — 2026-05-24)
+
+### Yang sudah dikerjakan
+
+| Phase | Status | Commit |
+|---|---|---|
+| Phase 0 — POC | ✅ Selesai 4/4 | `5d01c47` |
+| Phase 1 — Daemon Skeleton | ✅ Selesai 61 tests | (Phase 1 commit) |
+| Phase 2 — Process Supervisor | ✅ Selesai +39 tests | (Phase 2 commit) |
+| Phase 3 — Log Management | ✅ Selesai +26 tests | (Phase 3 commit) |
+| Phase 4 — State Persistence | ✅ Selesai +12 tests | (Phase 4 commit) |
+| Phase 5 — envman Integration | ✅ Selesai +22 tests | (Phase 5 commit) |
+| Phase 6 — Web UI | ⏸️ Deferred (per K2) | — |
+| Phase 7 — Docs + MCP | ✅ docs + MCP tools selesai | (Phase 7 commit) |
+
+**Total**: 160/160 tests pass. Typecheck clean. Smoke test end-to-end verified untuk start/stop/restart/logs/save/sync/resurrect.
+
+### File structure final
+
+```
+src/pm/
+  shared/
+    paths.ts            — file paths (~/.config/envman/run/)
+    token.ts            — daemon auth token + safeEqual
+    types.ts            — DaemonHealth, ApiResponse, ErrorCode
+  daemon/
+    pidfile.ts          — O_EXCL atomic + PID+start_epoch validation
+    server.ts           — Bun.serve unix + chmod 0600 + auth middleware
+    router.ts           — path matching + JSON body + 1MB limit
+    logger.ts           — structured stdout logging
+    backoff.ts          — exponential + sliding window quarantine
+    env-resolver.ts     — allowlist inherit + strip secrets
+    process-container.ts — state machine per child + signal handling
+    process-manager.ts  — collection + audit hook + auto-save trigger
+    log-writer.ts       — O_APPEND fd + remainder buffer (bm2 L2 fix)
+    log-rotator.ts      — size-based N-shifting + background gzip atomic
+    log-tailer.ts       — multi-subscriber SSE + tailFile pure JS
+    state-store.ts      — atomic tmp+rename + .bak fallback + schema version
+    resurrect.ts        — orphan detection + kill + respawn
+    envman-client.ts    — HTTP client ke envman server (retry + 401 handling)
+    env-syncer.ts       — source resolve + diff + restart-on-change
+    main.ts             — daemon entry point (semua wiring di sini)
+  cli/
+    client.ts           — IPC client (HTTP over unix socket)
+    daemon-control.ts   — envman daemon start/stop/status
+    pm-commands.ts      — envman pm start/stop/ls/logs/sync/save/...
+
+tests/pm/                — 14 test files, 160 tests, no fixtures (in-memory)
+scripts/poc/pm/          — 4 POC scripts + run-all.sh
+scripts/mcp/tools/pm.ts  — readonly + admin tools untuk Claude MCP
+
+src/routes/envman/pm-audit.ts — server endpoint untuk audit events
+```
+
+### Bug mitigations addressed (50+)
+
+Semua bug class dari Section 3 catalog ter-cover di code dengan inline jsdoc reference:
+
+| Class | Items | Status |
+|---|---|---|
+| D — Daemon lifecycle | D1-D7 | ✅ all addressed |
+| I — IPC | I1-I5 | ✅ all addressed |
+| P — Process supervisor | P1-P6, P8 | ✅ (P7 treeKill deferred — acceptable trade-off) |
+| L — Log management | L1-L8 | ✅ all addressed |
+| S — State persistence | S1-S4 | ✅ all addressed |
+| E — Env integration | E1-E6 | ✅ all addressed |
+| R — Race conditions | R1-R3 | ✅ all addressed |
+| RL — Resource leaks | RL1-RL4 | ✅ all addressed |
+| C — Cross-platform | C1-C4 | ✅ (Linux validation TBD via run-all.sh) |
+
+### Yang belum (Phase 6 + advanced features)
+
+Tidak masuk MVP — bisa dibangun nanti kalau perlu:
+
+- Web UI tab "Processes" di project detail
+- Cluster mode (Bun.serve reusePort)
+- Prometheus metrics export
+- Health check via custom command (HTTP only saat ini)
+- Cron-style scheduling
+- File watch mode untuk auto-restart on code change
+- treeKill subprocess hierarchy (acceptable: child fork = child's responsibility)
+
+### Validasi Linux yang harus dilakukan
+
+POC #37 (Bun.spawn detached) divalidasi di macOS. Behavior di Linux Debian/Ubuntu diharapkan
+identik karena POSIX-standard, tapi harus tetap diverifikasi:
+
+```bash
+git checkout feature/pm
+bash scripts/poc/pm/run-all.sh
+# → output ke /tmp/poc-report-<timestamp>.txt
+```
+
+Selain itu run full test suite:
+
+```bash
+bun test tests/pm/
+# Expected: 160 pass, 0 fail
+```
+
+Plus smoke test daemon lifecycle:
+
+```bash
+ENVMAN_PM_HOME=/tmp/envman-linux-test bun src/cli.ts daemon start
+ENVMAN_PM_HOME=/tmp/envman-linux-test bun src/cli.ts pm start --name test -- sleep 30
+ENVMAN_PM_HOME=/tmp/envman-linux-test bun src/cli.ts pm ls
+ENVMAN_PM_HOME=/tmp/envman-linux-test bun src/cli.ts daemon stop
+```
+
+### Lessons learned
+
+1. **POC dulu pays off**. 1 hari riset menemukan bahwa Bun's `detached: true` cukup tanpa `setsid` wrapper, SO_PEERCRED tidak supported (drop dari design), macOS FSEvents agresif coalesce (hybrid approach diperlukan). Ketiga finding ini menghemat ~3 hari debug saat implementasi.
+
+2. **bm2 study material bagus** — codebase kecil, Bun-native, semua pattern relevant. Tapi ada 5+ bugs yang ditemukan dari source code review (broken remainder buffer, non-atomic state write, PID-number signal, dll) yang semuanya di-mitigasi di envman pm.
+
+3. **Test discipline membantu**. 160 tests berarti refactor aman. Bug `LogWriter.close() set closed=true sebelum flush` ketangkap segera oleh test 'multiple chunks with mixed boundaries' — andai tidak ada test, bug ini hanya akan muncul saat user delete process dengan partial line di buffer.
+
+4. **Schema versioning sejak awal** menghindari technical debt nanti. `STATE_SCHEMA_VERSION = 1` + migration function chain siap untuk perubahan struct future.
+
+5. **Defense-in-depth tetap relevant** meski beberapa layer tidak available di Bun (SO_PEERCRED). `chmod 0600` + header token = sufficient untuk personal/self-host threat model.
+
+---
+
+## 13. Changelog Plan
 
 | Tanggal | Versi | Perubahan |
 |---|---|---|
 | 2026-05-24 | v1 (draft) | Initial plan, approved, ready for Phase 0 POC |
 | 2026-05-24 | v1.1 | Phase 0 POC selesai (4/4). Hasil di Section 11. Section 2.3 + D6 + I1 di-update: drop SO_PEERCRED (tidak supported di Bun), pakai chmod 0600 + header token saja. |
+| 2026-05-24 | v2.0 | **MVP COMPLETE**. Phase 1-5 + 7 selesai dalam 1 sesi (estimasi awal 22-28 hari → aktual 1 hari karena AI pair programming). 160/160 tests pass. Lihat Section 12 untuk completion summary. |

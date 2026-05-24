@@ -12,6 +12,7 @@ import { redisTools } from './tools/redis'
 import { ticketTools } from './tools/tickets'
 import { aliasReadonlyTools, aliasAdminTools } from './tools/aliases'
 import { fileReadonlyTools, fileAdminTools } from './tools/files'
+import { pmReadonlyTools, pmAdminTools } from './tools/pm'
 import type { McpScope, ToolModule } from './tools/shared'
 
 export type { McpScope }
@@ -25,6 +26,7 @@ const READONLY_MODULES: ToolModule[] = [
   codeTools,
   aliasReadonlyTools,
   fileReadonlyTools,
+  pmReadonlyTools,
 ]
 
 const ADMIN_MODULES: ToolModule[] = [
@@ -36,6 +38,7 @@ const ADMIN_MODULES: ToolModule[] = [
   ticketTools,
   aliasAdminTools,
   fileAdminTools,
+  pmAdminTools,
 ]
 
 export function createMcpServer(scope: McpScope = 'admin'): McpServer {
