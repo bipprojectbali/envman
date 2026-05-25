@@ -121,7 +121,7 @@ const HOVER_STYLES = `
 }
 .envman-token-card:not(.is-disabled):not(.is-expired):hover {
   transform: translateY(-1px);
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
   box-shadow: var(--mantine-shadow-sm);
 }
 `
@@ -142,7 +142,7 @@ function ScopeBadge({ scope, size = 'xs' }: { scope: string; size?: 'xs' | 'sm' 
         <Badge
           size={size}
           variant="dot"
-          color="violet"
+          color="primary"
           style={{ fontFamily: 'monospace', cursor: 'pointer' }}
         >
           {scope}
@@ -200,7 +200,7 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
         withBorder p="xs"
         style={{
           cursor: allAccess ? 'default' : 'pointer',
-          borderColor: allAccess ? 'var(--mantine-color-violet-5)' : undefined,
+          borderColor: allAccess ? 'var(--mantine-color-primary)' : undefined,
           background: allAccess ? 'var(--mantine-color-violet-light)' : undefined,
         }}
         onClick={() => { if (!allAccess) onChange([]) }}
@@ -237,10 +237,10 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
                 onChange={() => toggleProject(p)}
                 onClick={e => { e.stopPropagation(); toggleProject(p) }}
               />
-              <TbVariable size={13} style={{ color: 'var(--mantine-color-violet-6)' }} />
+              <TbVariable size={13} style={{ color: 'var(--mantine-color-primary)' }} />
               <Text size="xs" fw={600} style={{ flex: 1 }}>{p.name}</Text>
               <Code fz="xs" c="dimmed">{p.slug}</Code>
-              {selectedCount > 0 && <Badge size="xs" color="violet" variant="filled">{selectedCount}/{projectScopes.length}</Badge>}
+              {selectedCount > 0 && <Badge size="xs" color="primary" variant="filled">{selectedCount}/{projectScopes.length}</Badge>}
               {p.environments.length > 0 && (isOpen ? <TbChevronDown size={13} /> : <TbChevronRight size={13} />)}
             </Group>
 
@@ -573,7 +573,7 @@ function TokensPage() {
                   key={days}
                   size="compact-xs"
                   variant={f.expiresAt === val ? 'filled' : 'default'}
-                  color="violet"
+                  color="primary"
                   leftSection={<TbCalendar size={11} />}
                   onClick={() => setF(x => ({ ...x, expiresAt: x.expiresAt === val ? '' : val }))}
                 >
@@ -632,7 +632,7 @@ function TokensPage() {
             </Tooltip>
           )}
           {canCreateToken && (
-            <Button size="sm" leftSection={<TbPlus size={14} />} color="violet" radius="md" onClick={openCreate}>
+            <Button size="sm" leftSection={<TbPlus size={14} />} color="primary" radius="md" onClick={openCreate}>
               Buat Token
             </Button>
           )}
@@ -833,7 +833,7 @@ function TokensPage() {
         )
       ) : !isError && tokens.length === 0 ? (
         <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
-          <ThemeIcon size={48} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
+          <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
             <TbKey size={24} />
           </ThemeIcon>
           <Text fw={600} mb={4}>Belum ada API token</Text>
@@ -842,7 +842,7 @@ function TokensPage() {
             Cocok untuk CI/CD pipeline, deploy script, atau development di laptop pribadi.
           </Text>
           {canCreateToken ? (
-            <Button size="sm" color="violet" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+            <Button size="sm" color="primary" leftSection={<TbPlus size={14} />} onClick={openCreate}>
               Buat Token Pertama
             </Button>
           ) : (
@@ -1190,7 +1190,7 @@ function TokensPage() {
         fullScreen={isMobile}
         title={
           <Group gap="xs">
-            <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+            <ThemeIcon size={28} variant="gradient" radius="md">
               <TbKey size={15} />
             </ThemeIcon>
             <Box>
@@ -1210,7 +1210,7 @@ function TokensPage() {
               <Badge size="xs" color={form.canWrite ? 'orange' : 'blue'} variant="light" leftSection={form.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
                 {form.canWrite ? 'read-write' : 'read-only'}
               </Badge>
-              <Badge size="xs" color="violet" variant="light">
+              <Badge size="xs" color="primary" variant="light">
                 {form.scopes.length === 0 ? 'semua project' : `${form.scopes.length} scope`}
               </Badge>
               <Badge size="xs" color={form.expiresAt ? 'teal' : 'gray'} variant="light" leftSection={<TbCalendar size={9} />}>
@@ -1223,7 +1223,7 @@ function TokensPage() {
             size="md"
             leftSection={<TbKey size={16} />}
             variant="gradient"
-            gradient={{ from: 'violet', to: 'grape' }}
+           
             onClick={() => createToken.mutate(form)}
             loading={createToken.isPending}
             disabled={!form.name.trim() || createToken.isPending}
@@ -1242,7 +1242,7 @@ function TokensPage() {
         fullScreen={isMobile}
         title={
           <Group gap="xs">
-            <ThemeIcon size={28} variant="light" color="violet" radius="md">
+            <ThemeIcon size={28} variant="light" color="primary" radius="md">
               <TbPencil size={15} />
             </ThemeIcon>
             <Box>
@@ -1261,7 +1261,7 @@ function TokensPage() {
               <Badge size="xs" color={editForm.canWrite ? 'orange' : 'blue'} variant="light" leftSection={editForm.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
                 {editForm.canWrite ? 'read-write' : 'read-only'}
               </Badge>
-              <Badge size="xs" color="violet" variant="light">
+              <Badge size="xs" color="primary" variant="light">
                 {editForm.scopes.length === 0 ? 'semua project' : `${editForm.scopes.length} scope`}
               </Badge>
               <Badge size="xs" color={editForm.expiresAt ? 'teal' : 'gray'} variant="light" leftSection={<TbCalendar size={9} />}>

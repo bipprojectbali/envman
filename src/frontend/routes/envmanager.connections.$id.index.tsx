@@ -498,7 +498,7 @@ function ConnectionDetailPage() {
           <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => navigate({ to: '/envmanager/connections' })}>
             <TbChevronLeft size={16} />
           </ActionIcon>
-          <ThemeIcon size={36} radius="md" variant="gradient" gradient={{ from: 'violet', to: 'grape' }}>
+          <ThemeIcon size={36} radius="md" variant="gradient">
             <TbPlugConnected size={18} />
           </ThemeIcon>
           <Box style={{ minWidth: 0 }}>
@@ -506,7 +506,7 @@ function ConnectionDetailPage() {
               <Text fw={700} size="md" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {connection.name}
               </Text>
-              <Badge size="sm" variant="light" color="violet">{stacks.length} stack</Badge>
+              <Badge size="sm" variant="light" color="primary">{stacks.length} stack</Badge>
             </Group>
             <Group gap="xs">
               <Text size="xs" c="dimmed" ff="monospace">
@@ -528,7 +528,7 @@ function ConnectionDetailPage() {
         <Tabs.List>
           <Tabs.Tab value="stacks" leftSection={<TbServer size={14} />}>
             Stacks
-            {stacks.length > 0 && <Badge size="xs" variant="light" color="violet" ml="xs">{stacks.length}</Badge>}
+            {stacks.length > 0 && <Badge size="xs" variant="light" color="primary" ml="xs">{stacks.length}</Badge>}
           </Tabs.Tab>
           <Tabs.Tab value="maintenance" leftSection={<TbTool size={14} />}>
             Maintenance

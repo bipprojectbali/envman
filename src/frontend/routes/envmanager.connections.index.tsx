@@ -79,13 +79,13 @@ const HOVER_STYLES = `
 }
 .envman-conn-card:hover {
   transform: translateY(-1px);
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
   box-shadow: var(--mantine-shadow-sm);
 }
 .envman-conn-card:focus-visible {
-  outline: 2px solid var(--mantine-color-violet-5);
+  outline: 2px solid var(--mantine-color-primary);
   outline-offset: 2px;
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
 }
 `
 
@@ -249,7 +249,7 @@ function ConnectionsPage() {
       {/* ─── Header ─────────────────────────── */}
       <Group justify="space-between" mb="md" wrap="nowrap" align="flex-start">
         <Group gap="sm" style={{ minWidth: 0 }}>
-          <ThemeIcon size={38} radius="md" variant="light" color="violet">
+          <ThemeIcon size={38} radius="md" variant="light" color="primary">
             <TbPlugConnected size={20} />
           </ThemeIcon>
           <Box style={{ minWidth: 0 }}>
@@ -276,7 +276,7 @@ function ConnectionsPage() {
             </Tooltip>
           )}
           {canManageConnections && (
-            <Button size="sm" leftSection={<TbPlus size={14} />} color="violet" onClick={openCreate}>
+            <Button size="sm" leftSection={<TbPlus size={14} />} color="primary" onClick={openCreate}>
               Add Connection
             </Button>
           )}
@@ -355,7 +355,7 @@ function ConnectionsPage() {
         )
       ) : !isError && connections.length === 0 ? (
         <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
-          <ThemeIcon size={48} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
+          <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
             <TbPlugConnectedX size={24} />
           </ThemeIcon>
           <Text fw={600} mb={4}>Belum ada connection</Text>
@@ -363,7 +363,7 @@ function ConnectionsPage() {
             Tambah Portainer instance yang dapat dipakai semua project untuk auto-sync env vars ke container stack.
           </Text>
           {canManageConnections ? (
-            <Button size="sm" color="violet" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+            <Button size="sm" color="primary" leftSection={<TbPlus size={14} />} onClick={openCreate}>
               Add Connection
             </Button>
           ) : (
@@ -420,7 +420,7 @@ function ConnectionsPage() {
         centered
         title={
           <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="violet" radius="md">
+            <ThemeIcon size="sm" variant="light" color="primary" radius="md">
               <TbPlugConnected size={13} />
             </ThemeIcon>
             <Text fw={600} size="sm">{editTarget ? 'Edit Connection' : 'Tambah Connection'}</Text>
@@ -495,7 +495,7 @@ function ConnectionsPage() {
             <Button variant="subtle" color="gray" onClick={handleClose}>Batal</Button>
             <Button
               leftSection={editTarget ? <TbCheck size={14} /> : <TbPlus size={14} />}
-              color="violet"
+              color="primary"
               loading={saveConnection.isPending}
               disabled={!form.name || !form.portainerUrl || (!editTarget && !form.apiToken)}
               onClick={() => saveConnection.mutate()}
@@ -546,7 +546,7 @@ function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, 
       style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
     >
       <Group justify="space-between" mb="xs" wrap="nowrap">
-        <ThemeIcon size={40} radius="md" variant="light" color="violet">
+        <ThemeIcon size={40} radius="md" variant="light" color="primary">
           <TbPlugConnected size={20} />
         </ThemeIcon>
         {canManage && (
@@ -618,7 +618,7 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
     >
       <Group justify="space-between" wrap="nowrap">
         <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
-          <ThemeIcon size={36} radius="md" variant="light" color="violet">
+          <ThemeIcon size={36} radius="md" variant="light" color="primary">
             <TbPlugConnected size={18} />
           </ThemeIcon>
           <Box style={{ flex: 1, minWidth: 0 }}>

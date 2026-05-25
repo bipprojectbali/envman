@@ -450,7 +450,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               ) : (
                 <Paper withBorder p="sm" radius="md" style={{ background: 'var(--mantine-color-violet-light)', borderColor: 'var(--mantine-color-violet-3)' }}>
                   <Group gap="xs">
-                    <TbPlugConnected size={14} color="var(--mantine-color-violet-6)" />
+                    <TbPlugConnected size={14} color="var(--mantine-color-primary)" />
                     <Text size="xs" c="violet.7" fw={500}>{connections.length} connection siap digunakan</Text>
                   </Group>
                 </Paper>
@@ -460,7 +460,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                 <Group gap="xs">
                   {connections.length > 0 ? (
                     <Button
-                      size="sm" color="violet"
+                      size="sm" color="primary"
                       leftSection={<TbPlugConnected size={14} />}
                       onClick={openSetup}
                     >
@@ -520,7 +520,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                   </Group>
                   <Group gap="xs" wrap="wrap">
                     {config.connectionName && (
-                      <Badge size="xs" variant="dot" color="violet" leftSection={<TbPlugConnected size={9} />}>
+                      <Badge size="xs" variant="dot" color="primary" leftSection={<TbPlugConnected size={9} />}>
                         {config.connectionName}
                       </Badge>
                     )}
@@ -583,7 +583,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                       </Button>
                     </Tooltip>
                     <Button
-                      size="sm" color="violet"
+                      size="sm" color="primary"
                       variant={sync.isPending ? 'filled' : 'light'}
                       leftSection={sync.isPending ? <Loader size={12} color="white" /> : <TbCloudUpload size={14} />}
                       onClick={confirmSync}
@@ -813,7 +813,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
         onClose={handleClose}
         title={
           <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="violet" radius="md"><TbCloud size={13} /></ThemeIcon>
+            <ThemeIcon size="sm" variant="light" color="primary" radius="md"><TbCloud size={13} /></ThemeIcon>
             <Text fw={600} size="sm">{isEditing ? 'Edit Portainer' : 'Hubungkan ke Portainer'}</Text>
           </Group>
         }
@@ -881,7 +881,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               searchable nothingFoundMessage="Stack tidak ditemukan"
             />
             {selectedStack && (
-              <Card withBorder p="sm" radius="md" style={{ borderColor: 'var(--mantine-color-violet-4)' }}>
+              <Card withBorder p="sm" radius="md" style={{ borderColor: 'var(--mantine-color-primary)' }}>
                 <Text size="xs" c="dimmed" mb={6}>Ringkasan</Text>
                 <Stack gap={4}>
                   {[
@@ -933,7 +933,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
             )}
             <Group justify="space-between" mt="xs">
               <Button variant="subtle" size="sm" color="gray" onClick={() => setStep(0)}>← Kembali</Button>
-              <Button size="sm" color="violet" disabled={!selectedStack} loading={saveConfig.isPending}
+              <Button size="sm" color="primary" disabled={!selectedStack} loading={saveConfig.isPending}
                 leftSection={<TbCheck size={14} />} onClick={() => saveConfig.mutate()}>
                 {isEditing ? 'Update' : 'Simpan & Hubungkan'}
               </Button>
@@ -1008,7 +1008,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
 
             {(diff.added.length > 0 || diff.changed.length > 0) && (
               <>
-                <Button fullWidth color="violet" leftSection={<TbCloudUpload size={14} />}
+                <Button fullWidth color="primary" leftSection={<TbCloudUpload size={14} />}
                   onClick={() => { closeDiff(); confirmSync() }}>
                   Lanjut Sync
                 </Button>

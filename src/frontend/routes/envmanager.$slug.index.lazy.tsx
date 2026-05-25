@@ -72,7 +72,7 @@ const envColor: Record<string, string> = {
   testing: 'grape', test: 'grape',
   qa: 'cyan', uat: 'pink',
 }
-const getEnvColor = (name: string) => envColor[name.toLowerCase()] ?? 'violet'
+const getEnvColor = (name: string) => envColor[name.toLowerCase()] ?? 'primary'
 
 const TAG_COLORS = [
   'red', 'pink', 'grape', 'violet', 'indigo', 'blue',
@@ -110,13 +110,13 @@ const HOVER_STYLES = `
 }
 .envman-env-card:hover {
   transform: translateY(-1px);
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
   box-shadow: var(--mantine-shadow-sm);
 }
 .envman-env-card:focus-visible {
-  outline: 2px solid var(--mantine-color-violet-5);
+  outline: 2px solid var(--mantine-color-primary);
   outline-offset: 2px;
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
 }
 `
 
@@ -329,8 +329,8 @@ function ProjectDetailPage() {
         <Paper withBorder radius="lg" p="lg" mb="lg">
           <Group gap="md" wrap="nowrap" align="flex-start">
             <ThemeIcon
-              size={52} radius="lg" variant="gradient"
-              gradient={{ from: `${roleColor[myRole as keyof typeof roleColor] ?? 'gray'}.6`, to: `${roleColor[myRole as keyof typeof roleColor] ?? 'gray'}.4`, deg: 135 }}
+              size={52} radius="lg" variant="light"
+              color={roleColor[myRole as keyof typeof roleColor] ?? 'gray'}
             >
               <TbFolders size={26} />
             </ThemeIcon>
@@ -344,7 +344,7 @@ function ProjectDetailPage() {
                 <Code fz="xs" style={{ flexShrink: 0 }}>{slug}</Code>
                 <Badge
                   size="sm"
-                  variant="filled"
+                  variant="light"
                   color={roleColor[myRole as keyof typeof roleColor] ?? 'gray'}
                   style={{ flexShrink: 0 }}
                 >
@@ -370,7 +370,7 @@ function ProjectDetailPage() {
               <Group gap={0} style={{ borderTop: '1px solid var(--mantine-color-default-border)', paddingTop: 10, marginTop: 4 }}>
                 <Tooltip label={`${envs.length} environment`} withArrow>
                   <Group gap={5} px={12} style={{ cursor: 'default' }}>
-                    <TbVariable size={13} color="var(--mantine-color-violet-5)" />
+                    <TbVariable size={13} color="var(--mantine-color-primary)" />
                     <Text size="xs" fw={600}>{envs.length}</Text>
                     <Text size="xs" c="dimmed">env</Text>
                   </Group>
@@ -416,7 +416,7 @@ function ProjectDetailPage() {
               value="environments"
               leftSection={<TbVariable size={13} />}
               rightSection={!isLoading && envs.length > 0 ? (
-                <Badge size="xs" variant="filled" color="violet" circle>{envs.length}</Badge>
+                <Badge size="xs" variant="light" color="primary" circle>{envs.length}</Badge>
               ) : undefined}
             >
               Environments
@@ -440,7 +440,7 @@ function ProjectDetailPage() {
               </Stack>
             ) : envs.length === 0 ? (
               <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
-                <ThemeIcon size={48} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
+                <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
                   <TbVariable size={24} />
                 </ThemeIcon>
                 <Text fw={600} mb={4}>Belum ada environment</Text>
@@ -563,7 +563,7 @@ function ProjectDetailPage() {
                                 </Text>
                                 <Badge
                                   size="xs"
-                                  variant="filled"
+                                  variant="light"
                                   color={color}
                                   style={{ flexShrink: 0 }}
                                 >
@@ -608,7 +608,7 @@ function ProjectDetailPage() {
                             )}
                             <Button
                               size="xs"
-                              variant="filled"
+                              variant="light"
                               color={color}
                               rightSection={<TbChevronRight size={12} />}
                               onClick={ev => { ev.stopPropagation(); goTo() }}

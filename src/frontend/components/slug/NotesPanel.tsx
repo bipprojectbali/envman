@@ -120,13 +120,13 @@ const HOVER_STYLES = `
 }
 .envman-note-card:hover {
   transform: translateY(-1px);
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
   box-shadow: var(--mantine-shadow-sm);
 }
 .envman-note-card:focus-visible {
-  outline: 2px solid var(--mantine-color-violet-5);
+  outline: 2px solid var(--mantine-color-primary);
   outline-offset: 2px;
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
 }
 .envman-note-pinned {
   background: linear-gradient(180deg, var(--mantine-color-yellow-light) 0%, transparent 24px);
@@ -233,7 +233,7 @@ function NoteCardList({ note, canEdit, isOwner, myUserId, onView, onEdit, onDele
           <Group gap={4} mt={4} wrap="wrap" align="center">
             {note.tags.map(t => (
               <Badge
-                key={t} size="xs" variant="outline" color="violet"
+                key={t} size="xs" variant="outline" color="primary"
                 className="envman-note-tag"
                 onClick={e => { e.stopPropagation(); onTagClick(t) }}
               >
@@ -294,7 +294,7 @@ function NoteCardGrid({ note, canEdit, isOwner, myUserId, onView, onEdit, onDele
       <Group gap={4} mt="xs" wrap="wrap" style={{ marginTop: 'auto' }} align="center">
         {note.tags.slice(0, 3).map(t => (
           <Badge
-            key={t} size="xs" variant="outline" color="violet"
+            key={t} size="xs" variant="outline" color="primary"
             className="envman-note-tag"
             onClick={e => { e.stopPropagation(); onTagClick(t) }}
           >
@@ -541,7 +541,7 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
               </Tooltip>
             </Group>
             {canEdit && canCreate && (
-              <Button type="button" size="xs" color="violet" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
+              <Button type="button" size="xs" color="primary" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
                 New Note
               </Button>
             )}
@@ -600,7 +600,7 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
         )
       ) : !isError && notes.length === 0 ? (
         <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
-          <ThemeIcon size={48} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
+          <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
             <TbNote size={24} />
           </ThemeIcon>
           <Text fw={600} mb={4}>Belum ada notes</Text>
@@ -609,7 +609,7 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
             runbook, atau apapun yang berguna untuk tim. Mendukung Markdown.
           </Text>
           {canEdit && canCreate && (
-            <Button type="button" size="xs" color="violet" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
+            <Button type="button" size="xs" color="primary" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
               Buat Note Pertama
             </Button>
           )}

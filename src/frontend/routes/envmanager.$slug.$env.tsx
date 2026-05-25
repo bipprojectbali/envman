@@ -896,7 +896,7 @@ function VarsPage() {
             if (editingId === v.id) {
               return (
                 <Paper key={v.id} withBorder p="sm" radius="md"
-                  style={{ background: 'var(--mantine-color-violet-light)', borderColor: 'var(--mantine-color-violet-4)' }}
+                  style={{ background: 'var(--mantine-color-violet-light)', borderColor: 'var(--mantine-color-primary)' }}
                 >
                   {/* Key + type toggle */}
                   <Group gap={6} mb="xs" wrap="nowrap">
@@ -934,7 +934,7 @@ function VarsPage() {
                   )}
                   {/* Aksi simpan/batal */}
                   <Group gap="xs" mt="xs" justify="flex-end">
-                    <Button size="sm" variant="filled" color="violet" loading={updateVar.isPending}
+                    <Button size="sm" variant="filled" color="primary" loading={updateVar.isPending}
                       leftSection={<TbCheck size={13} />}
                       onClick={() => updateVar.mutate({ key: v.key, value: editForm.value, isSecret: editForm.isSecret })}>
                       Simpan
@@ -1034,7 +1034,7 @@ function VarsPage() {
                       >
                         {v.isDisabled ? <TbToggleLeft size={17} /> : <TbToggleRight size={17} />}
                       </ActionIcon>
-                      <ActionIcon size={32} variant="subtle" color="violet" onClick={() => startEdit(v)}>
+                      <ActionIcon size={32} variant="subtle" color="primary" onClick={() => startEdit(v)}>
                         <TbPencil size={15} />
                       </ActionIcon>
                       <ActionIcon size={32} variant="subtle" color="red" onClick={() => deleteVar(v.key)}>
@@ -1130,7 +1130,7 @@ function VarsPage() {
                       <Table.Td>
                         <Group gap={4} wrap="nowrap">
                           <Tooltip label="Simpan (Enter)">
-                            <ActionIcon size="sm" variant="filled" color="violet" loading={updateVar.isPending}
+                            <ActionIcon size="sm" variant="filled" color="primary" loading={updateVar.isPending}
                               onClick={() => updateVar.mutate({ key: v.key, value: editForm.value, isSecret: editForm.isSecret })}>
                               <TbCheck size={13} />
                             </ActionIcon>
@@ -1231,7 +1231,7 @@ function VarsPage() {
                               </ActionIcon>
                             </Tooltip>
                             <Tooltip label="Edit">
-                              <ActionIcon size="sm" variant="subtle" color="violet" onClick={() => startEdit(v)}>
+                              <ActionIcon size="sm" variant="subtle" color="primary" onClick={() => startEdit(v)}>
                                 <TbPencil size={13} />
                               </ActionIcon>
                             </Tooltip>
@@ -1358,7 +1358,7 @@ function VarsPage() {
         size="lg"
         title={
           <Group gap="xs" wrap="nowrap">
-            <ThemeIcon size="sm" variant="light" color="violet" radius="sm"><TbPencil size={14} /></ThemeIcon>
+            <ThemeIcon size="sm" variant="light" color="primary" radius="sm"><TbPencil size={14} /></ThemeIcon>
             <Text fw={600} size="sm">Edit .env</Text>
             <Badge size="xs" variant="outline" color="gray" style={{ flexShrink: 0 }}>{slug}:{env}</Badge>
           </Group>

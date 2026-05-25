@@ -156,13 +156,13 @@ const HOVER_STYLES = `
 }
 .envman-gist-card:hover {
   transform: translateY(-1px);
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
   box-shadow: var(--mantine-shadow-sm);
 }
 .envman-gist-card:focus-visible {
-  outline: 2px solid var(--mantine-color-violet-5);
+  outline: 2px solid var(--mantine-color-primary);
   outline-offset: 2px;
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
 }
 .envman-gist-tag {
   cursor: pointer;
@@ -259,7 +259,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
       <Stack gap="xs">
         <Group justify="space-between" align="center">
           <Group gap="xs">
-            <ThemeIcon size={22} radius="md" variant="light" color="violet">
+            <ThemeIcon size={22} radius="md" variant="light" color="primary">
               <TbFileCode size={13} />
             </ThemeIcon>
             <Text size="sm" fw={600}>Files</Text>
@@ -269,7 +269,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
             type="button"
             size="xs"
             variant="light"
-            color="violet"
+            color="primary"
             leftSection={<TbFilePlus size={13} />}
             onClick={addFile}
           >
@@ -454,7 +454,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
               radius="md"
               style={{
                 cursor: 'pointer',
-                borderColor: !isPublic ? 'var(--mantine-color-violet-5)' : undefined,
+                borderColor: !isPublic ? 'var(--mantine-color-primary)' : undefined,
                 background: !isPublic ? 'var(--mantine-color-violet-light)' : undefined,
               }}
               onClick={() => setIsPublic(false)}
@@ -467,7 +467,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
                   <Text size="sm" fw={600}>Private</Text>
                   <Text size="xs" c="dimmed">Hanya kamu yang bisa lihat</Text>
                 </Box>
-                {!isPublic && <TbCheck size={16} color="var(--mantine-color-violet-6)" />}
+                {!isPublic && <TbCheck size={16} color="var(--mantine-color-primary)" />}
               </Group>
             </Card>
             <Card
@@ -476,7 +476,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
               radius="md"
               style={{
                 cursor: 'pointer',
-                borderColor: isPublic ? 'var(--mantine-color-violet-5)' : undefined,
+                borderColor: isPublic ? 'var(--mantine-color-primary)' : undefined,
                 background: isPublic ? 'var(--mantine-color-violet-light)' : undefined,
               }}
               onClick={() => setIsPublic(true)}
@@ -489,7 +489,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
                   <Text size="sm" fw={600}>Public</Text>
                   <Text size="xs" c="dimmed">Semua user envmanager bisa lihat</Text>
                 </Box>
-                {isPublic && <TbCheck size={16} color="var(--mantine-color-violet-6)" />}
+                {isPublic && <TbCheck size={16} color="var(--mantine-color-primary)" />}
               </Group>
             </Card>
           </SimpleGrid>
@@ -513,7 +513,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
             onClick={() => save.mutate()}
             loading={save.isPending}
             disabled={!canSave}
-            color="violet"
+            color="primary"
           >
             {isEditMode ? 'Simpan perubahan' : 'Buat Gist'}
           </Button>
@@ -547,7 +547,7 @@ function GistCard({
     >
       <Group justify="space-between" wrap="nowrap" mb={4}>
         <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-          <ThemeIcon size={28} radius="sm" variant="light" color="violet">
+          <ThemeIcon size={28} radius="sm" variant="light" color="primary">
             <TbBrandGithub size={16} />
           </ThemeIcon>
           <Box style={{ flex: 1, minWidth: 0 }}>
@@ -887,7 +887,7 @@ function GistsPage() {
       {/* Header */}
       <Group mb="md" justify="space-between" wrap="nowrap" align="flex-start">
         <Group gap="sm" style={{ minWidth: 0 }}>
-          <ThemeIcon size={38} radius="md" variant="light" color="violet">
+          <ThemeIcon size={38} radius="md" variant="light" color="primary">
             <TbBrandGithub size={20} />
           </ThemeIcon>
           <Box style={{ minWidth: 0 }}>
@@ -902,7 +902,7 @@ function GistsPage() {
           </Box>
         </Group>
         {canCreateGist && (
-          <Button type="button" size="sm" color="violet" leftSection={<TbPlus size={14} />} onClick={() => setFormModal('new')}>
+          <Button type="button" size="sm" color="primary" leftSection={<TbPlus size={14} />} onClick={() => setFormModal('new')}>
             New Gist
           </Button>
         )}
@@ -923,7 +923,7 @@ function GistsPage() {
                 key={f.value}
                 size="sm"
                 variant={filter === f.value ? 'filled' : 'outline'}
-                color="violet"
+                color="primary"
                 style={{ cursor: 'pointer' }}
                 onClick={() => setFilter(f.value)}
               >
@@ -1039,7 +1039,7 @@ function GistsPage() {
         )
       ) : gists.length === 0 ? (
         <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
-          <ThemeIcon size={48} radius="xl" variant="light" color="violet" mx="auto" mb="sm">
+          <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
             <TbBrandGithub size={24} />
           </ThemeIcon>
           <Text fw={600} mb={4}>Belum ada gists</Text>
@@ -1048,7 +1048,7 @@ function GistsPage() {
             Dukung Markdown, syntax highlighting, dan multi-file.
           </Text>
           {canCreateGist ? (
-            <Button type="button" size="sm" color="violet" leftSection={<TbPlus size={14} />} onClick={() => setFormModal('new')}>
+            <Button type="button" size="sm" color="primary" leftSection={<TbPlus size={14} />} onClick={() => setFormModal('new')}>
               Buat Gist Pertama
             </Button>
           ) : (

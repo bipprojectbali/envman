@@ -139,7 +139,7 @@ function UsersPage() {
   return (
     <Stack gap="lg" p="md">
       <Group gap="sm">
-        <ThemeIcon size={36} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+        <ThemeIcon size={36} variant="gradient" radius="md">
           <TbUsers size={20} />
         </ThemeIcon>
         <div>
@@ -206,9 +206,9 @@ function UsersPage() {
                   </Table.Td>
                   <Table.Td ta="right">
                     {u.role === 'SUPER_ADMIN' ? (
-                      <Badge size="xs" color="violet" variant="light">all</Badge>
+                      <Badge size="xs" color="primary" variant="light">all</Badge>
                     ) : u.permissions.length > 0 ? (
-                      <Badge size="xs" color="violet" variant="light">{u.permissions.length}</Badge>
+                      <Badge size="xs" color="primary" variant="light">{u.permissions.length}</Badge>
                     ) : (
                       <Text size="xs" c="dimmed">—</Text>
                     )}
@@ -235,7 +235,7 @@ function UsersPage() {
         padding="md"
         title={
           <Group gap="xs">
-            <ThemeIcon size={28} radius="md" variant="gradient" gradient={{ from: 'violet', to: 'grape' }}>
+            <ThemeIcon size={28} radius="md" variant="gradient">
               <TbShieldCheck size={16} />
             </ThemeIcon>
             <Box>
@@ -322,7 +322,7 @@ function UserDrawerContent({ userId }: { userId: string }) {
                   {user.role}
                 </Badge>
                 {isSuperAdmin && (
-                  <Badge size="xs" color="violet" variant="dot">
+                  <Badge size="xs" color="primary" variant="dot">
                     bypass semua check
                   </Badge>
                 )}
@@ -354,14 +354,14 @@ function UserDrawerContent({ userId }: { userId: string }) {
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="profile" variant="pills" color="violet">
+      <Tabs defaultValue="profile" variant="pills" color="primary">
         <Tabs.List grow>
           <Tabs.Tab value="profile" leftSection={<TbUser size={14} />}>Profile</Tabs.Tab>
           <Tabs.Tab value="access" leftSection={<TbShieldCheck size={14} />}>
             <Group gap={4}>
               <Text size="sm">Access Matrix</Text>
               {accessibleProjects > 0 && (
-                <Badge size="xs" color="violet" variant="filled" circle>{accessibleProjects}</Badge>
+                <Badge size="xs" color="primary" variant="filled" circle>{accessibleProjects}</Badge>
               )}
             </Group>
           </Tabs.Tab>
@@ -369,7 +369,7 @@ function UserDrawerContent({ userId }: { userId: string }) {
             <Group gap={4}>
               <Text size="sm">Permissions</Text>
               {!isSuperAdmin && permissionCount > 0 && (
-                <Badge size="xs" color="violet" variant="filled" circle>{permissionCount}</Badge>
+                <Badge size="xs" color="primary" variant="filled" circle>{permissionCount}</Badge>
               )}
             </Group>
           </Tabs.Tab>
@@ -432,7 +432,7 @@ function ProfileTab({ user }: { user: UserAccess['user'] }) {
       {/* ─── Global Role section ────────────────────────── */}
       <Paper withBorder p="md" radius="md">
         <Group gap="xs" mb="xs">
-          <ThemeIcon size={22} radius="md" variant="light" color="violet">
+          <ThemeIcon size={22} radius="md" variant="light" color="primary">
             <TbShieldCheck size={13} />
           </ThemeIcon>
           <Text size="sm" fw={600}>Global Role</Text>
@@ -442,7 +442,7 @@ function ProfileTab({ user }: { user: UserAccess['user'] }) {
         </Text>
 
         {isSuperAdmin ? (
-          <Alert color="violet" variant="light" icon={<TbLock size={14} />} p="sm">
+          <Alert color="primary" variant="light" icon={<TbLock size={14} />} p="sm">
             <Text size="xs" fw={500}>SUPER_ADMIN tidak dapat diubah dari sini.</Text>
             <Text size="xs" c="dimmed">Untuk promote/demote SUPER_ADMIN, lakukan via Prisma Studio atau database langsung.</Text>
           </Alert>
@@ -452,7 +452,7 @@ function ProfileTab({ user }: { user: UserAccess['user'] }) {
             value={user.role}
             onChange={(v) => roleMutation.mutate(v as GlobalRole)}
             disabled={roleMutation.isPending}
-            color="violet"
+            color="primary"
             data={(['USER', 'QC', 'ADMIN'] as const).map(r => ({
               value: r,
               label: (
@@ -767,7 +767,7 @@ function ProjectAccessItem({ userId, project }: { userId: string; project: Proje
           {/* Project default role */}
           <Paper withBorder p="sm" radius="md">
             <Group gap="xs" mb={6}>
-              <ThemeIcon size={18} radius="sm" variant="light" color="violet">
+              <ThemeIcon size={18} radius="sm" variant="light" color="primary">
                 <TbShieldCheck size={11} />
               </ThemeIcon>
               <Text size="xs" fw={700} tt="uppercase" c="violet">Project default role</Text>
@@ -965,7 +965,7 @@ function PermissionsTab({ user }: { user: UserAccess['user'] }) {
     return (
       <Card withBorder p="md" radius="md">
         <Group gap="sm" wrap="nowrap">
-          <ThemeIcon size={40} radius="xl" variant="gradient" gradient={{ from: 'violet', to: 'grape' }}>
+          <ThemeIcon size={40} radius="xl" variant="gradient">
             <TbShieldCheck size={20} />
           </ThemeIcon>
           <Box>
@@ -1009,7 +1009,7 @@ function PermissionsTab({ user }: { user: UserAccess['user'] }) {
           <Box style={{ flex: 1, maxWidth: 240 }}>
             <Progress
               value={(selected.length / totalCaps) * 100}
-              color="violet"
+              color="primary"
               radius="md"
               size="sm"
             />
@@ -1165,7 +1165,7 @@ function PermissionsTab({ user }: { user: UserAccess['user'] }) {
             )}
             <Button
               size="sm"
-              color="violet"
+              color="primary"
               leftSection={<TbCheck size={14} />}
               onClick={() => mutation.mutate(selected)}
               loading={mutation.isPending}

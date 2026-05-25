@@ -76,7 +76,7 @@ export function MultiSelectChips({
           disabled={disabled}
           rightSection={
             value.length > 0 ? (
-              <Badge size="xs" circle variant="filled" color="violet">
+              <Badge size="xs" circle variant="filled" color="primary">
                 {value.length}
               </Badge>
             ) : (

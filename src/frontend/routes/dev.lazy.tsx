@@ -1331,7 +1331,7 @@ function DatabasePanelInner() {
           <Badge variant="light" size="sm">
             {schema.models.length} models
           </Badge>
-          <Badge variant="light" color="violet" size="sm">
+          <Badge variant="light" color="primary" size="sm">
             {schema.enums.length} enums
           </Badge>
           <Badge variant="light" color="blue" size="sm">
@@ -1548,8 +1548,8 @@ function FileNode2({
       onDoubleClick={() => openInEditor(data.path)}
       title="Double-click to open in editor"
     >
-      <Handle type="target" position={Position.Left} style={{ background: 'var(--mantine-color-violet-6)' }} />
-      <Handle type="source" position={Position.Right} style={{ background: 'var(--mantine-color-violet-6)' }} />
+      <Handle type="target" position={Position.Left} style={{ background: 'var(--mantine-color-primary)' }} />
+      <Handle type="source" position={Position.Right} style={{ background: 'var(--mantine-color-primary)' }} />
       <Group gap={6} mb={4}>
         <Badge size="xs" color={CATEGORY_COLORS[data.category] || 'gray'} variant="filled">
           {data.category}
@@ -2106,7 +2106,7 @@ function FileStructureFlowInner() {
             target: imp.from,
             label: imp.names.length <= 2 ? imp.names.join(', ') : `${imp.names.length} imports`,
             labelStyle: { fontSize: 8, fontFamily: 'monospace' },
-            style: { stroke: 'var(--mantine-color-violet-4)', strokeWidth: 1 },
+            style: { stroke: 'var(--mantine-color-primary)', strokeWidth: 1 },
             markerEnd: { type: MarkerType.ArrowClosed, width: 10, height: 10 },
           })
         }
@@ -2407,7 +2407,7 @@ function DataFlowViewInner() {
         <Badge size="sm" color="red" variant="light">
           Redis
         </Badge>
-        <Badge size="sm" color="violet" variant="light">
+        <Badge size="sm" color="primary" variant="light">
           WebSocket
         </Badge>
         <LayoutSelector layoutKey={storageKey('data-flow')} onLayout={flow.relayout} />

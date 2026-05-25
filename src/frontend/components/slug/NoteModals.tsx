@@ -198,7 +198,7 @@ function NoteForm({ slug, note, onClose }: { slug: string; note?: Note; onClose:
         </Button>
         <Button
           type="button"
-          color="violet"
+          color="primary"
           leftSection={<TbFileText size={14} />}
           onClick={() => save.mutate()}
           loading={save.isPending}
@@ -224,7 +224,7 @@ export function NoteFormModal({ slug, openNote, setOpenNote }: {
       onClose={() => setOpenNote(null)}
       title={
         <Group gap="xs">
-          <ThemeIcon size={28} variant={isEdit ? 'light' : 'gradient'} gradient={{ from: 'violet', to: 'grape' }} color="violet" radius="md">
+          <ThemeIcon size={28} variant={isEdit ? 'light' : 'gradient'} color="primary" radius="md">
             {isEdit ? <TbEdit size={15} /> : <TbNote size={15} />}
           </ThemeIcon>
           <Box>
@@ -335,7 +335,7 @@ export function NoteViewModal({ slug, note, onClose, canEditNote, onEdit, onDele
           {/* Metadata strip */}
           <Group gap="xs" wrap="wrap" align="center">
             {note.tags.map(t => (
-              <Badge key={t} size="xs" variant="outline" color="violet" leftSection={<TbTag size={9} />}>{t}</Badge>
+              <Badge key={t} size="xs" variant="outline" color="primary" leftSection={<TbTag size={9} />}>{t}</Badge>
             ))}
             <Tooltip label={`${wasEdited ? 'Diedit' : 'Dibuat'} ${absoluteTime(note.updatedAt)}`}>
               <Text size="xs" c="dimmed" ml="auto">
@@ -395,7 +395,7 @@ export function NoteViewModal({ slug, note, onClose, canEditNote, onEdit, onDele
                   Hapus
                 </Button>
                 <Button
-                  type="button" size="xs" color="violet"
+                  type="button" size="xs" color="primary"
                   leftSection={<TbEdit size={13} />}
                   onClick={() => onEdit(note)}
                 >

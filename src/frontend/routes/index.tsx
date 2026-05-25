@@ -227,7 +227,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
         <Container size="lg">
           <Group h={56} justify="space-between">
             <Group gap="xs">
-              <ThemeIcon size={32} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+              <ThemeIcon size={32} variant="gradient" radius="md">
                 <TbVariable size={16} />
               </ThemeIcon>
               <Text fw={700} size="sm" lh={1}>Env Manager</Text>
@@ -249,7 +249,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
                   to={getDefaultRoute(user.role)}
                   size="sm"
                   variant="gradient"
-                  gradient={{ from: 'violet', to: 'grape' }}
+                 
                   leftSection={<TbLayoutDashboard size={14} />}
                 >
                   Dashboard
@@ -260,7 +260,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
                   to="/login"
                   size="sm"
                   variant="gradient"
-                  gradient={{ from: 'violet', to: 'grape' }}
+                 
                   leftSection={<TbLogin size={14} />}
                 >
                   Login
@@ -274,7 +274,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
       {/* ─── Hero ────────────────────────────────────────────────────── */}
       <Container size="md" py={{ base: 60, md: 100 }}>
         <Stack align="center" gap="xl">
-          <Badge variant="dot" color="violet" size="lg" radius="sm">
+          <Badge variant="dot" color="primary" size="lg" radius="sm">
             Self-Hosted · Open Source
           </Badge>
 
@@ -288,7 +288,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
             <Text
               component="span"
               variant="gradient"
-              gradient={{ from: 'violet', to: 'grape' }}
+             
               inherit
             >
               terkelola dengan baik.
@@ -306,7 +306,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
               to="/login"
               size="md"
               variant="gradient"
-              gradient={{ from: 'violet', to: 'grape' }}
+             
               leftSection={<TbLogin size={17} />}
             >
               Masuk ke Dashboard
@@ -346,13 +346,13 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
         <Container size="md">
           <Stack gap="xl">
             <Stack align="center" gap="xs">
-              <ThemeIcon size={44} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+              <ThemeIcon size={44} variant="gradient" radius="md">
                 <TbDownload size={22} />
               </ThemeIcon>
               <Title order={2} ta="center" fw={700}>Install CLI</Title>
               {versionData?.version && (
                 <Group justify="center" gap="xs">
-                  <Badge variant="light" color="violet" size="sm">
+                  <Badge variant="light" color="primary" size="sm">
                     CLI v{versionData.version}
                   </Badge>
                   <Badge variant="outline" color="gray" size="sm">
@@ -397,7 +397,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
                         href={`${origin}/download/cli/${platform}`}
                         size="xs"
                         variant="light"
-                        color="violet"
+                        color="primary"
                         leftSection={<TbDownload size={13} />}
                         download
                       >
@@ -416,7 +416,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
       <Container size="md" py={{ base: 48, md: 64 }} id="guide">
         <Stack gap="xl">
           <Stack align="center" gap="xs">
-            <ThemeIcon size={44} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+            <ThemeIcon size={44} variant="gradient" radius="md">
               <TbPlayerPlay size={22} />
             </ThemeIcon>
             <Title order={2} ta="center" fw={700}>Panduan Penggunaan</Title>
@@ -425,7 +425,7 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
             </Text>
           </Stack>
 
-          <Timeline active={-1} bulletSize={32} lineWidth={2} color="violet">
+          <Timeline active={-1} bulletSize={32} lineWidth={2} color="primary">
             {/* Step 1 */}
             <Timeline.Item
               bullet={<Text fw={800} size="sm" c="white">1</Text>}
@@ -587,7 +587,7 @@ envman -e myapp:production -- bash myapp:scripts/deploy.sh`}
         <Container size="md">
           <Stack gap="md">
             <Group gap="xs">
-              <ThemeIcon size={22} variant="light" color="violet" radius="sm">
+              <ThemeIcon size={22} variant="light" color="primary" radius="sm">
                 <TbCode size={12} />
               </ThemeIcon>
               <Text fw={600} size="sm" c="gray.3">CLI Cheatsheet</Text>
@@ -693,7 +693,7 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
             <ThemeIcon
               size={60}
               variant="gradient"
-              gradient={{ from: 'violet', to: 'grape' }}
+             
               radius="xl"
               style={{ boxShadow: '0 8px 32px rgba(121, 80, 242, 0.35)' }}
             >
@@ -709,7 +709,7 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
                 to="/login"
                 size="md"
                 variant="gradient"
-                gradient={{ from: 'violet', to: 'grape' }}
+               
                 leftSection={<TbLogin size={17} />}
               >
                 Masuk ke Dashboard
@@ -733,7 +733,7 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
         <Container size="lg">
           <Group justify="space-between" wrap="wrap" gap="xs">
             <Group gap="xs">
-              <ThemeIcon size={22} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="sm">
+              <ThemeIcon size={22} variant="gradient" radius="sm">
                 <TbVariable size={11} />
               </ThemeIcon>
               <Text size="xs" fw={600}>Env Manager</Text>

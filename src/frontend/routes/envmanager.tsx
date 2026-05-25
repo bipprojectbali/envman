@@ -158,7 +158,7 @@ function EnvManagerLayout() {
             <Burger opened={mobileOpened} onClick={toggleMobile} size="sm" />
             <Group gap={6}>
               <Box style={{ position: 'relative' }}>
-                <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+                <ThemeIcon size={28} variant="gradient" radius="md">
                   <TbVariable size={14} />
                 </ThemeIcon>
                 <Box
@@ -183,11 +183,11 @@ function EnvManagerLayout() {
               <Menu.Target>
                 <Box style={{ position: 'relative', cursor: 'pointer' }}>
                   <Avatar
-                    color="violet"
+                    color="primary"
                     radius="xl"
                     size="sm"
                     variant="gradient"
-                    gradient={{ from: 'violet', to: 'grape' }}
+                   
                   >
                     {user?.name?.charAt(0).toUpperCase()}
                   </Avatar>
@@ -233,7 +233,7 @@ function EnvManagerLayout() {
               <Tooltip label="Expand sidebar" position="right" withArrow>
                 <ActionIcon
                   variant="gradient"
-                  gradient={{ from: 'violet', to: 'grape' }}
+                 
                   size="lg"
                   onClick={toggleSidebar}
                   radius="md"
@@ -248,7 +248,7 @@ function EnvManagerLayout() {
                     <ThemeIcon
                       size={38}
                       variant="gradient"
-                      gradient={{ from: 'violet', to: 'grape' }}
+                     
                       radius="md"
                     >
                       <TbVariable size={20} />
@@ -310,7 +310,7 @@ function EnvManagerLayout() {
                     onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
                     onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
                   >
-                    <item.icon size={18} color={item.active ? 'var(--mantine-color-violet-6)' : 'var(--mantine-color-dimmed)'} />
+                    <item.icon size={18} color={item.active ? 'var(--mantine-color-primary)' : 'var(--mantine-color-dimmed)'} />
                   </UnstyledButton>
                 </Tooltip>
               ) : (
@@ -335,7 +335,6 @@ function EnvManagerLayout() {
                   <ThemeIcon
                     size={34}
                     variant={item.active ? 'gradient' : 'subtle'}
-                    gradient={item.active ? { from: 'violet', to: 'grape' } : undefined}
                     color={item.active ? undefined : 'gray'}
                     radius="md"
                   >
@@ -353,7 +352,7 @@ function EnvManagerLayout() {
                         width: 4,
                         height: 4,
                         borderRadius: '50%',
-                        background: 'var(--mantine-color-violet-6)',
+                        background: 'var(--mantine-color-primary)',
                       }}
                     />
                   )}
@@ -387,7 +386,7 @@ function EnvManagerLayout() {
                     onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
                     onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
                   >
-                    <item.icon size={16} color={item.active ? 'var(--mantine-color-violet-6)' : 'var(--mantine-color-dimmed)'} />
+                    <item.icon size={16} color={item.active ? 'var(--mantine-color-primary)' : 'var(--mantine-color-dimmed)'} />
                   </UnstyledButton>
                 </Tooltip>
               ) : (
@@ -426,8 +425,8 @@ function EnvManagerLayout() {
                 <Menu.Target>
                   <Box style={{ position: 'relative', cursor: 'pointer' }}>
                     <Avatar
-                      color="violet" radius="xl" size="md"
-                      variant="gradient" gradient={{ from: 'violet', to: 'grape' }}
+                      color="primary" radius="xl" size="md"
+                      variant="gradient"
                     >
                       {user?.name?.charAt(0).toUpperCase()}
                     </Avatar>
@@ -479,8 +478,8 @@ function EnvManagerLayout() {
                     <Group gap="xs" wrap="nowrap">
                       <Box style={{ position: 'relative', flexShrink: 0 }}>
                         <Avatar
-                          color="violet" radius="xl" size="md"
-                          variant="gradient" gradient={{ from: 'violet', to: 'grape' }}
+                          color="primary" radius="xl" size="md"
+                          variant="gradient"
                         >
                           {user?.name?.charAt(0).toUpperCase()}
                         </Avatar>
@@ -502,7 +501,7 @@ function EnvManagerLayout() {
                           {user?.name}
                         </Text>
                         <Group gap={4} mt={2}>
-                          <Badge size="xs" color="violet" variant="light">
+                          <Badge size="xs" color="primary" variant="light">
                             {roleLabel[user?.role ?? ''] ?? user?.role}
                           </Badge>
                         </Group>
@@ -578,7 +577,7 @@ function EnvManagerLayout() {
                 gap: 4,
                 padding: '8px 4px',
                 minHeight: 58,
-                color: tab.active ? 'var(--mantine-color-violet-6)' : 'var(--mantine-color-dimmed)',
+                color: tab.active ? 'var(--mantine-color-primary)' : 'var(--mantine-color-dimmed)',
                 position: 'relative',
                 transition: 'color 0.15s',
               }}
@@ -594,7 +593,7 @@ function EnvManagerLayout() {
                     width: 32,
                     height: 3,
                     borderRadius: '0 0 4px 4px',
-                    background: 'linear-gradient(90deg, var(--mantine-color-violet-5), var(--mantine-color-grape-5))',
+                    background: 'linear-gradient(90deg, var(--mantine-color-primary), var(--mantine-color-grape-5))',
                   }}
                 />
               )}

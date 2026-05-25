@@ -42,7 +42,7 @@ function DatabasePage() {
   return (
     <Stack gap="lg" p="md">
       <Group gap="sm">
-        <ThemeIcon size={36} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+        <ThemeIcon size={36} variant="gradient" radius="md">
           <TbDatabase size={20} />
         </ThemeIcon>
         <div>
@@ -99,7 +99,7 @@ function GenerateTokenSection() {
     <Card withBorder radius="md" p="md">
       <Stack gap="sm">
         <Group gap="xs">
-          <ThemeIcon size={28} variant="light" color="violet" radius="md">
+          <ThemeIcon size={28} variant="light" color="primary" radius="md">
             <TbKey size={14} />
           </ThemeIcon>
           <Text fw={600}>Generate Sync Token</Text>
@@ -139,7 +139,7 @@ function GenerateTokenSection() {
             onClick={() => mutation.mutate()}
             loading={mutation.isPending}
             variant="light"
-            color="violet"
+            color="primary"
             w="fit-content"
           >
             Generate Token

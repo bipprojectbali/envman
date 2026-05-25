@@ -1048,7 +1048,7 @@ function DocsPage() {
           <Container size="lg">
             <Group h={52} justify="space-between">
               <Group gap="xs">
-                <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+                <ThemeIcon size={28} variant="gradient" radius="md">
                   <TbVariable size={14} />
                 </ThemeIcon>
                 <Anchor component={Link} to="/" underline="never">
@@ -1068,7 +1068,7 @@ function DocsPage() {
                     to={getDefaultRoute(user.role)}
                     size="xs"
                     variant="gradient"
-                    gradient={{ from: 'violet', to: 'grape' }}
+                   
                     leftSection={<TbLayoutDashboard size={13} />}
                   >
                     Dashboard
@@ -1079,7 +1079,7 @@ function DocsPage() {
                     to="/login"
                     size="xs"
                     variant="gradient"
-                    gradient={{ from: 'violet', to: 'grape' }}
+                   
                     leftSection={<TbLogin size={13} />}
                   >
                     Login
@@ -1105,7 +1105,7 @@ function DocsPage() {
         <Container size="lg">
           <Group justify="space-between" wrap="wrap" gap="xs">
             <Group gap="xs">
-              <ThemeIcon size={20} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="sm">
+              <ThemeIcon size={20} variant="gradient" radius="sm">
                 <TbVariable size={10} />
               </ThemeIcon>
               <Text size="xs" fw={600}>Env Manager</Text>

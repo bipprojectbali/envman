@@ -81,7 +81,7 @@ function LoginPage() {
         style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
       >
         <Group gap="xs">
-          <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+          <ThemeIcon size={28} variant="gradient" radius="md">
             <TbVariable size={14} />
           </ThemeIcon>
           <Text fw={700} size="sm">Env Manager</Text>
@@ -229,7 +229,7 @@ function LoginPage() {
                   fullWidth
                   size="md"
                   variant="gradient"
-                  gradient={{ from: 'violet', to: 'grape' }}
+                 
                   leftSection={<TbLogin size={17} />}
                   loading={login.isPending}
                   mt={4}

@@ -1,4 +1,4 @@
-import { ColorSchemeScript, createTheme, MantineProvider, rem } from '@mantine/core'
+import { ColorSchemeScript, MantineProvider } from '@mantine/core'
 import '@mantine/core/styles.css'
 import { Notifications } from '@mantine/notifications'
 import '@mantine/notifications/styles.css'
@@ -7,37 +7,7 @@ import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-qu
 import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { UnauthorizedError } from '@/frontend/lib/api'
 import { routeTree } from './routeTree.gen'
-
-const theme = createTheme({
-  primaryColor: 'blue',
-  fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
-  components: {
-    Button: {
-      defaultProps: { radius: 'md' },
-    },
-    TextInput: {
-      defaultProps: { radius: 'md' },
-    },
-    PasswordInput: {
-      defaultProps: { radius: 'md' },
-    },
-    Select: {
-      defaultProps: { radius: 'md' },
-    },
-    Textarea: {
-      defaultProps: { radius: 'md' },
-    },
-    Modal: {
-      defaultProps: { radius: 'lg' },
-    },
-    Paper: {
-      defaultProps: { radius: 'md' },
-    },
-  },
-  other: {
-    mobileBreak: rem(768),
-  },
-})
+import { theme } from './theme'
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({

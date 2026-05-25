@@ -69,14 +69,14 @@ const HOVER_STYLES = `
 .envman-stat-card.is-clickable:hover,
 .envman-overview-row:hover {
   transform: translateY(-1px);
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
   box-shadow: var(--mantine-shadow-sm);
 }
 .envman-stat-card.is-clickable:focus-visible,
 .envman-overview-row:focus-visible {
-  outline: 2px solid var(--mantine-color-violet-5);
+  outline: 2px solid var(--mantine-color-primary);
   outline-offset: 2px;
-  border-color: var(--mantine-color-violet-5);
+  border-color: var(--mantine-color-primary);
 }
 `
 
@@ -251,7 +251,7 @@ function OverviewPage() {
           label="Projects"
           value={projects.length}
           sub={`${totalEnvs} environment`}
-          color="violet"
+          color="primary"
           loading={loadingProjects}
           onClick={() => navigate({ to: '/envmanager' })}
         />
@@ -306,15 +306,15 @@ function OverviewPage() {
         <Card withBorder p="md" radius="md">
           <Group justify="space-between" mb="md">
             <Group gap="xs">
-              <ThemeIcon size={24} radius="sm" variant="light" color="violet">
+              <ThemeIcon size={24} radius="sm" variant="light" color="primary">
                 <TbFolders size={13} />
               </ThemeIcon>
               <Text fw={600} size="sm">Projects</Text>
               {!loadingProjects && projects.length > 0 && (
-                <Badge size="xs" variant="light" color="violet" circle>{projects.length}</Badge>
+                <Badge size="xs" variant="light" color="primary" circle>{projects.length}</Badge>
               )}
             </Group>
-            <Button size="compact-xs" variant="subtle" color="violet" rightSection={<TbArrowRight size={12} />}
+            <Button size="compact-xs" variant="subtle" color="primary" rightSection={<TbArrowRight size={12} />}
               onClick={() => navigate({ to: '/envmanager' })}>
               Lihat semua
             </Button>

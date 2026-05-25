@@ -125,13 +125,13 @@ const HOVER_STYLES = `
 }
 .envman-project-card:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--mantine-color-violet-5) 50%, transparent);
+  border-color: color-mix(in srgb, var(--mantine-color-primary) 50%, transparent);
   box-shadow: var(--mantine-shadow-sm);
 }
 .envman-project-card:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--mantine-color-violet-5) 50%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--mantine-color-primary) 50%, transparent);
   outline-offset: 2px;
-  border-color: color-mix(in srgb, var(--mantine-color-violet-5) 50%, transparent);
+  border-color: color-mix(in srgb, var(--mantine-color-primary) 50%, transparent);
 }
 .envman-tag-chip {
   cursor: pointer;
@@ -329,7 +329,7 @@ function ProjectListPage() {
             </Tooltip>
           )}
           {canCreateProject && (
-            <Button size="sm" leftSection={<TbPlus size={14} />} color="violet" onClick={openCreate} radius="md">
+            <Button size="sm" leftSection={<TbPlus size={14} />} color="primary" onClick={openCreate} radius="md">
               New Project
             </Button>
           )}
@@ -436,7 +436,7 @@ function ProjectListPage() {
       {/* ─── Empty state ────────────────────── */}
       {!isLoading && !isError && projects.length === 0 && (
         <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
-          <ThemeIcon size={56} radius="xl" variant="light" color="violet" mx="auto" mb="md">
+          <ThemeIcon size={56} radius="xl" variant="light" color="primary" mx="auto" mb="md">
             <TbFolders size={28} />
           </ThemeIcon>
           <Text fw={600} size="md" mb={6}>Belum ada project</Text>
@@ -447,7 +447,7 @@ function ProjectListPage() {
                 Setiap project bisa punya beberapa environment (dev, staging, production)
                 yang masing-masing menyimpan var sendiri.
               </Text>
-              <Button leftSection={<TbPlus size={14} />} color="violet" onClick={openCreate}>
+              <Button leftSection={<TbPlus size={14} />} color="primary" onClick={openCreate}>
                 Buat Project Pertama
               </Button>
             </>
@@ -578,7 +578,7 @@ function CreateProjectModal({
       onClose={onClose}
       title={
         <Group gap="xs">
-          <ThemeIcon size={28} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+          <ThemeIcon size={28} variant="gradient" radius="md">
             <TbFolders size={15} />
           </ThemeIcon>
           <Box>
@@ -683,7 +683,7 @@ function CreateProjectModal({
           <Button variant="subtle" color="gray" onClick={onClose} disabled={isPending}>Batal</Button>
           <Button
             leftSection={<TbPlus size={14} />}
-            color="violet"
+            color="primary"
             onClick={onSubmit}
             loading={isPending}
             disabled={!canSubmit}
