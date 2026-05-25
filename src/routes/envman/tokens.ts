@@ -16,7 +16,7 @@ export const tokensRouter = new Elysia()
     if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
     const tokens = await prisma.apiToken.findMany({
       where: { userId: caller.userId },
-      select: { id: true, name: true, scopes: true, canWrite: true, isDisabled: true, lastUsedAt: true, expiresAt: true, createdAt: true },
+      select: { id: true, name: true, scopes: true, tags: true, canWrite: true, isDisabled: true, lastUsedAt: true, expiresAt: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     })
     return { tokens }
@@ -28,7 +28,7 @@ export const tokensRouter = new Elysia()
     if (!hasCapability(caller, 'token:create')) { set.status = 403; return { error: 'Tidak punya izin create API token. Hubungi SUPER_ADMIN.' } }
     const body = await request.json().catch(() => null)
     if (!body?.name) { set.status = 400; return { error: 'name required' } }
-    const { name, scopes = [], canWrite = false, expiresAt } = body
+    const { name, scopes = [], tags, canWrite = false, expiresAt } = body
     // Validate each scope — user must have access to every project in scopes
     for (const scope of scopes as string[]) {
       const projectSlug = scope.split(':')[0]
@@ -38,7 +38,7 @@ export const tokensRouter = new Elysia()
     }
     const token = `em_${crypto.randomUUID().replace(/-/g, '')}`
     const created = await prisma.apiToken.create({
-      data: { userId: caller.userId, name, token, scopes, canWrite, expiresAt: expiresAt ? new Date(expiresAt) : null },
+      data: { userId: caller.userId, name, token, scopes, tags: tags ?? [], canWrite, expiresAt: expiresAt ? new Date(expiresAt) : null },
     })
     return { id: created.id, name: created.name, token, canWrite, expiresAt: created.expiresAt }
       })
@@ -49,7 +49,7 @@ export const tokensRouter = new Elysia()
     const existing = await prisma.apiToken.findUnique({ where: { id: params.id } })
     if (!existing || existing.userId !== caller.userId) { set.status = 404; return { error: 'Not found' } }
     const body = await request.json().catch(() => null)
-    const { name, scopes, canWrite, expiresAt } = body ?? {}
+    const { name, scopes, tags, canWrite, expiresAt } = body ?? {}
     // Validate scopes if provided
     if (scopes) {
       for (const scope of scopes as string[]) {
@@ -65,11 +65,12 @@ export const tokensRouter = new Elysia()
       data: {
         ...(name !== undefined && { name }),
         ...(scopes !== undefined && { scopes }),
+        ...(tags !== undefined && { tags }),
         ...(canWrite !== undefined && { canWrite }),
         ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
       },
     })
-    return { id: updated.id, name: updated.name, scopes: updated.scopes, canWrite: updated.canWrite, expiresAt: updated.expiresAt }
+    return { id: updated.id, name: updated.name, scopes: updated.scopes, tags: updated.tags, canWrite: updated.canWrite, expiresAt: updated.expiresAt }
       })
 
   .patch('/api/envman/tokens/:id/toggle', async ({ request, params, set }) => {

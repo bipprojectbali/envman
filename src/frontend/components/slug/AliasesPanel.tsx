@@ -336,9 +336,20 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                       </Group>
                     )}
                   </Group>
-                  <Code block fz="xs" style={{ wordBreak: 'break-all' }}>
-                    envman {alias.args}
-                  </Code>
+                  <Group gap={4} wrap="nowrap" align="flex-start">
+                    <Code block fz="xs" style={{ wordBreak: 'break-all', flex: 1 }}>
+                      envman {alias.args}
+                    </Code>
+                    <CopyButton value={`envman ${alias.args}`} timeout={2000}>
+                      {({ copied, copy }) => (
+                        <Tooltip label={copied ? 'Disalin!' : 'Salin perintah'} withArrow>
+                          <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                            {copied ? <TbCheck size={14} /> : <TbCopy size={14} />}
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </CopyButton>
+                  </Group>
                   {alias.description && (
                     <Text size="xs" c="dimmed">{alias.description}</Text>
                   )}

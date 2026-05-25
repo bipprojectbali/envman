@@ -22,6 +22,7 @@ import {
   Skeleton,
   Stack,
   Switch,
+  TagsInput,
   Text,
   TextInput,
   ThemeIcon,
@@ -57,6 +58,7 @@ import {
   TbSearch,
   TbShieldCheck,
   TbSortAscending,
+  TbTag,
   TbTerminal,
   TbToggleLeft,
   TbToggleRight,
@@ -71,6 +73,7 @@ interface ApiToken {
   id: string
   name: string
   scopes: string[]
+  tags: string[]
   canWrite: boolean
   isDisabled: boolean
   lastUsedAt: string | null
@@ -113,6 +116,17 @@ function expiryStatus(expiresAt: string | null): 'none' | 'active' | 'soon' | 'e
 
 function daysUntil(expiresAt: string): number {
   return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+}
+
+const TAG_COLORS = [
+  'red', 'pink', 'grape', 'violet', 'indigo', 'blue',
+  'cyan', 'teal', 'green', 'lime', 'yellow', 'orange',
+] as const
+
+function tagColor(tag: string): string {
+  let h = 0
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0
+  return TAG_COLORS[h % TAG_COLORS.length]
 }
 
 const HOVER_STYLES = `
@@ -286,7 +300,7 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
   )
 }
 
-const emptyForm = { name: '', canWrite: false, expiresAt: '', scopes: [] as string[] }
+const emptyForm = { name: '', canWrite: false, expiresAt: '', scopes: [] as string[], tags: [] as string[] }
 
 function TokensPage() {
   const qc = useQueryClient()
@@ -303,6 +317,7 @@ function TokensPage() {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('semua')
   const [filterProjects, setFilterProjects] = useState<string[]>([])
+  const [filterTags, setFilterTags] = useState<string[]>([])
   const [sort, setSort] = useState('terbaru')
   const [view, setView] = useLocalStorage<'grid' | 'list'>({ key: 'envman:tokens:view', defaultValue: 'list' })
 
@@ -338,6 +353,14 @@ function TokensPage() {
   const expiredTokens = tokens.filter(t => expiryStatus(t.expiresAt) === 'expired')
   const disabledTokens = tokens.filter(t => t.isDisabled)
 
+  const allTags = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const t of tokens) for (const tag of t.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, count]) => ({ value, label: `${value} (${count})` }))
+  }, [tokens])
+
   const filteredTokens = useMemo(() => {
     let list = [...tokens]
     if (debouncedSearch.trim()) {
@@ -354,16 +377,19 @@ function TokensPage() {
           : filterProjects.some(slug => t.scopes.some(s => s === `${slug}:*` || s.startsWith(`${slug}:`)))
       )
     }
+    if (filterTags.length > 0) {
+      list = list.filter(t => filterTags.some(tag => (t.tags ?? []).includes(tag)))
+    }
     if (sort === 'nama') list.sort((a, b) => a.name.localeCompare(b.name))
     if (sort === 'terlama') list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     if (sort === 'last_used') list.sort((a, b) => (b.lastUsedAt ?? '').localeCompare(a.lastUsedAt ?? ''))
     // default 'terbaru': already sorted by server desc
     return list
-  }, [tokens, debouncedSearch, filterStatus, filterProjects, sort])
+  }, [tokens, debouncedSearch, filterStatus, filterProjects, filterTags, sort])
 
   const TOKENS_PER_PAGE = 20
   const [tokensPage, setTokensPage] = useState(1)
-  useEffect(() => setTokensPage(1), [debouncedSearch, filterStatus, filterProjects, sort])
+  useEffect(() => setTokensPage(1), [debouncedSearch, filterStatus, filterProjects, filterTags, sort])
   const tokensTotalPages = Math.ceil(filteredTokens.length / TOKENS_PER_PAGE)
   const paginatedTokens = filteredTokens.slice((tokensPage - 1) * TOKENS_PER_PAGE, tokensPage * TOKENS_PER_PAGE)
 
@@ -405,6 +431,7 @@ function TokensPage() {
       canWrite: t.canWrite,
       expiresAt: t.expiresAt ? new Date(t.expiresAt).toISOString().split('T')[0] : '',
       scopes: t.scopes,
+      tags: t.tags ?? [],
     })
     openEdit()
   }
@@ -555,6 +582,20 @@ function TokensPage() {
         />
       </Stack>
 
+      {/* ── Tags ── */}
+      <Stack gap="xs">
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Tags</Text>
+        <TagsInput
+          placeholder="Tambah tag, tekan Enter"
+          description="Opsional — untuk pengelompokan dan filter token"
+          value={f.tags}
+          onChange={v => setF(x => ({ ...x, tags: v }))}
+          data={allTags.map(t => t.value)}
+          clearable
+          splitChars={[',', ' ']}
+        />
+      </Stack>
+
       {/* ── Kedaluwarsa ── */}
       <Stack gap="xs">
         <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Kedaluwarsa</Text>
@@ -602,8 +643,8 @@ function TokensPage() {
     </Stack>
   )
 
-  const hasFilter = debouncedSearch.trim().length > 0 || filterStatus !== 'semua' || filterProjects.length > 0
-  const resetFilter = () => { setSearch(''); setFilterStatus('semua'); setFilterProjects([]) }
+  const hasFilter = debouncedSearch.trim().length > 0 || filterStatus !== 'semua' || filterProjects.length > 0 || filterTags.length > 0
+  const resetFilter = () => { setSearch(''); setFilterStatus('semua'); setFilterProjects([]); setFilterTags([]) }
 
   return (
     <Box>
@@ -702,6 +743,17 @@ function TokensPage() {
                 onChange={setFilterProjects}
               />
             )}
+            {allTags.length > 0 && (
+              <MultiSelectChips
+                size="xs"
+                label="Tag"
+                icon={<TbTag size={13} />}
+                width={130}
+                options={allTags}
+                value={filterTags}
+                onChange={setFilterTags}
+              />
+            )}
             <Select
               size="xs"
               w={isMobile ? 130 : 150}
@@ -724,6 +776,16 @@ function TokensPage() {
                 value={filterProjects}
                 onChange={setFilterProjects}
                 getLabel={slug => projects.find(p => p.slug === slug)?.name ?? slug}
+              />
+            </Group>
+          )}
+          {filterTags.length > 0 && (
+            <Group gap="xs" mt="xs" wrap="wrap" align="center">
+              <Text size="xs" c="dimmed">Tag aktif:</Text>
+              <MultiSelectChipsRow
+                value={filterTags}
+                onChange={setFilterTags}
+                getColor={tagColor}
               />
             </Group>
           )}
@@ -957,6 +1019,13 @@ function TokensPage() {
                     </>
                   )}
                 </Group>
+                {t.tags.length > 0 && (
+                  <Group gap={4} mb={6} wrap="wrap">
+                    {t.tags.map(tag => (
+                      <Badge key={tag} size="xs" variant="light" color={tagColor(tag)}>{tag}</Badge>
+                    ))}
+                  </Group>
+                )}
                 <Tooltip label={t.lastUsedAt ? `Terakhir dipakai ${absoluteTime(t.lastUsedAt)}` : 'Belum pernah dipakai'} withArrow>
                   <Group gap={4} style={{ cursor: 'default' }}>
                     <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
@@ -1069,6 +1138,9 @@ function TokensPage() {
                             )}
                           </>
                         )}
+                        {t.tags.length > 0 && t.tags.map(tag => (
+                          <Badge key={tag} size="xs" variant="light" color={tagColor(tag)}>{tag}</Badge>
+                        ))}
                         <Tooltip label={t.lastUsedAt ? `Terakhir dipakai ${absoluteTime(t.lastUsedAt)}` : 'Belum pernah dipakai'} withArrow>
                           <Group gap={3} style={{ cursor: 'default' }}>
                             <TbClock size={10} style={{ color: 'var(--mantine-color-dimmed)' }} />

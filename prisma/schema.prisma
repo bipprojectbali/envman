@@ -359,6 +359,7 @@ model ApiToken {
   name       String
   token      String    @unique
   scopes     String[]  @default([])
+  tags       String[]  @default([])
   canWrite   Boolean   @default(false)
   isDisabled Boolean   @default(false)
   lastUsedAt DateTime?
