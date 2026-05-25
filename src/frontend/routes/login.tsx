@@ -4,14 +4,12 @@ import {
   Button,
   Divider,
   Group,
-  Paper,
   PasswordInput,
   Stack,
   Text,
   TextInput,
   ThemeIcon,
   Title,
-  Tooltip,
 } from '@mantine/core'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useState } from 'react'
@@ -19,7 +17,6 @@ import { FcGoogle } from 'react-icons/fc'
 import {
   TbAlertCircle,
   TbCode,
-  TbKey,
   TbLock,
   TbLogin,
   TbMail,
@@ -60,11 +57,6 @@ const features = [
   { icon: TbServer, label: 'Self-Hosted', desc: 'Data 100% di server milikmu sendiri' },
 ]
 
-const demoAccounts = [
-  { label: 'Super Admin', email: 'superadmin@example.com', password: 'superadmin123', color: 'violet' },
-  { label: 'Admin', email: 'admin@example.com', password: 'admin123', color: 'blue' },
-  { label: 'User', email: 'user@example.com', password: 'user123', color: 'gray' },
-]
 
 function LoginPage() {
   const login = useLogin()
@@ -77,11 +69,6 @@ function LoginPage() {
     if (email && password) login.mutate({ email, password })
   }
 
-  const quickLogin = (acc: typeof demoAccounts[0]) => {
-    setEmail(acc.email)
-    setPassword(acc.password)
-    login.mutate({ email: acc.email, password: acc.password })
-  }
 
   return (
     <Box style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -265,39 +252,6 @@ function LoginPage() {
               Login dengan Google
             </Button>
 
-            {/* Demo accounts */}
-            <Paper
-              withBorder
-              p="sm"
-              mt="xl"
-              radius="md"
-              style={{ background: 'var(--mantine-color-default-hover)' }}
-            >
-              <Group gap="xs" mb="sm">
-                <TbKey size={13} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                <Text size="xs" fw={600} c="dimmed">Demo accounts (development)</Text>
-              </Group>
-              <Group gap="xs" wrap="wrap">
-                {demoAccounts.map(acc => (
-                  <Tooltip
-                    key={acc.label}
-                    label={`${acc.email} / ${acc.password}`}
-                    position="top"
-                    withArrow
-                  >
-                    <Button
-                      size="xs"
-                      variant="light"
-                      color={acc.color}
-                      loading={login.isPending && email === acc.email}
-                      onClick={() => quickLogin(acc)}
-                    >
-                      {acc.label}
-                    </Button>
-                  </Tooltip>
-                ))}
-              </Group>
-            </Paper>
 
           </Box>
         </Box>
