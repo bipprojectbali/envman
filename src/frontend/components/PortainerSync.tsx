@@ -15,6 +15,7 @@ import {
   NumberInput,
   Paper,
   ScrollArea,
+  Skeleton,
   TextInput,
   Select,
   Stack,
@@ -52,12 +53,14 @@ import {
   TbServer,
   TbTrash,
   TbX,
+  TbCode,
   TbTerminal2,
   TbPlayerPlay,
   TbBookmark,
   TbClipboard,
   TbEraser,
 } from 'react-icons/tb'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
 
 interface Props {
   slug: string
@@ -190,6 +193,10 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
   const [autoScroll, setAutoScroll] = useState(true)
   const logViewportRef = useRef<HTMLDivElement>(null)
 
+  // Compose editor modal state
+  const [composeOpen, { open: openCompose, close: closeCompose }] = useDisclosure(false)
+  const [composeContent, setComposeContent] = useState('')
+
   // Exec modal state
   type ExecContainer = { containerId: string; endpointId: number; containerName: string }
   const [execOpen, { open: openExec, close: closeExec }] = useDisclosure(false)
@@ -275,6 +282,16 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
   })
 
   const logLines: LogLine[] = logsData?.lines ?? []
+
+  const composeQuery = useQuery({
+    queryKey: ['portainer', 'compose', config?.connectionId, config?.stackId],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/file`),
+    enabled: composeOpen && !!config?.connectionId && !!config?.stackId,
+    staleTime: 0,
+  })
+  useEffect(() => {
+    if (composeQuery.data?.content !== undefined) setComposeContent(composeQuery.data.content)
+  }, [composeQuery.data])
 
   // Auto-scroll logs
   useEffect(() => {
@@ -413,6 +430,18 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
       confirmProps: { color: 'orange' },
       onConfirm: () => recreate.mutate(),
     })
+
+  const saveCompose = useMutation({
+    mutationFn: (content: string) =>
+      apiFetch(`/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/file`, {
+        method: 'PUT',
+        body: JSON.stringify({ content }),
+      }),
+    onSuccess: () => {
+      closeCompose()
+    },
+    onError: (e: Error) => { alert(e.message) },
+  })
 
   const toggleAutoSync = useMutation({
     mutationFn: (autoSync: boolean) =>
@@ -638,6 +667,17 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                       Recreate
                     </Button>
                   </Tooltip>
+                  {!!config?.connectionId && (
+                    <Tooltip label="Edit compose file">
+                      <Button
+                        size="xs" variant="light" color="violet"
+                        leftSection={<TbCode size={12} />}
+                        onClick={openCompose}
+                      >
+                        Compose
+                      </Button>
+                    </Tooltip>
+                  )}
                   <Button
                     size="xs" color="primary"
                     variant={sync.isPending ? 'filled' : 'light'}
@@ -1470,6 +1510,58 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
             {execHistory.length > 0 && <Text fz={10} style={{ color: '#636e7b' }}>{execHistory.length} command dijalankan</Text>}
           </Group>
         </Box>
+      </Modal>
+      {/* ─── Compose Editor Modal ────────────────────────── */}
+      <Modal
+        opened={composeOpen}
+        onClose={closeCompose}
+        title={
+          <Group gap="xs">
+            <ThemeIcon size={28} variant="light" color="violet" radius="md">
+              <TbCode size={15} />
+            </ThemeIcon>
+            <Box>
+              <Text fw={700} size="sm">Edit Compose File</Text>
+              <Code fz="xs">{config?.stackName}</Code>
+            </Box>
+          </Group>
+        }
+        size="xl"
+        centered
+      >
+        {composeQuery.isLoading ? (
+          <Skeleton height={400} />
+        ) : (
+          <CodeEditor
+            value={composeContent}
+            onChange={v => setComposeContent(v ?? '')}
+            filename="docker-compose.yml"
+            height={450}
+            noMinimap
+          />
+        )}
+        <Group justify="flex-end" gap="xs" mt="md">
+          <Button variant="subtle" color="gray" onClick={closeCompose} disabled={saveCompose.isPending}>Batal</Button>
+          <Button
+            color="violet"
+            leftSection={<TbCheck size={14} />}
+            loading={saveCompose.isPending}
+            disabled={composeQuery.isLoading || !composeContent}
+            onClick={() => {
+              modals.openConfirmModal({
+                title: 'Apply & Redeploy?',
+                children: (
+                  <Text size="sm">Stack <strong>{config?.stackName}</strong> akan di-redeploy dengan compose file baru.</Text>
+                ),
+                labels: { confirm: 'Apply & Redeploy', cancel: 'Batal' },
+                confirmProps: { color: 'violet' },
+                onConfirm: () => saveCompose.mutate(composeContent),
+              })
+            }}
+          >
+            Apply & Redeploy
+          </Button>
+        </Group>
       </Modal>
     </>
   )
