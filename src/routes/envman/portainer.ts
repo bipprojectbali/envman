@@ -514,6 +514,88 @@ export const portainerRouter = new Elysia()
     }
   })
 
+  // Stopped containers (by connectionId, endpointId from query)
+  .get('/api/envman/portainer/connections/:id/containers/stopped', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin.' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const endpointId = Number((query as any).endpointId) || 1
+    try {
+      const filters = encodeURIComponent(JSON.stringify({ status: ['exited', 'dead'] }))
+      const res = await fetch(`${url}/api/endpoints/${endpointId}/docker/containers/json?all=1&filters=${filters}`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!res.ok) { const t = await res.text().catch(() => ''); set.status = 400; return { error: `Portainer error ${res.status}: ${t}` } }
+      const containers = await res.json() as any[]
+      const totalSize = containers.reduce((acc, c) => acc + (c.SizeRootFs ?? 0), 0)
+      return {
+        containers: containers.map(c => ({
+          id: c.Id.slice(0, 12),
+          name: (c.Names?.[0] ?? '').replace(/^\//, ''),
+          image: c.Image,
+          state: c.State,
+          status: c.Status,
+          size: c.SizeRootFs ?? 0,
+        })),
+        count: containers.length,
+        totalSizeMB: Math.round(totalSize / 1024 / 1024),
+        endpointId,
+      }
+    } catch (e) {
+      set.status = 500; return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Unused volumes (by connectionId, endpointId from query)
+  .get('/api/envman/portainer/connections/:id/volumes/unused', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin.' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const endpointId = Number((query as any).endpointId) || 1
+    try {
+      const filters = encodeURIComponent(JSON.stringify({ dangling: ['true'] }))
+      const res = await fetch(`${url}/api/endpoints/${endpointId}/docker/volumes?filters=${filters}`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!res.ok) { const t = await res.text().catch(() => ''); set.status = 400; return { error: `Portainer error ${res.status}: ${t}` } }
+      const data = await res.json() as any
+      const volumes = (data.Volumes ?? []) as any[]
+      return {
+        volumes: volumes.map(v => ({ name: v.Name, driver: v.Driver, mountpoint: v.Mountpoint, createdAt: v.CreatedAt })),
+        count: volumes.length,
+        endpointId,
+      }
+    } catch (e) {
+      set.status = 500; return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Unused networks (by connectionId, endpointId from query)
+  .get('/api/envman/portainer/connections/:id/networks/unused', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin.' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const endpointId = Number((query as any).endpointId) || 1
+    try {
+      const filters = encodeURIComponent(JSON.stringify({ dangling: ['true'] }))
+      const res = await fetch(`${url}/api/endpoints/${endpointId}/docker/networks?filters=${filters}`, { headers: { 'X-API-Key': conn.apiToken } })
+      if (!res.ok) { const t = await res.text().catch(() => ''); set.status = 400; return { error: `Portainer error ${res.status}: ${t}` } }
+      const networks = await res.json() as any[]
+      return {
+        networks: networks.map(n => ({ id: n.Id?.slice(0, 12), name: n.Name, driver: n.Driver, scope: n.Scope })),
+        count: networks.length,
+        endpointId,
+      }
+    } catch (e) {
+      set.status = 500; return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
   // Prune images (by connectionId)
   .post('/api/envman/portainer/connections/:id/prune/images', async ({ request, params, query, set }) => {
     const caller = await requireEnvAuth(request)
@@ -603,6 +685,27 @@ export const portainerRouter = new Elysia()
       return { ok: true, deletedNetworks: result.NetworksDeleted ?? [] }
     } catch (e) {
       set.status = 500; return { error: `Prune networks failed: ${e instanceof Error ? e.message : String(e)}` }
+    }
+  })
+
+  // Prune stopped containers (by connectionId)
+  .post('/api/envman/portainer/connections/:id/prune/containers', async ({ request, params, query, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:prune')) { set.status = 403; return { error: 'Tidak punya izin prune containers.' } }
+    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
+    const url = conn.portainerUrl.replace(/\/$/, '')
+    const endpointId = Number((query as any).endpointId) || 1
+    try {
+      const res = await fetch(`${url}/api/endpoints/${endpointId}/docker/containers/prune`, { method: 'POST', headers: { 'X-API-Key': conn.apiToken, 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      if (!res.ok) { const t = await res.text().catch(() => ''); set.status = 400; return { error: `Prune containers failed: ${res.status}: ${t}` } }
+      const result = await res.json() as any
+      const reclaimedMB = Math.round((result.SpaceReclaimed ?? 0) / 1024 / 1024)
+      appLog('info', `Portainer prune containers via connection ${conn.name}`)
+      return { ok: true, deletedContainers: result.ContainersDeleted ?? [], reclaimedMB }
+    } catch (e) {
+      set.status = 500; return { error: `Prune containers failed: ${e instanceof Error ? e.message : String(e)}` }
     }
   })
 

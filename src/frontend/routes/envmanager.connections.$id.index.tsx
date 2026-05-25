@@ -58,6 +58,9 @@ import {
   TbRefreshDot,
   TbServer,
   TbTrash,
+  TbBox,
+  TbDatabase,
+  TbNetwork,
   TbX,
 } from 'react-icons/tb'
 
@@ -238,6 +241,27 @@ function ConnectionDetailPage() {
     staleTime: 30000,
   })
 
+  const { data: containersData, isFetching: containersFetching, refetch: refetchContainers } = useQuery({
+    queryKey: ['portainer', 'stopped-containers', id, cleanupEndpointId],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/containers/stopped?endpointId=${cleanupEndpointId}`),
+    enabled: cleanupEndpointId !== null,
+    staleTime: 30000,
+  })
+
+  const { data: volumesData, isFetching: volumesFetching, refetch: refetchVolumes } = useQuery({
+    queryKey: ['portainer', 'unused-volumes', id, cleanupEndpointId],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/volumes/unused?endpointId=${cleanupEndpointId}`),
+    enabled: cleanupEndpointId !== null,
+    staleTime: 30000,
+  })
+
+  const { data: networksData, isFetching: networksFetching, refetch: refetchNetworks } = useQuery({
+    queryKey: ['portainer', 'unused-networks', id, cleanupEndpointId],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/networks/unused?endpointId=${cleanupEndpointId}`),
+    enabled: cleanupEndpointId !== null,
+    staleTime: 30000,
+  })
+
   const connection = data?.connection
   const stacks: StackInfo[] = data?.stacks ?? []
   const logLines: LogLine[] = liveLines
@@ -403,15 +427,31 @@ function ConnectionDetailPage() {
     onError: (e) => notifyErr(e),
   })
 
+  const pruneContainers = useMutation({
+    mutationFn: () => apiFetch(`/api/envman/portainer/connections/${id}/prune/containers?endpointId=${cleanupEndpointId}`, { method: 'POST' }),
+    onSuccess: (d: any) => {
+      notifyOk(`${d.deletedContainers?.length ?? 0} container dihapus — ${d.reclaimedMB} MB dibebaskan`)
+      refetchContainers()
+      refetchImages()
+    },
+    onError: (e) => notifyErr(e),
+  })
+
   const pruneVolumes = useMutation({
     mutationFn: () => apiFetch(`/api/envman/portainer/connections/${id}/prune/volumes?endpointId=${cleanupEndpointId}`, { method: 'POST' }),
-    onSuccess: (d: any) => notifyOk(`Volumes dihapus: ${d.deletedVolumes?.join(', ') || 'tidak ada'}`),
+    onSuccess: (d: any) => {
+      notifyOk(`${d.deletedVolumes?.length ?? 0} volume dihapus — ${d.reclaimedMB} MB dibebaskan`)
+      refetchVolumes()
+    },
     onError: (e) => notifyErr(e),
   })
 
   const pruneNetworks = useMutation({
     mutationFn: () => apiFetch(`/api/envman/portainer/connections/${id}/prune/networks?endpointId=${cleanupEndpointId}`, { method: 'POST' }),
-    onSuccess: (d: any) => notifyOk(`Networks dihapus: ${d.deletedNetworks?.join(', ') || 'tidak ada'}`),
+    onSuccess: (d: any) => {
+      notifyOk(`${d.deletedNetworks?.length ?? 0} network dihapus`)
+      refetchNetworks()
+    },
     onError: (e) => notifyErr(e),
   })
 
@@ -1033,42 +1073,216 @@ function ConnectionDetailPage() {
           </Alert>
         )}
 
-        <Divider label="Prune lainnya" labelPosition="center" mb="sm" />
-        <Group gap="xs">
-          <Button size="xs" variant="light" color="orange" leftSection={<TbTrash size={13} />}
-            loading={pruneVolumes.isPending} onClick={() =>
-              modals.openConfirmModal({
-                title: 'Hapus Unused Volumes',
-                children: (
-                  <Stack gap="xs">
-                    <Text size="sm">Hapus semua volume yang tidak dipakai?</Text>
-                    <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
-                      <Text size="xs" fw={600}>Data di volume yang dihapus tidak bisa dikembalikan.</Text>
-                    </Alert>
-                  </Stack>
-                ),
-                labels: { confirm: 'Hapus Volumes', cancel: 'Batal' },
-                confirmProps: { color: 'red' },
-                onConfirm: () => pruneVolumes.mutate(),
-              })
-            }
-          >
-            Prune Volumes
-          </Button>
-          <Button size="xs" variant="light" color="gray" leftSection={<TbTrash size={13} />}
-            loading={pruneNetworks.isPending} onClick={() =>
-              modals.openConfirmModal({
-                title: 'Hapus Unused Networks',
-                children: <Text size="sm">Hapus semua network Docker yang tidak dipakai container?</Text>,
-                labels: { confirm: 'Hapus Networks', cancel: 'Batal' },
-                confirmProps: { color: 'orange' },
-                onConfirm: () => pruneNetworks.mutate(),
-              })
-            }
-          >
-            Prune Networks
-          </Button>
+        {/* ─── Stopped Containers ─── */}
+        <Divider mb="md" mt="md" label={
+          <Group gap={6}><TbBox size={12} /><Text size="xs" fw={500} c="dimmed">Stopped Containers</Text></Group>
+        } labelPosition="left" />
+        <Group justify="space-between" mb="sm" wrap="wrap" gap="xs">
+          <Box>
+            <Text fw={600} size="sm" mb={2}>Stopped / Dead Containers</Text>
+            <Text size="xs" c="dimmed">Container yang sudah berhenti dan belum dihapus</Text>
+          </Box>
+          <Group gap="xs">
+            {containersData && (
+              <Badge size="sm" variant="light" color={containersData.count > 0 ? 'orange' : 'teal'}>
+                {containersData.count} container{containersData.totalSizeMB > 0 ? ` — ${containersData.totalSizeMB} MB` : ''}
+              </Badge>
+            )}
+            <ActionIcon size="sm" variant="subtle" color="gray" loading={containersFetching} onClick={() => refetchContainers()}>
+              <TbRefresh size={13} />
+            </ActionIcon>
+            {containersData?.count > 0 && canPrune && (
+              <Button size="xs" variant="light" color="red" leftSection={<TbTrash size={13} />}
+                loading={pruneContainers.isPending}
+                onClick={() => modals.openConfirmModal({
+                  title: 'Hapus Stopped Containers',
+                  children: (
+                    <Stack gap="xs">
+                      <Text size="sm">Hapus <strong>{containersData.count}</strong> stopped/dead container?</Text>
+                      <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
+                        <Text size="xs">Container yang dihapus tidak bisa dikembalikan. Image yang dipakai container ini mungkin bisa di-prune setelah ini.</Text>
+                      </Alert>
+                    </Stack>
+                  ),
+                  labels: { confirm: 'Hapus Containers', cancel: 'Batal' },
+                  confirmProps: { color: 'red' },
+                  onConfirm: () => pruneContainers.mutate(),
+                })}
+              >
+                Prune Containers
+              </Button>
+            )}
+          </Group>
         </Group>
+        {containersData?.count === 0 ? (
+          <Alert color="teal" icon={<TbCheck size={14} />} p="xs" mb="md">
+            <Text size="xs">Tidak ada stopped containers.</Text>
+          </Alert>
+        ) : containersData?.containers?.length > 0 ? (
+          <Paper withBorder radius="sm" style={{ overflow: 'hidden' }} mb="md">
+            <ScrollArea.Autosize mah={200}>
+              <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
+                <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
+                  <Table.Tr>
+                    <Table.Th>ID</Table.Th>
+                    <Table.Th>Nama</Table.Th>
+                    <Table.Th>Image</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Size</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {containersData.containers.map((c: any) => (
+                    <Table.Tr key={c.id}>
+                      <Table.Td><Code fz={10}>{c.id}</Code></Table.Td>
+                      <Table.Td><Text fz="xs">{c.name || '—'}</Text></Table.Td>
+                      <Table.Td><Code fz={10}>{c.image}</Code></Table.Td>
+                      <Table.Td>
+                        <Badge size="xs" color={stateColor[c.state] ?? 'gray'} variant="light">{c.status}</Badge>
+                      </Table.Td>
+                      <Table.Td><Text fz="xs">{c.size > 0 ? fmtBytes(c.size) : '—'}</Text></Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea.Autosize>
+          </Paper>
+        ) : null}
+
+        {/* ─── Unused Volumes ─── */}
+        <Divider mb="md" mt="xs" label={
+          <Group gap={6}><TbDatabase size={12} /><Text size="xs" fw={500} c="dimmed">Unused Volumes</Text></Group>
+        } labelPosition="left" />
+        <Group justify="space-between" mb="sm" wrap="wrap" gap="xs">
+          <Box>
+            <Text fw={600} size="sm" mb={2}>Unused Volumes</Text>
+            <Text size="xs" c="dimmed">Volume yang tidak dipakai container manapun</Text>
+          </Box>
+          <Group gap="xs">
+            {volumesData && (
+              <Badge size="sm" variant="light" color={volumesData.count > 0 ? 'orange' : 'teal'}>
+                {volumesData.count} volume
+              </Badge>
+            )}
+            <ActionIcon size="sm" variant="subtle" color="gray" loading={volumesFetching} onClick={() => refetchVolumes()}>
+              <TbRefresh size={13} />
+            </ActionIcon>
+            {volumesData?.count > 0 && canPrune && (
+              <Button size="xs" variant="light" color="red" leftSection={<TbTrash size={13} />}
+                loading={pruneVolumes.isPending}
+                onClick={() => modals.openConfirmModal({
+                  title: 'Hapus Unused Volumes',
+                  children: (
+                    <Stack gap="xs">
+                      <Text size="sm">Hapus <strong>{volumesData.count}</strong> volume yang tidak dipakai?</Text>
+                      <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
+                        <Text size="xs" fw={600}>Data di volume yang dihapus tidak bisa dikembalikan.</Text>
+                      </Alert>
+                    </Stack>
+                  ),
+                  labels: { confirm: 'Hapus Volumes', cancel: 'Batal' },
+                  confirmProps: { color: 'red' },
+                  onConfirm: () => pruneVolumes.mutate(),
+                })}
+              >
+                Prune Volumes
+              </Button>
+            )}
+          </Group>
+        </Group>
+        {volumesData?.count === 0 ? (
+          <Alert color="teal" icon={<TbCheck size={14} />} p="xs" mb="md">
+            <Text size="xs">Tidak ada unused volumes.</Text>
+          </Alert>
+        ) : volumesData?.volumes?.length > 0 ? (
+          <Paper withBorder radius="sm" style={{ overflow: 'hidden' }} mb="md">
+            <ScrollArea.Autosize mah={200}>
+              <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
+                <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
+                  <Table.Tr>
+                    <Table.Th>Nama</Table.Th>
+                    <Table.Th>Driver</Table.Th>
+                    <Table.Th>Dibuat</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {volumesData.volumes.map((v: any) => (
+                    <Table.Tr key={v.name}>
+                      <Table.Td><Code fz={10}>{v.name}</Code></Table.Td>
+                      <Table.Td><Text fz="xs">{v.driver}</Text></Table.Td>
+                      <Table.Td><Text fz="xs">{relTime(v.createdAt)}</Text></Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea.Autosize>
+          </Paper>
+        ) : null}
+
+        {/* ─── Unused Networks ─── */}
+        <Divider mb="md" mt="xs" label={
+          <Group gap={6}><TbNetwork size={12} /><Text size="xs" fw={500} c="dimmed">Unused Networks</Text></Group>
+        } labelPosition="left" />
+        <Group justify="space-between" mb="sm" wrap="wrap" gap="xs">
+          <Box>
+            <Text fw={600} size="sm" mb={2}>Dangling Networks</Text>
+            <Text size="xs" c="dimmed">Network Docker yang tidak dipakai container manapun</Text>
+          </Box>
+          <Group gap="xs">
+            {networksData && (
+              <Badge size="sm" variant="light" color={networksData.count > 0 ? 'orange' : 'teal'}>
+                {networksData.count} network
+              </Badge>
+            )}
+            <ActionIcon size="sm" variant="subtle" color="gray" loading={networksFetching} onClick={() => refetchNetworks()}>
+              <TbRefresh size={13} />
+            </ActionIcon>
+            {networksData?.count > 0 && canPrune && (
+              <Button size="xs" variant="light" color="orange" leftSection={<TbTrash size={13} />}
+                loading={pruneNetworks.isPending}
+                onClick={() => modals.openConfirmModal({
+                  title: 'Hapus Unused Networks',
+                  children: <Text size="sm">Hapus <strong>{networksData.count}</strong> network Docker yang tidak dipakai?</Text>,
+                  labels: { confirm: 'Hapus Networks', cancel: 'Batal' },
+                  confirmProps: { color: 'orange' },
+                  onConfirm: () => pruneNetworks.mutate(),
+                })}
+              >
+                Prune Networks
+              </Button>
+            )}
+          </Group>
+        </Group>
+        {networksData?.count === 0 ? (
+          <Alert color="teal" icon={<TbCheck size={14} />} p="xs" mb="md">
+            <Text size="xs">Tidak ada dangling networks.</Text>
+          </Alert>
+        ) : networksData?.networks?.length > 0 ? (
+          <Paper withBorder radius="sm" style={{ overflow: 'hidden' }} mb="md">
+            <ScrollArea.Autosize mah={200}>
+              <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
+                <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
+                  <Table.Tr>
+                    <Table.Th>ID</Table.Th>
+                    <Table.Th>Nama</Table.Th>
+                    <Table.Th>Driver</Table.Th>
+                    <Table.Th>Scope</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {networksData.networks.map((n: any) => (
+                    <Table.Tr key={n.id}>
+                      <Table.Td><Code fz={10}>{n.id}</Code></Table.Td>
+                      <Table.Td><Text fz="xs">{n.name}</Text></Table.Td>
+                      <Table.Td><Text fz="xs">{n.driver}</Text></Table.Td>
+                      <Table.Td><Text fz="xs">{n.scope}</Text></Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea.Autosize>
+          </Paper>
+        ) : null}
       </Paper>
 
       </>}
