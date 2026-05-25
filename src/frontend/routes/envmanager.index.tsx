@@ -101,10 +101,13 @@ function ProjectAvatar({ name, role, size = 40 }: { name: string; role: string; 
   return (
     <Box style={{
       width: size, height: size, borderRadius: 8, flexShrink: 0,
-      background: `var(--mantine-color-${color}-6)`,
+      background: `var(--mantine-color-${color}-light)`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      <Text size={size > 36 ? 'sm' : 'xs'} fw={800} c="white" lh={1}>{initial}</Text>
+      <Text size={size > 36 ? 'sm' : 'xs'} fw={800} lh={1}
+        style={{ color: `var(--mantine-color-${color}-light-color)` }}>
+        {initial}
+      </Text>
     </Box>
   )
 }
@@ -122,13 +125,13 @@ const HOVER_STYLES = `
 }
 .envman-project-card:hover {
   transform: translateY(-2px);
-  border-color: var(--mantine-color-violet-5);
+  border-color: color-mix(in srgb, var(--mantine-color-violet-5) 50%, transparent);
   box-shadow: var(--mantine-shadow-sm);
 }
 .envman-project-card:focus-visible {
-  outline: 2px solid var(--mantine-color-violet-5);
+  outline: 2px solid color-mix(in srgb, var(--mantine-color-violet-5) 50%, transparent);
   outline-offset: 2px;
-  border-color: var(--mantine-color-violet-5);
+  border-color: color-mix(in srgb, var(--mantine-color-violet-5) 50%, transparent);
 }
 .envman-tag-chip {
   cursor: pointer;
@@ -403,7 +406,7 @@ function ProjectListPage() {
 
       {/* ─── Error state ────────────────────── */}
       {isError && (
-        <Card withBorder p="xl" ta="center" style={{ borderColor: 'var(--mantine-color-red-5)' }}>
+        <Card withBorder p="xl" ta="center" style={{ borderColor: 'color-mix(in srgb, var(--mantine-color-red-5) 35%, transparent)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="red" mx="auto" mb="sm">
             <TbAlertTriangle size={24} />
           </ThemeIcon>
@@ -900,7 +903,7 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagC
       <Group gap={0} pt={8} style={{ borderTop: '1px solid var(--mantine-color-default-border)', marginTop: 'auto' }}>
         <Tooltip label={`${p._count.environments} environment`} withArrow>
           <Group gap={4} style={{ flex: 1 }}>
-            <TbVariable size={12} color={`var(--mantine-color-${color}-5)`} />
+            <TbVariable size={12} style={{ color: `var(--mantine-color-${color}-light-color)` }} />
             <Text size="xs" fw={600}>{p._count.environments}</Text>
             <Text size="xs" c="dimmed">env</Text>
           </Group>
