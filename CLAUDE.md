@@ -208,8 +208,7 @@ Quick reference:
 - `envman pm {ls,describe,stop,restart,delete,reset,save,sync,logs} <name>` — lifecycle
 - Audit endpoint: `POST /api/envman/pm/audit` (lihat `src/routes/envman/pm-audit.ts`)
 
-Lihat @docs/CLI.md section "Process Manager" untuk usage detail dan @docs/PROCESS-MANAGER-PLAN.md
-untuk arsitektur lengkap (50+ bug mitigations terdokumentasi).
+Lihat @docs/CLI.md section "Process Manager" untuk usage detail.
 
 ## MCP Server (envman mcp)
 
@@ -223,8 +222,7 @@ Quick reference:
 - Setup di `.mcp.json`: `{ "mcpServers": { "envman": { "command": "envman", "args": ["mcp"] } } }`
 - Audit endpoint: `POST /api/envman/mcp/audit` (lihat `src/routes/envman/mcp-audit.ts`)
 
-Lihat @docs/CLI.md section "MCP Server" untuk usage detail dan @docs/MCP-SERVER-PLAN.md
-untuk arsitektur lengkap (60+ bug mitigations terdokumentasi).
+Lihat @docs/CLI.md section "MCP Server" untuk usage detail.
 
 ## Detail Docs
 
@@ -235,9 +233,6 @@ untuk arsitektur lengkap (60+ bug mitigations terdokumentasi).
 - @docs/INFRA.md — Redis, logging, MCP server, dev tools
 - @docs/AI-CONTRACT.md — aturan kerja AI di repo ini (wajib dibaca sebelum edit kode)
 - @docs/PERFORMANCE.md — panduan performa per layer: runtime, caching, bundle, infra (agnostik, bisa diterapkan di project serupa)
-- @docs/PRISMA7-MIGRATION.md — audit lengkap migrasi Prisma 6 → 7: breaking changes, solusi, potensi bug, urutan eksekusi
-- @docs/PROCESS-MANAGER-PLAN.md — perencanaan lengkap fitur envman pm: arsitektur, 50+ bug catalog + mitigasi, 7 fase implementasi
-
 ## Scaling Roadmap
 
 Baca sebelum menambah fitur besar atau melakukan refactor:

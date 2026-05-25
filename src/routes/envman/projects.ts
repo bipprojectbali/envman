@@ -63,7 +63,7 @@ export const projectsRouter = new Elysia()
     const access = await getProjectAccess(auth.userId, auth.role, params.slug)
     if (!access || access === 'VIEWER' || access === 'EDITOR') { set.status = 403; return { error: 'Owner required' } }
     const body = await request.json().catch(() => null)
-    const project = await prisma.project.update({ where: { slug: params.slug }, data: { name: body?.name, description: body?.description, ...(body?.tags !== undefined ? { tags: body.tags } : {}) } })
+    const project = await prisma.project.update({ where: { slug: params.slug }, data: { name: body?.name, description: body?.description, ...(body?.tags !== undefined ? { tags: body.tags } : {}), ...(typeof body?.isActive === 'boolean' ? { isActive: body.isActive } : {}) } })
     await invalidateProjectCaches(params.slug)
     return { project }
       })

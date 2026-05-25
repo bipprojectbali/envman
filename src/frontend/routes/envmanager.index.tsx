@@ -10,6 +10,7 @@ import {
   Kbd,
   Modal,
   Paper,
+  SegmentedControl,
   Select,
   Pagination,
   SimpleGrid,
@@ -39,6 +40,7 @@ import {
   TbPin,
   TbPinFilled,
   TbPlus,
+  TbPower,
   TbSearch,
   TbTag,
   TbTrash,
@@ -60,6 +62,7 @@ interface Project {
   name: string
   description?: string
   tags: string[]
+  isActive: boolean
   createdAt?: string
   myRole: 'OWNER' | 'EDITOR' | 'VIEWER'
   _count: { environments: number }
@@ -158,6 +161,7 @@ function ProjectListPage() {
   const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: 'envman:projects:tagFilter', defaultValue: [] })
   const [sort, setSort] = useLocalStorage<SortKey>({ key: 'envman:projects:sort', defaultValue: 'recent' })
   const [pinned, setPinned] = useLocalStorage<string[]>({ key: 'envman:projects:pinned', defaultValue: [] })
+  const [statusFilter, setStatusFilter] = useLocalStorage<'all' | 'active' | 'inactive'>({ key: 'envman:projects:statusFilter', defaultValue: 'all' })
 
   const [debouncedSearch] = useDebouncedValue(search, 150)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -205,8 +209,42 @@ function ProjectListPage() {
     onError: (e) => notifyErr(e),
   })
 
+  const toggleActive = useMutation({
+    mutationFn: ({ slug, isActive }: { slug: string; isActive: boolean }) =>
+      apiFetch(`/api/envman/projects/${slug}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+    onSuccess: (_, { isActive }) => {
+      qc.invalidateQueries({ queryKey: ['envman', 'projects'] })
+      notifyOk(isActive ? 'Project diaktifkan' : 'Project dinonaktifkan')
+    },
+    onError: (e) => notifyErr(e),
+  })
+
   const togglePin = (slug: string) =>
     setPinned(prev => prev.includes(slug) ? prev.filter(s => s !== slug) : [...prev, slug])
+
+  const confirmToggleActive = (slug: string, name: string, currentActive: boolean) => {
+    modals.openConfirmModal({
+      title: (
+        <Group gap="xs">
+          <ThemeIcon size="sm" variant="light" color={currentActive ? 'orange' : 'teal'} radius="md">
+            <TbPower size={13} />
+          </ThemeIcon>
+          <Text fw={600} size="sm">{currentActive ? 'Nonaktifkan project' : 'Aktifkan project'}</Text>
+        </Group>
+      ),
+      children: (
+        <Text size="sm">
+          {currentActive
+            ? <>Project <strong>{name}</strong> akan dinonaktifkan. Environment dan variabelnya tetap tersimpan, tapi project tidak akan muncul di filter "Aktif".</>
+            : <>Project <strong>{name}</strong> akan diaktifkan kembali.</>
+          }
+        </Text>
+      ),
+      labels: { confirm: currentActive ? 'Nonaktifkan' : 'Aktifkan', cancel: 'Batal' },
+      confirmProps: { color: currentActive ? 'orange' : 'teal' },
+      onConfirm: () => toggleActive.mutate({ slug, isActive: !currentActive }),
+    })
+  }
 
   const deleteProject = (slug: string, name: string) => {
     const id = `delete-project-${slug}`
@@ -244,7 +282,7 @@ function ProjectListPage() {
   const addTagFilter = (tag: string) =>
     setTagFilter(prev => prev.includes(tag) ? prev : [...prev, tag])
 
-  const resetFilter = () => { setSearch(''); setTagFilter([]) }
+  const resetFilter = () => { setSearch(''); setTagFilter([]); setStatusFilter('all') }
 
   const projects: Project[] = data?.projects ?? []
 
@@ -270,6 +308,8 @@ function ProjectListPage() {
     if (tagFilter.length > 0) {
       result = result.filter(p => tagFilter.every(t => (p.tags ?? []).includes(t)))
     }
+    if (statusFilter === 'active') result = result.filter(p => p.isActive)
+    if (statusFilter === 'inactive') result = result.filter(p => !p.isActive)
 
     const sorted = [...result]
     if (sort === 'name') {
@@ -277,25 +317,44 @@ function ProjectListPage() {
     } else if (sort === 'envs') {
       sorted.sort((a, b) => b._count.environments - a._count.environments)
     }
-    // 'recent' uses default API order (createdAt desc)
+    return sorted
+  }, [projects, debouncedSearch, tagFilter, statusFilter, sort])
 
-    return sorted.sort((a, b) => {
-      const ap = pinned.includes(a.slug) ? 0 : 1
-      const bp = pinned.includes(b.slug) ? 0 : 1
-      return ap - bp
-    })
-  }, [projects, debouncedSearch, tagFilter, sort, pinned])
+  // Grouped by status (pinned always first within each group)
+  const groups = useMemo(() => {
+    const sortGroup = (arr: Project[]) =>
+      [...arr].sort((a, b) => (pinned.includes(b.slug) ? 1 : 0) - (pinned.includes(a.slug) ? 1 : 0))
+    if (statusFilter !== 'all') {
+      return [{ key: statusFilter, label: null as string | null, items: sortGroup(filtered) }]
+    }
+    const pinnedItems = sortGroup(filtered.filter(p => pinned.includes(p.slug)))
+    const activeItems = sortGroup(filtered.filter(p => !pinned.includes(p.slug) && p.isActive))
+    const inactiveItems = sortGroup(filtered.filter(p => !pinned.includes(p.slug) && !p.isActive))
+    return [
+      pinnedItems.length > 0 ? { key: 'pinned', label: 'Pinned', items: pinnedItems } : null,
+      activeItems.length > 0 ? { key: 'active', label: pinnedItems.length > 0 || inactiveItems.length > 0 ? 'Aktif' : null, items: activeItems } : null,
+      inactiveItems.length > 0 ? { key: 'inactive', label: 'Nonaktif', items: inactiveItems } : null,
+    ].filter(Boolean) as { key: string; label: string | null; items: Project[] }[]
+  }, [filtered, pinned, statusFilter])
 
   const PAGE_SIZE = 24
   const [page, setPage] = useState(1)
-  useEffect(() => setPage(1), [debouncedSearch, tagFilter, sort])
+  useEffect(() => setPage(1), [debouncedSearch, tagFilter, statusFilter, sort])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  // Paginate across all groups flat
+  const paginatedSlugs = useMemo(() => {
+    const flat = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(p => p.slug)
+    return new Set(flat)
+  }, [filtered, page])
+  const paginatedGroups = useMemo(() =>
+    groups.map(g => ({ ...g, items: g.items.filter(p => paginatedSlugs.has(p.slug)) }))
+      .filter(g => g.items.length > 0),
+    [groups, paginatedSlugs])
 
   const ownerCount = projects.filter(p => p.myRole === 'OWNER').length
   const totalEnvs = projects.reduce((s, p) => s + p._count.environments, 0)
-  const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0
+  const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0 || statusFilter !== 'all'
 
   const openProject = (slug: string) =>
     navigate({ to: '/envmanager/$slug', params: { slug }, search: { tab: 'environments' } })
@@ -381,6 +440,17 @@ function ProjectListPage() {
               leftSection={<TbArrowsSort size={14} />}
               allowDeselect={false}
               w={155}
+              radius="md"
+            />
+            <SegmentedControl
+              size="xs"
+              value={statusFilter}
+              onChange={v => setStatusFilter(v as 'all' | 'active' | 'inactive')}
+              data={[
+                { value: 'all', label: 'Semua' },
+                { value: 'active', label: 'Aktif' },
+                { value: 'inactive', label: 'Nonaktif' },
+              ]}
               radius="md"
             />
           </Group>
@@ -478,37 +548,56 @@ function ProjectListPage() {
       {/* ─── Project list / grid ────────────── */}
       {!isError && filtered.length > 0 && (
         <>
-          {view === 'list' ? (
-            <Stack gap="xs">
-              {paginated.map((p) => (
-                <ProjectListCard
-                  key={p.slug}
-                  project={p}
-                  isPinned={pinned.includes(p.slug)}
-                  onPin={() => togglePin(p.slug)}
-                  onEdit={() => setEditTarget(p)}
-                  onDelete={() => deleteProject(p.slug, p.name)}
-                  onTagClick={addTagFilter}
-                  onClick={() => openProject(p.slug)}
-                />
-              ))}
-            </Stack>
-          ) : (
-            <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
-              {paginated.map((p) => (
-                <ProjectGridCard
-                  key={p.slug}
-                  project={p}
-                  isPinned={pinned.includes(p.slug)}
-                  onPin={() => togglePin(p.slug)}
-                  onEdit={() => setEditTarget(p)}
-                  onDelete={() => deleteProject(p.slug, p.name)}
-                  onTagClick={addTagFilter}
-                  onClick={() => openProject(p.slug)}
-                />
-              ))}
-            </SimpleGrid>
-          )}
+          <Stack gap="md">
+            {paginatedGroups.map((group, gi) => (
+              <Box key={group.key}>
+                {group.label && (
+                  <Group gap="xs" mb="xs" mt={gi > 0 ? 4 : 0}>
+                    <Text size="xs" fw={700} c={group.key === 'pinned' ? 'violet.6' : group.key === 'inactive' ? 'dimmed' : 'dimmed'} tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+                      {group.label}
+                    </Text>
+                    <Badge size="xs" variant="light" color={group.key === 'pinned' ? 'violet' : group.key === 'inactive' ? 'gray' : 'teal'} radius="sm">
+                      {group.items.length}
+                    </Badge>
+                    {gi > 0 && <Box style={{ flex: 1, height: 1, background: 'var(--mantine-color-default-border)' }} />}
+                  </Group>
+                )}
+                {view === 'list' ? (
+                  <Stack gap="xs">
+                    {group.items.map((p) => (
+                      <ProjectListCard
+                        key={p.slug}
+                        project={p}
+                        isPinned={pinned.includes(p.slug)}
+                        onPin={() => togglePin(p.slug)}
+                        onEdit={() => setEditTarget(p)}
+                        onDelete={() => deleteProject(p.slug, p.name)}
+                        onToggleActive={() => confirmToggleActive(p.slug, p.name, p.isActive)}
+                        onTagClick={addTagFilter}
+                        onClick={() => openProject(p.slug)}
+                      />
+                    ))}
+                  </Stack>
+                ) : (
+                  <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
+                    {group.items.map((p) => (
+                      <ProjectGridCard
+                        key={p.slug}
+                        project={p}
+                        isPinned={pinned.includes(p.slug)}
+                        onPin={() => togglePin(p.slug)}
+                        onEdit={() => setEditTarget(p)}
+                        onDelete={() => deleteProject(p.slug, p.name)}
+                        onToggleActive={() => confirmToggleActive(p.slug, p.name, p.isActive)}
+                        onTagClick={addTagFilter}
+                        onClick={() => openProject(p.slug)}
+                      />
+                    ))}
+                  </SimpleGrid>
+                )}
+              </Box>
+            ))}
+          </Stack>
           {totalPages > 1 && (
             <Group justify="center" mt="lg">
               <Pagination value={page} onChange={setPage} total={totalPages} />
@@ -704,6 +793,7 @@ interface CardProps {
   onPin: () => void
   onEdit: () => void
   onDelete: () => void
+  onToggleActive: () => void
   onTagClick: (tag: string) => void
   onClick: () => void
 }
@@ -832,8 +922,13 @@ function EditProjectModal({
   )
 }
 
-function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagClick, onClick }: CardProps) {
+function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onToggleActive, onTagClick, onClick }: CardProps) {
   const color = roleColor[p.myRole]
+  const bg = isPinned
+    ? 'color-mix(in srgb, var(--mantine-color-violet-3) 12%, var(--mantine-color-body))'
+    : !p.isActive
+      ? 'color-mix(in srgb, var(--mantine-color-gray-3) 15%, var(--mantine-color-body))'
+      : undefined
   return (
     <Card
       withBorder radius="lg" p="md"
@@ -842,7 +937,7 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagC
       aria-label={`Buka project ${p.name}`}
       onClick={onClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', background: bg }}
     >
       {/* Top row: avatar + actions */}
       <Group justify="space-between" mb="sm" wrap="nowrap" align="flex-start">
@@ -852,12 +947,17 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagC
         </Group>
         <Group gap={2} onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
           <Tooltip label={isPinned ? 'Lepas pin' : 'Pin'} withArrow>
-            <ActionIcon size="sm" variant="subtle" color={isPinned ? 'yellow' : 'gray'} onClick={e => { e.stopPropagation(); onPin() }}>
+            <ActionIcon size="sm" variant="subtle" color={isPinned ? 'violet' : 'gray'} onClick={e => { e.stopPropagation(); onPin() }}>
               {isPinned ? <TbPinFilled size={13} /> : <TbPin size={13} />}
             </ActionIcon>
           </Tooltip>
           {p.myRole === 'OWNER' && (
             <>
+              <Tooltip label={p.isActive ? 'Nonaktifkan' : 'Aktifkan'} withArrow>
+                <ActionIcon size="sm" variant="subtle" color={p.isActive ? 'gray' : 'teal'} onClick={e => { e.stopPropagation(); onToggleActive() }}>
+                  <TbPower size={13} />
+                </ActionIcon>
+              </Tooltip>
               <Tooltip label="Edit" withArrow>
                 <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); onEdit() }}>
                   <TbPencil size={13} />
@@ -926,8 +1026,13 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagC
   )
 }
 
-function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagClick, onClick }: CardProps) {
+function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onToggleActive, onTagClick, onClick }: CardProps) {
   const color = roleColor[p.myRole]
+  const bg = isPinned
+    ? 'color-mix(in srgb, var(--mantine-color-violet-3) 12%, var(--mantine-color-body))'
+    : !p.isActive
+      ? 'color-mix(in srgb, var(--mantine-color-gray-3) 15%, var(--mantine-color-body))'
+      : undefined
   return (
     <Card
       withBorder radius="md" p="sm"
@@ -936,7 +1041,7 @@ function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagC
       aria-label={`Buka project ${p.name}`}
       onClick={onClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', background: bg }}
     >
       <Group justify="space-between" wrap="nowrap" gap="sm">
         <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
@@ -997,12 +1102,17 @@ function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onTagC
         {/* Actions */}
         <Group gap={2} wrap="nowrap" onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
           <Tooltip label={isPinned ? 'Lepas pin' : 'Pin'} withArrow>
-            <ActionIcon size="sm" variant="subtle" color={isPinned ? 'yellow' : 'gray'} onClick={e => { e.stopPropagation(); onPin() }}>
+            <ActionIcon size="sm" variant="subtle" color={isPinned ? 'violet' : 'gray'} onClick={e => { e.stopPropagation(); onPin() }}>
               {isPinned ? <TbPinFilled size={13} /> : <TbPin size={13} />}
             </ActionIcon>
           </Tooltip>
           {p.myRole === 'OWNER' && (
             <>
+              <Tooltip label={p.isActive ? 'Nonaktifkan' : 'Aktifkan'} position="left" withArrow>
+                <ActionIcon size="sm" variant="subtle" color={p.isActive ? 'gray' : 'teal'} onClick={e => { e.stopPropagation(); onToggleActive() }}>
+                  <TbPower size={13} />
+                </ActionIcon>
+              </Tooltip>
               <Tooltip label="Edit" position="left" withArrow>
                 <ActionIcon size="sm" variant="subtle" color="gray" onClick={e => { e.stopPropagation(); onEdit() }}>
                   <TbPencil size={13} />

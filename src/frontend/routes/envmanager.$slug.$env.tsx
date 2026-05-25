@@ -41,6 +41,7 @@ import { CompareModal } from '@/frontend/components/env/CompareModal'
 import { useEffect, useMemo, useState } from 'react'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { apiFetch } from '@/frontend/lib/api'
+import { useExtensions } from '@/frontend/hooks/useExtensions'
 import {
   TbAlertTriangle,
   TbCheck,
@@ -117,6 +118,8 @@ function VarsPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const isMobile = useMediaQuery('(max-width: 48em)')
+  const { data: extensions } = useExtensions()
+  const portainerEnabled = extensions?.portainer ?? true
 
   // modals
   const [addOpen, { open: openAdd, close: closeAdd }] = useDisclosure(false)
@@ -439,31 +442,33 @@ function VarsPage() {
             </Badge>
           </Tooltip>
 
-          {/* Integrations — Portainer dll. */}
-          <Tooltip label={
-            portainerData?.config
-              ? `Portainer tersambung${portainerData.unsyncedCount > 0 ? ` · ${portainerData.unsyncedCount} belum di-sync` : ''}`
-              : 'Sambungkan ke Portainer (opsional)'
-          }>
-            <Indicator
-              color={portainerData?.config ? (portainerData.unsyncedCount > 0 ? 'orange' : 'teal') : 'gray'}
-              size={8}
-              offset={4}
-              processing={!!portainerData?.config && portainerData.unsyncedCount > 0}
-              disabled={!portainerData?.config}
-            >
-              <Button
-                size="compact-xs"
-                variant={portainerData?.config ? 'light' : 'subtle'}
-                color={portainerData?.config ? 'cyan' : 'gray'}
-                leftSection={<TbPlugConnected size={12} />}
-                onClick={openIntegrations}
-                px={isMobile ? 6 : 8}
+          {/* Integrations — Portainer dll. (hanya jika extension aktif) */}
+          {portainerEnabled && (
+            <Tooltip label={
+              portainerData?.config
+                ? `Portainer tersambung${portainerData.unsyncedCount > 0 ? ` · ${portainerData.unsyncedCount} belum di-sync` : ''}`
+                : 'Sambungkan ke Portainer (opsional)'
+            }>
+              <Indicator
+                color={portainerData?.config ? (portainerData.unsyncedCount > 0 ? 'orange' : 'teal') : 'gray'}
+                size={8}
+                offset={4}
+                processing={!!portainerData?.config && portainerData.unsyncedCount > 0}
+                disabled={!portainerData?.config}
               >
-                {isMobile ? '' : 'Integrasi'}
-              </Button>
-            </Indicator>
-          </Tooltip>
+                <Button
+                  size="compact-xs"
+                  variant={portainerData?.config ? 'light' : 'subtle'}
+                  color={portainerData?.config ? 'cyan' : 'gray'}
+                  leftSection={<TbPlugConnected size={12} />}
+                  onClick={openIntegrations}
+                  px={isMobile ? 6 : 8}
+                >
+                  {isMobile ? '' : 'Integrasi'}
+                </Button>
+              </Indicator>
+            </Tooltip>
+          )}
 
           <Tooltip label="Refresh">
             <ActionIcon size="sm" variant="subtle" color="gray" loading={isFetching} onClick={() => refetch()}>
@@ -1493,9 +1498,9 @@ function VarsPage() {
         canEdit={canEdit}
       />
 
-      {/* ─── Integrations Drawer (Portainer dll.) ──────── */}
+      {/* ─── Integrations Drawer (Portainer dll.) — hanya jika extension aktif ──────── */}
       <Drawer
-        opened={integrationsOpen}
+        opened={integrationsOpen && portainerEnabled}
         onClose={closeIntegrations}
         position="right"
         size={isMobile ? '100%' : 'xl'}

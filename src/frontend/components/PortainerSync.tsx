@@ -15,6 +15,7 @@ import {
   NumberInput,
   Paper,
   ScrollArea,
+  TextInput,
   Select,
   Stack,
   Stepper,
@@ -23,7 +24,8 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
+import { useDisclosure, useLocalStorage } from '@mantine/hooks'
+import { useSession } from '../hooks/useAuth'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
@@ -50,6 +52,11 @@ import {
   TbServer,
   TbTrash,
   TbX,
+  TbTerminal2,
+  TbPlayerPlay,
+  TbBookmark,
+  TbClipboard,
+  TbEraser,
 } from 'react-icons/tb'
 
 interface Props {
@@ -147,6 +154,8 @@ function relativeTime(dateStr: string): string {
 }
 
 export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
+  const { data: session } = useSession()
+  const isSuperAdmin = session?.user?.role === 'SUPER_ADMIN'
   const qc = useQueryClient()
   const [setupOpen, { open: openSetup, close: closeSetup }] = useDisclosure(false)
   const [diffOpen, { open: openDiff, close: closeDiff }] = useDisclosure(false)
@@ -180,6 +189,28 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
   const logViewportRef = useRef<HTMLDivElement>(null)
+
+  // Exec modal state
+  type ExecContainer = { containerId: string; endpointId: number; containerName: string }
+  const [execOpen, { open: openExec, close: closeExec }] = useDisclosure(false)
+  const [execContainer, setExecContainer] = useState<ExecContainer | null>(null)
+  const [execCommand, setExecCommand] = useState('')
+  const [execHistory, setExecHistory] = useState<{ command: string; stdout: string[]; stderr: string[]; exitCode: number | null; timestamp: number }[]>([])
+  const [execQuickCommands, setExecQuickCommands] = useLocalStorage<{ id: string; label: string; command: string }[]>({
+    key: 'envman:exec:quick-commands',
+    defaultValue: [
+      { id: 'ps', label: 'ps', command: 'ps aux' },
+      { id: 'env', label: 'env', command: 'env | sort' },
+      { id: 'df', label: 'df', command: 'df -h' },
+      { id: 'free', label: 'free', command: 'free -h 2>/dev/null || cat /proc/meminfo 2>/dev/null' },
+      { id: 'netstat', label: 'netstat', command: 'netstat -tlnp 2>/dev/null || ss -tlnp' },
+    ],
+  })
+  const [execShowQuickAdd, setExecShowQuickAdd] = useState(false)
+  const [execNewQuickLabel, setExecNewQuickLabel] = useState('')
+  const [execNewQuickCommand, setExecNewQuickCommand] = useState('')
+  const execHistoryIdxRef = useRef(-1)
+  const execOutputRef = useRef<HTMLDivElement>(null)
 
   const handleClose = () => {
     closeSetup()
@@ -252,7 +283,26 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
     }
   }, [logLines, autoScroll])
 
+  useEffect(() => {
+    if (execOpen && execOutputRef.current) {
+      execOutputRef.current.scrollTop = execOutputRef.current.scrollHeight
+    }
+  }, [execHistory, execOpen])
+
   // ─── Mutations ────────────────────────────────────────────────────────────
+  const execMutation = useMutation({
+    mutationFn: ({ containerId, endpointId, command }: { containerId: string; endpointId: number; command: string }) =>
+      apiFetch(`/api/envman/portainer/connections/${config!.connectionId}/exec`, {
+        method: 'POST',
+        body: JSON.stringify({ containerId, endpointId, command }),
+      }),
+    onSuccess: (data: any, { command }) => {
+      setExecHistory(prev => [{ command, stdout: data.stdout ?? [], stderr: data.stderr ?? [], exitCode: data.exitCode ?? null, timestamp: Date.now() }, ...prev])
+      setExecCommand('')
+    },
+    onError: (e: Error) => { alert(e.message) },
+  })
+
   const probe = useMutation({
     mutationFn: (connectionId: string) =>
       apiFetch(`/api/envman/portainer/connections/${connectionId}/probe`, { method: 'POST' }),
@@ -495,106 +545,111 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
         <Card withBorder radius="md" p={0} style={{ overflow: 'hidden' }}>
           {/* Header — stack info + status */}
           <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
-            <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
-              <Group gap="md" style={{ flex: 1, minWidth: 0 }}>
-                <ThemeIcon
-                  size={48} radius="md" variant="light"
-                  color={syncStatus === 'failed' ? 'red' : syncStatus === 'success' ? 'teal' : 'gray'}
-                >
-                  {syncStatus === 'failed' ? <TbX size={22} /> : <TbCloud size={22} />}
-                </ThemeIcon>
-                <Box style={{ flex: 1, minWidth: 0 }}>
-                  <Group gap="xs" mb={4} wrap="nowrap">
-                    <Text fw={700} size="md" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {config.stackName}
-                    </Text>
-                    {syncStatus === 'success' && (
-                      <Badge size="sm" color="teal" variant="light" leftSection={<TbCheck size={10} />}>Synced</Badge>
-                    )}
-                    {syncStatus === 'failed' && (
-                      <Badge size="sm" color="red" variant="light" leftSection={<TbX size={10} />}>Failed</Badge>
-                    )}
-                    {syncStatus === 'never' && (
-                      <Badge size="sm" color="gray" variant="outline">Belum pernah sync</Badge>
-                    )}
-                  </Group>
-                  <Group gap="xs" wrap="wrap">
-                    {config.connectionName && (
-                      <Badge size="xs" variant="dot" color="primary" leftSection={<TbPlugConnected size={9} />}>
-                        {config.connectionName}
-                      </Badge>
-                    )}
-                    <Badge size="xs" variant="outline" color="gray">
-                      Endpoint #{config.endpointId}
-                    </Badge>
-                    <Badge size="xs" variant="outline" color="gray">
-                      Stack #{config.stackId}
-                    </Badge>
-                  </Group>
-                </Box>
+            <Stack gap="xs">
+              {/* Row 1: icon + name + status badges + manage icons */}
+              <Group justify="space-between" wrap="nowrap" gap="sm">
+                <Group gap="sm" style={{ minWidth: 0, flex: 1 }}>
+                  <ThemeIcon
+                    size={36} radius="md" variant="light"
+                    color={syncStatus === 'failed' ? 'red' : syncStatus === 'success' ? 'teal' : 'gray'}
+                  >
+                    {syncStatus === 'failed' ? <TbX size={18} /> : <TbCloud size={18} />}
+                  </ThemeIcon>
+                  <Box style={{ minWidth: 0, flex: 1 }}>
+                    <Group gap="xs" mb={2} wrap="nowrap">
+                      <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {config.stackName}
+                      </Text>
+                      {syncStatus === 'success' && (
+                        <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={9} />}>Synced</Badge>
+                      )}
+                      {syncStatus === 'failed' && (
+                        <Badge size="xs" color="red" variant="light" leftSection={<TbX size={9} />}>Failed</Badge>
+                      )}
+                      {syncStatus === 'never' && (
+                        <Badge size="xs" color="gray" variant="outline">Belum sync</Badge>
+                      )}
+                    </Group>
+                    <Group gap={4} wrap="wrap">
+                      {config.connectionName && (
+                        <Badge size="xs" variant="dot" color="primary" leftSection={<TbPlugConnected size={9} />}>
+                          {config.connectionName}
+                        </Badge>
+                      )}
+                      <Badge size="xs" variant="outline" color="gray">ep#{config.endpointId}</Badge>
+                      <Badge size="xs" variant="outline" color="gray">stack#{config.stackId}</Badge>
+                    </Group>
+                  </Box>
+                </Group>
+
+                {/* Manage icons — edit & delete only */}
+                <Group gap={4} wrap="nowrap">
+                  {sync.isError && (
+                    <Tooltip label={(sync.error as Error).message} position="left" multiline maw={260}>
+                      <Badge size="xs" color="red" variant="light" leftSection={<TbAlertTriangle size={10} />} style={{ cursor: 'help' }}>error</Badge>
+                    </Tooltip>
+                  )}
+                  {canEdit && (
+                    <>
+                      <Tooltip label="Edit konfigurasi">
+                        <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEdit(config!)}>
+                          <TbPencil size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Hapus koneksi">
+                        <ActionIcon size="sm" variant="subtle" color="red" onClick={deleteConfig}>
+                          <TbTrash size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </>
+                  )}
+                </Group>
               </Group>
 
-              {/* Action buttons */}
-              <Group gap="xs" wrap="nowrap">
-                {sync.isError && (
-                  <Tooltip label={(sync.error as Error).message} position="left" multiline maw={260}>
-                    <Badge size="xs" color="red" variant="light" leftSection={<TbAlertTriangle size={10} />} style={{ cursor: 'help' }}>error</Badge>
+              {/* Row 2: action buttons — can wrap on narrow panels */}
+              {canEdit && (
+                <Group gap="xs" wrap="wrap">
+                  <Button
+                    size="xs" variant="subtle" color="gray"
+                    leftSection={<TbPlug size={12} />}
+                    onClick={() => openDiff()}
+                  >
+                    Diff
+                  </Button>
+                  <Tooltip label="Pull image terbaru & restart container">
+                    <Button
+                      size="xs" variant="light" color="blue"
+                      leftSection={<TbRefreshDot size={12} />}
+                      loading={repull.isPending}
+                      disabled={!config?.connectionId}
+                      onClick={confirmRepull}
+                    >
+                      Repull
+                    </Button>
                   </Tooltip>
-                )}
-                {canEdit && (
-                  <>
-                    <Tooltip label="Edit konfigurasi">
-                      <ActionIcon size="md" variant="subtle" color="gray" onClick={() => openEdit(config!)}>
-                        <TbPencil size={15} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Hapus koneksi">
-                      <ActionIcon size="md" variant="subtle" color="red" onClick={deleteConfig}>
-                        <TbTrash size={15} />
-                      </ActionIcon>
-                    </Tooltip>
+                  <Tooltip label="Stop → start ulang container (tanpa pull)">
                     <Button
-                      size="sm" variant="light" color="gray"
-                      leftSection={<TbPlug size={14} />}
-                      onClick={() => openDiff()}
+                      size="xs" variant="light" color="orange"
+                      leftSection={<TbRefresh size={12} />}
+                      loading={recreate.isPending}
+                      disabled={!config?.connectionId}
+                      onClick={confirmRecreate}
                     >
-                      Diff
+                      Recreate
                     </Button>
-                    <Tooltip label="Pull image terbaru & restart container">
-                      <Button
-                        size="sm" variant="light" color="blue"
-                        leftSection={<TbRefreshDot size={14} />}
-                        loading={repull.isPending}
-                        disabled={!config?.connectionId}
-                        onClick={confirmRepull}
-                      >
-                        Repull
-                      </Button>
-                    </Tooltip>
-                    <Tooltip label="Stop → start ulang container (tanpa pull)">
-                      <Button
-                        size="sm" variant="light" color="orange"
-                        leftSection={<TbRefresh size={14} />}
-                        loading={recreate.isPending}
-                        disabled={!config?.connectionId}
-                        onClick={confirmRecreate}
-                      >
-                        Recreate
-                      </Button>
-                    </Tooltip>
-                    <Button
-                      size="sm" color="primary"
-                      variant={sync.isPending ? 'filled' : 'light'}
-                      leftSection={sync.isPending ? <Loader size={12} color="white" /> : <TbCloudUpload size={14} />}
-                      onClick={confirmSync}
-                      loading={sync.isPending}
-                    >
-                      Sync Vars
-                    </Button>
-                  </>
-                )}
-              </Group>
-            </Group>
+                  </Tooltip>
+                  <Button
+                    size="xs" color="primary"
+                    variant={sync.isPending ? 'filled' : 'light'}
+                    leftSection={sync.isPending ? <Loader size={10} color="white" /> : <TbCloudUpload size={12} />}
+                    onClick={confirmSync}
+                    loading={sync.isPending}
+                  >
+                    Sync Vars
+                  </Button>
+                </Group>
+              )}
+            </Stack>
           </Box>
 
           {/* Body */}
@@ -735,10 +790,19 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                           <Badge size="xs" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
                           {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
                           <Tooltip label="Lihat logs">
-                            <ActionIcon size="sm" variant="subtle" color="gray">
+                            <ActionIcon size="sm" variant="subtle" color="gray"
+                              onClick={e => { e.stopPropagation(); setSelectedContainerId(c.id); openLogs() }}>
                               <TbFileText size={13} />
                             </ActionIcon>
                           </Tooltip>
+                          {canEdit && (
+                            <Tooltip label="Exec command">
+                              <ActionIcon size="sm" variant="subtle" color="teal"
+                                onClick={e => { e.stopPropagation(); setExecContainer({ containerId: c.id, endpointId: config!.endpointId, containerName: c.names[0] }); setExecHistory([]); openExec() }}>
+                                <TbTerminal2 size={13} />
+                              </ActionIcon>
+                            </Tooltip>
+                          )}
                         </Group>
                       </Group>
                     </Paper>
@@ -1199,6 +1263,213 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
             </>
           )}
         </Stack>
+      </Modal>
+
+      {/* ─── Exec Modal ───────────────────────────────────── */}
+      <Modal
+        opened={execOpen}
+        onClose={() => { closeExec(); setExecCommand(''); execHistoryIdxRef.current = -1 }}
+        size="xl"
+        title={
+          <Group gap="sm">
+            <ThemeIcon size={32} radius="md" variant="light" color="teal"><TbTerminal2 size={16} /></ThemeIcon>
+            <Box>
+              <Text fw={700} size="sm" lh={1.3}>{execContainer?.containerName}</Text>
+              <Text size="xs" c="dimmed" lh={1.2}>{config?.stackName} — {slug}:{env}</Text>
+            </Box>
+          </Group>
+        }
+        styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '70vh', overflow: 'hidden' } }}
+      >
+        {/* Quick commands */}
+        <Box style={{ background: 'var(--mantine-color-default-hover)', borderBottom: '1px solid var(--mantine-color-default-border)', flexShrink: 0 }}>
+          <Box px="sm" pt="sm" pb="sm">
+            <Group gap="xs" justify="space-between" mb={execQuickCommands.length > 0 || execShowQuickAdd ? 'xs' : 0}>
+              <Group gap={6} align="center">
+                <TbBookmark size={12} style={{ color: 'var(--mantine-color-teal-6)' }} />
+                <Text size="xs" fw={600}>Quick Commands</Text>
+                <Text size="xs" c="dimmed">— tersimpan untuk semua container</Text>
+              </Group>
+              <Group gap={4}>
+                {execHistory.length > 0 && (
+                  <Tooltip label="Hapus semua riwayat">
+                    <ActionIcon size="xs" variant="subtle" color="red"
+                      onClick={() => { setExecHistory([]); execHistoryIdxRef.current = -1 }}>
+                      <TbEraser size={12} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+                {isSuperAdmin && (
+                  <Tooltip label={execShowQuickAdd ? 'Batal' : 'Tambah quick command'}>
+                    <ActionIcon size="xs" variant={execShowQuickAdd ? 'light' : 'subtle'} color={execShowQuickAdd ? 'red' : 'teal'}
+                      onClick={() => { setExecShowQuickAdd(v => !v); setExecNewQuickLabel(''); setExecNewQuickCommand('') }}>
+                      {execShowQuickAdd ? <TbX size={12} /> : <TbPlus size={12} />}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </Group>
+            </Group>
+            {execShowQuickAdd && (
+              <Paper withBorder p="xs" radius="sm" mb="xs" style={{ background: 'var(--mantine-color-body)' }}>
+                <Group gap="xs" align="flex-end">
+                  <TextInput size="xs" label="Label" placeholder="mis: ps" value={execNewQuickLabel}
+                    onChange={e => setExecNewQuickLabel(e.target.value)} style={{ width: 100 }} />
+                  <TextInput size="xs" label="Command" placeholder="ps aux | grep node"
+                    value={execNewQuickCommand} onChange={e => setExecNewQuickCommand(e.target.value)}
+                    style={{ flex: 1 }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && execNewQuickLabel.trim() && execNewQuickCommand.trim()) {
+                        setExecQuickCommands(prev => [...prev, { id: crypto.randomUUID(), label: execNewQuickLabel.trim(), command: execNewQuickCommand.trim() }])
+                        setExecNewQuickLabel(''); setExecNewQuickCommand(''); setExecShowQuickAdd(false)
+                      }
+                    }}
+                  />
+                  <ActionIcon size="sm" variant="filled" color="teal" mb={1}
+                    disabled={!execNewQuickLabel.trim() || !execNewQuickCommand.trim()}
+                    onClick={() => {
+                      setExecQuickCommands(prev => [...prev, { id: crypto.randomUUID(), label: execNewQuickLabel.trim(), command: execNewQuickCommand.trim() }])
+                      setExecNewQuickLabel(''); setExecNewQuickCommand(''); setExecShowQuickAdd(false)
+                    }}>
+                    <TbCheck size={12} />
+                  </ActionIcon>
+                </Group>
+              </Paper>
+            )}
+            {execQuickCommands.length > 0 && (
+              <Group gap={4} wrap="wrap">
+                {execQuickCommands.map(qc => (
+                  <Tooltip key={qc.id} label={<Text size="xs" ff="monospace">{qc.command}</Text>} openDelay={350} multiline maw={280}>
+                    <Group gap={0} wrap="nowrap">
+                      <Box component="button"
+                        onClick={() => { setExecCommand(qc.command); execHistoryIdxRef.current = -1 }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--mantine-color-teal-light)', color: 'var(--mantine-color-teal-text)', border: 'none', borderRadius: isSuperAdmin ? '4px 0 0 4px' : '4px', padding: '2px 7px', fontSize: 11, fontWeight: 600, cursor: 'pointer', userSelect: 'none', lineHeight: 1.6 }}>
+                        <TbTerminal2 size={10} />{qc.label}
+                      </Box>
+                      {isSuperAdmin && (
+                        <Box component="button"
+                          onClick={() => setExecQuickCommands(prev => prev.filter(x => x.id !== qc.id))}
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, background: 'var(--mantine-color-teal-light)', border: 'none', borderLeft: '1px solid var(--mantine-color-teal-light-hover)', borderRadius: '0 4px 4px 0', cursor: 'pointer', color: 'var(--mantine-color-teal-text)', fontSize: 13, padding: 0, alignSelf: 'stretch' }}>
+                          ×
+                        </Box>
+                      )}
+                    </Group>
+                  </Tooltip>
+                ))}
+              </Group>
+            )}
+          </Box>
+        </Box>
+
+        {/* Terminal output */}
+        <Box ref={execOutputRef} style={{ flex: 1, overflowY: 'auto', background: '#0d1117' }}>
+          {execHistory.length === 0 && !execMutation.isPending ? (
+            <Box p="md">
+              <Text fz={12} ff="monospace" style={{ color: '#8b949e' }}>
+                Connected to <Text span ff="monospace" style={{ color: '#79c0ff' }}>{execContainer?.containerName}</Text>
+              </Text>
+              <Text fz={11} ff="monospace" mt={6} style={{ color: '#636e7b' }}>
+                Ketik command lalu tekan{' '}
+                <Text span style={{ color: '#e6edf3', background: '#21262d', padding: '1px 5px', borderRadius: 3 }}>Enter</Text>
+                {' '}untuk eksekusi. Gunakan{' '}
+                <Text span style={{ color: '#e6edf3', background: '#21262d', padding: '1px 5px', borderRadius: 3 }}>↑↓</Text>
+                {' '}untuk navigasi riwayat.
+              </Text>
+            </Box>
+          ) : (
+            <Box p="sm" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[...execHistory].reverse().map((entry, i) => (
+                <Box key={i} style={{ borderRadius: 6, border: '1px solid #21262d', overflow: 'hidden' }}>
+                  <Group px="sm" py={5} gap="xs" wrap="nowrap" justify="space-between"
+                    style={{ background: '#161b22', borderBottom: (entry.stdout.length > 0 || entry.stderr.length > 0) ? '1px solid #21262d' : undefined }}>
+                    <Group gap={6} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+                      <Text span fz={12} ff="monospace" style={{ color: '#3fb950', flexShrink: 0 }}>❯</Text>
+                      <Text span fz={12} ff="monospace" style={{ color: '#79c0ff', wordBreak: 'break-all' }}>{entry.command}</Text>
+                    </Group>
+                    <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
+                      <Text fz={10} style={{ color: '#636e7b' }}>{new Date(entry.timestamp).toLocaleTimeString('id-ID', { hour12: false })}</Text>
+                      <Badge size="xs" variant="dot" color={entry.exitCode === 0 ? 'teal' : entry.exitCode === null ? 'gray' : 'red'}>
+                        {entry.exitCode ?? '?'}
+                      </Badge>
+                      <Tooltip label="Copy output" openDelay={400}>
+                        <ActionIcon size="xs" variant="subtle" color="gray"
+                          onClick={() => navigator.clipboard.writeText([...entry.stdout, ...entry.stderr].join('\n')).catch(() => {})}>
+                          <TbClipboard size={11} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Group>
+                  {entry.stdout.length === 0 && entry.stderr.length === 0 ? (
+                    <Box px="sm" py={6}><Text fz={11} ff="monospace" style={{ color: '#636e7b', fontStyle: 'italic' }}>(no output)</Text></Box>
+                  ) : (
+                    <Box px="sm" py={6}>
+                      {entry.stdout.map((line, j) => (
+                        <Text key={`o${j}`} fz={11} ff="monospace" style={{ color: '#e6edf3', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.6 }}>{line}</Text>
+                      ))}
+                      {entry.stderr.map((line, j) => (
+                        <Text key={`e${j}`} fz={11} ff="monospace" style={{ color: '#ff7b72', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.6 }}>{line}</Text>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          )}
+          {execMutation.isPending && (
+            <Box px="sm" pb="sm">
+              <Group gap="xs" px="sm" py={8} style={{ background: '#161b22', borderRadius: 6, border: '1px solid #21262d' }}>
+                <Loader size="xs" color="teal" />
+                <Text fz={11} ff="monospace" style={{ color: '#636e7b' }}>
+                  running <Text span ff="monospace" style={{ color: '#79c0ff' }}>{execCommand}</Text> ...
+                </Text>
+              </Group>
+            </Box>
+          )}
+        </Box>
+
+        {/* Command input */}
+        <Box style={{ borderTop: '1px solid #21262d', background: '#010409', flexShrink: 0, padding: '10px 12px 8px' }}>
+          <Group gap="xs" wrap="nowrap" align="center">
+            <Text fz={14} ff="monospace" style={{ color: '#3fb950', flexShrink: 0, userSelect: 'none' }}>❯</Text>
+            <TextInput
+              style={{ flex: 1 }} size="sm"
+              placeholder={execMutation.isPending ? 'waiting...' : 'command...'}
+              value={execCommand}
+              onChange={e => { execHistoryIdxRef.current = -1; setExecCommand(e.target.value) }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && execCommand.trim() && !execMutation.isPending && execContainer) {
+                  execMutation.mutate({ containerId: execContainer.containerId, endpointId: execContainer.endpointId, command: execCommand.trim() })
+                  return
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  const newIdx = Math.min(execHistoryIdxRef.current + 1, execHistory.length - 1)
+                  execHistoryIdxRef.current = newIdx
+                  if (execHistory[newIdx]) setExecCommand(execHistory[newIdx].command)
+                  return
+                }
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  const newIdx = Math.max(execHistoryIdxRef.current - 1, -1)
+                  execHistoryIdxRef.current = newIdx
+                  setExecCommand(newIdx === -1 ? '' : (execHistory[newIdx]?.command ?? ''))
+                }
+              }}
+              styles={{ input: { fontFamily: 'monospace', fontSize: 13, background: '#0d1117', border: '1px solid #30363d', color: '#e6edf3' } }}
+              disabled={execMutation.isPending}
+              autoFocus
+            />
+            <ActionIcon size="lg" variant="filled" color="teal"
+              loading={execMutation.isPending}
+              disabled={!execCommand.trim() || execMutation.isPending || !execContainer}
+              onClick={() => execContainer && execMutation.mutate({ containerId: execContainer.containerId, endpointId: execContainer.endpointId, command: execCommand.trim() })}>
+              <TbPlayerPlay size={15} />
+            </ActionIcon>
+          </Group>
+          <Group mt={5} justify="space-between">
+            <Text fz={10} style={{ color: '#636e7b' }}>↑↓ history · Enter jalankan</Text>
+            {execHistory.length > 0 && <Text fz={10} style={{ color: '#636e7b' }}>{execHistory.length} command dijalankan</Text>}
+          </Group>
+        </Box>
       </Modal>
     </>
   )

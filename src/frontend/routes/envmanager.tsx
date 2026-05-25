@@ -37,6 +37,7 @@ import {
 } from 'react-icons/tb'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { hasCapability, useLogout, useSession } from '@/frontend/hooks/useAuth'
+import { useExtensions } from '@/frontend/hooks/useExtensions'
 
 export const Route = createFileRoute('/envmanager')({
   beforeLoad: async ({ context }) => {
@@ -68,6 +69,8 @@ function EnvManagerLayout() {
   const { data } = useSession()
   const logout = useLogout()
   const user = data?.user
+  const { data: extensions } = useExtensions()
+  const portainerEnabled = extensions?.portainer ?? true
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false)
   const isMobile = useMediaQuery('(max-width: 48em)')
   const navigate = useNavigate()
@@ -107,7 +110,7 @@ function EnvManagerLayout() {
     ...(hasCapability(user, 'menu:tokens')
       ? [{ label: 'Tokens', description: 'API token untuk CLI', icon: TbKey, href: '/envmanager/tokens', active: isTokens }]
       : []),
-    ...(hasCapability(user, 'menu:connections')
+    ...(hasCapability(user, 'menu:connections') && portainerEnabled
       ? [{ label: 'Connections', description: 'Portainer instances', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections }]
       : []),
     ...(hasCapability(user, 'menu:gists')
