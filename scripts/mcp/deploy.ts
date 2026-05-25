@@ -42,7 +42,7 @@ function run(cmd: string, opts?: { cwd?: string; env?: NodeJS.ProcessEnv }): str
   }).trim()
 }
 
-function tryRun(cmd: string, opts?: { cwd?: string }): string {
+function tryRun(cmd: string, opts?: { cwd?: string; env?: NodeJS.ProcessEnv }): string {
   try {
     return run(cmd, opts)
   } catch {
@@ -138,7 +138,7 @@ function scanCredentials(branch: string): { ok: boolean; issues: CredIssue[]; se
   for (const { name, re } of CREDENTIAL_PATTERNS) {
     const matches = addedLines.match(new RegExp(re.source, 'g')) ?? []
     if (matches.length > 0) {
-      const sample = matches[0].slice(0, 20) + '***'
+      const sample = (matches[0] ?? '').slice(0, 20) + '***'
       issues.push({ type: name, sample, count: matches.length })
     }
   }
