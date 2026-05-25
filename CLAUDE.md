@@ -233,6 +233,7 @@ Lihat @docs/CLI.md section "MCP Server" untuk usage detail.
 - @docs/INFRA.md — Redis, logging, MCP server, dev tools
 - @docs/AI-CONTRACT.md — aturan kerja AI di repo ini (wajib dibaca sebelum edit kode)
 - @docs/PERFORMANCE.md — panduan performa per layer: runtime, caching, bundle, infra (agnostik, bisa diterapkan di project serupa)
+- @docs/FILE-HEALTH.md — aturan ukuran & struktur file: batas baris/karakter per tipe, kapan harus pecah, pola pemecahan
 ## Scaling Roadmap
 
 Baca sebelum menambah fitur besar atau melakukan refactor:
