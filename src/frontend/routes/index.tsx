@@ -33,6 +33,7 @@ import {
   TbNote,
   TbPlayerPlay,
   TbRefresh,
+  TbRobot,
   TbServer,
   TbShield,
   TbTerminal,
@@ -74,7 +75,7 @@ const features = [
     color: 'blue',
     title: 'Project Files',
     description:
-      'Simpan scripts, config, dan template per project. Eksekusi langsung: envman -e myapp:dev -- bash files:deploy. Konten di-pipe via stdin, zero disk write.',
+      'Simpan scripts, config, dan template per project. Eksekusi langsung: envman -- bash myapp:scripts/deploy.sh. Konten di-pipe via stdin, zero disk write.',
   },
   {
     icon: TbNote,
@@ -110,6 +111,20 @@ const features = [
     title: 'Auto-Update CLI',
     description:
       'Binary CLI auto-update di background setiap ada versi baru. Tidak perlu reinstall manual — envman update jika butuh update paksa.',
+  },
+  {
+    icon: TbTerminal,
+    color: 'indigo',
+    title: 'Process Manager',
+    description:
+      'envman pm — supervisor process built-in, tanpa PM2. Start, stop, restart, logs, env sync, crash-loop quarantine. Daemon persisten di background.',
+  },
+  {
+    icon: TbRobot,
+    color: 'violet',
+    title: 'MCP untuk AI Agent',
+    description:
+      'envman mcp — stdio MCP server untuk Claude Code. Agent bisa introspect vars, files, aliases, dan kontrol pm process tanpa shell exec.',
   },
   {
     icon: TbServer,
@@ -614,6 +629,18 @@ envman run myapp:deploy --flag arg       # passthrough args ke command
 envman -- bash myapp:scripts/deploy.sh         # slug:path, tanpa -e
 envman -- bun myapp:utils/seed.ts              # slug:file.ts
 envman -e myapp:production -- bash myapp:scripts/deploy.sh  # + inject env vars
+
+# Process Manager (POSIX: Linux + macOS)
+envman pm daemon start               # start supervisor daemon
+envman pm start --name api -- bun index.js   # start managed process
+envman pm start --name api -s myapp:prod -- bun index.js  # + env sync
+envman pm ls                         # list semua proses
+envman pm logs api -f                # tail logs live
+envman pm stop|restart|delete api   # lifecycle
+
+# MCP server (Claude Code + AI agents)
+envman mcp                           # readonly (15 tools)
+envman mcp --write                   # + write tools (var_set, pm_start, dll)
 
 # Flag
 --server-wins    system env menang vs merged vars (default: merged wins)`}
