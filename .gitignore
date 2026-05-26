@@ -47,3 +47,4 @@ prisma/seed-dev.ts
 # Scratch notes & test files
 xnote.md
 xtest.ts
+.tanstack/tmp/
