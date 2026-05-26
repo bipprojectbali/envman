@@ -166,6 +166,10 @@ async function serveFrontend(request: Request): Promise<Response> {
   return new Response('Not Found', { status: 404 })
 }
 
+// ─── Portainer Backup Crons ───────────────────────────
+import { syncBackupCrons } from './lib/portainer-cron'
+syncBackupCrons().catch(console.error)
+
 // ─── Audit Log Rotation ───────────────────────────────
 import { prisma } from './lib/db'
 

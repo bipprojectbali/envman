@@ -56,6 +56,7 @@ model User {
   assigned              Ticket[]              @relation("TicketAssignee")
   portainerConnections  PortainerConnection[]
   portainerSyncLogs     PortainerSyncLog[]
+  portainerBackups      PortainerBackup[]     @relation("PortainerBackupCreator")
   comments              TicketComment[]
   projectMembers        ProjectMember[]
   envMemberships        EnvironmentMember[]
@@ -383,9 +384,11 @@ model PortainerConnection {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  createdBy      User                   @relation(fields: [createdById], references: [id])
+  createdBy      User                      @relation(fields: [createdById], references: [id])
   configs        PortainerConfig[]
   stackTargets   PortainerStackTarget[]
+  backups        PortainerBackup[]
+  backupSchedule PortainerBackupSchedule?
 
   @@map("portainer_connection")
 }
@@ -450,4 +453,47 @@ model PortainerStackTarget {
 
   @@index([configId])
   @@map("portainer_stack_target")
+}
+
+enum PortainerBackupType {
+  PORTAINER_DB
+  COMPOSE_FILES
+  FULL
+}
+
+model PortainerBackup {
+  id           String              @id @default(uuid())
+  connectionId String
+  type         PortainerBackupType @default(PORTAINER_DB)
+  note         String?
+  sizeBytes    Int?
+  data         Bytes
+  ok           Boolean
+  error        String?
+  createdById  String?
+  createdAt    DateTime            @default(now())
+
+  connection PortainerConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  createdBy  User?               @relation("PortainerBackupCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([connectionId])
+  @@index([createdAt])
+  @@map("portainer_backup")
+}
+
+model PortainerBackupSchedule {
+  id           String              @id @default(uuid())
+  connectionId String              @unique
+  cron         String
+  type         PortainerBackupType @default(PORTAINER_DB)
+  note         String?
+  enabled      Boolean             @default(true)
+  lastRunAt    DateTime?
+  lastRunOk    Boolean?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  connection PortainerConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@map("portainer_backup_schedule")
 }
