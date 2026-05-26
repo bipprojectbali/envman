@@ -4,13 +4,11 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Container,
   Divider,
   Group,
   Menu,
   Modal,
-  Paper,
   ScrollArea,
   Select,
   Stack,
@@ -185,15 +183,15 @@ export function TicketsPanel() {
           <Stack gap="xs">
             {isLoading && <Text ta="center" c="dimmed" py="md" size="sm">Loading…</Text>}
             {!isLoading && tickets.length === 0 && (
-              <Paper withBorder p="lg" ta="center" radius="md">
+              <Box p="lg" ta="center" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
                 <Text size="sm" c="dimmed">Tidak ada ticket</Text>
-              </Paper>
+              </Box>
             )}
             {tickets.map((t) => (
-              <Paper
+              <Box
                 key={t.id}
-                withBorder p="sm" radius="md"
-                style={{ cursor: 'pointer' }}
+                p="sm"
+                style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
                 onClick={() => setDetailId(t.id)}
               >
                 <Group justify="space-between" mb={6} wrap="nowrap">
@@ -217,12 +215,12 @@ export function TicketsPanel() {
                     <Badge size="xs" variant="default">{t._count.evidence}e</Badge>
                   </Group>
                 </Group>
-              </Paper>
+              </Box>
             ))}
           </Stack>
         ) : (
           /* Desktop: scrollable table */
-          <Card withBorder padding={0} radius="md">
+          <Box p={0} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
             <ScrollArea>
               <Table striped highlightOnHover style={{ minWidth: 680 }}>
                 <Table.Thead>
@@ -285,7 +283,7 @@ export function TicketsPanel() {
                 </Table.Tbody>
               </Table>
             </ScrollArea>
-          </Card>
+          </Box>
         )}
       </Stack>
 
@@ -456,14 +454,14 @@ function TicketDetailModal({
             )}
           </Group>
 
-          <Card withBorder padding="sm" radius="sm">
+          <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}>
             <Text size="xs" c="dimmed" mb={4}>
               Description
             </Text>
             <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
               {ticket.description}
             </Text>
-          </Card>
+          </Box>
 
           <Group gap="xs" wrap="wrap">
             <Text size="xs" c="dimmed">
@@ -480,7 +478,7 @@ function TicketDetailModal({
           </Group>
 
           {/* Status actions */}
-          <Card withBorder padding="sm" radius="sm">
+          <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}>
             <Text size="xs" c="dimmed" mb={6}>
               Actions
             </Text>
@@ -557,10 +555,10 @@ function TicketDetailModal({
                 {patch.error.message}
               </Alert>
             )}
-          </Card>
+          </Box>
 
           {/* Comments */}
-          <Card withBorder padding="sm" radius="sm">
+          <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}>
             <Text size="xs" c="dimmed" mb={6}>
               Comments ({ticket.comments.length})
             </Text>
@@ -571,7 +569,7 @@ function TicketDetailModal({
                 </Text>
               )}
               {ticket.comments.map((c) => (
-                <Card key={c.id} withBorder padding="xs" radius="xs">
+                <Box key={c.id} p="xs" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-xs)' }}>
                   <Group gap="xs" mb={2}>
                     <Badge
                       size="xs"
@@ -589,7 +587,7 @@ function TicketDetailModal({
                   <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
                     {c.body}
                   </Text>
-                </Card>
+                </Box>
               ))}
             </Stack>
             <Group mt="sm" align="flex-end">
@@ -610,10 +608,10 @@ function TicketDetailModal({
                 Send
               </Button>
             </Group>
-          </Card>
+          </Box>
 
           {/* Evidence */}
-          <Card withBorder padding="sm" radius="sm">
+          <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}>
             <Text size="xs" c="dimmed" mb={6}>
               Evidence ({ticket.evidence.length})
             </Text>
@@ -678,7 +676,7 @@ function TicketDetailModal({
                 Attach
               </Button>
             </Group>
-          </Card>
+          </Box>
         </Stack>
       )}
     </Modal>

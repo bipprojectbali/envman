@@ -1,4 +1,4 @@
-import { Avatar, Badge, Box, Button, Container, Divider, Group, Paper, Stack, Text, Title } from '@mantine/core'
+import { Avatar, Badge, Box, Button, Container, Divider, Group, Stack, Text, Title } from '@mantine/core'
 import { modals } from '@mantine/modals'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { TbLogout, TbUser } from 'react-icons/tb'
@@ -79,7 +79,7 @@ function ProfilePage() {
         </Group>
 
         {/* Avatar card */}
-        <Paper withBorder p="lg" radius="md">
+        <Box p="lg" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
           <Stack align="center" gap="sm">
             <Avatar color="blue" radius="xl" size={72} variant="gradient" gradient={{ from: 'blue', to: 'violet' }}>
               {user?.name?.charAt(0).toUpperCase()}
@@ -92,10 +92,10 @@ function ProfilePage() {
               {user?.role}
             </Badge>
           </Stack>
-        </Paper>
+        </Box>
 
         {/* Info */}
-        <Paper withBorder p="md" radius="md">
+        <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
           <Group gap="xs" mb="sm">
             <TbUser size={15} />
             <Text fw={600} size="sm">Account Info</Text>
@@ -113,7 +113,7 @@ function ProfilePage() {
               </Group>
             ))}
           </Stack>
-        </Paper>
+        </Box>
       </Stack>
     </Container>
   )

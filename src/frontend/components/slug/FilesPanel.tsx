@@ -1,16 +1,15 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
-  Card,
   Code,
   CopyButton,
   Divider,
   Group,
   Modal,
   Pagination,
-  Paper,
   SegmentedControl,
   Select,
   SimpleGrid,
@@ -35,6 +34,7 @@ import {
   TbFileCode,
   TbFilePlus,
   TbFiles,
+  TbInfoCircle,
   TbLayoutGrid,
   TbLayoutList,
   TbPlus,
@@ -339,7 +339,7 @@ function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; o
                     </Group>
                   </Box>
                 ) : (
-                  <Paper withBorder p="md" mih={220} radius="md">
+                  <Box p="md" mih={220} style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
                     {f.content ? (
                       <MarkdownRenderer fontSize={13}>
                         {f.language === 'markdown' ? f.content : `\`\`\`${f.language}\n${f.content}\n\`\`\``}
@@ -352,7 +352,7 @@ function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; o
                         </Stack>
                       </Group>
                     )}
-                  </Paper>
+                  </Box>
                 )}
               </Stack>
             </Tabs.Panel>
@@ -416,14 +416,14 @@ function FileCard({ file, slug, canManage, onEdit, onDelete, onView, onTagClick 
 }) {
   const firstFile = file.files[0]
   return (
-    <Card
-      withBorder p="sm"
+    <Box
+      p="sm"
       className="envman-file-card"
       role="article"
       tabIndex={0}
       onClick={onView}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
-      style={{ cursor: 'pointer' }}
+      style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
     >
       <Group justify="space-between" wrap="nowrap" mb={4}>
         <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
@@ -519,7 +519,7 @@ function FileCard({ file, slug, canManage, onEdit, onDelete, onView, onTagClick 
           <Text size="xs" c="dimmed" ml="auto">{file.author.name} · {relTime(file.updatedAt)}</Text>
         </Tooltip>
       </Group>
-    </Card>
+    </Box>
   )
 }
 
@@ -563,11 +563,11 @@ function FileViewModal({ file, onClose, canManage, onEdit }: {
           </Tabs.List>
           {file.files.map((f, i) => (
             <Tabs.Panel key={i} value={String(i)} pt="xs">
-              <Paper withBorder p="md" style={{ maxHeight: 400, overflowY: 'auto' }}>
+              <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', maxHeight: 400, overflowY: 'auto' }}>
                 <MarkdownRenderer fontSize={13}>
                   {f.language === 'markdown' ? (f.content || '_Kosong_') : `\`\`\`${f.language}\n${f.content || ''}\n\`\`\``}
                 </MarkdownRenderer>
-              </Paper>
+              </Box>
             </Tabs.Panel>
           ))}
         </Tabs>
@@ -669,12 +669,12 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
       children: (
         <Stack gap="sm">
           <Text size="sm">Hapus <strong>{f.title}</strong>?</Text>
-          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+          <Box p="xs" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
             <Group gap={4} mb={4}>
               {f.files.map(e => <Badge key={e.filename} size="xs" variant="dot" color={getLangColor(e.language)}>{e.filename}</Badge>)}
             </Group>
             <Text size="xs" c="dimmed">{f.files.length} file · dibuat {absoluteTime(f.createdAt)}</Text>
-          </Paper>
+          </Box>
           <Text size="xs" c="dimmed">Tindakan ini tidak dapat dibatalkan.</Text>
           <Group justify="flex-end" mt="xs">
             <Button variant="subtle" color="gray" onClick={() => modals.close(modalId)}>Batal</Button>
@@ -738,51 +738,60 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
         )}
       </Group>
 
+      <Alert
+        variant="light" color="blue" radius="md" mb="xs" p="xs"
+        icon={<TbInfoCircle size={15} />}
+        styles={{ message: { fontSize: 'var(--mantine-font-size-xs)' }, body: { gap: 4 } }}
+      >
+        Simpan scripts, snippets, dan config files per project. File dapat dieksekusi langsung dari CLI tanpa download.
+        Jalankan: <Code fz="xs">envman -- bash {slug}:scripts/deploy.sh</Code>. Mendukung multi-file per entry dan preview Markdown.
+      </Alert>
+
       {/* Toolbar */}
       {!isLoading && files.length > 0 && (
-        <Paper withBorder radius="md" p="xs" mb="md">
-          <Group gap="xs" wrap="wrap">
-            <TextInput
-              ref={searchRef}
-              size="xs"
-              placeholder="Cari judul, deskripsi, filename, isi, atau tag..."
-              leftSection={<TbSearch size={13} />}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              rightSection={search ? (
-                <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon>
-              ) : undefined}
-              style={{ flex: 1, minWidth: 160 }}
-            />
-            <MultiSelectChips
-              value={tagFilter}
-              onChange={setTagFilter}
-              options={allTags}
-              label="Tags"
-              icon={<TbTag size={12} />}
-              width={120}
-              disabled={allTags.length === 0}
-            />
-            <Select
-              size="xs"
-              value={sort}
-              onChange={v => setSort((v ?? 'updated') as 'updated' | 'created')}
-              data={[{ value: 'updated', label: 'Terbaru diupdate' }, { value: 'created', label: 'Terbaru dibuat' }]}
-              leftSection={<TbSortAscending size={13} />}
-              allowDeselect={false}
-              style={{ width: 160 }}
-            />
-            <Group gap={4} ml="auto">
+        <Stack gap="xs" mb="md">
+          <TextInput
+            ref={searchRef}
+            size="sm"
+            placeholder="Cari judul, deskripsi, filename, isi, atau tag..."
+            leftSection={<TbSearch size={13} />}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            rightSection={search ? (
+              <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon>
+            ) : undefined}
+            radius="md"
+          />
+          <Group justify="space-between" wrap="wrap" gap="xs">
+            <Group gap="xs" wrap="wrap">
+              <MultiSelectChips
+                value={tagFilter}
+                onChange={setTagFilter}
+                options={allTags}
+                label="Tags"
+                icon={<TbTag size={12} />}
+                width={120}
+                disabled={allTags.length === 0}
+              />
+              <Select
+                size="xs"
+                value={sort}
+                onChange={v => setSort((v ?? 'updated') as 'updated' | 'created')}
+                data={[{ value: 'updated', label: 'Terbaru diupdate' }, { value: 'created', label: 'Terbaru dibuat' }]}
+                leftSection={<TbSortAscending size={13} />}
+                allowDeselect={false}
+                w={160}
+              />
+            </Group>
+            <Group gap={4}>
               <Tooltip label="List view"><ActionIcon size="sm" variant={view === 'list' ? 'filled' : 'subtle'} color="blue" onClick={() => setView('list')}><TbLayoutList size={14} /></ActionIcon></Tooltip>
               <Tooltip label="Grid view"><ActionIcon size="sm" variant={view === 'grid' ? 'filled' : 'subtle'} color="blue" onClick={() => setView('grid')}><TbLayoutGrid size={14} /></ActionIcon></Tooltip>
             </Group>
           </Group>
           {tagFilter.length > 0 && (
-            <Box mt="xs">
-              <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />
-            </Box>
+            <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />
           )}
-        </Paper>
+        </Stack>
       )}
 
       {/* Skeleton */}
@@ -796,7 +805,7 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
 
       {/* Empty state */}
       {!isLoading && !isError && files.length === 0 && (
-        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="blue" mx="auto" mb="sm"><TbFiles size={24} /></ThemeIcon>
           <Text fw={600} mb={4}>Belum ada file</Text>
           <Text size="sm" c="dimmed" mb="md" maw={400} mx="auto">
@@ -807,15 +816,19 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
               Buat File Pertama
             </Button>
           )}
-        </Card>
+        </Box>
       )}
 
       {/* No filter results */}
       {!isLoading && !isError && files.length > 0 && filtered.length === 0 && (
-        <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
-          <Text size="sm" c="dimmed" mb="xs">Tidak ada file yang cocok dengan filter.</Text>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
+            <TbSearch size={22} />
+          </ThemeIcon>
+          <Text fw={500} size="sm" mb={4}>Tidak ada file yang cocok</Text>
+          <Text size="xs" c="dimmed" mb="sm">Coba ubah filter atau kata kunci pencarian.</Text>
           <Button type="button" size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={resetFilter}>Reset filter</Button>
-        </Card>
+        </Box>
       )}
 
       {/* List */}

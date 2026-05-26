@@ -11,7 +11,6 @@ import {
   Group,
   Loader,
   Modal,
-  Paper,
   ScrollArea,
   SegmentedControl,
   Stack,
@@ -494,7 +493,7 @@ function DiffRowItem({
   const expandable = row.category !== 'uncertain'
 
   return (
-    <Paper withBorder p={0} radius="sm">
+    <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }} p={0}>
       {/* ── Header row (compact, clickable) ─────────────── */}
       <Group
         gap="xs" wrap="nowrap" align="center" px="sm" py={6}
@@ -620,7 +619,7 @@ function DiffRowItem({
           )}
         </Box>
       )}
-    </Paper>
+    </Box>
   )
 }
 

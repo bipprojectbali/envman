@@ -4,7 +4,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Checkbox,
   Code,
   Collapse,
@@ -13,7 +12,6 @@ import {
   Group,
   Kbd,
   Modal,
-  Paper,
   SegmentedControl,
   Pagination,
   Select,
@@ -137,7 +135,7 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
     const someSelected = !allAccess && selectedCount > 0 && !allSelected
     const isOpen = expanded.has(p.slug)
     return (
-      <Paper key={p.slug} withBorder p={0} style={{ overflow: 'hidden', opacity: allAccess ? 0.55 : 1 }}>
+      <Box key={p.slug} style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden', opacity: allAccess ? 0.55 : 1 }}>
         <Group
           gap="xs" p="xs"
           style={{ cursor: 'pointer', background: someSelected || allSelected ? 'var(--mantine-color-violet-light)' : undefined }}
@@ -178,7 +176,7 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
             )}
           </Stack>
         </Collapse>
-      </Paper>
+      </Box>
     )
   }
 
@@ -188,12 +186,13 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
     const allSelected = !allAccess && selectedCount === projectScopes.length && projectScopes.length > 0
     const someSelected = !allAccess && selectedCount > 0 && !allSelected
     return (
-      <Paper
-        key={p.slug} withBorder p="xs"
+      <Box
+        key={p.slug} p="xs"
         style={{
+          borderRadius: 'var(--mantine-radius-md)',
+          border: `1px solid ${allSelected ? 'var(--mantine-color-primary)' : 'var(--mantine-color-default-border)'}`,
           opacity: allAccess ? 0.55 : 1,
           background: allSelected || someSelected ? 'var(--mantine-color-violet-light)' : undefined,
-          borderColor: allSelected ? 'var(--mantine-color-primary)' : undefined,
         }}
       >
         <Group gap="xs" mb={6} wrap="nowrap">
@@ -232,18 +231,19 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
         {selectedCount > 0 && (
           <Text size="xs" c="primary" mt={4}>{selectedCount}/{projectScopes.length} dipilih</Text>
         )}
-      </Paper>
+      </Box>
     )
   }
 
   return (
     <Stack gap={6}>
       {/* All access toggle */}
-      <Paper
-        withBorder p="xs"
+      <Box
+        p="xs"
         style={{
+          borderRadius: 'var(--mantine-radius-md)',
+          border: `1px solid ${allAccess ? 'var(--mantine-color-primary)' : 'var(--mantine-color-default-border)'}`,
           cursor: allAccess ? 'default' : 'pointer',
-          borderColor: allAccess ? 'var(--mantine-color-primary)' : undefined,
           background: allAccess ? 'var(--mantine-color-violet-light)' : undefined,
         }}
         onClick={() => { if (!allAccess) onChange([]) }}
@@ -256,7 +256,7 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
           </Box>
           {!allAccess && <Badge size="xs" color="gray" variant="outline">klik untuk reset</Badge>}
         </Group>
-      </Paper>
+      </Box>
 
       {/* Toolbar: search + view toggle */}
       <Group gap="xs" wrap="nowrap">
@@ -604,7 +604,7 @@ function TokensPage() {
       {/* ── Izin akses ── */}
       <Stack gap="xs">
         <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Izin Akses</Text>
-        <Paper withBorder p="sm" style={{ background: f.canWrite ? 'var(--mantine-color-orange-light)' : undefined, borderColor: f.canWrite ? 'var(--mantine-color-orange-5)' : undefined }}>
+        <Box p="sm" style={{ borderRadius: 'var(--mantine-radius-md)', border: `1px solid ${f.canWrite ? 'var(--mantine-color-orange-5)' : 'var(--mantine-color-default-border)'}`, background: f.canWrite ? 'var(--mantine-color-orange-light)' : undefined }}>
           <Group justify="space-between" wrap="nowrap">
             <Box style={{ flex: 1 }}>
               <Group gap="xs" mb={2}>
@@ -624,7 +624,7 @@ function TokensPage() {
               color="orange"
             />
           </Group>
-        </Paper>
+        </Box>
       </Stack>
 
       {/* ── Scope ── */}
@@ -736,10 +736,10 @@ function TokensPage() {
           <Text size="sm" c="dimmed">/</Text>
           <Text size="sm" fw={600}>Buat Token Baru</Text>
         </Group>
-        <Card withBorder radius="md" p="md">
+        <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
           {tokenForm(form, setForm)}
           <Divider my="md" />
-          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)" mb="md">
+          <Box p="xs" mb="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
             <Text size="xs" fw={600} mb={4}>Ringkasan token:</Text>
             <Group gap="xs" wrap="wrap">
               <Badge size="xs" color={form.canWrite ? 'orange' : 'blue'} variant="light" leftSection={form.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
@@ -752,7 +752,7 @@ function TokensPage() {
                 {form.expiresAt ? `exp: ${new Date(form.expiresAt).toLocaleDateString('id-ID')}` : 'tidak ada expiry'}
               </Badge>
             </Group>
-          </Paper>
+          </Box>
           <Group justify="flex-end" gap="xs">
             <Button variant="subtle" color="gray" onClick={() => { setForm(emptyForm); goToList() }} disabled={createToken.isPending}>
               Batal
@@ -769,7 +769,7 @@ function TokensPage() {
             </Button>
           </Group>
           {createToken.isError && <Text size="xs" c="red" mt="xs">{(createToken.error as Error).message}</Text>}
-        </Card>
+        </Box>
       </Stack>
     )
   }
@@ -787,10 +787,10 @@ function TokensPage() {
           <Text size="sm" c="dimmed">/</Text>
           <Text size="sm" fw={600}>Edit</Text>
         </Group>
-        <Card withBorder radius="md" p="md">
+        <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
           {tokenForm(editForm, setEditForm)}
           <Divider my="md" />
-          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)" mb="md">
+          <Box p="xs" mb="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
             <Text size="xs" fw={600} mb={4}>Ringkasan token:</Text>
             <Group gap="xs" wrap="wrap">
               <Badge size="xs" color={editForm.canWrite ? 'orange' : 'blue'} variant="light" leftSection={editForm.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
@@ -803,7 +803,7 @@ function TokensPage() {
                 {editForm.expiresAt ? `exp: ${new Date(editForm.expiresAt).toLocaleDateString('id-ID')}` : 'tidak ada expiry'}
               </Badge>
             </Group>
-          </Paper>
+          </Box>
           <Group justify="flex-end" gap="xs">
             <Button variant="subtle" color="gray" onClick={() => goToDetail(selectedToken.id)} disabled={editToken.isPending}>
               Batal
@@ -818,7 +818,7 @@ function TokensPage() {
             </Button>
           </Group>
           {editToken.isError && <Text size="xs" c="red" mt="xs">{(editToken.error as Error).message}</Text>}
-        </Card>
+        </Box>
       </Stack>
     )
   }
@@ -852,11 +852,23 @@ function TokensPage() {
         <Box style={{ minWidth: 0 }}>
           <Text fw={800} size="xl" lh={1.2}>API Tokens</Text>
           {!isLoading && tokens.length > 0 && (
-            <Text size="xs" c="dimmed" mt={2}>
-              {tokens.length} total · {activeTokens.length} aktif
-              {expiredTokens.length > 0 && ` · ${expiredTokens.length} expired`}
-              {disabledTokens.length > 0 && ` · ${disabledTokens.length} disabled`}
-            </Text>
+            <Group gap={4} mt={2} wrap="wrap">
+              <Text size="xs" c="dimmed">{tokens.length} token</Text>
+              <Text size="xs" c="dimmed">·</Text>
+              <Text size="xs" c="dimmed">{activeTokens.length} aktif</Text>
+              {expiredTokens.length > 0 && (
+                <>
+                  <Text size="xs" c="dimmed">·</Text>
+                  <Text size="xs" c="dimmed">{expiredTokens.length} expired</Text>
+                </>
+              )}
+              {disabledTokens.length > 0 && (
+                <>
+                  <Text size="xs" c="dimmed">·</Text>
+                  <Text size="xs" c="dimmed">{disabledTokens.length} disabled</Text>
+                </>
+              )}
+            </Group>
           )}
         </Box>
         <Group gap="xs" wrap="nowrap">
@@ -878,61 +890,49 @@ function TokensPage() {
 
       {/* ─── Toolbar ────────────────────────── */}
       {!isError && tokens.length > 0 && (
-        <Box mb="md">
+        <Stack gap="xs" mb="md">
+          {/* Search — selalu full width */}
+          <TextInput
+            ref={searchRef}
+            size="sm"
+            placeholder="Cari nama atau scope..."
+            leftSection={<TbSearch size={14} />}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            rightSection={
+              search ? (
+                <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
+                  <TbX size={12} />
+                </ActionIcon>
+              ) : (
+                <Tooltip label="Tekan / untuk focus">
+                  <Kbd size="xs">/</Kbd>
+                </Tooltip>
+              )
+            }
+            rightSectionWidth={36}
+            radius="md"
+          />
+
+          {/* Filter row — wrap di mobile */}
           <Group gap="xs" wrap="wrap">
-            <TextInput
-              ref={searchRef}
+            <SegmentedControl
               size="xs"
-              placeholder="Cari nama atau scope..."
-              leftSection={<TbSearch size={13} />}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              rightSection={
-                search ? (
-                  <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
-                    <TbX size={11} />
-                  </ActionIcon>
-                ) : (
-                  <Tooltip label="Tekan / untuk focus">
-                    <Kbd size="xs">/</Kbd>
-                  </Tooltip>
-                )
-              }
-              rightSectionWidth={32}
-              style={{ flex: '1 1 180px', minWidth: 0 }}
+              value={filterStatus}
+              onChange={setFilterStatus}
+              data={[
+                { label: `Semua ${tokens.length}`, value: 'semua' },
+                { label: `Aktif ${activeTokens.length}`, value: 'aktif' },
+                { label: `Expired ${expiredTokens.length}`, value: 'expired' },
+                { label: `Disabled ${disabledTokens.length}`, value: 'disabled' },
+              ]}
+              radius="md"
             />
-            {isMobile ? (
-              <Select
-                size="xs"
-                value={filterStatus}
-                onChange={v => setFilterStatus(v ?? 'semua')}
-                data={[
-                  { label: `Semua (${tokens.length})`, value: 'semua' },
-                  { label: `Aktif (${activeTokens.length})`, value: 'aktif' },
-                  { label: `Expired (${expiredTokens.length})`, value: 'expired' },
-                  { label: `Disabled (${disabledTokens.length})`, value: 'disabled' },
-                ]}
-                allowDeselect={false}
-                w={130}
-              />
-            ) : (
-              <SegmentedControl
-                size="xs"
-                value={filterStatus}
-                onChange={setFilterStatus}
-                data={[
-                  { label: `Semua ${tokens.length}`, value: 'semua' },
-                  { label: `Aktif ${activeTokens.length}`, value: 'aktif' },
-                  { label: `Expired ${expiredTokens.length}`, value: 'expired' },
-                  { label: `Disabled ${disabledTokens.length}`, value: 'disabled' },
-                ]}
-              />
-            )}
             {projects.length > 0 && (
               <MultiSelectChips
-                size="xs"
+                size="sm"
                 label="Project"
-                icon={<TbFilter size={13} />}
+                icon={<TbFilter size={14} />}
                 width={130}
                 options={projects.map(p => ({ value: p.slug, label: p.name }))}
                 value={filterProjects}
@@ -941,9 +941,9 @@ function TokensPage() {
             )}
             {allTags.length > 0 && (
               <MultiSelectChips
-                size="xs"
+                size="sm"
                 label="Tag"
-                icon={<TbTag size={13} />}
+                icon={<TbTag size={14} />}
                 width={130}
                 options={allTags}
                 value={filterTags}
@@ -951,9 +951,9 @@ function TokensPage() {
               />
             )}
             <Select
-              size="xs"
-              w={isMobile ? 130 : 150}
-              leftSection={<TbSortAscending size={13} />}
+              size="sm"
+              w={155}
+              leftSection={<TbSortAscending size={14} />}
               value={sort}
               onChange={v => setSort(v ?? 'terbaru')}
               data={[
@@ -963,11 +963,13 @@ function TokensPage() {
                 { label: 'Last used', value: 'last_used' },
               ]}
               allowDeselect={false}
+              radius="md"
             />
           </Group>
+
+          {/* Active project chips */}
           {filterProjects.length > 0 && (
-            <Group gap="xs" mt="xs" wrap="wrap" align="center">
-              <Text size="xs" c="dimmed">Project aktif:</Text>
+            <Group gap={6} wrap="wrap" align="center">
               <MultiSelectChipsRow
                 value={filterProjects}
                 onChange={setFilterProjects}
@@ -975,9 +977,10 @@ function TokensPage() {
               />
             </Group>
           )}
+
+          {/* Active tag chips */}
           {filterTags.length > 0 && (
-            <Group gap="xs" mt="xs" wrap="wrap" align="center">
-              <Text size="xs" c="dimmed">Tag aktif:</Text>
+            <Group gap={6} wrap="wrap" align="center">
               <MultiSelectChipsRow
                 value={filterTags}
                 onChange={setFilterTags}
@@ -985,19 +988,21 @@ function TokensPage() {
               />
             </Group>
           )}
+
+          {/* Result count + reset */}
           {hasFilter && (
-            <Group justify="space-between" mt={6} gap="xs" wrap="nowrap">
+            <Group justify="space-between" gap="xs" wrap="nowrap">
               <Text size="xs" c="dimmed">
                 {filteredTokens.length === tokens.length
                   ? `${tokens.length} token`
                   : `${filteredTokens.length} dari ${tokens.length} token`}
               </Text>
               <Button size="compact-xs" variant="subtle" color="gray" leftSection={<TbX size={11} />} onClick={resetFilter}>
-                Reset
+                Reset filter
               </Button>
             </Group>
           )}
-        </Box>
+        </Stack>
       )}
 
       <Group gap="xs" mb="md" align="center">
@@ -1013,7 +1018,7 @@ function TokensPage() {
 
       {/* ─── New token banner ───────────────── */}
       {newToken && (
-        <Card withBorder mb="md" p="md" style={{ borderColor: 'var(--mantine-color-teal-5)', position: 'relative' }}>
+        <Box mb="md" p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-teal-5)', position: 'relative' }}>
           <ActionIcon size="xs" variant="subtle" color="gray" style={{ position: 'absolute', top: 8, right: 8 }} onClick={() => setNewToken(null)}>
             <TbX size={12} />
           </ActionIcon>
@@ -1059,12 +1064,12 @@ function TokensPage() {
               </Box>
             ))}
           </Stack>
-        </Card>
+        </Box>
       )}
 
       {/* ─── Error state ────────────────────── */}
       {isError && (
-        <Card withBorder p="xl" ta="center" style={{ borderColor: 'var(--mantine-color-red-5)' }}>
+        <Box p="xl" ta="center" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-red-5)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="red" mx="auto" mb="sm">
             <TbAlertTriangle size={24} />
           </ThemeIcon>
@@ -1075,7 +1080,7 @@ function TokensPage() {
           <Button size="xs" variant="light" color="red" onClick={() => refetch()}>
             Coba lagi
           </Button>
-        </Card>
+        </Box>
       )}
 
       {/* ─── Token list ─────────────────────── */}
@@ -1090,7 +1095,7 @@ function TokensPage() {
           </Stack>
         )
       ) : !isError && tokens.length === 0 ? (
-        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
             <TbKey size={24} />
           </ThemeIcon>
@@ -1106,9 +1111,9 @@ function TokensPage() {
           ) : (
             <Text size="xs" c="dimmed">Tidak punya izin create API token. Hubungi SUPER_ADMIN.</Text>
           )}
-        </Card>
+        </Box>
       ) : !isError && filteredTokens.length === 0 ? (
-        <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="lg" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
           <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
             <TbSearch size={22} />
           </ThemeIcon>
@@ -1117,7 +1122,7 @@ function TokensPage() {
           <Button size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={resetFilter}>
             Reset filter
           </Button>
-        </Card>
+        </Box>
       ) : !isError && view === 'grid' ? (
         <>
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
@@ -1198,7 +1203,7 @@ function TokensPage() {
         <Stack gap="md">
           {tokenForm(editForm, setEditForm)}
           <Divider />
-          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+          <Box p="xs" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
             <Text size="xs" fw={600} mb={4}>Ringkasan token:</Text>
             <Group gap="xs" wrap="wrap">
               <Badge size="xs" color={editForm.canWrite ? 'orange' : 'blue'} variant="light" leftSection={editForm.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
@@ -1211,7 +1216,7 @@ function TokensPage() {
                 {editForm.expiresAt ? `exp: ${new Date(editForm.expiresAt).toLocaleDateString('id-ID')}` : 'tidak ada expiry'}
               </Badge>
             </Group>
-          </Paper>
+          </Box>
           <Button fullWidth leftSection={<TbCheck size={14} />} onClick={() => editToken.mutate(editForm)} loading={editToken.isPending} disabled={!editForm.name}>
             Simpan Perubahan
           </Button>

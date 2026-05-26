@@ -3,13 +3,11 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   Divider,
   Group,
   Kbd,
   Modal,
-  Paper,
   SegmentedControl,
   Select,
   Pagination,
@@ -364,18 +362,25 @@ function ProjectListPage() {
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover effects */}
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
-      {/* ─── Header ─────────────────────────── */}
-      <Group justify="space-between" mb="md" wrap="nowrap" align="center">
+      {/* ─── Header ─── */}
+      <Group justify="space-between" mb="md" gap="xs" align="flex-start">
         <Box style={{ minWidth: 0 }}>
           <Text fw={800} size="xl" lh={1.2}>Projects</Text>
           {!isLoading && !isError && projects.length > 0 && (
-            <Text size="xs" c="dimmed" mt={2}>
-              {projects.length} project · {totalEnvs} env
-              {ownerCount > 0 && ` · ${ownerCount} milik saya`}
-            </Text>
+            <Group gap={4} mt={2} wrap="wrap">
+              <Text size="xs" c="dimmed">{projects.length} project</Text>
+              <Text size="xs" c="dimmed">·</Text>
+              <Text size="xs" c="dimmed">{totalEnvs} environment</Text>
+              {ownerCount > 0 && (
+                <>
+                  <Text size="xs" c="dimmed">·</Text>
+                  <Text size="xs" c="dimmed">{ownerCount} milik saya</Text>
+                </>
+              )}
+            </Group>
           )}
         </Box>
-        <Group gap="xs" wrap="nowrap">
+        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
           {projects.length > 0 && (
             <Tooltip label={view === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
               <ActionIcon
@@ -395,32 +400,34 @@ function ProjectListPage() {
         </Group>
       </Group>
 
-      {/* ─── Toolbar: search + filter + sort ─── */}
+      {/* ─── Toolbar ─── */}
       {!isLoading && !isError && projects.length > 0 && (
-        <Box mb="md">
+        <Stack gap="xs" mb="md">
+          {/* Search — selalu full width */}
+          <TextInput
+            ref={searchRef}
+            size="sm"
+            placeholder="Cari project, slug, deskripsi, atau tag..."
+            leftSection={<TbSearch size={14} />}
+            rightSection={
+              search ? (
+                <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
+                  <TbX size={12} />
+                </ActionIcon>
+              ) : (
+                <Tooltip label="Tekan / untuk focus">
+                  <Kbd size="xs">/</Kbd>
+                </Tooltip>
+              )
+            }
+            rightSectionWidth={36}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            radius="md"
+          />
+
+          {/* Filter row — wrap di mobile */}
           <Group gap="xs" wrap="wrap">
-            <TextInput
-              ref={searchRef}
-              size="sm"
-              placeholder="Cari project..."
-              leftSection={<TbSearch size={14} />}
-              rightSection={
-                search ? (
-                  <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
-                    <TbX size={12} />
-                  </ActionIcon>
-                ) : (
-                  <Tooltip label="Tekan / untuk focus">
-                    <Kbd size="xs">/</Kbd>
-                  </Tooltip>
-                )
-              }
-              rightSectionWidth={36}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ flex: '1 1 200px', minWidth: 0 }}
-              radius="md"
-            />
             {allTags.length > 0 && (
               <MultiSelectChips
                 size="sm"
@@ -454,29 +461,33 @@ function ProjectListPage() {
               radius="md"
             />
           </Group>
+
+          {/* Active tag chips */}
           {tagFilter.length > 0 && (
-            <Group gap={6} mt="xs" wrap="wrap" align="center">
+            <Group gap={6} wrap="wrap" align="center">
               <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} getColor={tagColor} />
             </Group>
           )}
+
+          {/* Result count + reset */}
           {hasFilter && (
-            <Group justify="space-between" mt={6} gap="xs" wrap="nowrap">
+            <Group justify="space-between" gap="xs" wrap="nowrap">
               <Text size="xs" c="dimmed">
                 {filtered.length === projects.length
                   ? `${projects.length} project`
                   : `${filtered.length} dari ${projects.length} project`}
               </Text>
               <Button size="compact-xs" variant="subtle" color="gray" leftSection={<TbX size={11} />} onClick={resetFilter}>
-                Reset
+                Reset filter
               </Button>
             </Group>
           )}
-        </Box>
+        </Stack>
       )}
 
-      {/* ─── Error state ────────────────────── */}
+      {/* ─── Error state ─── */}
       {isError && (
-        <Card withBorder p="xl" ta="center" style={{ borderColor: 'color-mix(in srgb, var(--mantine-color-red-5) 35%, transparent)' }}>
+        <Box p="xl" ta="center" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid color-mix(in srgb, var(--mantine-color-red-5) 35%, transparent)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="red" mx="auto" mb="sm">
             <TbAlertTriangle size={24} />
           </ThemeIcon>
@@ -487,10 +498,10 @@ function ProjectListPage() {
           <Button size="xs" variant="light" color="red" onClick={() => refetch()}>
             Coba lagi
           </Button>
-        </Card>
+        </Box>
       )}
 
-      {/* ─── Loading skeleton ───────────────── */}
+      {/* ─── Loading skeleton ─── */}
       {isLoading && (
         view === 'grid' ? (
           <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
@@ -503,9 +514,9 @@ function ProjectListPage() {
         )
       )}
 
-      {/* ─── Empty state ────────────────────── */}
+      {/* ─── Empty state ─── */}
       {!isLoading && !isError && projects.length === 0 && (
-        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
           <ThemeIcon size={56} radius="xl" variant="light" color="primary" mx="auto" mb="md">
             <TbFolders size={28} />
           </ThemeIcon>
@@ -514,8 +525,8 @@ function ProjectListPage() {
             <>
               <Text size="sm" c="dimmed" mb="lg" maw={420} mx="auto">
                 Buat project pertama untuk mulai mengelola environment variables.
-                Setiap project bisa punya beberapa environment (dev, staging, production)
-                yang masing-masing menyimpan var sendiri.
+                Setiap project bisa punya beberapa environment (<Code fz="xs">dev</Code>, <Code fz="xs">stg</Code>, <Code fz="xs">prod</Code>)
+                yang masing-masing menyimpan variabel sendiri.
               </Text>
               <Button leftSection={<TbPlus size={14} />} color="primary" onClick={openCreate}>
                 Buat Project Pertama
@@ -526,12 +537,12 @@ function ProjectListPage() {
               Kamu belum ditambahkan ke project manapun. Minta admin untuk mengundangmu ke project.
             </Text>
           )}
-        </Card>
+        </Box>
       )}
 
-      {/* ─── No results state ───────────────── */}
+      {/* ─── No results ─── */}
       {!isLoading && !isError && projects.length > 0 && filtered.length === 0 && (
-        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
             <TbSearch size={24} />
           </ThemeIcon>
@@ -542,24 +553,31 @@ function ProjectListPage() {
           <Button size="xs" variant="subtle" leftSection={<TbX size={12} />} onClick={resetFilter}>
             Reset filter
           </Button>
-        </Card>
+        </Box>
       )}
 
-      {/* ─── Project list / grid ────────────── */}
+      {/* ─── Project list / grid ─── */}
       {!isError && filtered.length > 0 && (
         <>
           <Stack gap="md">
             {paginatedGroups.map((group, gi) => (
               <Box key={group.key}>
                 {group.label && (
-                  <Group gap="xs" mb="xs" mt={gi > 0 ? 4 : 0}>
-                    <Text size="xs" fw={700} c={group.key === 'pinned' ? 'violet.6' : group.key === 'inactive' ? 'dimmed' : 'dimmed'} tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+                  <Group gap="xs" mb="xs" mt={gi > 0 ? 4 : 0} align="center">
+                    <Text
+                      size="xs" fw={700} tt="uppercase"
+                      c={group.key === 'pinned' ? 'violet.6' : 'dimmed'}
+                      style={{ letterSpacing: '0.06em' }}
+                    >
                       {group.label}
                     </Text>
-                    <Badge size="xs" variant="light" color={group.key === 'pinned' ? 'violet' : group.key === 'inactive' ? 'gray' : 'teal'} radius="sm">
+                    <Badge
+                      size="xs" variant="light" radius="sm"
+                      color={group.key === 'pinned' ? 'violet' : group.key === 'inactive' ? 'gray' : 'teal'}
+                    >
                       {group.items.length}
                     </Badge>
-                    {gi > 0 && <Box style={{ flex: 1, height: 1, background: 'var(--mantine-color-default-border)' }} />}
+                    <Box style={{ flex: 1, height: 1, background: 'var(--mantine-color-default-border)' }} />
                   </Group>
                 )}
                 {view === 'list' ? (
@@ -600,13 +618,13 @@ function ProjectListPage() {
           </Stack>
           {totalPages > 1 && (
             <Group justify="center" mt="lg">
-              <Pagination value={page} onChange={setPage} total={totalPages} />
+              <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
             </Group>
           )}
         </>
       )}
 
-      {/* ─── Create modal ───────────────────── */}
+      {/* ─── Create modal ─── */}
       <CreateProjectModal
         opened={createOpen}
         form={form}
@@ -620,7 +638,7 @@ function ProjectListPage() {
         onSubmit={() => createProject.mutate(form)}
       />
 
-      {/* ─── Edit modal ───────────────────── */}
+      {/* ─── Edit modal ─── */}
       <EditProjectModal
         project={editTarget}
         allTagValues={allTags.map(t => t.value)}
@@ -753,7 +771,7 @@ function CreateProjectModal({
         <Divider />
 
         {/* Summary card */}
-        <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+        <Box p="xs" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
           <Text size="xs" fw={600} mb={4}>Setelah dibuat:</Text>
           <Stack gap={4}>
             <Text size="xs" c="dimmed">
@@ -766,7 +784,7 @@ function CreateProjectModal({
               ✓ Bisa tambah anggota dan environment setelah project dibuat
             </Text>
           </Stack>
-        </Paper>
+        </Box>
 
         <Group justify="flex-end" gap="xs">
           <Button variant="subtle" color="gray" onClick={onClose} disabled={isPending}>Batal</Button>
@@ -930,20 +948,23 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
       ? 'color-mix(in srgb, var(--mantine-color-gray-3) 15%, var(--mantine-color-body))'
       : undefined
   return (
-    <Card
-      withBorder radius="lg" p="md"
+    <Box
+      p="md"
       className="envman-project-card"
       role="link" tabIndex={0}
       aria-label={`Buka project ${p.name}`}
       onClick={onClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', background: bg }}
+      style={{ borderRadius: 'var(--mantine-radius-lg)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer', display: 'flex', flexDirection: 'column', background: bg }}
     >
-      {/* Top row: avatar + actions */}
+      {/* Top: avatar + badges + actions */}
       <Group justify="space-between" mb="sm" wrap="nowrap" align="flex-start">
         <Group gap="sm" wrap="nowrap" align="center">
-          <ProjectAvatar name={p.name} role={p.myRole} size={40} />
-          <Badge size="xs" variant="light" color={color} style={{ flexShrink: 0 }}>{p.myRole}</Badge>
+          <ProjectAvatar name={p.name} role={p.myRole} size={38} />
+          <Stack gap={3}>
+            <Badge size="xs" variant="light" color={color}>{p.myRole}</Badge>
+            {!p.isActive && <Badge size="xs" variant="light" color="gray">nonaktif</Badge>}
+          </Stack>
         </Group>
         <Group gap={2} onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
           <Tooltip label={isPinned ? 'Lepas pin' : 'Pin'} withArrow>
@@ -973,16 +994,20 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
         </Group>
       </Group>
 
-      {/* Name + slug */}
-      <Text fw={700} size="sm" lh={1.3} mb={2} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {p.name}
-      </Text>
-      <Code fz="xs" c="dimmed" mb={6} style={{ display: 'inline-block', alignSelf: 'flex-start' }}>{p.slug}</Code>
+      {/* Name */}
+      <Text fw={700} size="sm" lh={1.3} mb={2} truncate>{p.name}</Text>
+
+      {/* Slug */}
+      <Code fz="xs" c="dimmed" mb={6} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {p.slug}
+      </Code>
 
       {/* Description */}
-      <Text size="xs" c="dimmed" mb={8} lineClamp={2} lh={1.6}
+      <Text
+        size="xs" c="dimmed" mb={8} lineClamp={2} lh={1.6}
         fs={p.description ? undefined : 'italic'}
-        style={{ flex: 1 }}>
+        style={{ flex: 1 }}
+      >
         {p.description || 'Belum ada deskripsi'}
       </Text>
 
@@ -999,30 +1024,42 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
         </Group>
       )}
 
-      {/* Stats footer */}
-      <Group gap={0} pt={8} style={{ borderTop: '1px solid var(--mantine-color-default-border)', marginTop: 'auto' }}>
+      {/* Stats footer — wrap-friendly, dot separators */}
+      <Group
+        gap="xs" wrap="wrap" pt={8}
+        style={{ borderTop: '1px solid var(--mantine-color-default-border)', marginTop: 'auto' }}
+      >
         <Tooltip label={`${p._count.environments} environment`} withArrow>
-          <Group gap={4} style={{ flex: 1 }}>
+          <Group gap={4} style={{ cursor: 'default' }}>
             <TbVariable size={12} style={{ color: `var(--mantine-color-${color}-light-color)` }} />
             <Text size="xs" fw={600}>{p._count.environments}</Text>
             <Text size="xs" c="dimmed">env</Text>
           </Group>
         </Tooltip>
         {p.members && (
-          <Tooltip label={`${p.members.length} anggota`} withArrow>
-            <Group gap={4} style={{ flex: 1 }}>
-              <TbUsers size={12} style={{ color: 'var(--mantine-color-dimmed)' }} />
-              <Text size="xs" c="dimmed">{p.members.length}</Text>
-            </Group>
-          </Tooltip>
+          <>
+            <Text size="xs" c="dimmed">·</Text>
+            <Tooltip label={`${p.members.length} anggota`} withArrow>
+              <Group gap={4} style={{ cursor: 'default' }}>
+                <TbUsers size={12} style={{ color: 'var(--mantine-color-dimmed)' }} />
+                <Text size="xs" c="dimmed">{p.members.length} anggota</Text>
+              </Group>
+            </Tooltip>
+          </>
         )}
         {p.createdAt && (
-          <Tooltip label={`Dibuat ${new Date(p.createdAt).toLocaleString('id-ID')}`} withArrow>
-            <Text size="xs" c="dimmed" style={{ marginLeft: 'auto' }}>{relativeDate(p.createdAt)}</Text>
-          </Tooltip>
+          <>
+            <Text size="xs" c="dimmed">·</Text>
+            <Tooltip label={`Dibuat ${new Date(p.createdAt).toLocaleString('id-ID')}`} withArrow>
+              <Group gap={4} style={{ cursor: 'default' }}>
+                <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
+                <Text size="xs" c="dimmed">{relativeDate(p.createdAt)}</Text>
+              </Group>
+            </Tooltip>
+          </>
         )}
       </Group>
-    </Card>
+    </Box>
   )
 }
 
@@ -1034,59 +1071,70 @@ function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
       ? 'color-mix(in srgb, var(--mantine-color-gray-3) 15%, var(--mantine-color-body))'
       : undefined
   return (
-    <Card
-      withBorder radius="md" p="sm"
+    <Box
+      p="sm"
       className="envman-project-card"
       role="link" tabIndex={0}
       aria-label={`Buka project ${p.name}`}
       onClick={onClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      style={{ cursor: 'pointer', background: bg }}
+      style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer', background: bg }}
     >
-      <Group justify="space-between" wrap="nowrap" gap="sm">
-        <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
+      <Group justify="space-between" wrap="nowrap" gap="sm" align="flex-start">
+        {/* Left: avatar + info */}
+        <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap" align="flex-start">
           <ProjectAvatar name={p.name} role={p.myRole} size={36} />
           <Box style={{ flex: 1, minWidth: 0 }}>
-            {/* Name row */}
-            <Group gap={6} mb={3} wrap="nowrap" align="center">
-              <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {p.name}
-              </Text>
-              <Code fz="xs" style={{ flexShrink: 0 }}>{p.slug}</Code>
-              <Badge size="xs" variant="light" color={color} style={{ flexShrink: 0 }}>{p.myRole}</Badge>
+            {/* Name — truncates if long */}
+            <Text fw={700} size="sm" truncate lh={1.3} mb={2}>{p.name}</Text>
+
+            {/* Slug + role + status badges — wrap if narrow */}
+            <Group gap={4} mb={p.description || p.tags?.length > 0 || p._count.environments >= 0 ? 3 : 0} wrap="wrap" align="center">
+              <Code fz="xs">{p.slug}</Code>
+              <Badge size="xs" variant="light" color={color}>{p.myRole}</Badge>
+              {!p.isActive && <Badge size="xs" variant="light" color="gray">nonaktif</Badge>}
             </Group>
-            {/* Stats + description row */}
-            <Group gap="sm" wrap="nowrap" align="center">
-              {p.description && (
-                <Text size="xs" c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-                  {p.description}
-                </Text>
-              )}
-              <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                <Tooltip label={`${p._count.environments} environment`} withArrow>
-                  <Group gap={3}>
-                    <TbVariable size={11} color={`var(--mantine-color-${color}-5)`} />
-                    <Text size="xs" c="dimmed">{p._count.environments} env</Text>
-                  </Group>
-                </Tooltip>
-                {p.members && (
+
+            {/* Description */}
+            {p.description && (
+              <Text size="xs" c="dimmed" truncate lh={1.5} mb={3}>{p.description}</Text>
+            )}
+
+            {/* Stats — dot separators, wrap on very narrow */}
+            <Group gap="xs" wrap="wrap" align="center">
+              <Tooltip label={`${p._count.environments} environment`} withArrow>
+                <Group gap={3} style={{ cursor: 'default' }}>
+                  <TbVariable size={11} color={`var(--mantine-color-${color}-5)`} />
+                  <Text size="xs" c="dimmed">{p._count.environments} env</Text>
+                </Group>
+              </Tooltip>
+              {p.members && (
+                <>
+                  <Text size="xs" c="dimmed">·</Text>
                   <Tooltip label={`${p.members.length} anggota`} withArrow>
-                    <Group gap={3}>
+                    <Group gap={3} style={{ cursor: 'default' }}>
                       <TbUsers size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
                       <Text size="xs" c="dimmed">{p.members.length}</Text>
                     </Group>
                   </Tooltip>
-                )}
-                {p.createdAt && (
+                </>
+              )}
+              {p.createdAt && (
+                <>
+                  <Text size="xs" c="dimmed">·</Text>
                   <Tooltip label={`Dibuat ${new Date(p.createdAt).toLocaleString('id-ID')}`} withArrow>
-                    <Text size="xs" c="dimmed">{relativeDate(p.createdAt)}</Text>
+                    <Group gap={3} style={{ cursor: 'default' }}>
+                      <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
+                      <Text size="xs" c="dimmed">{relativeDate(p.createdAt)}</Text>
+                    </Group>
                   </Tooltip>
-                )}
-              </Group>
+                </>
+              )}
             </Group>
+
             {/* Tags */}
             {p.tags?.length > 0 && (
-              <Group gap={4} mt={4}>
+              <Group gap={4} mt={5}>
                 {p.tags.slice(0, 5).map(tag => (
                   <Badge key={tag} size="xs" variant="light" color={tagColor(tag)} className="envman-tag-chip"
                     onClick={e => { e.stopPropagation(); onTagClick(tag) }}>
@@ -1128,7 +1176,7 @@ function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
           <TbChevronRight size={14} style={{ color: 'var(--mantine-color-dimmed)', marginLeft: 2 }} />
         </Group>
       </Group>
-    </Card>
+    </Box>
   )
 }
 

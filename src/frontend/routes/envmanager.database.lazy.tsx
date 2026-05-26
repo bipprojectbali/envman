@@ -1,14 +1,13 @@
 import {
   Alert,
   Badge,
+  Box,
   Button,
-  Card,
   Code,
   CopyButton,
   Divider,
   Group,
   Loader,
-  Paper,
   Stack,
   Table,
   Text,
@@ -96,7 +95,7 @@ function GenerateTokenSection() {
   }, [tokenResp])
 
   return (
-    <Card withBorder radius="md" p="md">
+    <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
       <Stack gap="sm">
         <Group gap="xs">
           <ThemeIcon size={28} variant="light" color="primary" radius="md">
@@ -110,7 +109,7 @@ function GenerateTokenSection() {
           dan paste di section "Sync From Remote" pada local dev.
         </Text>
         {tokenResp ? (
-          <Paper withBorder p="sm" radius="md" bg="var(--mantine-color-default-hover)">
+          <Box p="sm" bg="var(--mantine-color-default-hover)" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
             <Stack gap="xs">
               <Group justify="space-between" wrap="nowrap">
                 <Code style={{ flex: 1, wordBreak: 'break-all' }}>{tokenResp.token}</Code>
@@ -132,7 +131,7 @@ function GenerateTokenSection() {
                 Kedaluwarsa dalam {Math.floor(remaining / 60)}m {remaining % 60}s
               </Text>
             </Stack>
-          </Paper>
+          </Box>
         ) : (
           <Button
             leftSection={<TbRefresh size={16} />}
@@ -146,7 +145,7 @@ function GenerateTokenSection() {
           </Button>
         )}
       </Stack>
-    </Card>
+    </Box>
   )
 }
 
@@ -196,7 +195,7 @@ function SyncFromSection() {
   }
 
   return (
-    <Card withBorder radius="md" p="md">
+    <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
       <Stack gap="sm">
         <Group gap="xs">
           <ThemeIcon size={28} variant="light" color="teal" radius="md">
@@ -234,7 +233,7 @@ function SyncFromSection() {
         </Button>
 
         {result && (
-          <Paper withBorder p="sm" radius="md" mt="xs">
+          <Box p="sm" mt="xs" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
             <Stack gap="xs">
               <Group gap="xs">
                 <ThemeIcon size={20} color="teal" variant="light" radius="xl">
@@ -259,9 +258,9 @@ function SyncFromSection() {
                 </Table.Tbody>
               </Table>
             </Stack>
-          </Paper>
+          </Box>
         )}
       </Stack>
-    </Card>
+    </Box>
   )
 }

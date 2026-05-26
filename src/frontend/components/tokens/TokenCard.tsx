@@ -2,7 +2,6 @@ import {
   ActionIcon,
   Badge,
   Box,
-  Card,
   Code,
   Collapse,
   CopyButton,
@@ -250,17 +249,16 @@ export function TokenCard({
   const cardClass = `envman-token-card ${token.isDisabled ? 'is-disabled' : ''} ${isExpired ? 'is-expired' : ''}`
   const cardStyle = {
     opacity: token.isDisabled ? 0.55 : isExpired ? 0.65 : 1,
-    borderColor: isExpired ? 'var(--mantine-color-red-3)' : undefined,
     overflow: 'hidden' as const,
     cursor: onCardClick ? 'pointer' : undefined,
   }
 
   if (compact) {
     return (
-      <Card
-        withBorder radius="md" p="sm"
+      <Box
+        p="sm"
         className={cardClass}
-        style={cardStyle}
+        style={{ ...cardStyle, border: isExpired ? '1px solid var(--mantine-color-red-3)' : '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
         onClick={onCardClick}
       >
         <Group justify="space-between" wrap="nowrap" gap="sm">
@@ -288,15 +286,15 @@ export function TokenCard({
           <Divider my="xs" />
           <UsageSection token={token} />
         </Collapse>
-      </Card>
+      </Box>
     )
   }
 
   return (
-    <Card
-      withBorder radius="lg" p={0}
+    <Box
+      p={0}
       className={cardClass}
-      style={cardStyle}
+      style={{ ...cardStyle, border: isExpired ? '1px solid var(--mantine-color-red-3)' : '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-lg)' }}
       onClick={onCardClick}
     >
       <Box p="sm">
@@ -322,6 +320,6 @@ export function TokenCard({
           <UsageSection token={token} />
         </Collapse>
       </Box>
-    </Card>
+    </Box>
   )
 }

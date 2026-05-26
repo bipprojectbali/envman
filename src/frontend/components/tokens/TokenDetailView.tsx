@@ -3,7 +3,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   Divider,
   Group,
@@ -18,6 +17,7 @@ import {
   TbCalendar,
   TbCheck,
   TbChevronLeft,
+  TbChevronRight,
   TbClock,
   TbCopy,
   TbKey,
@@ -88,7 +88,7 @@ export function TokenDetailView({
           <TbChevronLeft size={15} />
         </ActionIcon>
         <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={onBack}>Tokens</Text>
-        <Text size="sm" c="dimmed">/</Text>
+        <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
         <Group gap="xs" wrap="nowrap">
           <ThemeIcon size={20} radius="sm" variant="light" color={accentColor}>
             <TbKey size={11} />
@@ -98,7 +98,7 @@ export function TokenDetailView({
       </Group>
 
       {/* Header card */}
-      <Card withBorder radius="md" p="md" style={{ opacity: token.isDisabled ? 0.7 : 1 }}>
+      <Box style={{ opacity: token.isDisabled ? 0.7 : 1 }}>
         <Group justify="space-between" wrap="nowrap" align="flex-start">
           <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
             <ThemeIcon size={44} radius="md" variant="light" color={accentColor}>
@@ -163,7 +163,7 @@ export function TokenDetailView({
         <Divider my="md" />
 
         {/* Metadata row */}
-        <Group gap="xl" wrap="wrap">
+        <Group gap="md" wrap="wrap">
           <Stack gap={2}>
             <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Dibuat</Text>
             <Tooltip label={absoluteTime(token.createdAt)} withArrow>
@@ -195,10 +195,10 @@ export function TokenDetailView({
             </Stack>
           )}
         </Group>
-      </Card>
+      </Box>
 
       {/* Scopes */}
-      <Card withBorder radius="md" p="md">
+      <Box>
         <Group gap="xs" mb="sm">
           <ThemeIcon size={20} radius="sm" variant="light" color="violet">
             <TbShieldCheck size={11} />
@@ -247,10 +247,10 @@ export function TokenDetailView({
             </Group>
           </>
         )}
-      </Card>
+      </Box>
 
       {/* Usage examples */}
-      <Card withBorder radius="md" p="md">
+      <Box>
         <Group gap="xs" mb="sm">
           <ThemeIcon size={20} radius="sm" variant="light" color="gray">
             <TbKey size={11} />
@@ -290,7 +290,7 @@ export function TokenDetailView({
         >
           {isCopied ? 'Token tersalin!' : 'Copy nilai token'}
         </Button>
-      </Card>
+      </Box>
     </Stack>
   )
 }

@@ -11,12 +11,10 @@ import {
   Stack,
   Tabs,
   Text,
-  ThemeIcon,
   Tooltip,
 } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import {
-  TbAlertTriangle,
   TbBan,
   TbCheck,
   TbCopy,
@@ -89,7 +87,6 @@ export function UserDrawerContent({ userId }: { userId: string }) {
     <Stack gap="md">
       {/* Header card */}
       <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8, overflow: 'hidden' }}>
-        <Box style={{ height: 4, background: `var(--mantine-color-${roleColor}-5)` }} />
         <Box p="md">
           <Group gap="md" wrap="nowrap">
             <Box style={{ position: 'relative', flexShrink: 0 }}>
@@ -150,21 +147,18 @@ export function UserDrawerContent({ userId }: { userId: string }) {
         </Box>
 
         <Divider />
-        <SimpleGrid cols={3} p="sm" spacing="xs">
+        <Group grow p="sm" gap="xs">
           {[
-            { value: accessibleProjects, label: 'Projects', color: accessibleProjects > 0 ? 'violet' : 'gray', icon: TbShieldCheck },
-            { value: envOverrides, label: 'Overrides', color: envOverrides > 0 ? 'orange' : 'gray', icon: TbAlertTriangle },
-            { value: isSuperAdmin ? '∞' : permissionCount, label: 'Capabilities', color: isSuperAdmin ? 'violet' : permissionCount > 0 ? 'teal' : 'gray', icon: TbKey },
+            { value: accessibleProjects, label: 'Projects', color: accessibleProjects > 0 ? 'violet' : 'gray' },
+            { value: envOverrides, label: 'Overrides', color: envOverrides > 0 ? 'orange' : 'gray' },
+            { value: isSuperAdmin ? '∞' : permissionCount, label: 'Capabilities', color: isSuperAdmin ? 'violet' : permissionCount > 0 ? 'teal' : 'gray' },
           ].map(s => (
-            <Stack key={s.label} gap={4} align="center" py="xs">
-              <ThemeIcon size={28} radius="md" variant="light" color={s.color}>
-                <s.icon size={14} />
-              </ThemeIcon>
-              <Text size="lg" fw={700} lh={1} c={s.color}>{s.value}</Text>
+            <Stack key={s.label} gap={2} align="center">
+              <Text size="xl" fw={800} lh={1} c={s.color}>{s.value}</Text>
               <Text size="xs" c="dimmed">{s.label}</Text>
             </Stack>
           ))}
-        </SimpleGrid>
+        </Group>
       </Box>
 
       {/* Tabs */}

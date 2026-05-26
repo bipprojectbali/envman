@@ -5,11 +5,9 @@ import {
   Badge,
   Box,
   Burger,
-  Card,
   Container,
   Group,
   NavLink,
-  Paper,
   Progress,
   RingProgress,
   SimpleGrid,
@@ -371,7 +369,7 @@ function OverviewPanel() {
 
         <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }}>
           {statsData.map((stat) => (
-            <Card key={stat.title} withBorder padding="lg" radius="md">
+            <Box key={stat.title} p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
               <Group justify="space-between" mb="xs">
                 <Text size="xs" c="dimmed" fw={600} tt="uppercase">
                   {stat.title}
@@ -396,12 +394,12 @@ function OverviewPanel() {
                   vs bulan lalu
                 </Text>
               </Group>
-            </Card>
+            </Box>
           ))}
         </SimpleGrid>
 
         <SimpleGrid cols={{ base: 1, md: 2 }}>
-          <Card withBorder padding="lg" radius="md">
+          <Box p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
             <Text fw={600} mb="md">
               Traffic Source
             </Text>
@@ -423,9 +421,9 @@ function OverviewPanel() {
                 </div>
               ))}
             </Stack>
-          </Card>
+          </Box>
 
-          <Card withBorder padding="lg" radius="md">
+          <Box p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
             <Text fw={600} mb="md">
               Performance
             </Text>
@@ -479,7 +477,7 @@ function OverviewPanel() {
                 </Text>
               </div>
             </Group>
-          </Card>
+          </Box>
         </SimpleGrid>
 
         <RecentActivityTable />
@@ -502,7 +500,7 @@ function AnalyticsPanel() {
             { label: 'Bounce Rate', value: '32.4%', diff: -3 },
             { label: 'Avg. Session', value: '4m 23s', diff: 8 },
           ].map((stat) => (
-            <Card key={stat.label} withBorder padding="lg" radius="md">
+            <Box key={stat.label} p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
               <Text size="xs" c="dimmed" fw={600} tt="uppercase">
                 {stat.label}
               </Text>
@@ -519,11 +517,11 @@ function AnalyticsPanel() {
                   {Math.abs(stat.diff)}%
                 </Text>
               </Group>
-            </Card>
+            </Box>
           ))}
         </SimpleGrid>
 
-        <Card withBorder padding="lg" radius="md">
+        <Box p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
           <Text fw={600} mb="md">
             Top Pages
           </Text>
@@ -563,7 +561,7 @@ function AnalyticsPanel() {
               ))}
             </Table.Tbody>
           </Table>
-        </Card>
+        </Box>
       </Stack>
     </Container>
   )
@@ -599,7 +597,7 @@ function OrdersPanel() {
           </Badge>
         </Group>
 
-        <Card withBorder radius="md" p={0}>
+        <Box style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
           <Table highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -640,7 +638,7 @@ function OrdersPanel() {
               ))}
             </Table.Tbody>
           </Table>
-        </Card>
+        </Box>
       </Stack>
     </Container>
   )
@@ -658,17 +656,16 @@ function RecentActivityTable() {
   ]
 
   return (
-    <Card withBorder padding="lg" radius="md">
+    <Box p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
       <Text fw={600} mb="md">
         Recent Activity
       </Text>
       <Stack gap="sm">
         {activities.map((act) => (
-          <Paper
+          <Box
             key={`${act.user}-${act.action}-${act.time}`}
             p="sm"
-            radius="sm"
-            bg="var(--mantine-color-default-hover)"
+            style={{ borderRadius: 'var(--mantine-radius-sm)', background: 'var(--mantine-color-default-hover)' }}
           >
             <Group justify="space-between">
               <Group gap="sm">
@@ -688,10 +685,10 @@ function RecentActivityTable() {
                 {act.time}
               </Text>
             </Group>
-          </Paper>
+          </Box>
         ))}
       </Stack>
-    </Card>
+    </Box>
   )
 }
 

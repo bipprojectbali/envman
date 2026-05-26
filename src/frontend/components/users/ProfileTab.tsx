@@ -3,7 +3,6 @@ import {
   Box,
   Code,
   Group,
-  Paper,
   SegmentedControl,
   Stack,
   Switch,
@@ -61,7 +60,7 @@ export function ProfileTab({ user }: { user: UserDetail }) {
   return (
     <Stack gap="md">
       {/* Global Role */}
-      <Paper withBorder p="md" radius="md">
+      <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
         <Group gap="xs" mb="xs">
           <ThemeIcon size={22} radius="md" variant="light" color="violet">
             <TbShieldCheck size={13} />
@@ -116,10 +115,10 @@ export function ProfileTab({ user }: { user: UserDetail }) {
             </Text>
           </Alert>
         )}
-      </Paper>
+      </Box>
 
       {/* Account Status */}
-      <Paper withBorder p="md" radius="md">
+      <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
         <Group gap="xs" mb="xs">
           <ThemeIcon size={22} radius="md" variant="light" color={user.blocked ? 'red' : 'teal'}>
             {user.blocked ? <TbBan size={13} /> : <TbCheck size={13} />}
@@ -160,7 +159,7 @@ export function ProfileTab({ user }: { user: UserDetail }) {
             </Text>
           </Alert>
         )}
-      </Paper>
+      </Box>
 
       {/* Catatan */}
       <Alert color="gray" variant="light" icon={<TbInfoCircle size={14} />} p="sm">

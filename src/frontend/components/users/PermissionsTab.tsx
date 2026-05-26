@@ -2,13 +2,11 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Checkbox,
   Code,
   Collapse,
   Divider,
   Group,
-  Paper,
   Progress,
   Stack,
   Text,
@@ -78,9 +76,9 @@ const CAPABILITY_GROUPS: CapabilityGroup[] = [
     icon: TbPlugConnected,
     items: [
       { value: 'connection:view', label: 'View Portainer connections', description: 'Lihat list & detail connection, health, probe.' },
-      { value: 'stack:operate', label: 'Operate stacks (read)', description: 'View stacks, container logs, compose file, status, stats, dangling images.' },
+      { value: 'stack:operate', label: 'Operate stacks (read)', description: 'View stacks, container logs, compose file, status, stats, dangling images, exec container.' },
       { value: 'stack:mutate', label: 'Mutate stacks', description: 'Edit compose, restart container, repull image, recreate stack.' },
-      { value: 'stack:prune', label: 'Prune resources (destructive)', description: 'Hapus images/volumes/networks yang tidak terpakai.' },
+      { value: 'stack:prune', label: 'Prune resources (destructive)', description: 'Hapus images/volumes/networks/containers yang tidak terpakai.' },
     ],
   },
 ]
@@ -107,7 +105,7 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
 
   if (isSuperAdmin) {
     return (
-      <Card withBorder p="md" radius="md">
+      <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
         <Group gap="sm" wrap="nowrap">
           <ThemeIcon size={40} radius="xl" variant="gradient">
             <TbShieldCheck size={20} />
@@ -119,7 +117,7 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
             </Text>
           </Box>
         </Group>
-      </Card>
+      </Box>
     )
   }
 
@@ -141,7 +139,7 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
   return (
     <Stack gap="md">
       {/* Summary */}
-      <Card withBorder p="sm" radius="md" bg="var(--mantine-color-default-hover)">
+      <Box p="sm" bg="var(--mantine-color-default-hover)" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
         <Group justify="space-between" wrap="nowrap">
           <Box>
             <Text size="xs" c="dimmed">Capability granted</Text>
@@ -162,7 +160,7 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
             </Text>
           </Box>
         </Group>
-      </Card>
+      </Box>
 
       {/* Capability groups */}
       <Checkbox.Group value={selected} onChange={setSelected}>
@@ -174,7 +172,7 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
             const allSelected = groupSelected === groupTotal
             const someSelected = groupSelected > 0 && groupSelected < groupTotal
             return (
-              <Paper key={group.label} withBorder radius="md" style={{ overflow: 'hidden' }}>
+              <Box key={group.label} style={{ overflow: 'hidden', border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
                 <Box
                   p="sm"
                   style={{
@@ -229,14 +227,14 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
                     </Box>
                   ))}
                 </Stack>
-              </Paper>
+              </Box>
             )
           })}
         </Stack>
       </Checkbox.Group>
 
       {/* Non-capability info */}
-      <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+      <Box style={{ overflow: 'hidden', border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
         <Group p="sm" justify="space-between" style={{ cursor: 'pointer' }} onClick={() => setShowInfo(!showInfo)}>
           <Group gap="xs">
             <ThemeIcon size={22} radius="md" variant="light" color="gray">
@@ -265,10 +263,10 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
             </Text>
           </Box>
         </Collapse>
-      </Paper>
+      </Box>
 
       {/* Footer */}
-      <Card withBorder p="sm" radius="md" style={{ position: 'sticky', bottom: 0, background: 'var(--mantine-color-body)', zIndex: 10 }}>
+      <Box p="sm" style={{ position: 'sticky', bottom: 0, background: 'var(--mantine-color-body)', zIndex: 10, border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
         <Group justify="space-between">
           <Text size="xs" c={hasChanges ? 'orange' : 'dimmed'}>
             {hasChanges ? `${Math.abs(selected.length - user.permissions.length)} perubahan belum disimpan` : 'Tidak ada perubahan'}
@@ -291,7 +289,7 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
             </Button>
           </Group>
         </Group>
-      </Card>
+      </Box>
     </Stack>
   )
 }

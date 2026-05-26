@@ -15,7 +15,6 @@ import {
   Menu,
   Modal,
   Pagination,
-  Paper,
   PasswordInput,
   RingProgress,
   ScrollArea,
@@ -409,11 +408,11 @@ function VarsPage() {
           <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeIntegrations}>
             {projectName}
           </Anchor>
-          <Text size="sm" c="dimmed">/</Text>
+          <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
           <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeIntegrations}>
             {env}
           </Anchor>
-          <Text size="sm" c="dimmed">/</Text>
+          <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
           <Text size="sm" fw={600}>Integrasi</Text>
         </Group>
 
@@ -583,216 +582,131 @@ function VarsPage() {
         </Alert>
       )}
 
-      {/* ─── Stats cards (horizontal scroll di mobile) ─── */}
+      {/* ─── Stats inline (flat) ─────────────── */}
       {vars.length > 0 && (
-        <ScrollArea type="never" mb="sm" offsetScrollbars={false}>
-          <Group gap="xs" wrap="nowrap" pb={2}>
-            {/* Total */}
-            <Paper withBorder p="xs" radius="md" style={{ minWidth: 76 }}>
-              <Group gap={6} align="center" wrap="nowrap">
-                <ThemeIcon size="sm" variant="light" color="blue" radius="sm"><TbVariable size={12} /></ThemeIcon>
-                <Box>
-                  <Text fz={10} c="dimmed" lh={1}>Total</Text>
-                  <Text size="sm" fw={700} lh={1.3}>{vars.length}</Text>
-                </Box>
-              </Group>
-            </Paper>
-
-            {/* Plain — klik filter */}
-            <Paper
-              withBorder p="xs" radius="md"
-              style={{ minWidth: 76, cursor: 'pointer', outline: filterType === 'plain' ? '2px solid var(--mantine-color-gray-5)' : undefined }}
+        <Stack gap={4} mb="sm">
+          <Group gap="xs" wrap="wrap" align="center">
+            <Group gap={4} align="center" wrap="nowrap">
+              <ThemeIcon size={18} variant="light" color="blue" radius="sm"><TbVariable size={10} /></ThemeIcon>
+              <Text size="xs" fw={700}>{vars.length}</Text>
+              <Text size="xs" c="dimmed">var</Text>
+            </Group>
+            <Text size="xs" c="dimmed">·</Text>
+            <Badge
+              size="sm" variant={filterType === 'plain' ? 'filled' : 'light'} color="gray"
+              leftSection={<TbLockOpen size={10} />}
+              style={{ cursor: 'pointer' }}
               onClick={() => setFilterType(f => f === 'plain' ? 'all' : 'plain')}
             >
-              <Group gap={6} align="center" wrap="nowrap">
-                <ThemeIcon size="sm" variant="light" color="gray" radius="sm"><TbLockOpen size={12} /></ThemeIcon>
-                <Box>
-                  <Text fz={10} c="dimmed" lh={1}>Plain</Text>
-                  <Text size="sm" fw={700} lh={1.3}>{plainCount}</Text>
-                </Box>
-              </Group>
-            </Paper>
-
-            {/* Secret — klik filter */}
-            <Paper
-              withBorder p="xs" radius="md"
-              style={{ minWidth: 76, cursor: 'pointer', outline: filterType === 'secret' ? '2px solid var(--mantine-color-red-4)' : undefined }}
+              {plainCount} plain
+            </Badge>
+            <Badge
+              size="sm" variant={filterType === 'secret' ? 'filled' : 'light'} color="red"
+              leftSection={<TbLock size={10} />}
+              style={{ cursor: 'pointer' }}
               onClick={() => setFilterType(f => f === 'secret' ? 'all' : 'secret')}
             >
-              <Group gap={6} align="center" wrap="nowrap">
-                <ThemeIcon size="sm" variant="light" color="red" radius="sm"><TbLock size={12} /></ThemeIcon>
-                <Box>
-                  <Text fz={10} c="dimmed" lh={1}>Secret</Text>
-                  <Text size="sm" fw={700} lh={1.3}>{secretCount}</Text>
-                </Box>
-              </Group>
-            </Paper>
-
-            {/* Disabled — hanya tampil jika ada */}
+              {secretCount} secret
+            </Badge>
             {disabledCount > 0 && (
-              <Paper
-                withBorder p="xs" radius="md"
-                style={{ minWidth: 80, cursor: 'pointer', outline: filterDisabled === 'disabled' ? '2px solid var(--mantine-color-orange-4)' : undefined }}
+              <Badge
+                size="sm" variant={filterDisabled === 'disabled' ? 'filled' : 'light'} color="orange"
+                leftSection={<TbToggleLeft size={10} />}
+                style={{ cursor: 'pointer' }}
                 onClick={() => setFilterDisabled(f => f === 'disabled' ? 'all' : 'disabled')}
               >
-                <Group gap={6} align="center" wrap="nowrap">
-                  <ThemeIcon size="sm" variant="light" color="orange" radius="sm"><TbToggleLeft size={12} /></ThemeIcon>
-                  <Box>
-                    <Text fz={10} c="dimmed" lh={1}>Off</Text>
-                    <Text size="sm" fw={700} lh={1.3}>{disabledCount}</Text>
-                  </Box>
-                </Group>
-              </Paper>
+                {disabledCount} off
+              </Badge>
             )}
-
-            {/* Komposisi ring — hanya desktop */}
-            {!isMobile && (
-              <Paper withBorder p="xs" radius="md" style={{ minWidth: 90 }}>
-                <Group gap={6} align="center" wrap="nowrap">
-                  <RingProgress size={32} thickness={3} sections={[
-                    { value: (plainCount / vars.length) * 100, color: 'gray' },
-                    { value: (secretCount / vars.length) * 100, color: 'red' },
+            {!isMobile && vars.length > 0 && (
+              <>
+                <Text size="xs" c="dimmed">·</Text>
+                <Group gap={4} wrap="nowrap" align="center">
+                  <RingProgress size={20} thickness={2} sections={[
+                    { value: (plainCount / vars.length) * 100, color: 'var(--mantine-color-gray-5)' },
+                    { value: (secretCount / vars.length) * 100, color: 'var(--mantine-color-red-5)' },
                   ]} />
-                  <Box>
-                    <Text fz={10} c="dimmed" lh={1}>Mix</Text>
-                    <Text fz={10} lh={1.4}>
-                      <Text span c="gray.6" fw={600}>{plainCount}p</Text>
-                      <Text span c="dimmed"> / </Text>
-                      <Text span c="red.5" fw={600}>{secretCount}s</Text>
-                    </Text>
-                  </Box>
+                  <Text size="xs" c="dimmed">{plainCount}p/{secretCount}s</Text>
                 </Group>
-              </Paper>
-            )}
-
-            {/* CLI — hanya desktop */}
-            {!isMobile && (
-              <Paper withBorder p="xs" radius="md" style={{ flex: 1, minWidth: 180 }}>
-                <Group gap={4} align="center" wrap="nowrap">
-                  <Box style={{ flex: 1, minWidth: 0 }}>
-                    <Text fz={10} c="dimmed" lh={1} mb={2}>CLI</Text>
-                    <Code fz={10} style={{ wordBreak: 'break-all' }}>{cliCommand}</Code>
-                  </Box>
-                  <CopyButton value={cliCommand}>
-                    {({ copied, copy }) => (
-                      <Tooltip label={copied ? 'Copied!' : 'Copy'}>
-                        <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy} style={{ flexShrink: 0 }}>
-                          {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </CopyButton>
-                </Group>
-              </Paper>
+              </>
             )}
           </Group>
-        </ScrollArea>
-      )}
-
-      {/* CLI mobile — baris sendiri di bawah stats */}
-      {vars.length > 0 && isMobile && (
-        <Paper withBorder p="xs" radius="md" mb="sm">
-          <Group gap={6} align="center" wrap="nowrap">
-            <Code fz={10} style={{ flex: 1, minWidth: 0, wordBreak: 'break-all' }}>{cliCommand}</Code>
+          <Group gap={4} wrap="nowrap" align="center">
+            <Code fz={10} style={{ flex: 1, wordBreak: 'break-all' }}>{cliCommand}</Code>
             <CopyButton value={cliCommand}>
               {({ copied, copy }) => (
-                <ActionIcon size={28} variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy} style={{ flexShrink: 0 }}>
-                  {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
-                </ActionIcon>
+                <Tooltip label={copied ? 'Copied!' : 'Copy CLI'}>
+                  <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy} style={{ flexShrink: 0 }}>
+                    {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
+                  </ActionIcon>
+                </Tooltip>
               )}
             </CopyButton>
           </Group>
-        </Paper>
+        </Stack>
       )}
 
-      {/* ─── Toolbar ─────────────────────────
-          3 zona: [Search + filter status] | [View tools — icon] | [Write actions — button]
-      ─────────────────────────────────── */}
-      <Paper withBorder mb="xs" p={6} radius="md">
-        <Group justify="space-between" gap={8} wrap="wrap" align="center">
+      {/* ─── Toolbar ─────────────────────────── */}
+      <Stack gap="xs" mb="sm">
 
-          {/* ── ZONA 1: Search + filter status ── */}
-          <Group gap={6} style={{ flex: 1, minWidth: isMobile ? '100%' : 220 }} align="center">
-            <TextInput
-              size="xs"
-              placeholder={isMobile ? 'Cari...' : 'Cari key atau value...'}
-              leftSection={<TbSearch size={13} />}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              rightSection={search ? (
-                <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setSearch('')}>
+        {/* Row 1: Search — full width */}
+        <TextInput
+          size="sm"
+          placeholder="Cari key atau value..."
+          leftSection={<TbSearch size={14} />}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          rightSection={
+            search || filterType !== 'all' || filterDisabled !== 'all' ? (
+              <Tooltip label="Reset semua filter">
+                <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => { setSearch(''); setFilterType('all'); setFilterDisabled('all') }}>
                   <TbX size={12} />
                 </ActionIcon>
-              ) : undefined}
-              style={{ flex: 1, maxWidth: isMobile ? undefined : 280 }}
-            />
-            {(search || filterType !== 'all' || filterDisabled !== 'all') && (
-              <Tooltip label="Klik untuk reset semua filter">
-                <Badge
-                  size="sm" variant="light" color="blue"
-                  leftSection={<TbFilter size={10} />}
-                  rightSection={<TbX size={10} />}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => { setSearch(''); setFilterType('all'); setFilterDisabled('all') }}
-                >
-                  {filteredVars.length} dari {vars.length}
-                </Badge>
               </Tooltip>
+            ) : undefined
+          }
+          rightSectionWidth={search || filterType !== 'all' || filterDisabled !== 'all' ? 32 : undefined}
+          radius="md"
+        />
+
+        {/* Row 2: View tools (left) + Write actions (right) */}
+        <Group justify="space-between" gap="xs" wrap="wrap" align="center">
+
+          {/* View tools */}
+          <Group gap={4} wrap="nowrap">
+            {(search || filterType !== 'all' || filterDisabled !== 'all') && (
+              <Badge
+                size="sm" variant="light" color="blue"
+                leftSection={<TbFilter size={10} />}
+                style={{ cursor: 'pointer' }}
+                onClick={() => { setSearch(''); setFilterType('all'); setFilterDisabled('all') }}
+              >
+                {filteredVars.length}/{vars.length}
+              </Badge>
             )}
-          </Group>
 
-          {/* ── ZONA 2 & 3: tools (kanan) ── */}
-          <Group gap={4} wrap="nowrap" align="center">
-
-            {/* ── ZONA 2: View tools (icon-only, equal weight) ── */}
             {vars.length > 0 && (
-              <Group gap={2} wrap="nowrap">
+              <>
                 {/* Sort */}
-                {isMobile ? (
-                  <Menu shadow="md" width={160} position="bottom-end">
-                    <Menu.Target>
-                      <Tooltip label="Urutkan">
-                        <ActionIcon size={30} variant="subtle" color="gray">
-                          <TbSortAscending size={15} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Label>Urutan</Menu.Label>
-                      {[
-                        { label: 'A → Z', value: 'key-asc' },
-                        { label: 'Z → A', value: 'key-desc' },
-                        { label: 'Terbaru', value: 'newest' },
-                        { label: 'Terlama', value: 'oldest' },
-                      ].map(o => (
-                        <Menu.Item key={o.value} onClick={() => setSort(o.value as typeof sort)}
-                          rightSection={sort === o.value ? <TbCheck size={13} /> : undefined}>
-                          {o.label}
-                        </Menu.Item>
-                      ))}
-                    </Menu.Dropdown>
-                  </Menu>
-                ) : (
-                  <Select
-                    size="xs" w={110}
-                    leftSection={<TbSortAscending size={13} />}
-                    value={sort}
-                    onChange={v => setSort((v ?? 'key-asc') as typeof sort)}
-                    data={[
-                      { label: 'A → Z', value: 'key-asc' },
-                      { label: 'Z → A', value: 'key-desc' },
-                      { label: 'Terbaru', value: 'newest' },
-                      { label: 'Terlama', value: 'oldest' },
-                    ]}
-                    allowDeselect={false}
-                  />
-                )}
+                <Select
+                  size="sm" w={130} radius="md"
+                  leftSection={<TbSortAscending size={13} />}
+                  value={sort}
+                  onChange={v => setSort((v ?? 'key-asc') as typeof sort)}
+                  data={[
+                    { label: 'A → Z', value: 'key-asc' },
+                    { label: 'Z → A', value: 'key-desc' },
+                    { label: 'Terbaru', value: 'newest' },
+                    { label: 'Terlama', value: 'oldest' },
+                  ]}
+                  allowDeselect={false}
+                />
 
                 {/* Copy export */}
                 <Menu shadow="md" width={210} position="bottom-end">
                   <Menu.Target>
                     <Tooltip label="Export .env ke clipboard">
-                      <ActionIcon size={30} variant="subtle" color={copiedAll || copiedSelected ? 'teal' : 'gray'}>
+                      <ActionIcon size="sm" variant="subtle" color={copiedAll || copiedSelected ? 'teal' : 'gray'} radius="md">
                         {copiedAll || copiedSelected ? <TbCheck size={14} /> : <TbCopy size={14} />}
                       </ActionIcon>
                     </Tooltip>
@@ -828,30 +742,26 @@ function VarsPage() {
 
                 {/* Compare */}
                 <Tooltip label="Bandingkan dengan .env local">
-                  <ActionIcon size={30} variant="subtle" color="grape" onClick={openCompare}>
+                  <ActionIcon size="sm" variant="subtle" color="grape" radius="md" onClick={openCompare}>
                     <TbGitCompare size={14} />
                   </ActionIcon>
                 </Tooltip>
-              </Group>
+              </>
             )}
+          </Group>
 
-            {/* ── Divider antara view tools dan write actions ── */}
-            {vars.length > 0 && canEdit && (
-              <Divider orientation="vertical" mx={4} />
-            )}
-
-            {/* ── ZONA 3: Write actions ── */}
-            {canEdit && (
-              <Group gap={4} wrap="nowrap">
-                {/* .env menu (utility) */}
-                <Menu shadow="md" width={220} position="bottom-end">
-                  <Menu.Target>
-                    <Tooltip label="Import / edit .env">
-                      <ActionIcon size={30} variant="subtle" color="gray">
-                        <TbFileImport size={14} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Menu.Target>
+          {/* Write actions */}
+          {canEdit && (
+            <Group gap={4} wrap="nowrap">
+              {/* .env menu (utility) */}
+              <Menu shadow="md" width={220} position="bottom-end">
+                <Menu.Target>
+                  <Tooltip label="Import / edit .env">
+                    <ActionIcon size="sm" variant="subtle" color="gray" radius="md">
+                      <TbFileImport size={14} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Menu.Target>
                   <Menu.Dropdown>
                     <Menu.Label>File .env</Menu.Label>
                     <Menu.Item leftSection={<TbFileImport size={14} />} onClick={openBulk}>
@@ -869,12 +779,12 @@ function VarsPage() {
 
                 {/* Tambah Var — CTA primary */}
                 <Button
-                  size="xs"
-                  leftSection={<TbPlus size={13} />}
+                  size="sm"
+                  leftSection={<TbPlus size={14} />}
                   onClick={openAdd}
-                  px={isMobile ? 8 : 12}
+                  radius="md"
                 >
-                  {isMobile ? '' : 'Tambah Var'}
+                  Tambah Var
                 </Button>
 
                 {/* More actions — overflow */}
@@ -882,7 +792,7 @@ function VarsPage() {
                   <Menu shadow="md" width={230} position="bottom-end">
                     <Menu.Target>
                       <Tooltip label="Lebih banyak aksi">
-                        <ActionIcon size={30} variant="subtle" color="gray">
+                        <ActionIcon size="sm" variant="subtle" color="gray" radius="md">
                           <TbDots size={14} />
                         </ActionIcon>
                       </Tooltip>
@@ -923,15 +833,11 @@ function VarsPage() {
               </Group>
             )}
           </Group>
-        </Group>
-      </Paper>
+        </Stack>
 
       {/* ─── Selection bar ─────────────────── */}
       {selectedIds.size > 0 && (
-        <Paper
-          mb="xs" p="xs" radius="md" withBorder
-          style={{ borderColor: 'var(--mantine-color-blue-4)', background: 'var(--mantine-color-blue-light)' }}
-        >
+        <Box mb="xs" p="xs" style={{ borderRadius: 'var(--mantine-radius-md)', background: 'var(--mantine-color-blue-light)' }}>
           <Group gap="xs" align="center" wrap="wrap">
             <Badge size="sm" variant="filled" color="blue">{selectedIds.size} terpilih</Badge>
             <Button
@@ -945,12 +851,12 @@ function VarsPage() {
               Batal
             </Button>
           </Group>
-        </Paper>
+        </Box>
       )}
 
       {/* ─── Empty state ────────────────────── */}
       {vars.length === 0 ? (
-        <Paper withBorder p={{ base: 'lg', sm: 'xl' }} radius="md" ta="center">
+        <Box p={{ base: 'lg', sm: 'xl' }} ta="center" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
           <ThemeIcon size={48} variant="light" color="blue" radius="xl" mx="auto" mb="md">
             <TbVariable size={24} />
           </ThemeIcon>
@@ -968,17 +874,19 @@ function VarsPage() {
               </Button>
             </Group>
           )}
-        </Paper>
+        </Box>
 
       ) : filteredVars.length === 0 ? (
-        <Paper withBorder p="lg" radius="md" ta="center">
-          <TbSearch size={28} style={{ opacity: 0.2, margin: '0 auto 8px' }} />
+        <Box p="xl" ta="center" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px dashed var(--mantine-color-default-border)' }}>
+          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
+            <TbSearch size={22} />
+          </ThemeIcon>
           <Text size="sm" fw={500} mb={4}>Tidak ada hasil</Text>
-          <Text size="xs" c="dimmed" mb="sm">Tidak ada variabel yang cocok.</Text>
+          <Text size="xs" c="dimmed" mb="md">Tidak ada variabel yang cocok dengan filter saat ini.</Text>
           <Button size="xs" variant="subtle" onClick={() => { setSearch(''); setFilterType('all'); setFilterDisabled('all') }} leftSection={<TbX size={12} />}>
             Reset filter
           </Button>
-        </Paper>
+        </Box>
 
       ) : isMobile ? (
         /* ══════════════════════════════════════
@@ -988,8 +896,8 @@ function VarsPage() {
           {filteredVars.map((v) => {
             if (editingId === v.id) {
               return (
-                <Paper key={v.id} withBorder p="sm" radius="md"
-                  style={{ background: 'var(--mantine-color-violet-light)', borderColor: 'var(--mantine-color-primary)' }}
+                <Box key={v.id} p="sm"
+                  style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-primary)', background: 'var(--mantine-color-violet-light)' }}
                 >
                   {/* Key + type toggle */}
                   <Group gap={6} mb="xs" wrap="nowrap">
@@ -1036,17 +944,18 @@ function VarsPage() {
                       Batal
                     </Button>
                   </Group>
-                </Paper>
+                </Box>
               )
             }
 
             return (
-              <Paper
-                key={v.id} withBorder p="sm" radius="md"
+              <Box
+                key={v.id} p="sm"
                 style={{
+                  borderRadius: 'var(--mantine-radius-md)',
+                  border: `1px solid ${selectedIds.has(v.id) ? 'var(--mantine-color-blue-4)' : 'var(--mantine-color-default-border)'}`,
                   opacity: v.isDisabled ? 0.5 : 1,
                   background: selectedIds.has(v.id) ? 'var(--mantine-color-blue-light)' : undefined,
-                  borderColor: selectedIds.has(v.id) ? 'var(--mantine-color-blue-4)' : undefined,
                   transition: 'opacity 0.15s',
                 }}
               >
@@ -1136,7 +1045,7 @@ function VarsPage() {
                     </>
                   )}
                 </Group>
-              </Paper>
+              </Box>
             )
           })}
 
@@ -1150,7 +1059,7 @@ function VarsPage() {
         /* ══════════════════════════════════════
            DESKTOP — Table view
         ══════════════════════════════════════ */
-        <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+        <Box style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
           <Table highlightOnHover verticalSpacing="xs" horizontalSpacing="sm">
             <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
               <Table.Tr>
@@ -1355,7 +1264,7 @@ function VarsPage() {
               </Group>
             </Box>
           )}
-        </Paper>
+        </Box>
       )}
 
       {/* ═══════════════════════════════════════
@@ -1398,7 +1307,7 @@ function VarsPage() {
                   onChange={e => setBulkAllSecret(e.currentTarget.checked)}
                 />
               </Group>
-              <Paper withBorder radius="sm" style={{ overflow: 'hidden' }}>
+              <Box style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
                 <ScrollArea.Autosize mah={isMobile ? 160 : 200}>
                   <Table fz="xs" horizontalSpacing="xs" verticalSpacing={4} highlightOnHover>
                     <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
@@ -1421,7 +1330,7 @@ function VarsPage() {
                     </Table.Tbody>
                   </Table>
                 </ScrollArea.Autosize>
-              </Paper>
+              </Box>
             </>
           )}
           {bulkText.trim() && parsedBulk.length === 0 && (
@@ -1544,7 +1453,7 @@ function VarsPage() {
               size={isMobile ? 'sm' : 'md'}
             />
           )}
-          <Paper withBorder p="sm" radius="sm">
+          <Box p="sm" style={{ borderRadius: 'var(--mantine-radius-sm)', background: 'var(--mantine-color-default-hover)' }}>
             <Group justify="space-between" align="center" wrap="nowrap">
               <Box style={{ minWidth: 0 }}>
                 <Text size="sm" fw={500}>{form.isSecret ? 'Secret' : 'Plain'}</Text>
@@ -1562,7 +1471,7 @@ function VarsPage() {
                 {form.isSecret ? <TbLock size={16} /> : <TbLockOpen size={16} />}
               </ActionIcon>
             </Group>
-          </Paper>
+          </Box>
           <Divider />
           <Button
             onClick={() => addVar.mutate(form)}

@@ -132,7 +132,7 @@ function EnvManagerLayout() {
   ]
 
   const extensionsNav = [
-    ...(portainerEnabled && user?.role === 'SUPER_ADMIN'
+    ...(portainerEnabled && (user?.role === 'SUPER_ADMIN' || hasCapability(user, 'menu:connections'))
       ? [{ label: 'Portainer', description: 'Connections & backup', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections }]
       : []),
   ]

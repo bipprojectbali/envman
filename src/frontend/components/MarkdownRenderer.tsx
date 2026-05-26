@@ -1,9 +1,9 @@
-import { Code } from '@mantine/core'
+import { Code, useMantineColorScheme } from '@mantine/core'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSlug from 'rehype-slug'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { vscDarkPlus, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useRef, useEffect } from 'react'
 
 interface MarkdownRendererProps {
@@ -12,6 +12,7 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ children, fontSize = 14 }: MarkdownRendererProps) {
+  const { colorScheme } = useMantineColorScheme()
   const containerRef = useRef<HTMLDivElement>(null)
 
   // TanStack Router mendaftarkan click listener di document pada CAPTURE phase.
@@ -74,13 +75,15 @@ export function MarkdownRenderer({ children, fontSize = 14 }: MarkdownRendererPr
             return lang ? (
               <SyntaxHighlighter
                 language={lang}
-                style={vscDarkPlus}
+                style={colorScheme === 'dark' ? vscDarkPlus : oneLight}
                 customStyle={{
                   borderRadius: 6,
                   fontSize: 13,
                   margin: '8px 0',
                   maxWidth: '100%',
                   overflowX: 'auto',
+                  background: 'var(--mantine-color-default-hover)',
+                  border: '1px solid var(--mantine-color-default-border)',
                 }}
                 codeTagProps={{ style: { whiteSpace: 'pre' } }}
                 showLineNumbers={String(codeChildren).split('\n').length > 5}

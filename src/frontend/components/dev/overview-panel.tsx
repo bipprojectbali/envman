@@ -1,4 +1,4 @@
-import { Card, Container, Group, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core'
+import { Box, Container, Group, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { TbLock, TbShieldCheck, TbUsers, TbWifi } from 'react-icons/tb'
 import { usePresence } from '@/frontend/hooks/usePresence'
@@ -33,7 +33,7 @@ export function OverviewPanel() {
         <Title order={3}>Overview</Title>
         <SimpleGrid cols={{ base: 1, sm: 4 }}>
           {overviewStats.map((stat) => (
-            <Card key={stat.title} withBorder padding="lg" radius="md">
+            <Box key={stat.title} style={{ border: '1px solid var(--mantine-color-default-border)' }} p="lg">
               <Group justify="space-between" mb="xs">
                 <Text size="sm" c="dimmed" fw={500}>
                   {stat.title}
@@ -45,7 +45,7 @@ export function OverviewPanel() {
               <Text fw={700} size="xl">
                 {counts[stat.title as keyof typeof counts]}
               </Text>
-            </Card>
+            </Box>
           ))}
         </SimpleGrid>
       </Stack>

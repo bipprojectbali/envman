@@ -1,18 +1,21 @@
 import {
   ActionIcon,
   Badge,
+  Box,
   Button,
-  Card,
   Group,
   Pagination,
   SegmentedControl,
+  SimpleGrid,
   Stack,
   Text,
   TextInput,
   ThemeIcon,
+  Tooltip,
 } from '@mantine/core'
+import { useLocalStorage } from '@mantine/hooks'
 import { useMemo, useState } from 'react'
-import { TbBan, TbCheck, TbSearch, TbX } from 'react-icons/tb'
+import { TbBan, TbCheck, TbLayoutGrid, TbLayoutList, TbSearch, TbX } from 'react-icons/tb'
 import type { ProjectAccess } from './types'
 import { ProjectAccessItem } from './ProjectAccessItem'
 
@@ -22,6 +25,7 @@ export function AccessMatrixTab({ userId, projects }: { userId: string; projects
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'has-access' | 'restricted'>('all')
   const [page, setPage] = useState(1)
+  const [view, setView] = useLocalStorage<'list' | 'grid'>({ key: 'envman:users:access-view', defaultValue: 'list' })
 
   const hasAnyOverride = (p: ProjectAccess) => p.environments.some(e => e.envRole !== 'inherit')
   const hasRestricted = (p: ProjectAccess) => p.environments.some(e => e.envRole === 'denied')
@@ -70,6 +74,18 @@ export function AccessMatrixTab({ userId, projects }: { userId: string; projects
             </ActionIcon>
           ) : undefined}
         />
+        <Group gap={2} wrap="nowrap">
+          <Tooltip label="Tampilan list">
+            <ActionIcon size="sm" variant={view === 'list' ? 'filled' : 'subtle'} color={view === 'list' ? 'violet' : 'gray'} onClick={() => setView('list')}>
+              <TbLayoutList size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Tampilan grid">
+            <ActionIcon size="sm" variant={view === 'grid' ? 'filled' : 'subtle'} color={view === 'grid' ? 'violet' : 'gray'} onClick={() => setView('grid')}>
+              <TbLayoutGrid size={14} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Group>
       <SegmentedControl
         size="xs"
@@ -93,11 +109,19 @@ export function AccessMatrixTab({ userId, projects }: { userId: string; projects
             <Text size="xs" tt="uppercase" fw={700} c="teal">Has access</Text>
             <Badge size="xs" variant="light" color="teal">{totalHasAccess}</Badge>
           </Group>
-          <Stack gap="xs">
-            {paginatedWithAccess.map(p => (
-              <ProjectAccessItem key={p.slug} userId={userId} project={p} />
-            ))}
-          </Stack>
+          {view === 'grid' ? (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              {paginatedWithAccess.map(p => (
+                <ProjectAccessItem key={p.slug} userId={userId} project={p} />
+              ))}
+            </SimpleGrid>
+          ) : (
+            <Stack gap="xs">
+              {paginatedWithAccess.map(p => (
+                <ProjectAccessItem key={p.slug} userId={userId} project={p} />
+              ))}
+            </Stack>
+          )}
         </Stack>
       )}
 
@@ -111,17 +135,25 @@ export function AccessMatrixTab({ userId, projects }: { userId: string; projects
             <Text size="xs" tt="uppercase" fw={700} c="dimmed">No access</Text>
             <Badge size="xs" variant="outline" color="gray">{projects.length - totalHasAccess}</Badge>
           </Group>
-          <Stack gap="xs">
-            {paginatedWithoutAccess.map(p => (
-              <ProjectAccessItem key={p.slug} userId={userId} project={p} />
-            ))}
-          </Stack>
+          {view === 'grid' ? (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              {paginatedWithoutAccess.map(p => (
+                <ProjectAccessItem key={p.slug} userId={userId} project={p} />
+              ))}
+            </SimpleGrid>
+          ) : (
+            <Stack gap="xs">
+              {paginatedWithoutAccess.map(p => (
+                <ProjectAccessItem key={p.slug} userId={userId} project={p} />
+              ))}
+            </Stack>
+          )}
         </Stack>
       )}
 
       {/* Empty state */}
       {filtered.length === 0 && (
-        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
           <ThemeIcon size={32} radius="xl" variant="light" color="gray" mx="auto" mb="xs">
             <TbSearch size={16} />
           </ThemeIcon>
@@ -132,7 +164,7 @@ export function AccessMatrixTab({ userId, projects }: { userId: string; projects
               Reset filter
             </Button>
           )}
-        </Card>
+        </Box>
       )}
 
       {/* Pagination */}

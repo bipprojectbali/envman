@@ -4,11 +4,9 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   Group,
   Kbd,
-  Paper,
   Select,
   SimpleGrid,
   Skeleton,
@@ -30,6 +28,7 @@ import {
   TbChevronRight,
   TbClock,
   TbFolders,
+  TbInfoCircle,
   TbLayoutGrid,
   TbLayoutList,
   TbNote,
@@ -102,7 +101,7 @@ function relativeDate(iso?: string): string {
 }
 
 const ENV_NAME_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/
-const ENV_PRESETS = ['production', 'staging', 'development'] as const
+const ENV_PRESETS = ['prod', 'stg', 'dev'] as const
 
 const HOVER_STYLES = `
 .envman-env-card {
@@ -155,6 +154,25 @@ function ProjectDetailPage() {
   const totalVars = envs.reduce((s, e) => s + (e._count?.vars ?? 0), 0)
   const memberCount: number = project?.members?.length ?? 0
   const projectTags: string[] = project?.tags ?? []
+
+  const { data: notesData } = useQuery({
+    queryKey: ['envman', 'notes', slug],
+    queryFn: () => apiFetch<{ notes: unknown[] }>(`/api/envman/projects/${slug}/notes`),
+    staleTime: 30_000,
+  })
+  const { data: aliasesData } = useQuery({
+    queryKey: ['envman', 'aliases', slug],
+    queryFn: () => apiFetch<{ aliases: unknown[] }>(`/api/envman/projects/${slug}/aliases`),
+    staleTime: 60_000,
+  })
+  const { data: filesData } = useQuery({
+    queryKey: ['envman', 'files', slug],
+    queryFn: () => apiFetch<{ files: unknown[] }>(`/api/envman/projects/${slug}/files`),
+    staleTime: 60_000,
+  })
+  const notesCount = notesData?.notes?.length ?? 0
+  const aliasesCount = aliasesData?.aliases?.length ?? 0
+  const filesCount = filesData?.files?.length ?? 0
 
   const filteredEnvs = useMemo(() => {
     let list = [...envs]
@@ -285,7 +303,7 @@ function ProjectDetailPage() {
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
-      {/* ─── Breadcrumb ─────────────────────── */}
+      {/* ─── Breadcrumb ─── */}
       <Group mb="md" gap={6} wrap="nowrap" align="center">
         <Button
           variant="subtle" size="xs" px={8} color="gray"
@@ -296,19 +314,17 @@ function ProjectDetailPage() {
           Projects
         </Button>
         <TbChevronRight size={13} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
-        {isLoading ? (
-          <Skeleton height={14} width={100} />
-        ) : (
-          <Text size="sm" fw={500} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {project?.name ?? slug}
-          </Text>
-        )}
+        {isLoading
+          ? <Skeleton height={14} width={100} />
+          : <Text size="sm" fw={500} truncate>{project?.name ?? slug}</Text>
+        }
       </Group>
 
+      {/* ─── Project Header ─── */}
       {isLoading ? (
-        <Skeleton height={88} mb="md" radius="md" />
+        <Skeleton height={100} mb="md" radius="md" />
       ) : isError ? (
-        <Card withBorder p="xl" ta="center" mb="md" style={{ borderColor: 'var(--mantine-color-red-5)' }}>
+        <Box p="xl" ta="center" mb="md" style={{ border: '1px solid var(--mantine-color-red-5)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="red" mx="auto" mb="sm">
             <TbAlertTriangle size={24} />
           </ThemeIcon>
@@ -324,78 +340,84 @@ function ProjectDetailPage() {
               Coba lagi
             </Button>
           </Group>
-        </Card>
+        </Box>
       ) : project && (
-        <Paper withBorder radius="lg" p="lg" mb="lg">
-          <Group gap="md" wrap="nowrap" align="flex-start">
+        <Box p={{ base: 'sm', sm: 'md' }} mb="lg" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+          <Group gap="sm" wrap="nowrap" align="flex-start">
             <ThemeIcon
-              size={52} radius="lg" variant="light"
+              size={48}
+              radius="lg" variant="light"
               color={roleColor[myRole as keyof typeof roleColor] ?? 'gray'}
+              style={{ flexShrink: 0 }}
             >
-              <TbFolders size={26} />
+              <TbFolders size={22} />
             </ThemeIcon>
 
             <Box style={{ flex: 1, minWidth: 0 }}>
               {/* Name + slug + role */}
-              <Group gap="xs" mb={6} wrap="nowrap" align="center">
-                <Text fw={800} size="xl" lh={1.2} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Group gap="xs" mb={4} wrap="wrap" align="center">
+                <Text fw={800} size="xl" lh={1.2} style={{ wordBreak: 'break-word' }}>
                   {project.name}
                 </Text>
-                <Code fz="xs" style={{ flexShrink: 0 }}>{slug}</Code>
-                <Badge
-                  size="sm"
-                  variant="light"
-                  color={roleColor[myRole as keyof typeof roleColor] ?? 'gray'}
-                  style={{ flexShrink: 0 }}
-                >
-                  {myRole}
-                </Badge>
+                <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
+                  <Code fz="xs">{slug}</Code>
+                  <Badge size="sm" variant="light" color={roleColor[myRole as keyof typeof roleColor] ?? 'gray'}>
+                    {myRole}
+                  </Badge>
+                </Group>
               </Group>
 
               {/* Description */}
-              <Text size="sm" c={project.description ? undefined : 'dimmed'} fs={project.description ? undefined : 'italic'} mb="sm" lh={1.6}>
+              <Text
+                size="sm" lh={1.6} mb="xs"
+                c={project.description ? undefined : 'dimmed'}
+                fs={project.description ? undefined : 'italic'}
+              >
                 {project.description || 'Belum ada deskripsi'}
               </Text>
 
               {/* Tags */}
               {projectTags.length > 0 && (
-                <Group gap={4} mb="sm">
+                <Group gap={4} mb="xs">
                   {projectTags.map(t => (
                     <Badge key={t} size="xs" variant="light" color={tagColor(t)} leftSection={<TbTag size={9} />}>{t}</Badge>
                   ))}
                 </Group>
               )}
 
-              {/* Stats row */}
-              <Group gap={0} style={{ borderTop: '1px solid var(--mantine-color-default-border)', paddingTop: 10, marginTop: 4 }}>
+              {/* Stats — wrap-friendly, no manual dividers */}
+              <Group
+                gap="xs" wrap="wrap" pt="xs" mt={4}
+                style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}
+              >
                 <Tooltip label={`${envs.length} environment`} withArrow>
-                  <Group gap={5} px={12} style={{ cursor: 'default' }}>
-                    <TbVariable size={13} color="var(--mantine-color-primary)" />
+                  <Group gap={4} style={{ cursor: 'default' }}>
+                    <TbVariable size={12} color="var(--mantine-color-primary)" />
                     <Text size="xs" fw={600}>{envs.length}</Text>
                     <Text size="xs" c="dimmed">env</Text>
                   </Group>
                 </Tooltip>
-                <Box w={1} h={16} bg="var(--mantine-color-default-border)" />
+                <Text size="xs" c="dimmed">·</Text>
                 <Tooltip label={`${totalVars} variabel di semua environment`} withArrow>
-                  <Group gap={5} px={12} style={{ cursor: 'default' }}>
+                  <Group gap={4} style={{ cursor: 'default' }}>
                     <Box w={6} h={6} bg="var(--mantine-color-teal-5)" style={{ borderRadius: 2 }} />
                     <Text size="xs" fw={600}>{totalVars}</Text>
                     <Text size="xs" c="dimmed">vars</Text>
                   </Group>
                 </Tooltip>
-                <Box w={1} h={16} bg="var(--mantine-color-default-border)" />
+                <Text size="xs" c="dimmed">·</Text>
                 <Tooltip label={`${memberCount} anggota project`} withArrow>
-                  <Group gap={5} px={12} style={{ cursor: 'default' }}>
-                    <TbUsers size={13} color="var(--mantine-color-blue-5)" />
+                  <Group gap={4} style={{ cursor: 'default' }}>
+                    <TbUsers size={12} color="var(--mantine-color-blue-5)" />
                     <Text size="xs" fw={600}>{memberCount}</Text>
                     <Text size="xs" c="dimmed">member</Text>
                   </Group>
                 </Tooltip>
                 {project.createdAt && (
                   <>
-                    <Box w={1} h={16} bg="var(--mantine-color-default-border)" />
+                    <Text size="xs" c="dimmed">·</Text>
                     <Tooltip label={`Dibuat ${new Date(project.createdAt).toLocaleString('id-ID')}`} withArrow>
-                      <Group gap={5} px={12} style={{ marginLeft: 'auto', cursor: 'default' }}>
+                      <Group gap={4} style={{ cursor: 'default' }}>
                         <TbClock size={12} color="var(--mantine-color-dimmed)" />
                         <Text size="xs" c="dimmed">{relativeDate(project.createdAt)}</Text>
                       </Group>
@@ -405,59 +427,83 @@ function ProjectDetailPage() {
               </Group>
             </Box>
           </Group>
-        </Paper>
+        </Box>
       )}
 
-      {/* ─── Tabs ───────────────────────────── */}
+      {/* ─── Tabs ─── */}
       {!isError && (
-        <Tabs value={tab} onChange={v => setTab(v ?? 'environments')} variant="pills">
+        <Tabs value={tab} onChange={v => setTab(v ?? 'environments')} variant="pills" color="gray">
           <Tabs.List mb="lg">
             <Tabs.Tab
               value="environments"
               leftSection={<TbVariable size={13} />}
-              rightSection={!isLoading && envs.length > 0 ? (
-                <Badge size="xs" variant="light" color="primary" circle>{envs.length}</Badge>
-              ) : undefined}
+              rightSection={!isLoading && envs.length > 0
+                ? <Badge size="xs" variant="light" color="primary" circle>{envs.length}</Badge>
+                : undefined}
             >
               Environments
             </Tabs.Tab>
-            <Tabs.Tab value="notes" leftSection={<TbNote size={13} />}>
+            <Tabs.Tab
+              value="notes"
+              leftSection={<TbNote size={13} />}
+              rightSection={notesCount > 0
+                ? <Badge size="xs" variant="light" color="primary" circle>{notesCount}</Badge>
+                : undefined}
+            >
               Notes
             </Tabs.Tab>
-            <Tabs.Tab value="aliases" leftSection={<TbTerminal2 size={13} />}>
+            <Tabs.Tab
+              value="aliases"
+              leftSection={<TbTerminal2 size={13} />}
+              rightSection={aliasesCount > 0
+                ? <Badge size="xs" variant="light" color="primary" circle>{aliasesCount}</Badge>
+                : undefined}
+            >
               Aliases
             </Tabs.Tab>
-            <Tabs.Tab value="files" leftSection={<TbFiles size={13} />}>
+            <Tabs.Tab
+              value="files"
+              leftSection={<TbFiles size={13} />}
+              rightSection={filesCount > 0
+                ? <Badge size="xs" variant="light" color="primary" circle>{filesCount}</Badge>
+                : undefined}
+            >
               Files
             </Tabs.Tab>
           </Tabs.List>
 
-          {/* ── Environments tab ─────────────── */}
+          {/* ── Environments tab ── */}
           <Tabs.Panel value="environments">
+            <Alert
+              variant="light" color="blue" radius="md" mb="sm" p="xs"
+              icon={<TbInfoCircle size={15} />}
+              styles={{ message: { fontSize: 'var(--mantine-font-size-xs)' }, body: { gap: 4 } }}
+            >
+              Environment menyimpan variabel konfigurasi per tahap deployment. Klik environment untuk mengelola vars, atau akses dari CLI:{' '}
+              <Code fz="xs">envman -e {slug}:production -- bun start</Code>
+            </Alert>
+
             {isLoading ? (
               <Stack gap="xs">
                 {[0, 1, 2].map(i => <Skeleton key={i} height={64} radius="md" />)}
               </Stack>
             ) : envs.length === 0 ? (
-              <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+              <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
                 <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
                   <TbVariable size={24} />
                 </ThemeIcon>
                 <Text fw={600} mb={4}>Belum ada environment</Text>
                 <Text size="sm" c="dimmed" mb="md" maw={420} mx="auto">
                   Environment adalah wadah untuk environment variables.
-                  Biasanya kamu butuh <Code fz="xs">production</Code>, <Code fz="xs">staging</Code>, dan <Code fz="xs">development</Code>.
+                  Biasanya kamu butuh <Code fz="xs">prod</Code>, <Code fz="xs">stg</Code>, dan <Code fz="xs">dev</Code>.
                 </Text>
                 {canEdit && (
                   <>
                     <Group justify="center" gap="xs" mb="sm">
                       {ENV_PRESETS.map(preset => (
                         <Button
-                          key={preset}
-                          size="xs"
-                          variant="light"
-                          color={getEnvColor(preset)}
-                          leftSection={<TbPlus size={12} />}
+                          key={preset} size="xs" variant="light"
+                          color={getEnvColor(preset)} leftSection={<TbPlus size={12} />}
                           onClick={() => addEnv.mutate(preset)}
                           loading={addEnv.isPending && addEnv.variables === preset}
                         >
@@ -468,37 +514,41 @@ function ProjectDetailPage() {
                     <Text size="xs" c="dimmed">atau buat nama custom di bawah</Text>
                   </>
                 )}
-              </Card>
+              </Box>
             ) : (
               <>
-                <Group mb="sm" gap="xs">
+                {/* Toolbar */}
+                <Stack gap="xs" mb="sm">
+                  {/* Search — full width own row */}
                   {envs.length > 2 && (
-                    <>
-                      <TextInput
-                        ref={searchRef}
-                        size="xs"
-                        placeholder="Cari environment..."
-                        leftSection={<TbSearch size={13} />}
-                        value={envSearch}
-                        onChange={e => setEnvSearch(e.target.value)}
-                        rightSection={
-                          envSearch ? (
-                            <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setEnvSearch('')}>
-                              <TbX size={11} />
-                            </ActionIcon>
-                          ) : (
-                            <Tooltip label="Tekan / untuk focus">
-                              <Kbd size="xs">/</Kbd>
-                            </Tooltip>
-                          )
-                        }
-                        rightSectionWidth={32}
-                        style={{ flex: 1 }}
-                      />
+                    <TextInput
+                      ref={searchRef}
+                      size="sm"
+                      placeholder="Cari environment..."
+                      leftSection={<TbSearch size={14} />}
+                      value={envSearch}
+                      onChange={e => setEnvSearch(e.target.value)}
+                      rightSection={
+                        envSearch ? (
+                          <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setEnvSearch('')}>
+                            <TbX size={12} />
+                          </ActionIcon>
+                        ) : (
+                          <Tooltip label="Tekan / untuk focus">
+                            <Kbd size="xs">/</Kbd>
+                          </Tooltip>
+                        )
+                      }
+                      rightSectionWidth={36}
+                      radius="md"
+                    />
+                  )}
+                  {/* Sort + view toggle */}
+                  <Group gap="xs" wrap="wrap" justify={envs.length > 2 ? undefined : 'flex-end'}>
+                    {envs.length > 2 && (
                       <Select
-                        size="xs"
-                        w={150}
-                        leftSection={<TbSortAscending size={13} />}
+                        size="sm" w={155} radius="md"
+                        leftSection={<TbSortAscending size={14} />}
                         value={envSort}
                         onChange={v => setEnvSort((v ?? 'name') as typeof envSort)}
                         data={[
@@ -508,70 +558,69 @@ function ProjectDetailPage() {
                         ]}
                         allowDeselect={false}
                       />
-                    </>
-                  )}
-                  <Group gap={4} ml="auto">
-                    <Tooltip label="List view" withArrow>
-                      <ActionIcon size="sm" variant={envView === 'list' ? 'filled' : 'subtle'} color="blue" onClick={() => setEnvView('list')}>
-                        <TbLayoutList size={14} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Grid view" withArrow>
-                      <ActionIcon size="sm" variant={envView === 'grid' ? 'filled' : 'subtle'} color="blue" onClick={() => setEnvView('grid')}>
-                        <TbLayoutGrid size={14} />
-                      </ActionIcon>
-                    </Tooltip>
+                    )}
+                    <Group gap={4} wrap="nowrap">
+                      <Tooltip label="List view" withArrow>
+                        <ActionIcon size="sm" variant={envView === 'list' ? 'filled' : 'subtle'} color="blue" onClick={() => setEnvView('list')}>
+                          <TbLayoutList size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Grid view" withArrow>
+                        <ActionIcon size="sm" variant={envView === 'grid' ? 'filled' : 'subtle'} color="blue" onClick={() => setEnvView('grid')}>
+                          <TbLayoutGrid size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
                   </Group>
-                </Group>
+                </Stack>
+
+                {/* Environment list/grid */}
                 {filteredEnvs.length === 0 ? (
-                  <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
+                  <Box p="md" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
                     <Text size="sm" c="dimmed" mb="xs">
                       Tidak ada environment yang cocok dengan "{envSearch}"
                     </Text>
                     <Button size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={() => setEnvSearch('')}>
                       Reset pencarian
                     </Button>
-                  </Card>
+                  </Box>
                 ) : (() => {
                   const cards = filteredEnvs.map(e => {
                     const color = getEnvColor(e.name)
                     const varCount = e._count?.vars ?? 0
                     const goTo = () => navigate({ to: '/envmanager/$slug/$env', params: { slug, env: e.name } })
                     return (
-                      <Card
+                      <Box
                         key={e.name}
-                        withBorder
-                        padding="sm"
-                        radius="md"
+                        p="sm"
                         className="envman-env-card"
-                        role="link"
-                        tabIndex={0}
+                        role="link" tabIndex={0}
                         aria-label={`Kelola environment ${e.name}`}
                         onClick={goTo}
                         onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); goTo() } }}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
                       >
-                        <Group justify="space-between" wrap="nowrap" gap="sm">
+                        <Group justify="space-between" wrap="nowrap" gap="sm" align="center">
+                          {/* Left: icon + info */}
                           <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
-                            <ThemeIcon size={40} radius="md" variant="light" color={color}>
-                              <TbVariable size={20} />
+                            <ThemeIcon size={36} radius="md" variant="light" color={color} style={{ flexShrink: 0 }}>
+                              <TbVariable size={18} />
                             </ThemeIcon>
                             <Box style={{ flex: 1, minWidth: 0 }}>
-                              <Group gap={6} mb={3} wrap="nowrap" align="center">
-                                <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <Group gap={6} mb={2} wrap="nowrap" align="center">
+                                <Text fw={700} size="sm" truncate style={{ flex: 1, minWidth: 0 }}>
                                   {e.name}
                                 </Text>
-                                <Badge
-                                  size="xs"
-                                  variant="light"
-                                  color={color}
-                                  style={{ flexShrink: 0 }}
-                                >
+                                <Badge size="xs" variant="light" color={color} style={{ flexShrink: 0 }}>
                                   {varCount} vars
                                 </Badge>
                               </Group>
-                              <Group gap="xs" wrap="nowrap">
-                                <Code fz="xs">{slug}:{e.name}</Code>
+                              <Group gap={6} wrap="nowrap" align="center">
+                                <Box style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
+                                  <Code fz="xs" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {slug}:{e.name}
+                                  </Code>
+                                </Box>
                                 {e.createdAt && (
                                   <Tooltip label={`Dibuat ${new Date(e.createdAt).toLocaleString('id-ID')}`} withArrow>
                                     <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
@@ -583,7 +632,8 @@ function ProjectDetailPage() {
                             </Box>
                           </Group>
 
-                          <Group gap={6} wrap="nowrap" onClick={ev => ev.stopPropagation()}>
+                          {/* Right: actions */}
+                          <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }} onClick={ev => ev.stopPropagation()}>
                             {isOwner && (
                               <>
                                 <Tooltip label="Rename" position="left" withArrow>
@@ -607,76 +657,73 @@ function ProjectDetailPage() {
                               </>
                             )}
                             <Button
-                              size="xs"
-                              variant="light"
-                              color={color}
+                              size="xs" variant="light" color={color}
                               rightSection={<TbChevronRight size={12} />}
                               onClick={ev => { ev.stopPropagation(); goTo() }}
-                              style={{ flexShrink: 0 }}
                             >
                               Open
                             </Button>
                           </Group>
                         </Group>
-                      </Card>
+                      </Box>
                     )
                   })
-                  return envView === 'grid' ? (
-                    <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{cards}</SimpleGrid>
-                  ) : (
-                    <Stack gap="xs">{cards}</Stack>
-                  )
+                  return envView === 'grid'
+                    ? <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{cards}</SimpleGrid>
+                    : <Stack gap="xs">{cards}</Stack>
                 })()}
               </>
             )}
 
+            {/* Add environment */}
             {canEdit && (
-              <Paper withBorder radius="md" p="sm" mt="md">
-                <Group gap="xs" align="flex-start">
-                  <Box style={{ flex: 1 }}>
-                    <TextInput
-                      size="sm"
-                      placeholder="Nama environment baru, mis. production, staging-eu..."
-                      value={newEnvName}
-                      onChange={ev => setNewEnvName(ev.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                      onKeyDown={ev => { if (ev.key === 'Enter' && newEnvValid && !newEnvDuplicate) addEnv.mutate(newEnvName) }}
-                      leftSection={<TbVariable size={14} />}
-                      error={newEnvError ?? undefined}
-                      styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
-                    />
-                    {envs.length > 0 && envs.length < ENV_PRESETS.length && (
-                      <Group gap={6} mt={8}>
-                        <Text size="xs" c="dimmed">Preset:</Text>
-                        {ENV_PRESETS.filter(p => !envs.some(e => e.name === p)).map(preset => (
-                          <Badge
-                            key={preset}
-                            size="sm"
-                            variant="outline"
-                            color={getEnvColor(preset)}
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => addEnv.mutate(preset)}
-                          >
-                            + {preset}
-                          </Badge>
-                        ))}
-                      </Group>
-                    )}
-                  </Box>
-                  <Button
-                    size="sm"
-                    leftSection={<TbPlus size={14} />}
-                    onClick={() => addEnv.mutate(newEnvName)}
-                    loading={addEnv.isPending}
-                    disabled={!newEnvValid || newEnvDuplicate}
-                  >
-                    Add
-                  </Button>
-                </Group>
-              </Paper>
+              <Box p="sm" mt="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+                <Stack gap="xs">
+                  <Text size="xs" fw={500} c="dimmed">Tambah environment</Text>
+                  <Group gap="xs" align="flex-start" wrap="nowrap">
+                    <Box style={{ flex: 1, minWidth: 0 }}>
+                      <TextInput
+                        size="sm"
+                        placeholder="production, staging-eu, dev-alice..."
+                        value={newEnvName}
+                        onChange={ev => setNewEnvName(ev.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                        onKeyDown={ev => { if (ev.key === 'Enter' && newEnvValid && !newEnvDuplicate) addEnv.mutate(newEnvName) }}
+                        leftSection={<TbVariable size={14} />}
+                        error={newEnvError ?? undefined}
+                        styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
+                      />
+                      {envs.length > 0 && envs.length < ENV_PRESETS.length && (
+                        <Group gap={6} mt={6}>
+                          <Text size="xs" c="dimmed">Preset:</Text>
+                          {ENV_PRESETS.filter(p => !envs.some(e => e.name === p)).map(preset => (
+                            <Badge
+                              key={preset} size="sm" variant="outline"
+                              color={getEnvColor(preset)}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => addEnv.mutate(preset)}
+                            >
+                              + {preset}
+                            </Badge>
+                          ))}
+                        </Group>
+                      )}
+                    </Box>
+                    <Button
+                      size="sm" style={{ flexShrink: 0 }}
+                      leftSection={<TbPlus size={14} />}
+                      onClick={() => addEnv.mutate(newEnvName)}
+                      loading={addEnv.isPending}
+                      disabled={!newEnvValid || newEnvDuplicate}
+                    >
+                      Add
+                    </Button>
+                  </Group>
+                </Stack>
+              </Box>
             )}
           </Tabs.Panel>
 
-          {/* ── Notes tab ────────────────────── */}
+          {/* ── Notes tab ── */}
           <Tabs.Panel value="notes">
             <NotesPanel
               slug={slug}
@@ -691,19 +738,19 @@ function ProjectDetailPage() {
             />
           </Tabs.Panel>
 
-          {/* ── Aliases tab ──────────────────── */}
+          {/* ── Aliases tab ── */}
           <Tabs.Panel value="aliases">
             <AliasesPanel slug={slug} isOwner={isOwner} />
           </Tabs.Panel>
 
-          {/* ── Files tab ────────────────────── */}
+          {/* ── Files tab ── */}
           <Tabs.Panel value="files">
             <FilesPanel slug={slug} isOwner={isOwner} myUserId={myUserId ?? ''} canEdit={canEdit} />
           </Tabs.Panel>
         </Tabs>
       )}
 
-      {/* ─── Note modals — di luar Tabs agar tidak konflik z-index ── */}
+      {/* Note modals — di luar Tabs agar tidak konflik z-index */}
       <NoteFormModal slug={slug} openNote={noteModal} setOpenNote={setNoteModal} />
       <NoteViewModal
         slug={slug}

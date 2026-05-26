@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  ActionIcon, Badge, Card, Container, Group,
+  ActionIcon, Badge, Box, Container, Group,
   Pagination, Select, Stack, Table, Text, Title, Tooltip,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -116,7 +116,7 @@ export function UserLogsPanel() {
           />
         </Group>
 
-        <Card withBorder radius="md" p={0}>
+        <Box style={{ border: '1px solid var(--mantine-color-default-border)' }} p={0}>
           <Table highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -191,7 +191,7 @@ export function UserLogsPanel() {
               })}
             </Table.Tbody>
           </Table>
-        </Card>
+        </Box>
 
         {logs.length > PAGE_SIZE && (
           <Group justify="space-between">

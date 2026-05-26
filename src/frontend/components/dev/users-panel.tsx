@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import {
-  ActionIcon, Avatar, Badge, Card, Container, Group,
+  ActionIcon, Avatar, Badge, Box, Container, Group,
   Menu, SegmentedControl, Stack, Table, Text, TextInput, Title,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -105,7 +105,7 @@ export function UsersPanel() {
           />
         </Group>
 
-        <Card withBorder radius="md" p={0}>
+        <Box style={{ border: '1px solid var(--mantine-color-default-border)' }} p={0}>
           <Table highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -257,7 +257,7 @@ export function UsersPanel() {
               })}
             </Table.Tbody>
           </Table>
-        </Card>
+        </Box>
       </Stack>
     </Container>
   )

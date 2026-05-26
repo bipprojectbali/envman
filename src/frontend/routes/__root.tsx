@@ -16,6 +16,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 const PUBLIC_ROUTES = ['/', '/login', '/blocked', '/docs']
+const PUBLIC_PREFIXES = ['/gists']
 
 function SessionGuard() {
   const { data, isLoading } = useSession()
@@ -24,7 +25,8 @@ function SessionGuard() {
 
   useEffect(() => {
     if (isLoading) return
-    if (data?.user === null && !PUBLIC_ROUTES.includes(pathname)) {
+    const isPublic = PUBLIC_ROUTES.includes(pathname) || PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
+    if (data?.user === null && !isPublic) {
       navigate({ to: '/login' })
     }
   }, [data?.user, isLoading, pathname])

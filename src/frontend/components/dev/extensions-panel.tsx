@@ -1,4 +1,4 @@
-import { Badge, Box, Container, Group, Paper, Stack, Switch, Text, ThemeIcon, Title } from '@mantine/core'
+import { Badge, Box, Container, Group, Stack, Switch, Text, ThemeIcon, Title } from '@mantine/core'
 import { TbPlugConnected, TbPlugOff } from 'react-icons/tb'
 import { notifyErr } from '@/frontend/lib/notify'
 import { useExtensions, useUpdateExtensions } from '@/frontend/hooks/useExtensions'
@@ -39,7 +39,7 @@ export function ExtensionsPanel() {
             const enabled = ext ? ext[ext_meta.key] : true
             const Icon = ext_meta.icon
             return (
-              <Paper key={ext_meta.key} withBorder p="md" radius="md">
+              <Box key={ext_meta.key} style={{ border: '1px solid var(--mantine-color-default-border)' }} p="md">
                 <Group justify="space-between" wrap="nowrap" align="flex-start">
                   <Group gap="md" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
                     <ThemeIcon
@@ -89,7 +89,7 @@ export function ExtensionsPanel() {
                     size="md"
                   />
                 </Group>
-              </Paper>
+              </Box>
             )
           })}
         </Stack>

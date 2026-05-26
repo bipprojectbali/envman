@@ -4,7 +4,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   Divider,
   Group,
@@ -119,17 +118,15 @@ function StatCard({
 }) {
   const clickable = !!onClick
   return (
-    <Card
-      withBorder
+    <Box
       p={{ base: 'sm', sm: 'md' }}
-      radius="md"
       className={`envman-stat-card ${clickable ? 'is-clickable' : ''}`}
       role={clickable ? 'link' : undefined}
       tabIndex={clickable ? 0 : undefined}
       aria-label={clickable ? `Buka ${label}` : undefined}
       onClick={onClick}
       onKeyDown={clickable ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } } : undefined}
-      style={{ cursor: clickable ? 'pointer' : undefined }}
+      style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: clickable ? 'pointer' : undefined }}
     >
       <Group justify="space-between" align="center" mb={8}>
         <ThemeIcon size={32} radius="md" variant="light" color={color}>
@@ -144,7 +141,7 @@ function StatCard({
       )}
       <Text size="xs" fw={600} c="dimmed">{label}</Text>
       {sub && <Text size="xs" c="dimmed" mt={2} lineClamp={1}>{sub}</Text>}
-    </Card>
+    </Box>
   )
 }
 
@@ -303,7 +300,7 @@ function OverviewPage() {
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: 'sm', md: 'md' }}>
 
         {/* ─── Projects list ──────────────── */}
-        <Card withBorder p="md" radius="md">
+        <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
           <Group justify="space-between" mb="md">
             <Group gap="xs">
               <ThemeIcon size={24} radius="sm" variant="light" color="primary">
@@ -325,12 +322,12 @@ function OverviewPage() {
               {[1, 2, 3].map(i => <Skeleton key={i} height={52} radius="md" />)}
             </Stack>
           ) : recentProjects.length === 0 ? (
-            <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
+            <Box p="lg" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
               <Text size="sm" c="dimmed" mb="xs">Belum ada project</Text>
               <Button size="xs" leftSection={<TbPlus size={13} />} onClick={() => navigate({ to: '/envmanager' })}>
                 Buat Project
               </Button>
-            </Card>
+            </Box>
           ) : (
             <Stack gap={6}>
               {recentProjects.map((p: any) => {
@@ -378,13 +375,13 @@ function OverviewPage() {
               )}
             </Stack>
           )}
-        </Card>
+        </Box>
 
         {/* ─── Right column ──────────────── */}
         <Stack gap="md">
 
           {/* Gists */}
-          <Card withBorder p="md" radius="md">
+          <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
             <Group justify="space-between" mb="md">
               <Group gap="xs">
                 <ThemeIcon size={24} radius="sm" variant="light" color="grape">
@@ -437,10 +434,10 @@ function OverviewPage() {
                 )}
               </Stack>
             )}
-          </Card>
+          </Box>
 
           {/* Tokens */}
-          <Card withBorder p="md" radius="md">
+          <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
             <Group justify="space-between" mb="md">
               <Group gap="xs">
                 <ThemeIcon size={24} radius="sm" variant="light" color="orange">
@@ -504,10 +501,10 @@ function OverviewPage() {
                 )}
               </Stack>
             )}
-          </Card>
+          </Box>
 
           {/* Connections */}
-          <Card withBorder p="md" radius="md">
+          <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
             <Group justify="space-between" mb="md">
               <Group gap="xs">
                 <ThemeIcon size={24} radius="sm" variant="light" color="teal">
@@ -538,7 +535,7 @@ function OverviewPage() {
                 ))}
               </Stack>
             )}
-          </Card>
+          </Box>
 
         </Stack>
       </SimpleGrid>

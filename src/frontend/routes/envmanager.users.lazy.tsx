@@ -4,9 +4,7 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Group,
-  Paper,
   SegmentedControl,
   SimpleGrid,
   Skeleton,
@@ -57,6 +55,14 @@ function UsersPage() {
     active: users.filter(u => !u.blocked).length,
     blocked: users.filter(u => u.blocked).length,
     adminPlus: users.filter(u => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN').length,
+  }), [users])
+
+  const roleCounts = useMemo(() => ({
+    ALL: users.length,
+    USER: users.filter(u => u.role === 'USER').length,
+    QC: users.filter(u => u.role === 'QC').length,
+    ADMIN: users.filter(u => u.role === 'ADMIN').length,
+    SUPER_ADMIN: users.filter(u => u.role === 'SUPER_ADMIN').length,
   }), [users])
 
   const filtered = useMemo(() => {
@@ -121,20 +127,35 @@ function UsersPage() {
   return (
     <Stack gap="lg" p="md">
       <Group justify="space-between" wrap="nowrap">
-        <Group gap="sm">
-          <ThemeIcon size={36} variant="gradient" radius="md">
+        <Group gap="sm" style={{ minWidth: 0 }}>
+          <ThemeIcon size={38} variant="gradient" radius="md" style={{ flexShrink: 0 }}>
             <TbUsers size={20} />
           </ThemeIcon>
-          <div>
-            <Text fw={700} size="lg">User Management</Text>
-            <Text size="sm" c="dimmed">Kelola role global dan akses per project/environment.</Text>
-          </div>
+          <Box style={{ minWidth: 0 }}>
+            <Text fw={800} size="xl" lh={1.2}>User Management</Text>
+            {!isLoading && users.length > 0 ? (
+              <Group gap={4} mt={2} wrap="wrap">
+                <Text size="xs" c="dimmed">{users.length} user</Text>
+                <Text size="xs" c="dimmed">·</Text>
+                <Text size="xs" c="dimmed">{stats.active} aktif</Text>
+                {stats.blocked > 0 && (
+                  <>
+                    <Text size="xs" c="dimmed">·</Text>
+                    <Text size="xs" c="dimmed">{stats.blocked} blocked</Text>
+                  </>
+                )}
+                {stats.adminPlus > 0 && (
+                  <>
+                    <Text size="xs" c="dimmed">·</Text>
+                    <Text size="xs" c="dimmed">{stats.adminPlus} admin+</Text>
+                  </>
+                )}
+              </Group>
+            ) : (
+              <Text size="xs" c="dimmed" mt={2}>Kelola role global dan akses per project.</Text>
+            )}
+          </Box>
         </Group>
-        {!isLoading && users.length > 0 && (
-          <Badge size="sm" variant="outline" color="gray" radius="sm">
-            {users.length} user{users.length !== 1 ? 's' : ''}
-          </Badge>
-        )}
       </Group>
 
       {/* Stats */}
@@ -146,46 +167,61 @@ function UsersPage() {
             { label: 'Blocked', value: stats.blocked, color: stats.blocked > 0 ? 'red' as const : undefined },
             { label: 'Admin+', value: stats.adminPlus, color: stats.adminPlus > 0 ? 'violet' as const : undefined },
           ].map(s => (
-            <Paper key={s.label} withBorder p="sm" radius="md">
+            <Box key={s.label} p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
               <Text size="xs" c="dimmed" mb={2}>{s.label}</Text>
               <Text size="xl" fw={700} c={s.color ?? (s.value === 0 ? 'dimmed' : undefined)}>
                 {s.value}
               </Text>
-            </Paper>
+            </Box>
           ))}
         </SimpleGrid>
       )}
 
       {/* Search + role filter */}
-      <Group gap="xs" wrap="nowrap">
+      <Stack gap="xs">
         <TextInput
+          size="sm"
           placeholder="Cari user (nama, email)..."
           leftSection={<TbSearch size={14} />}
           value={search}
           onChange={(e) => setSearch(e.currentTarget.value)}
           rightSection={search ? (
-            <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setSearch('')}>
-              <TbX size={11} />
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setSearch('')}>
+              <TbX size={12} />
             </ActionIcon>
           ) : undefined}
-          style={{ flex: 1, maxWidth: 360 }}
+          rightSectionWidth={search ? 32 : undefined}
+          radius="md"
         />
         <SegmentedControl
           size="xs"
           value={roleFilter}
           onChange={(v) => setRoleFilter(v as GlobalRole | 'ALL')}
-          data={[
+          radius="md"
+          data={([
             { value: 'ALL', label: 'All' },
             { value: 'USER', label: 'User' },
             { value: 'QC', label: 'QC' },
             { value: 'ADMIN', label: 'Admin' },
             { value: 'SUPER_ADMIN', label: 'Super' },
-          ]}
+          ] as { value: keyof typeof roleCounts; label: string }[]).map(({ value, label }) => ({
+            value,
+            label: (
+              <Group gap={4} wrap="nowrap" justify="center">
+                <span>{label}</span>
+                {roleCounts[value] > 0 && (
+                  <Badge size="xs" variant="light" color={GLOBAL_ROLE_COLOR[value === 'ALL' ? 'USER' : value]} circle>
+                    {roleCounts[value]}
+                  </Badge>
+                )}
+              </Group>
+            ),
+          }))}
         />
-      </Group>
+      </Stack>
 
       {/* Table */}
-      <Card withBorder radius="md" p={0}>
+      <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden' }}>
         {isLoading ? (
           <Stack gap={0}>
             {Array.from({ length: 5 }).map((_, i) => (
@@ -299,7 +335,7 @@ function UsersPage() {
             </Table.Tbody>
           </Table>
         )}
-      </Card>
+      </Box>
     </Stack>
   )
 }

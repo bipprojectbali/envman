@@ -1,14 +1,13 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
-  Card,
   CopyButton,
   Group,
   Kbd,
   Pagination,
-  Paper,
   Select,
   SimpleGrid,
   Skeleton,
@@ -18,7 +17,7 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDebouncedValue, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { useDebouncedValue, useHotkeys, useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -30,6 +29,7 @@ import {
   TbChevronRight,
   TbCopy,
   TbEdit,
+  TbInfoCircle,
   TbLayoutGrid,
   TbLayoutList,
   TbNote,
@@ -208,8 +208,7 @@ function NoteCardActions({ note, canEdit, isOwner, myUserId, onView, onEdit, onD
 function NoteCardList({ note, canEdit, isOwner, myUserId, onView, onEdit, onDelete, onPin, onTagClick }: NoteCardProps) {
   const wasEdited = new Date(note.updatedAt).getTime() - new Date(note.createdAt).getTime() > 60_000
   return (
-    <Card
-      withBorder
+    <Box
       p="sm"
       className={`envman-note-card ${note.pinned ? 'envman-note-pinned' : ''}`}
       role="article"
@@ -217,7 +216,7 @@ function NoteCardList({ note, canEdit, isOwner, myUserId, onView, onEdit, onDele
       aria-label={`Note: ${note.title}`}
       onClick={onView}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
-      style={{ cursor: 'pointer', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
+      style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
     >
       <Group justify="space-between" wrap="nowrap" gap="xs">
         <Box style={{ flex: 1, minWidth: 0 }}>
@@ -252,15 +251,14 @@ function NoteCardList({ note, canEdit, isOwner, myUserId, onView, onEdit, onDele
           onView={onView} onEdit={onEdit} onDelete={onDelete} onPin={onPin}
         />
       </Group>
-    </Card>
+    </Box>
   )
 }
 
 function NoteCardGrid({ note, canEdit, isOwner, myUserId, onView, onEdit, onDelete, onPin, onTagClick }: NoteCardProps) {
   const wasEdited = new Date(note.updatedAt).getTime() - new Date(note.createdAt).getTime() > 60_000
   return (
-    <Card
-      withBorder
+    <Box
       p="sm"
       className={`envman-note-card ${note.pinned ? 'envman-note-pinned' : ''}`}
       role="article"
@@ -270,6 +268,7 @@ function NoteCardGrid({ note, canEdit, isOwner, myUserId, onView, onEdit, onDele
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
       style={{
         cursor: 'pointer',
+        border: '1px solid var(--mantine-color-default-border)',
         borderTop: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined,
         display: 'flex',
         flexDirection: 'column',
@@ -312,13 +311,12 @@ function NoteCardGrid({ note, canEdit, isOwner, myUserId, onView, onEdit, onDele
           </Text>
         </Tooltip>
       </Group>
-    </Card>
+    </Box>
   )
 }
 
 export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpenModal, setViewNote }: NotesPanelProps) {
   const qc = useQueryClient()
-  const isMobile = useMediaQuery('(max-width: 48em)')
 
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState<string[]>([])
@@ -420,11 +418,11 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
             Hapus note <strong>{note.title}</strong>?
           </Text>
           {note.body && (
-            <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+            <Box p="xs" bg="var(--mantine-color-default-hover)" style={{ border: '1px solid var(--mantine-color-default-border)' }}>
               <Text size="xs" c="dimmed" lineClamp={3}>
                 {stripMarkdown(note.body, 200)}
               </Text>
-            </Paper>
+            </Box>
           )}
           <Text size="xs" c="dimmed">
             Dibuat {absoluteTime(note.createdAt)} oleh {note.author.name}.
@@ -445,9 +443,18 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
+      <Alert
+        variant="light" color="blue" radius="md" p="xs"
+        icon={<TbInfoCircle size={15} />}
+        styles={{ message: { fontSize: 'var(--mantine-font-size-xs)' }, body: { gap: 4 } }}
+      >
+        Notes untuk dokumentasi internal: runbook, deployment guide, troubleshooting log, atau catatan tim.
+        Mendukung Markdown. Pin note penting agar tampil di atas. Tekan <Kbd size="xs">/</Kbd> untuk cari cepat.
+      </Alert>
+
       {/* ─── Stats inline ───────────────────── */}
       {!isLoading && !isError && notes.length > 0 && (
-        <Group gap="md" mb={-4}>
+        <Group gap="xs" wrap="wrap" mb={-4}>
           <Text size="xs" c="dimmed">
             <Text component="span" fw={600} c="default">{notes.length}</Text> note
           </Text>
@@ -469,91 +476,95 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
 
       {/* ─── Toolbar ────────────────────────── */}
       {!isError && (notes.length > 0 || isLoading) && (
-        <Paper withBorder radius="md" p="xs">
-          <Group gap="xs" wrap="wrap">
-            <TextInput
-              ref={searchRef}
-              size="xs"
-              placeholder="Cari judul, isi, atau tag..."
-              leftSection={<TbSearch size={13} />}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              rightSection={
-                search ? (
-                  <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
-                    <TbX size={11} />
-                  </ActionIcon>
-                ) : (
-                  <Tooltip label="Tekan / untuk focus">
-                    <Kbd size="xs">/</Kbd>
-                  </Tooltip>
-                )
-              }
-              rightSectionWidth={32}
-              style={{ flex: '1 1 180px', minWidth: 0 }}
-            />
-            {!isMobile && allTags.length > 0 && (
-              <MultiSelectChips
+        <Stack gap="xs">
+          <TextInput
+            ref={searchRef}
+            size="sm"
+            placeholder="Cari judul, isi, atau tag..."
+            leftSection={<TbSearch size={13} />}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            rightSection={
+              search ? (
+                <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
+                  <TbX size={11} />
+                </ActionIcon>
+              ) : (
+                <Tooltip label="Tekan / untuk focus">
+                  <Kbd size="xs">/</Kbd>
+                </Tooltip>
+              )
+            }
+            rightSectionWidth={32}
+            radius="md"
+          />
+          <Group justify="space-between" wrap="wrap" gap="xs">
+            <Group gap="xs" wrap="wrap">
+              {allTags.length > 0 && (
+                <MultiSelectChips
+                  size="xs"
+                  label="Tag"
+                  icon={<TbTag size={13} />}
+                  width={140}
+                  options={allTags}
+                  value={tagFilter}
+                  onChange={setTagFilter}
+                />
+              )}
+              <Select
                 size="xs"
-                label="Tag"
-                icon={<TbTag size={13} />}
-                width={130}
-                options={allTags}
-                value={tagFilter}
-                onChange={setTagFilter}
+                w={140}
+                leftSection={<TbSortAscending size={13} />}
+                value={sort}
+                onChange={v => setSort((v ?? 'updated') as typeof sort)}
+                data={[
+                  { label: 'Terbaru edit', value: 'updated' },
+                  { label: 'Terbaru buat', value: 'created' },
+                  { label: 'Judul A→Z', value: 'title' },
+                ]}
+                allowDeselect={false}
               />
-            )}
-            <Select
-              size="xs"
-              w={isMobile ? 130 : 150}
-              leftSection={<TbSortAscending size={13} />}
-              value={sort}
-              onChange={v => setSort((v ?? 'updated') as typeof sort)}
-              data={[
-                { label: 'Terbaru edit', value: 'updated' },
-                { label: 'Terbaru buat', value: 'created' },
-                { label: 'Judul A→Z', value: 'title' },
-              ]}
-              allowDeselect={false}
-            />
-            <Group gap={2} wrap="nowrap">
-              <Tooltip label="Tampilan list">
-                <ActionIcon
-                  size="sm"
-                  variant={view === 'list' ? 'filled' : 'subtle'}
-                  color={view === 'list' ? 'violet' : 'gray'}
-                  aria-label="Tampilan list"
-                  onClick={() => setView('list')}
-                >
-                  <TbLayoutList size={14} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Tampilan grid">
-                <ActionIcon
-                  size="sm"
-                  variant={view === 'grid' ? 'filled' : 'subtle'}
-                  color={view === 'grid' ? 'violet' : 'gray'}
-                  aria-label="Tampilan grid"
-                  onClick={() => setView('grid')}
-                >
-                  <TbLayoutGrid size={14} />
-                </ActionIcon>
-              </Tooltip>
             </Group>
-            {canEdit && canCreate && (
-              <Button type="button" size="xs" color="primary" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
-                New Note
-              </Button>
-            )}
+            <Group gap="xs" wrap="nowrap">
+              <Group gap={2} wrap="nowrap">
+                <Tooltip label="Tampilan list">
+                  <ActionIcon
+                    size="sm"
+                    variant={view === 'list' ? 'filled' : 'subtle'}
+                    color={view === 'list' ? 'violet' : 'gray'}
+                    aria-label="Tampilan list"
+                    onClick={() => setView('list')}
+                  >
+                    <TbLayoutList size={14} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Tampilan grid">
+                  <ActionIcon
+                    size="sm"
+                    variant={view === 'grid' ? 'filled' : 'subtle'}
+                    color={view === 'grid' ? 'violet' : 'gray'}
+                    aria-label="Tampilan grid"
+                    onClick={() => setView('grid')}
+                  >
+                    <TbLayoutGrid size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+              {canEdit && canCreate && (
+                <Button type="button" size="sm" color="primary" leftSection={<TbPlus size={13} />} onClick={() => setOpenModal('new')}>
+                  New Note
+                </Button>
+              )}
+            </Group>
           </Group>
           {tagFilter.length > 0 && (
-            <Group gap="xs" mt="xs" wrap="wrap" align="center">
+            <Group gap="xs" wrap="wrap" align="center">
               <Text size="xs" c="dimmed">Tag aktif:</Text>
               <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />
             </Group>
           )}
           {hasFilter && (
-            <Group justify="space-between" mt="xs" gap="xs" wrap="nowrap">
+            <Group justify="space-between" gap="xs" wrap="nowrap">
               <Text size="xs" c="dimmed">
                 {filtered.length === notes.length
                   ? `Menampilkan semua ${notes.length} note`
@@ -568,12 +579,12 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
               </Button>
             </Group>
           )}
-        </Paper>
+        </Stack>
       )}
 
       {/* ─── Error state ────────────────────── */}
       {isError && (
-        <Card withBorder p="xl" ta="center" style={{ borderColor: 'var(--mantine-color-red-5)' }}>
+        <Box p="xl" ta="center" style={{ border: '1px solid var(--mantine-color-red-5)' }}>
           <ThemeIcon size={44} radius="xl" variant="light" color="red" mx="auto" mb="sm">
             <TbAlertTriangle size={22} />
           </ThemeIcon>
@@ -584,7 +595,7 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
           <Button size="xs" variant="light" color="red" onClick={() => refetch()}>
             Coba lagi
           </Button>
-        </Card>
+        </Box>
       )}
 
       {/* ─── Note list ────────────────────── */}
@@ -599,7 +610,7 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
           </Stack>
         )
       ) : !isError && notes.length === 0 ? (
-        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
             <TbNote size={24} />
           </ThemeIcon>
@@ -613,14 +624,18 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
               Buat Note Pertama
             </Button>
           )}
-        </Card>
+        </Box>
       ) : !isError && filtered.length === 0 ? (
-        <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
-          <Text size="sm" c="dimmed" mb="xs">Tidak ada note yang cocok dengan filter saat ini.</Text>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
+          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
+            <TbSearch size={22} />
+          </ThemeIcon>
+          <Text fw={500} size="sm" mb={4}>Tidak ada note yang cocok</Text>
+          <Text size="xs" c="dimmed" mb="sm">Coba ubah filter atau kata kunci pencarian.</Text>
           <Button type="button" size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={resetFilter}>
             Reset filter
           </Button>
-        </Card>
+        </Box>
       ) : !isError && view === 'list' ? (
         <>
           <Stack gap="xs">

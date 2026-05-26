@@ -7,7 +7,6 @@ import {
   Kbd,
   Modal,
   MultiSelect,
-  Paper,
   SegmentedControl,
   Stack,
   Text,
@@ -138,13 +137,13 @@ function NoteForm({ slug, note, onClose }: { slug: string; note?: Note; onClose:
             height={360}
           />
         ) : (
-          <Paper withBorder p="md" mih={240} style={{ overflow: 'auto', maxHeight: 480 }}>
+          <Box p="md" mih={240} style={{ overflow: 'auto', maxHeight: 480, border: '1px solid var(--mantine-color-default-border)' }}>
             {body ? (
               <MarkdownRenderer fontSize={13}>{body}</MarkdownRenderer>
             ) : (
               <Text size="sm" c="dimmed" fs="italic">Tidak ada konten — klik "Tulis" untuk mulai menulis.</Text>
             )}
-          </Paper>
+          </Box>
         )}
         <Group gap="md" justify="space-between">
           <Group gap="md">
@@ -183,13 +182,13 @@ function NoteForm({ slug, note, onClose }: { slug: string; note?: Note; onClose:
       </Stack>
 
       {note && (
-        <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+        <Box p="xs" bg="var(--mantine-color-default-hover)" style={{ border: '1px solid var(--mantine-color-default-border)' }}>
           <Text size="xs" c="dimmed">
             Dibuat {absoluteTime(note.createdAt)} oleh {note.author.name}
             {new Date(note.updatedAt).getTime() - new Date(note.createdAt).getTime() > 60_000 &&
               <> · diedit {relTime(note.updatedAt)}</>}
           </Text>
-        </Paper>
+        </Box>
       )}
 
       <Group justify="flex-end" gap="xs">
@@ -345,12 +344,13 @@ export function NoteViewModal({ slug, note, onClose, canEditNote, onEdit, onDele
           </Group>
 
           {/* Body */}
-          <Paper
-            withBorder p="md"
+          <Box
+            p="md"
             style={{
               maxHeight: isMobile ? '50vh' : 460,
               overflowY: 'auto',
               minHeight: 200,
+              border: '1px solid var(--mantine-color-default-border)',
             }}
           >
             {note.body ? (
@@ -358,7 +358,7 @@ export function NoteViewModal({ slug, note, onClose, canEditNote, onEdit, onDele
             ) : (
               <Text size="sm" c="dimmed" fs="italic">Tidak ada konten.</Text>
             )}
-          </Paper>
+          </Box>
 
           {/* Footer stats */}
           {note.body && (

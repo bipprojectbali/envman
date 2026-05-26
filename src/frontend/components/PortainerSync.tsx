@@ -5,7 +5,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Checkbox,
   Code,
   Divider,
@@ -13,7 +12,6 @@ import {
   Loader,
   Modal,
   NumberInput,
-  Paper,
   ScrollArea,
   Skeleton,
   TextInput,
@@ -493,7 +491,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
     <>
       {/* ─── Not configured ─────────────────────────────── */}
       {!config ? (
-        <Card withBorder radius="md" p={0} style={{ overflow: 'hidden' }}>
+        <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden' }}>
           {/* Header strip */}
           <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
             <Group gap="sm">
@@ -527,12 +525,12 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                   </Text>
                 </Alert>
               ) : (
-                <Paper withBorder p="sm" radius="md" style={{ background: 'var(--mantine-color-violet-light)', borderColor: 'var(--mantine-color-violet-3)' }}>
+                <Box p="sm" style={{ borderRadius: 'var(--mantine-radius-md)', background: 'var(--mantine-color-violet-light)', border: '1px solid var(--mantine-color-violet-3)' }}>
                   <Group gap="xs">
                     <TbPlugConnected size={14} color="var(--mantine-color-primary)" />
                     <Text size="xs" c="violet.7" fw={500}>{connections.length} connection siap digunakan</Text>
                   </Group>
-                </Paper>
+                </Box>
               )}
 
               {canEdit && (
@@ -567,33 +565,44 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               )}
             </Stack>
           </Box>
-        </Card>
+        </Box>
 
       ) : (
         /* ─── Configured ────────────────────────────────── */
-        <Card withBorder radius="md" p={0} style={{ overflow: 'hidden' }}>
-          {/* Header — stack info + status */}
-          <Box p="sm" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
-            {/* Row 1: stack name + status + manage icons */}
-            <Group justify="space-between" wrap="nowrap" gap="sm" mb={6}>
+        <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden' }}>
+
+          {/* ── Header ──────────────────────────────────────── */}
+          <Stack gap="xs" p="sm" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+
+            {/* Row 1: identity + status + manage */}
+            <Group justify="space-between" gap="xs" wrap="nowrap">
               <Group gap="xs" style={{ minWidth: 0, flex: 1 }} wrap="nowrap">
-                <TbCloud
-                  size={15}
-                  style={{
-                    flexShrink: 0,
-                    color: syncStatus === 'failed' ? 'var(--mantine-color-red-5)'
-                      : syncStatus === 'success' ? 'var(--mantine-color-teal-5)'
-                      : 'var(--mantine-color-dimmed)',
-                  }}
-                />
-                <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {config.stackName}
-                </Text>
+                <ThemeIcon
+                  size={32} radius="md" variant="light"
+                  color={syncStatus === 'failed' ? 'red' : syncStatus === 'success' ? 'teal' : 'gray'}
+                  style={{ flexShrink: 0 }}
+                >
+                  <TbCloud size={15} />
+                </ThemeIcon>
+                <Box style={{ minWidth: 0 }}>
+                  <Text fw={700} size="sm" truncate>{config.stackName}</Text>
+                  <Group gap={4} wrap="wrap" mt={2}>
+                    {config.connectionName && (
+                      <>
+                        <Text size="xs" c="dimmed">{config.connectionName}</Text>
+                        <Text size="xs" c="dimmed">·</Text>
+                      </>
+                    )}
+                    <Text size="xs" c="dimmed">ep#{config.endpointId}</Text>
+                    <Text size="xs" c="dimmed">·</Text>
+                    <Text size="xs" c="dimmed">stack#{config.stackId}</Text>
+                  </Group>
+                </Box>
+              </Group>
+              <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }} align="center">
                 {syncStatus === 'success' && <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={9} />}>synced</Badge>}
                 {syncStatus === 'failed' && <Badge size="xs" color="red" variant="light" leftSection={<TbX size={9} />}>failed</Badge>}
                 {syncStatus === 'never' && <Badge size="xs" color="gray" variant="outline">belum sync</Badge>}
-              </Group>
-              <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
                 {sync.isError && (
                   <Tooltip label={(sync.error as Error).message} position="left" multiline maw={260}>
                     <TbAlertTriangle size={14} style={{ color: 'var(--mantine-color-red-5)', cursor: 'help' }} />
@@ -602,12 +611,12 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                 {canEdit && (
                   <>
                     <Tooltip label="Edit konfigurasi">
-                      <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => openEdit(config!)}>
+                      <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEdit(config!)}>
                         <TbPencil size={13} />
                       </ActionIcon>
                     </Tooltip>
                     <Tooltip label="Hapus koneksi">
-                      <ActionIcon size="xs" variant="subtle" color="red" onClick={deleteConfig}>
+                      <ActionIcon size="sm" variant="subtle" color="red" onClick={deleteConfig}>
                         <TbTrash size={13} />
                       </ActionIcon>
                     </Tooltip>
@@ -616,62 +625,33 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               </Group>
             </Group>
 
-            {/* Row 2: meta info as single dimmed text line */}
-            <Text size="xs" c="dimmed" mb={canEdit ? 8 : 0}>
-              {[
-                config.connectionName,
-                `ep#${config.endpointId}`,
-                `stack#${config.stackId}`,
-              ].filter(Boolean).join(' · ')}
-            </Text>
-
-            {/* Row 3: action buttons */}
+            {/* Row 2: action buttons */}
             {canEdit && (
-              <Group gap={6} wrap="wrap">
-                <Button
-                  size="compact-xs" variant="subtle" color="gray"
-                  leftSection={<TbPlug size={11} />}
-                  onClick={() => openDiff()}
-                >
+              <Group gap="xs" wrap="wrap">
+                <Button size="xs" variant="subtle" color="gray" leftSection={<TbPlug size={12} />} onClick={() => openDiff()}>
                   Diff
                 </Button>
                 <Tooltip label="Pull image terbaru & restart container">
-                  <Button
-                    size="compact-xs" variant="light" color="blue"
-                    leftSection={<TbRefreshDot size={11} />}
-                    loading={repull.isPending}
-                    disabled={!config?.connectionId}
-                    onClick={confirmRepull}
-                  >
+                  <Button size="xs" variant="light" color="blue" leftSection={<TbRefreshDot size={12} />} loading={repull.isPending} disabled={!config?.connectionId} onClick={confirmRepull}>
                     Repull
                   </Button>
                 </Tooltip>
                 <Tooltip label="Stop → start ulang container (tanpa pull)">
-                  <Button
-                    size="compact-xs" variant="light" color="orange"
-                    leftSection={<TbRefresh size={11} />}
-                    loading={recreate.isPending}
-                    disabled={!config?.connectionId}
-                    onClick={confirmRecreate}
-                  >
+                  <Button size="xs" variant="light" color="orange" leftSection={<TbRefresh size={12} />} loading={recreate.isPending} disabled={!config?.connectionId} onClick={confirmRecreate}>
                     Recreate
                   </Button>
                 </Tooltip>
                 {!!config?.connectionId && (
                   <Tooltip label="Edit compose file">
-                    <Button
-                      size="compact-xs" variant="light" color="violet"
-                      leftSection={<TbCode size={11} />}
-                      onClick={openCompose}
-                    >
+                    <Button size="xs" variant="light" color="violet" leftSection={<TbCode size={12} />} onClick={openCompose}>
                       Compose
                     </Button>
                   </Tooltip>
                 )}
                 <Button
-                  size="compact-xs" color="primary"
+                  size="xs" color="primary"
                   variant={sync.isPending ? 'filled' : 'light'}
-                  leftSection={sync.isPending ? <Loader size={9} color="white" /> : <TbCloudUpload size={11} />}
+                  leftSection={sync.isPending ? <Loader size={10} color="white" /> : <TbCloudUpload size={12} />}
                   onClick={confirmSync}
                   loading={sync.isPending}
                 >
@@ -679,97 +659,106 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                 </Button>
               </Group>
             )}
-          </Box>
+          </Stack>
 
-          {/* Body */}
-          <Box p="md">
-            <Stack gap="md">
+          {/* ── Body ────────────────────────────────────────── */}
+          <Stack gap="sm" p="sm">
 
-              {/* Info row: last sync + links */}
-              <Group gap="xl" wrap="wrap" justify="space-between">
-                <Group gap="xl" wrap="wrap">
-                  <Box>
-                    <Text size="xs" c="dimmed" fw={500} mb={2}>Last Sync</Text>
-                    <Group gap={6}>
-                      <TbHistory size={13} color="var(--mantine-color-dimmed)" />
-                      <Text size="sm" fw={500}>
-                        {config.lastSyncAt ? relativeTime(config.lastSyncAt) : '—'}
-                      </Text>
-                    </Group>
-                  </Box>
-                  <Box>
-                    <Text size="xs" c="dimmed" fw={500} mb={2}>Stack</Text>
-                    <Text size="sm" fw={500} ff="monospace">{config.stackName}</Text>
-                  </Box>
-                  {config.connectionName && (
-                    <Box>
-                      <Text size="xs" c="dimmed" fw={500} mb={2}>Connection</Text>
-                      <Text size="sm" fw={500}>{config.connectionName}</Text>
-                    </Box>
-                  )}
-                </Group>
-                <Group gap="md" wrap="wrap">
-                  <Anchor size="xs" href={`${displayUrl}#!/${config.endpointId}/docker/stacks/${config.stackId}`} target="_blank" rel="noreferrer">
-                    <Group gap={4}><TbExternalLink size={13} /><Text size="xs">Buka di Portainer</Text></Group>
-                  </Anchor>
-                  {config.connectionId && (
-                    <Anchor size="xs" component={Link} to="/envmanager/connections/$id" params={{ id: config.connectionId } as any}>
-                      <Group gap={4}><TbServer size={13} /><Text size="xs">Detail connection</Text><TbChevronRight size={11} /></Group>
-                    </Anchor>
-                  )}
-                </Group>
-              </Group>
-
-              {/* Banner operasi aktif */}
-              {activeOp && (
-                <Paper withBorder p="sm" radius="md" style={{
-                  borderColor: activeOp.error ? 'var(--mantine-color-red-4)' :
-                    activeOp.done ? 'var(--mantine-color-teal-4)' : 'var(--mantine-color-blue-4)',
-                  background: activeOp.error ? 'var(--mantine-color-red-light)' :
-                    activeOp.done ? 'var(--mantine-color-teal-light)' : 'var(--mantine-color-blue-light)',
-                }}>
-                  <Group justify="space-between" wrap="nowrap" gap="xs">
-                    <Group gap="sm" style={{ minWidth: 0 }}>
-                      {!activeOp.done ? (
-                        <Loader size={16} color="blue" />
-                      ) : activeOp.error ? (
-                        <TbAlertTriangle size={16} color="var(--mantine-color-red-6)" />
-                      ) : (
-                        <TbCheck size={16} color="var(--mantine-color-teal-6)" />
-                      )}
-                      <Box style={{ minWidth: 0 }}>
-                        <Group gap="xs" mb={2}>
-                          <Badge size="xs" variant="filled"
-                            color={activeOp.error ? 'red' : activeOp.done ? 'teal' : 'blue'}>
-                            {activeOp.type === 'repull' ? 'Repull' : 'Recreate'}
-                          </Badge>
-                          {!activeOp.done && (
-                            <Text fz={10} c="dimmed">{elapsed}s</Text>
-                          )}
-                        </Group>
-                        <Text size="xs" fw={500} c={activeOp.error ? 'red' : undefined}
-                          style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {activeOp.step}
-                        </Text>
-                        {!activeOp.done && (
-                          <Text fz={10} c="dimmed" mt={2}>
-                            {activeOp.type === 'repull'
-                              ? 'Portainer sedang pull image dan restart container...'
-                              : 'Portainer sedang stop dan start ulang container...'}
-                          </Text>
-                        )}
-                      </Box>
-                    </Group>
-                    {activeOp.done && (
-                      <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setOp(null)}>
-                        <TbX size={12} />
-                      </ActionIcon>
-                    )}
+            {/* Stats: Last sync + links */}
+            <Group gap="xs" wrap="wrap" justify="space-between" align="flex-start">
+              <Group gap="lg" wrap="wrap">
+                <Box>
+                  <Text size="xs" c="dimmed" fw={500} mb={2}>Last Sync</Text>
+                  <Group gap={4}>
+                    <TbHistory size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
+                    <Text size="xs" fw={600}>
+                      {config.lastSyncAt ? relativeTime(config.lastSyncAt) : '—'}
+                    </Text>
                   </Group>
-                </Paper>
-              )}
+                </Box>
+                <Box>
+                  <Text size="xs" c="dimmed" fw={500} mb={2}>Stack</Text>
+                  <Text size="xs" fw={600} ff="monospace">{config.stackName}</Text>
+                </Box>
+                {config.connectionName && (
+                  <Box>
+                    <Text size="xs" c="dimmed" fw={500} mb={2}>Connection</Text>
+                    <Text size="xs" fw={600}>{config.connectionName}</Text>
+                  </Box>
+                )}
+              </Group>
+              <Group gap="sm" wrap="wrap">
+                <Anchor size="xs" href={`${displayUrl}#!/${config.endpointId}/docker/stacks/${config.stackId}`} target="_blank" rel="noreferrer">
+                  <Group gap={4} wrap="nowrap">
+                    <TbExternalLink size={12} />
+                    <Text size="xs">Portainer</Text>
+                  </Group>
+                </Anchor>
+                {config.connectionId && (
+                  <Anchor size="xs" component={Link} to="/envmanager/connections/$id" params={{ id: config.connectionId } as any}>
+                    <Group gap={4} wrap="nowrap">
+                      <TbServer size={12} />
+                      <Text size="xs">Connection</Text>
+                      <TbChevronRight size={10} />
+                    </Group>
+                  </Anchor>
+                )}
+              </Group>
+            </Group>
 
-              <Divider label={
+            {/* Active operation banner */}
+            {activeOp && (
+              <Box p="xs" style={{
+                borderRadius: 'var(--mantine-radius-md)',
+                border: `1px solid ${activeOp.error ? 'var(--mantine-color-red-4)' : activeOp.done ? 'var(--mantine-color-teal-4)' : 'var(--mantine-color-blue-4)'}`,
+                background: activeOp.error ? 'var(--mantine-color-red-light)' :
+                  activeOp.done ? 'var(--mantine-color-teal-light)' : 'var(--mantine-color-blue-light)',
+              }}>
+                <Group justify="space-between" wrap="nowrap" gap="xs">
+                  <Group gap="xs" style={{ minWidth: 0 }}>
+                    <ThemeIcon
+                      size={26} radius="md" variant="light"
+                      color={activeOp.error ? 'red' : activeOp.done ? 'teal' : 'blue'}
+                      style={{ flexShrink: 0 }}
+                    >
+                      {!activeOp.done
+                        ? <Loader size={12} color="blue" />
+                        : activeOp.error
+                          ? <TbAlertTriangle size={13} />
+                          : <TbCheck size={13} />
+                      }
+                    </ThemeIcon>
+                    <Box style={{ minWidth: 0 }}>
+                      <Group gap="xs" mb={2}>
+                        <Badge size="xs" variant="filled" color={activeOp.error ? 'red' : activeOp.done ? 'teal' : 'blue'}>
+                          {activeOp.type === 'repull' ? 'Repull' : 'Recreate'}
+                        </Badge>
+                        {!activeOp.done && <Text fz={10} c="dimmed">{elapsed}s</Text>}
+                      </Group>
+                      <Text size="xs" fw={500} c={activeOp.error ? 'red' : undefined} truncate>
+                        {activeOp.step}
+                      </Text>
+                      {!activeOp.done && (
+                        <Text fz={10} c="dimmed" mt={2}>
+                          {activeOp.type === 'repull'
+                            ? 'Portainer sedang pull image dan restart container...'
+                            : 'Portainer sedang stop dan start ulang container...'}
+                        </Text>
+                      )}
+                    </Box>
+                  </Group>
+                  {activeOp.done && (
+                    <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setOp(null)}>
+                      <TbX size={12} />
+                    </ActionIcon>
+                  )}
+                </Group>
+              </Box>
+            )}
+
+            {/* Containers */}
+            <Divider
+              label={
                 <Group gap="xs">
                   <TbServer size={12} />
                   <Text size="xs" c="dimmed" fw={500}>Containers</Text>
@@ -778,126 +767,128 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                     <Badge size="xs" variant="light" color="gray">{containers.length}</Badge>
                   )}
                 </Group>
-              } labelPosition="left" />
+              }
+              labelPosition="left"
+            />
 
-              {/* Containers list — selalu tampil */}
-              {statusFetching && containers.length === 0 ? (
-                <Group gap="xs" py="xs">
-                  <Loader size="xs" />
-                  <Text size="xs" c="dimmed">Memuat containers...</Text>
-                </Group>
-              ) : !config.connectionId ? (
-                <Text size="xs" c="dimmed">Connection tidak terkonfigurasi.</Text>
-              ) : containers.length === 0 && !statusFetching ? (
-                <Text size="xs" c="dimmed">Tidak ada container ditemukan di stack ini.</Text>
-              ) : (
-                <Stack gap="xs">
-                  {containers.map(c => (
-                    <Paper
-                      key={c.id} withBorder p="sm" radius="md"
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => { setSelectedContainerId(c.id); openLogs() }}
-                    >
-                      <Group justify="space-between" wrap="nowrap">
-                        <Group gap="sm" style={{ minWidth: 0 }}>
-                          <ThemeIcon size={32} radius="md" variant="light" color={stateColor[c.state] ?? 'gray'}>
-                            <TbServer size={15} />
-                          </ThemeIcon>
-                          <Box style={{ minWidth: 0 }}>
-                            <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {c.names[0]}
+            {statusFetching && containers.length === 0 ? (
+              <Group gap="xs" py="xs">
+                <Loader size="xs" />
+                <Text size="xs" c="dimmed">Memuat containers...</Text>
+              </Group>
+            ) : !config.connectionId ? (
+              <Text size="xs" c="dimmed" py={4}>Connection tidak terkonfigurasi.</Text>
+            ) : containers.length === 0 && !statusFetching ? (
+              <Text size="xs" c="dimmed" py={4}>Tidak ada container ditemukan di stack ini.</Text>
+            ) : (
+              <Stack gap="xs">
+                {containers.map(c => (
+                  <Box
+                    key={c.id}
+                    p="xs"
+                    style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
+                    onClick={() => { setSelectedContainerId(c.id); openLogs() }}
+                  >
+                    <Group justify="space-between" wrap="nowrap" gap="xs">
+                      <Group gap="xs" style={{ minWidth: 0, flex: 1 }} wrap="nowrap">
+                        <ThemeIcon size={28} radius="md" variant="light" color={stateColor[c.state] ?? 'gray'} style={{ flexShrink: 0 }}>
+                          <TbServer size={13} />
+                        </ThemeIcon>
+                        <Box style={{ minWidth: 0 }}>
+                          <Text size="xs" fw={600} truncate>{c.names[0]}</Text>
+                          <Group gap={6} mt={2} wrap="nowrap">
+                            <Code fz={10} c="dimmed">{c.shortId}</Code>
+                            <Text fz={10} c="dimmed" truncate style={{ maxWidth: 140 }}>
+                              {c.image.split('/').pop()}
                             </Text>
-                            <Group gap="xs" mt={2}>
-                              <Code fz={10} c="dimmed">{c.shortId}</Code>
-                              <Text fz={10} c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
-                                {c.image.split('/').pop()}
-                              </Text>
-                            </Group>
-                          </Box>
-                        </Group>
-                        <Group gap="xs" wrap="nowrap">
-                          <Badge size="xs" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
-                          {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
-                          <Tooltip label="Lihat logs">
-                            <ActionIcon size="sm" variant="subtle" color="gray"
-                              onClick={e => { e.stopPropagation(); setSelectedContainerId(c.id); openLogs() }}>
-                              <TbFileText size={13} />
+                          </Group>
+                        </Box>
+                      </Group>
+                      <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                        <Badge size="xs" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
+                        {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
+                        <Tooltip label="Lihat logs">
+                          <ActionIcon size="sm" variant="subtle" color="gray"
+                            onClick={e => { e.stopPropagation(); setSelectedContainerId(c.id); openLogs() }}>
+                            <TbFileText size={13} />
+                          </ActionIcon>
+                        </Tooltip>
+                        {canEdit && (
+                          <Tooltip label="Exec command">
+                            <ActionIcon size="sm" variant="subtle" color="teal"
+                              onClick={e => { e.stopPropagation(); setExecContainer({ containerId: c.id, endpointId: config!.endpointId, containerName: c.names[0] }); setExecHistory([]); openExec() }}>
+                              <TbTerminal2 size={13} />
                             </ActionIcon>
                           </Tooltip>
-                          {canEdit && (
-                            <Tooltip label="Exec command">
-                              <ActionIcon size="sm" variant="subtle" color="teal"
-                                onClick={e => { e.stopPropagation(); setExecContainer({ containerId: c.id, endpointId: config!.endpointId, containerName: c.names[0] }); setExecHistory([]); openExec() }}>
-                                <TbTerminal2 size={13} />
-                              </ActionIcon>
-                            </Tooltip>
-                          )}
-                        </Group>
+                        )}
                       </Group>
-                    </Paper>
-                  ))}
-                </Stack>
-              )}
+                    </Group>
+                  </Box>
+                ))}
+              </Stack>
+            )}
 
-              {/* Auto-sync toggle */}
-              {canEdit && (
-                <Paper withBorder p="sm" radius="md">
-                  <Group justify="space-between" wrap="nowrap">
-                    <Box>
-                      <Text size="sm" fw={500}>Auto-sync</Text>
-                      <Text size="xs" c="dimmed">Sync otomatis ke Portainer setiap kali vars disimpan</Text>
-                      {config.autoSync && secretCount > 0 && (
-                        <Text size="xs" c="orange" mt={2}>Secret vars akan di-decrypt setiap save</Text>
-                      )}
-                    </Box>
-                    <Switch
-                      checked={config.autoSync ?? false}
-                      onChange={e => toggleAutoSync.mutate(e.currentTarget.checked)}
-                      size="md"
-                    />
-                  </Group>
-                </Paper>
-              )}
+            {/* Auto-sync */}
+            {canEdit && (
+              <Box p="xs" style={{ borderRadius: 'var(--mantine-radius-md)', background: 'var(--mantine-color-default-hover)' }}>
+                <Group justify="space-between" gap="xs" wrap="nowrap">
+                  <Box style={{ minWidth: 0 }}>
+                    <Text size="xs" fw={600} mb={2}>Auto-sync</Text>
+                    <Text size="xs" c="dimmed">Sync otomatis ke Portainer setiap kali vars disimpan</Text>
+                    {config.autoSync && secretCount > 0 && (
+                      <Text size="xs" c="orange" mt={2}>Secret vars akan di-decrypt setiap save</Text>
+                    )}
+                  </Box>
+                  <Switch
+                    checked={config.autoSync ?? false}
+                    onChange={e => toggleAutoSync.mutate(e.currentTarget.checked)}
+                    size="sm"
+                    style={{ flexShrink: 0 }}
+                  />
+                </Group>
+              </Box>
+            )}
 
-              {/* Additional stack targets */}
-              {(config.additionalTargets && config.additionalTargets.length > 0) && (
-                <>
-                  <Divider label={<Text size="xs" c="dimmed">Stack tambahan</Text>} labelPosition="left" />
-                  <Stack gap="xs">
-                    {config.additionalTargets.map(t => (
-                      <Group key={t.id} justify="space-between" p="xs" style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 6 }}>
-                        <Group gap="xs">
+            {/* Additional stack targets */}
+            {config.additionalTargets && config.additionalTargets.length > 0 && (
+              <>
+                <Divider label={<Text size="xs" c="dimmed">Stack tambahan</Text>} labelPosition="left" />
+                <Stack gap="xs">
+                  {config.additionalTargets.map(t => (
+                    <Box key={t.id} p="xs" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+                      <Group justify="space-between" gap="xs" wrap="nowrap">
+                        <Group gap="xs" wrap="wrap" style={{ minWidth: 0 }}>
                           <Badge size="xs" variant="outline" color="gray">ep#{t.endpointId}</Badge>
                           <Text size="xs" fw={500} ff="monospace">{t.stackName}</Text>
                           {t.label && <Text size="xs" c="dimmed">({t.label})</Text>}
                         </Group>
                         {canEdit && (
-                          <ActionIcon size="xs" variant="subtle" color="red" onClick={() => removeTarget.mutate(t.id)}>
+                          <ActionIcon size="xs" variant="subtle" color="red" style={{ flexShrink: 0 }} onClick={() => removeTarget.mutate(t.id)}>
                             <TbTrash size={12} />
                           </ActionIcon>
                         )}
                       </Group>
-                    ))}
-                  </Stack>
-                </>
-              )}
+                    </Box>
+                  ))}
+                </Stack>
+              </>
+            )}
 
-              {/* Alerts */}
-              {syncStatus === 'never' && (
-                <Alert color="blue" icon={<TbCloudUpload size={14} />} p="sm" radius="md">
-                  <Text size="xs" fw={500} mb={2}>Belum pernah disync</Text>
-                  <Text size="xs" c="dimmed">Klik <strong>Sync Vars</strong> untuk pertama kali push env vars ke stack Portainer.</Text>
-                </Alert>
-              )}
-              {syncStatus === 'failed' && (
-                <Alert color="red" icon={<TbAlertTriangle size={14} />} p="sm" radius="md">
-                  <Text size="xs" fw={500} mb={2}>Sync terakhir gagal</Text>
-                  <Text size="xs" c="dimmed">Periksa koneksi ke Portainer dan pastikan stack masih aktif, lalu coba sync ulang.</Text>
-                </Alert>
-              )}
-            </Stack>
-          </Box>
-        </Card>
+            {/* Alerts */}
+            {syncStatus === 'never' && (
+              <Alert color="blue" icon={<TbCloudUpload size={14} />} p="xs" radius="md">
+                <Text size="xs" fw={500} mb={2}>Belum pernah disync</Text>
+                <Text size="xs" c="dimmed">Klik <strong>Sync Vars</strong> untuk pertama kali push env vars ke stack Portainer.</Text>
+              </Alert>
+            )}
+            {syncStatus === 'failed' && (
+              <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs" radius="md">
+                <Text size="xs" fw={500} mb={2}>Sync terakhir gagal</Text>
+                <Text size="xs" c="dimmed">Periksa koneksi ke Portainer dan pastikan stack masih aktif, lalu coba sync ulang.</Text>
+              </Alert>
+            )}
+          </Stack>
+        </Box>
       )}
 
       {/* ─── Setup Modal ────────────────────────────────── */}
@@ -974,7 +965,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               searchable nothingFoundMessage="Stack tidak ditemukan"
             />
             {selectedStack && (
-              <Card withBorder p="sm" radius="md" style={{ borderColor: 'var(--mantine-color-primary)' }}>
+              <Box p="sm" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-primary)' }}>
                 <Text size="xs" c="dimmed" mb={6}>Ringkasan</Text>
                 <Stack gap={4}>
                   {[
@@ -989,7 +980,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                     </Group>
                   ))}
                 </Stack>
-              </Card>
+              </Box>
             )}
 
             {/* Additional stacks (multi-stack sync) */}
@@ -1067,25 +1058,25 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
             <ScrollArea.Autosize mah={400}>
               <Stack gap="xs">
                 {diff.added.map((key: string) => (
-                  <Paper key={key} p="xs" radius="sm" style={{ background: 'var(--mantine-color-teal-light)', borderLeft: '3px solid var(--mantine-color-teal-5)' }}>
+                  <Box key={key} p="xs" style={{ borderRadius: 'var(--mantine-radius-sm)', background: 'var(--mantine-color-teal-light)', borderLeft: '3px solid var(--mantine-color-teal-5)' }}>
                     <Group gap="xs">
                       <Badge size="xs" color="teal">+</Badge>
                       <Code fz="xs" fw={600}>{key}</Code>
                       <Text fz="xs" c="dimmed">akan ditambahkan</Text>
                     </Group>
-                  </Paper>
+                  </Box>
                 ))}
                 {diff.removed.map((key: string) => (
-                  <Paper key={key} p="xs" radius="sm" style={{ background: 'var(--mantine-color-red-light)', borderLeft: '3px solid var(--mantine-color-red-5)' }}>
+                  <Box key={key} p="xs" style={{ borderRadius: 'var(--mantine-radius-sm)', background: 'var(--mantine-color-red-light)', borderLeft: '3px solid var(--mantine-color-red-5)' }}>
                     <Group gap="xs">
                       <Badge size="xs" color="red">-</Badge>
                       <Code fz="xs" fw={600}>{key}</Code>
                       <Text fz="xs" c="dimmed">ada di Portainer, tidak di envman</Text>
                     </Group>
-                  </Paper>
+                  </Box>
                 ))}
                 {diff.changed.map((item: DiffItem) => (
-                  <Paper key={item.key} p="xs" radius="sm" style={{ background: 'var(--mantine-color-yellow-light)', borderLeft: '3px solid var(--mantine-color-yellow-5)' }}>
+                  <Box key={item.key} p="xs" style={{ borderRadius: 'var(--mantine-radius-sm)', background: 'var(--mantine-color-yellow-light)', borderLeft: '3px solid var(--mantine-color-yellow-5)' }}>
                     <Group gap="xs" mb={4}>
                       <Badge size="xs" color="yellow">~</Badge>
                       <Code fz="xs" fw={600}>{item.key}</Code>
@@ -1094,7 +1085,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                       <Group gap="xs"><Text fz={10} c="dimmed" w={40}>lama</Text><Code fz={10} c="red.5">{item.oldValue || '(kosong)'}</Code></Group>
                       <Group gap="xs"><Text fz={10} c="dimmed" w={40}>baru</Text><Code fz={10} c="teal.5">{item.newValue || '(kosong)'}</Code></Group>
                     </Stack>
-                  </Paper>
+                  </Box>
                 ))}
               </Stack>
             </ScrollArea.Autosize>
@@ -1150,10 +1141,10 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               ) : (
                 <Stack gap="xs">
                   {containers.map(c => (
-                    <Paper
+                    <Box
                       key={c.id}
-                      withBorder p="sm" radius="md"
-                      style={{ cursor: 'pointer', borderColor: 'var(--mantine-color-default-border)' }}
+                      p="sm"
+                      style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
                       onClick={() => setSelectedContainerId(c.id)}
                     >
                       <Group justify="space-between" wrap="nowrap">
@@ -1179,7 +1170,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                           <TbChevronRight size={14} color="var(--mantine-color-dimmed)" />
                         </Group>
                       </Group>
-                    </Paper>
+                    </Box>
                   ))}
                 </Stack>
               )}
@@ -1191,7 +1182,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               {(() => {
                 const c = containers.find(x => x.id === selectedContainerId)
                 return c ? (
-                  <Paper withBorder p="xs" radius="md" style={{ background: 'var(--mantine-color-default-hover)' }}>
+                  <Box p="xs" style={{ borderRadius: 'var(--mantine-radius-md)', background: 'var(--mantine-color-default-hover)' }}>
                     <Group gap="sm" wrap="nowrap">
                       <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
                       <Text size="xs" fw={600}>{c.names[0]}</Text>
@@ -1200,7 +1191,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                         {c.image.split('/').pop()}
                       </Text>
                     </Group>
-                  </Paper>
+                  </Box>
                 ) : null
               })()}
 
@@ -1248,7 +1239,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               {logsFetching && logLines.length === 0 ? (
                 <Group justify="center" py="xl"><Loader size="sm" /></Group>
               ) : (
-                <Paper withBorder radius="sm" style={{ overflow: 'hidden' }}>
+                <Box style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
                   <Group px="xs" py={4} justify="space-between" style={{ background: '#161b22', borderBottom: '1px solid #30363d' }}>
                     <Group gap="xs">
                       <Badge size="xs" color="gray" variant="filled">{logLines.length} baris</Badge>
@@ -1287,7 +1278,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                       )}
                     </Box>
                   </ScrollArea.Autosize>
-                </Paper>
+                </Box>
               )}
             </>
           )}
@@ -1339,7 +1330,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               </Group>
             </Group>
             {execShowQuickAdd && (
-              <Paper withBorder p="xs" radius="sm" mb="xs" style={{ background: 'var(--mantine-color-body)' }}>
+              <Box p="xs" mb="xs" style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-body)' }}>
                 <Group gap="xs" align="flex-end">
                   <TextInput size="xs" label="Label" placeholder="mis: ps" value={execNewQuickLabel}
                     onChange={e => setExecNewQuickLabel(e.target.value)} style={{ width: 100 }} />
@@ -1362,7 +1353,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                     <TbCheck size={12} />
                   </ActionIcon>
                 </Group>
-              </Paper>
+              </Box>
             )}
             {execQuickCommands.length > 0 && (
               <Group gap={4} wrap="wrap">

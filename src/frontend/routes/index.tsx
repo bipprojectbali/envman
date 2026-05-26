@@ -2,7 +2,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   Container,
   CopyButton,
@@ -663,7 +662,7 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
 
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
             {features.map(f => (
-              <Card key={f.title} withBorder p="md" radius="md">
+              <Box key={f.title} p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
                 <Group gap="sm" mb="xs">
                   <ThemeIcon size={36} variant="light" color={f.color} radius="md">
                     <f.icon size={18} />
@@ -671,7 +670,7 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
                   <Text fw={600} size="sm">{f.title}</Text>
                 </Group>
                 <Text size="sm" c="dimmed" lh={1.65}>{f.description}</Text>
-              </Card>
+              </Box>
             ))}
           </SimpleGrid>
         </Stack>
@@ -679,14 +678,13 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
 
       {/* ─── CTA ─────────────────────────────────────────────────────── */}
       <Container size="sm" py={{ base: 60, md: 80 }}>
-        <Card
-          withBorder
+        <Box
           p={{ base: 'xl', md: 48 }}
-          radius="xl"
           ta="center"
           style={{
             background: 'linear-gradient(135deg, var(--mantine-color-violet-light) 0%, var(--mantine-color-grape-light) 100%)',
-            borderColor: 'var(--mantine-color-violet-light-hover)',
+            border: '1px solid var(--mantine-color-violet-light-hover)',
+            borderRadius: 'var(--mantine-radius-xl)',
           }}
         >
           <Stack gap="md" align="center">
@@ -725,7 +723,7 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
               </Button>
             </Group>
           </Stack>
-        </Card>
+        </Box>
       </Container>
 
       {/* ─── Footer ──────────────────────────────────────────────────── */}

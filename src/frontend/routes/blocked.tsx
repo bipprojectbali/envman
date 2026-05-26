@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Center, Paper, Stack, Text, ThemeIcon, Title } from '@mantine/core'
+import { Alert, Box, Button, Center, Stack, Text, ThemeIcon, Title } from '@mantine/core'
 import { createFileRoute } from '@tanstack/react-router'
 import { TbAlertTriangle, TbLogout, TbShieldOff } from 'react-icons/tb'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
@@ -16,7 +16,7 @@ function BlockedPage() {
       <Box style={{ position: 'absolute', top: 16, right: 16 }}>
         <ThemeToggle />
       </Box>
-      <Paper shadow="md" p={{ base: 'lg', sm: 'xl' }} radius="md" w="100%" maw={460} withBorder mx="md">
+      <Box p={{ base: 'lg', sm: 'xl' }} w="100%" maw={460} mx="md" style={{ boxShadow: 'var(--mantine-shadow-md)', border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
         <Stack align="center" gap="lg">
           <ThemeIcon color="red" size={72} radius="xl" variant="light">
             <TbShieldOff size={40} />
@@ -59,7 +59,7 @@ function BlockedPage() {
             Logout
           </Button>
         </Stack>
-      </Paper>
+      </Box>
     </Center>
   )
 }

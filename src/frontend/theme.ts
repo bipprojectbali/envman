@@ -34,7 +34,6 @@ export const theme = createTheme({
     Select: { defaultProps: { radius: 'md' } },
     Textarea: { defaultProps: { radius: 'md' } },
     Modal: { defaultProps: { radius: 'lg' } },
-    Paper: { defaultProps: { radius: 'md' } },
   },
   other: {
     mobileBreak: rem(768),

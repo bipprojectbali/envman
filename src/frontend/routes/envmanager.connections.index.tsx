@@ -4,13 +4,11 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   Divider,
   Group,
   Kbd,
   Modal,
-  Paper,
   PasswordInput,
   SimpleGrid,
   Skeleton,
@@ -306,7 +304,7 @@ function ConnectionsPage() {
 
       {/* ─── Toolbar ────────────────────────── */}
       {!isError && connections.length > 0 && (
-        <Paper withBorder radius="md" p="xs" mb="md">
+        <Box p="xs" mb="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
           <TextInput
             ref={searchRef}
             size="sm"
@@ -337,12 +335,12 @@ function ConnectionsPage() {
               </Button>
             </Group>
           )}
-        </Paper>
+        </Box>
       )}
 
       {/* ─── Error state ────────────────────── */}
       {isError && (
-        <Card withBorder p="xl" ta="center" style={{ borderColor: 'var(--mantine-color-red-5)' }}>
+        <Box p="xl" ta="center" style={{ border: '1px solid var(--mantine-color-red-5)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="red" mx="auto" mb="sm">
             <TbAlertTriangle size={24} />
           </ThemeIcon>
@@ -353,7 +351,7 @@ function ConnectionsPage() {
           <Button size="xs" variant="light" color="red" onClick={() => refetch()}>
             Coba lagi
           </Button>
-        </Card>
+        </Box>
       )}
 
       {/* ─── List/grid ─────────────────────── */}
@@ -368,7 +366,7 @@ function ConnectionsPage() {
           </Stack>
         )
       ) : !isError && connections.length === 0 ? (
-        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
             <TbPlugConnectedX size={24} />
           </ThemeIcon>
@@ -383,9 +381,9 @@ function ConnectionsPage() {
           ) : (
             <Text size="xs" c="dimmed">Connection adalah infrastruktur global — hanya SUPER_ADMIN yang boleh menambah.</Text>
           )}
-        </Card>
+        </Box>
       ) : !isError && filteredConnections.length === 0 ? (
-        <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="lg" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
           <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
             <TbSearch size={22} />
           </ThemeIcon>
@@ -394,7 +392,7 @@ function ConnectionsPage() {
           <Button size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={() => setSearch('')}>
             Reset pencarian
           </Button>
-        </Card>
+        </Box>
       ) : !isError && view === 'grid' ? (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
           {filteredConnections.map(c => (
@@ -554,8 +552,7 @@ function HealthBadge({ health }: { health?: { totalStacks: number; activeStacks:
 
 function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, onDelete }: CardProps) {
   return (
-    <Card
-      withBorder
+    <Box
       p="md"
       className="envman-conn-card"
       role="link"
@@ -563,7 +560,7 @@ function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, 
       aria-label={`Buka connection ${c.name}`}
       onClick={onOpen}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
-      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', border: '1px solid var(--mantine-color-default-border)' }}
     >
       <Group justify="space-between" mb="xs" wrap="nowrap">
         <ThemeIcon size={40} radius="md" variant="light" color="primary">
@@ -619,14 +616,13 @@ function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, 
           </Group>
         </Tooltip>
       </Group>
-    </Card>
+    </Box>
   )
 }
 
 function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, onDelete }: CardProps) {
   return (
-    <Card
-      withBorder
+    <Box
       p="sm"
       className="envman-conn-card"
       role="link"
@@ -634,7 +630,7 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
       aria-label={`Buka connection ${c.name}`}
       onClick={onOpen}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)' }}
     >
       <Group justify="space-between" wrap="nowrap">
         <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
@@ -692,7 +688,7 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
           </Group>
         )}
       </Group>
-    </Card>
+    </Box>
   )
 }
 

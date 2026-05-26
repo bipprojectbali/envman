@@ -3,14 +3,12 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   CopyButton,
   Divider,
   Group,
   Kbd,
   MultiSelect,
-  Paper,
   SegmentedControl,
   Select,
   SimpleGrid,
@@ -52,6 +50,7 @@ import {
   TbLock,
   TbPlus,
   TbSearch,
+  TbShare,
   TbSortAscending,
   TbTag,
   TbTrash,
@@ -396,7 +395,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
                     </Group>
                   </Box>
                 ) : (
-                  <Paper withBorder p="md" mih={220} radius="md">
+                  <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }} p="md" mih={220}>
                     {f.content ? (
                       <MarkdownRenderer fontSize={13}>
                         {f.language === 'markdown'
@@ -411,7 +410,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
                         </Stack>
                       </Group>
                     )}
-                  </Paper>
+                  </Box>
                 )}
               </Stack>
             </Tabs.Panel>
@@ -448,12 +447,12 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
         <Box>
           <Text size="sm" fw={500} mb={6}>Visibility</Text>
           <SimpleGrid cols={2} spacing="xs">
-            <Card
-              withBorder
+            <Box
               p="sm"
-              radius="md"
               style={{
                 cursor: 'pointer',
+                border: '1px solid var(--mantine-color-default-border)',
+                borderRadius: 'var(--mantine-radius-md)',
                 borderColor: !isPublic ? 'var(--mantine-color-primary)' : undefined,
                 background: !isPublic ? 'var(--mantine-color-violet-light)' : undefined,
               }}
@@ -469,13 +468,13 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
                 </Box>
                 {!isPublic && <TbCheck size={16} color="var(--mantine-color-primary)" />}
               </Group>
-            </Card>
-            <Card
-              withBorder
+            </Box>
+            <Box
               p="sm"
-              radius="md"
               style={{
                 cursor: 'pointer',
+                border: '1px solid var(--mantine-color-default-border)',
+                borderRadius: 'var(--mantine-radius-md)',
                 borderColor: isPublic ? 'var(--mantine-color-primary)' : undefined,
                 background: isPublic ? 'var(--mantine-color-violet-light)' : undefined,
               }}
@@ -491,7 +490,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
                 </Box>
                 {isPublic && <TbCheck size={16} color="var(--mantine-color-primary)" />}
               </Group>
-            </Card>
+            </Box>
           </SimpleGrid>
         </Box>
       </Stack>
@@ -534,8 +533,7 @@ function GistCard({
 }) {
   const firstFile = gist.files[0]
   return (
-    <Card
-      withBorder
+    <Box
       p="sm"
       className="envman-gist-card"
       role="article"
@@ -543,7 +541,7 @@ function GistCard({
       aria-label={`Buka gist ${gist.title}`}
       onClick={onView}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)' }}
     >
       <Group justify="space-between" wrap="nowrap" mb={4}>
         <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
@@ -582,6 +580,21 @@ function GistCard({
               </Tooltip>
             )}
           </CopyButton>
+          {gist.isPublic && (
+            <CopyButton value={`${window.location.origin}/gists/${gist.id}`} timeout={2000}>
+              {({ copied, copy }) => (
+                <Tooltip label={copied ? 'Link disalin!' : 'Salin public link'} position="left">
+                  <ActionIcon
+                    size="sm" variant="subtle" color={copied ? 'teal' : 'gray'}
+                    aria-label="Salin public link"
+                    onClick={e => { e.stopPropagation(); copy() }}
+                  >
+                    {copied ? <TbCheck size={13} /> : <TbShare size={13} />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </CopyButton>
+          )}
           {isOwner && (
             <>
               <Tooltip label="Edit" position="left">
@@ -647,7 +660,7 @@ function GistCard({
           </Text>
         </Tooltip>
       </Group>
-    </Card>
+    </Box>
   )
 }
 
@@ -691,16 +704,46 @@ function GistDetailView({
               </Group>
             </Tabs.Tab>
           ))}
+          {isOwner && (
+            <Tooltip label="Tambah file" withArrow>
+              <ActionIcon size="sm" variant="subtle" color="gray" ml={4} my="auto" onClick={onEdit}>
+                <TbPlus size={14} />
+              </ActionIcon>
+            </Tooltip>
+          )}
         </Tabs.List>
         {gist.files.map((f, i) => (
           <Tabs.Panel key={i} value={String(i)} pt="xs">
-            <Paper withBorder p="md" style={{ maxHeight: 400, overflowY: 'auto' }}>
+            <Group justify="flex-end" gap={4} mb={4}>
+              <CopyButton value={f.content} timeout={2000}>
+                {({ copied, copy }) => (
+                  <Tooltip label={copied ? 'Tersalin!' : 'Salin konten'}>
+                    <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                      {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </CopyButton>
+              <Tooltip label="Buka raw">
+                <ActionIcon
+                  size="xs" variant="subtle" color="gray"
+                  component="a"
+                  href={gist.isPublic
+                    ? `/api/public/gists/${gist.id}/raw/${encodeURIComponent(f.filename)}`
+                    : `/api/envman/gists/${gist.id}/raw/${encodeURIComponent(f.filename)}`}
+                  target="_blank" rel="noopener noreferrer"
+                >
+                  <TbEye size={11} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+            <Box style={{ maxHeight: 400, overflowY: 'auto' }}>
               <MarkdownRenderer fontSize={13}>
                 {f.language === 'markdown'
                   ? (f.content || '_Kosong_')
                   : `\`\`\`${f.language}\n${f.content || ''}\n\`\`\``}
               </MarkdownRenderer>
-            </Paper>
+            </Box>
           </Tabs.Panel>
         ))}
       </Tabs>
@@ -713,13 +756,28 @@ function GistDetailView({
       <Divider />
 
       <Group justify="space-between">
-        <CopyButton value={file?.content ?? ''} timeout={2000}>
-          {({ copied, copy }) => (
-            <Button type="button" size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} leftSection={copied ? <TbCheck size={13} /> : <TbCopy size={13} />} onClick={copy}>
-              {copied ? 'Tersalin!' : `Copy ${file?.filename ?? ''}`}
+        <Group gap={4}>
+          <CopyButton value={file?.content ?? ''} timeout={2000}>
+            {({ copied, copy }) => (
+              <Button type="button" size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} leftSection={copied ? <TbCheck size={13} /> : <TbCopy size={13} />} onClick={copy}>
+                {copied ? 'Tersalin!' : `Copy ${file?.filename ?? ''}`}
+              </Button>
+            )}
+          </CopyButton>
+          {file && (
+            <Button
+              type="button" size="xs" variant="subtle" color="gray"
+              leftSection={<TbEye size={13} />}
+              component="a"
+              href={gist.isPublic
+                ? `/api/public/gists/${gist.id}/raw/${encodeURIComponent(file.filename)}`
+                : `/api/envman/gists/${gist.id}/raw/${encodeURIComponent(file.filename)}`}
+              target="_blank" rel="noopener noreferrer"
+            >
+              Raw
             </Button>
           )}
-        </CopyButton>
+        </Group>
         {isOwner && (
           <Button type="button" size="xs" leftSection={<TbEdit size={13} />} onClick={onEdit}>
             Edit
@@ -892,7 +950,7 @@ function GistsPage() {
           <Text size="sm">
             Hapus gist <strong>{g.title}</strong>?
           </Text>
-          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
+          <Box p="xs" bg="var(--mantine-color-default-hover)" style={{ border: '1px solid var(--mantine-color-default-border)' }}>
             <Group gap={4} mb={4}>
               {g.files.map(f => (
                 <Badge key={f.filename} size="xs" variant="dot" color={getLangColor(f.language)}>{f.filename}</Badge>
@@ -902,7 +960,7 @@ function GistsPage() {
               {g.files.length} file · dibuat {absoluteTime(g.createdAt)}
               {g.isPublic ? ' · public' : ' · private'}
             </Text>
-          </Paper>
+          </Box>
           <Text size="xs" c="dimmed">Tindakan ini tidak dapat dibatalkan.</Text>
           <Group justify="flex-end" mt="xs">
             <Button variant="subtle" color="gray" onClick={() => modals.close(modalId)}>Batal</Button>
@@ -946,13 +1004,19 @@ function GistsPage() {
           </ThemeIcon>
           <Box style={{ minWidth: 0 }}>
             <Text fw={700} size="lg" lh={1.2}>Gists</Text>
-            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-              {isLoading
-                ? 'Memuat...'
-                : gists.length === 0
-                  ? 'Snippets, config, atau script untuk tim'
-                  : <>{gists.length} gist · {publicCount} public · {mineCount} milik saya</>}
-            </Text>
+            {isLoading ? (
+              <Text size="xs" c="dimmed" mt={2}>Memuat...</Text>
+            ) : gists.length === 0 ? (
+              <Text size="xs" c="dimmed" mt={2}>Snippets, config, atau script untuk tim</Text>
+            ) : (
+              <Group gap={4} mt={2} wrap="wrap">
+                <Text size="xs" c="dimmed">{gists.length} gist</Text>
+                <Text size="xs" c="dimmed">·</Text>
+                <Text size="xs" c="dimmed">{publicCount} public</Text>
+                <Text size="xs" c="dimmed">·</Text>
+                <Text size="xs" c="dimmed">{mineCount} milik saya</Text>
+              </Group>
+            )}
           </Box>
         </Group>
         {canCreateGist && (
@@ -964,9 +1028,32 @@ function GistsPage() {
 
       {/* Toolbar */}
       {!isLoading && gists.length > 0 && (
-        <Paper withBorder radius="md" p="xs" mb="md">
-          {/* Filter pills */}
-          <Group gap="xs" mb="xs">
+        <Stack gap="xs" mb="md">
+          {/* Search — selalu full width */}
+          <TextInput
+            ref={searchRef}
+            size="sm"
+            placeholder="Cari judul, deskripsi, filename, isi, atau tag..."
+            leftSection={<TbSearch size={14} />}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            rightSection={
+              search ? (
+                <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
+                  <TbX size={12} />
+                </ActionIcon>
+              ) : (
+                <Tooltip label="Tekan / untuk focus">
+                  <Kbd size="xs">/</Kbd>
+                </Tooltip>
+              )
+            }
+            rightSectionWidth={36}
+            radius="md"
+          />
+
+          {/* Filter row — wrap di mobile */}
+          <Group gap="xs" wrap="wrap">
             {([
               { value: 'all', label: `Semua (${gists.length})` },
               { value: 'mine', label: `Milik saya (${mineCount})` },
@@ -984,34 +1071,11 @@ function GistsPage() {
                 {f.label}
               </Badge>
             ))}
-          </Group>
-          <Group gap="xs" wrap="wrap">
-            <TextInput
-              ref={searchRef}
-              size="xs"
-              placeholder="Cari judul, deskripsi, filename, isi, atau tag..."
-              leftSection={<TbSearch size={13} />}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              rightSection={
-                search ? (
-                  <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
-                    <TbX size={11} />
-                  </ActionIcon>
-                ) : (
-                  <Tooltip label="Tekan / untuk focus">
-                    <Kbd size="xs">/</Kbd>
-                  </Tooltip>
-                )
-              }
-              rightSectionWidth={32}
-              style={{ flex: '1 1 180px', minWidth: 0 }}
-            />
-            {!isMobile && allTags.length > 0 && (
+            {allTags.length > 0 && (
               <MultiSelectChips
-                size="xs"
+                size="sm"
                 label="Tag"
-                icon={<TbTag size={13} />}
+                icon={<TbTag size={14} />}
                 width={130}
                 options={allTags}
                 value={tagFilter}
@@ -1019,9 +1083,9 @@ function GistsPage() {
               />
             )}
             <Select
-              size="xs"
-              w={isMobile ? 130 : 150}
-              leftSection={<TbSortAscending size={13} />}
+              size="sm"
+              w={150}
+              leftSection={<TbSortAscending size={14} />}
               value={sort}
               onChange={v => setSort((v ?? 'updated') as typeof sort)}
               data={[
@@ -1029,9 +1093,10 @@ function GistsPage() {
                 { label: 'Terbaru buat', value: 'created' },
               ]}
               allowDeselect={false}
+              radius="md"
             />
-            <Group gap={2} wrap="nowrap">
-              <Tooltip label="Tampilan list">
+            <Group gap={4} wrap="nowrap">
+              <Tooltip label="Tampilan list" withArrow>
                 <ActionIcon
                   size="sm"
                   variant={view === 'list' ? 'filled' : 'subtle'}
@@ -1042,7 +1107,7 @@ function GistsPage() {
                   <TbLayoutList size={14} />
                 </ActionIcon>
               </Tooltip>
-              <Tooltip label="Tampilan grid">
+              <Tooltip label="Tampilan grid" withArrow>
                 <ActionIcon
                   size="sm"
                   variant={view === 'grid' ? 'filled' : 'subtle'}
@@ -1055,17 +1120,20 @@ function GistsPage() {
               </Tooltip>
             </Group>
           </Group>
+
+          {/* Active tag chips */}
           {tagFilter.length > 0 && (
-            <Group gap="xs" mt="xs" wrap="wrap" align="center">
-              <Text size="xs" c="dimmed">Tag aktif:</Text>
+            <Group gap={6} wrap="wrap" align="center">
               <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />
             </Group>
           )}
+
+          {/* Result count + reset */}
           {hasFilter && (
-            <Group justify="space-between" mt="xs" gap="xs" wrap="nowrap">
+            <Group justify="space-between" gap="xs" wrap="nowrap">
               <Text size="xs" c="dimmed">
                 {filtered.length === gists.length
-                  ? `Menampilkan semua ${gists.length} gist`
+                  ? `${gists.length} gist`
                   : `${filtered.length} dari ${gists.length} gist`}
               </Text>
               <Button
@@ -1077,7 +1145,7 @@ function GistsPage() {
               </Button>
             </Group>
           )}
-        </Paper>
+        </Stack>
       )}
 
       {/* List */}
@@ -1092,7 +1160,7 @@ function GistsPage() {
           </Stack>
         )
       ) : gists.length === 0 ? (
-        <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
           <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
             <TbBrandGithub size={24} />
           </ThemeIcon>
@@ -1108,9 +1176,9 @@ function GistsPage() {
           ) : (
             <Text size="xs" c="dimmed">Tidak punya izin create gist. Hubungi SUPER_ADMIN.</Text>
           )}
-        </Card>
+        </Box>
       ) : filtered.length === 0 ? (
-        <Card withBorder p="md" ta="center" style={{ borderStyle: 'dashed' }}>
+        <Box p="md" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
           <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
             <TbSearch size={22} />
           </ThemeIcon>
@@ -1119,7 +1187,7 @@ function GistsPage() {
           <Button type="button" size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={resetFilter}>
             Reset filter
           </Button>
-        </Card>
+        </Box>
       ) : view === 'list' ? (
         <InfiniteList
           fetchNextPage={fetchNextPage}

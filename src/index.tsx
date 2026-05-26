@@ -29,10 +29,13 @@ async function serveFrontend(request: Request): Promise<Response> {
     // === DEVELOPMENT: Vite Middleware Mode ===
 
     // SPA route → serve index.html via Vite transform
-    if (
+    // SPA prefixes — routes that contain dots (e.g. filenames in path params) but are still frontend routes
+    const spaPrefixes = ['/gists/', '/envmanager/', '/dashboard', '/dev', '/profile', '/login', '/blocked', '/docs']
+    const isSpaRoute =
       pathname === '/' ||
+      spaPrefixes.some(p => pathname.startsWith(p)) ||
       (!pathname.includes('.') && !pathname.startsWith('/@') && !pathname.startsWith('/__open-stack-frame-in-editor'))
-    ) {
+    if (isSpaRoute) {
       const htmlPath = path.resolve('index.html')
       let htmlContent = fs.readFileSync(htmlPath, 'utf-8')
       htmlContent = await vite.transformIndexHtml(pathname, htmlContent)

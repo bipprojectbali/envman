@@ -1,9 +1,9 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
-  Card,
   Code,
   CopyButton,
   Group,
@@ -22,7 +22,7 @@ import { useDisclosure, useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { TbCheck, TbCopy, TbLayoutGrid, TbLayoutList, TbPencil, TbPlus, TbSearch, TbTag, TbTerminal2, TbTrash } from 'react-icons/tb'
+import { TbCheck, TbCopy, TbInfoCircle, TbLayoutGrid, TbLayoutList, TbPencil, TbPlus, TbSearch, TbTag, TbTerminal2, TbTrash } from 'react-icons/tb'
 import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -236,26 +236,24 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
     <>
       <Stack gap="xs">
         {/* ── Toolbar ────────────────────────────────── */}
+        <TextInput
+          size="sm"
+          placeholder="Cari alias, args, atau tags..."
+          leftSection={<TbSearch size={13} />}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          radius="md"
+        />
         <Group justify="space-between" wrap="wrap" gap="xs">
-          <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-            <TextInput
-              size="xs"
-              placeholder="Cari alias, args, atau tags..."
-              leftSection={<TbSearch size={13} />}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ flex: 1, maxWidth: 280 }}
-            />
-            <MultiSelectChips
-              value={tagFilter}
-              onChange={setTagFilter}
-              options={allTags}
-              label="Tags"
-              icon={<TbTag size={12} />}
-              width={120}
-              disabled={allTags.length === 0}
-            />
-          </Group>
+          <MultiSelectChips
+            value={tagFilter}
+            onChange={setTagFilter}
+            options={allTags}
+            label="Tags"
+            icon={<TbTag size={12} />}
+            width={120}
+            disabled={allTags.length === 0}
+          />
           <Group gap="xs" wrap="nowrap">
             <Group gap={4}>
               <Tooltip label="List view" withArrow>
@@ -270,7 +268,7 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
               </Tooltip>
             </Group>
             {isOwner && (
-              <Button size="xs" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+              <Button size="sm" leftSection={<TbPlus size={14} />} onClick={openCreate}>
                 Tambah alias
               </Button>
             )}
@@ -281,9 +279,18 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
           <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />
         )}
 
+        <Alert
+          variant="light" color="blue" radius="md" p="xs"
+          icon={<TbInfoCircle size={15} />}
+          styles={{ message: { fontSize: 'var(--mantine-font-size-xs)' }, body: { gap: 4 } }}
+        >
+          Alias menyimpan perintah lengkap agar bisa dijalankan singkat dari terminal.
+          Jalankan dengan: <Code fz="xs">envman run {slug}:nama-alias</Code>. Bisa menyertakan multi-source env, flags, dan perintah apapun.
+        </Alert>
+
         {/* ── List ───────────────────────────────────── */}
         {aliases.length === 0 ? (
-          <Card withBorder p="xl" ta="center" style={{ borderStyle: 'dashed' }}>
+          <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
             <ThemeIcon size={48} radius="xl" variant="light" color="blue" mx="auto" mb="sm">
               <TbTerminal2 size={24} />
             </ThemeIcon>
@@ -297,15 +304,19 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                 Buat alias pertama
               </Button>
             )}
-          </Card>
+          </Box>
         ) : filtered.length === 0 ? (
-          <Card withBorder p="lg" ta="center" style={{ borderStyle: 'dashed' }}>
-            <Text size="sm" c="dimmed">Tidak ada alias yang cocok dengan filter.</Text>
-          </Card>
+          <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
+            <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
+              <TbSearch size={22} />
+            </ThemeIcon>
+            <Text fw={500} size="sm" mb={4}>Tidak ada alias yang cocok</Text>
+            <Text size="xs" c="dimmed">Coba ubah filter atau kata kunci pencarian.</Text>
+          </Box>
         ) : (
           (() => {
             const cards = filtered.map(alias => (
-            <Card key={alias.id} withBorder padding="sm" radius="md">
+            <Box key={alias.id} p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
               <Group justify="space-between" wrap="nowrap" align="flex-start">
                 <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
                   <Group gap="xs" wrap="nowrap">
@@ -373,7 +384,7 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                   </Group>
                 )}
               </Group>
-            </Card>
+            </Box>
             ))
             return view === 'grid' ? (
               <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{cards}</SimpleGrid>

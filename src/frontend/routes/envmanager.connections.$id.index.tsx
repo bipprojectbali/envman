@@ -14,7 +14,6 @@ import {
   Loader,
   Modal,
   NumberInput,
-  Paper,
   Pagination,
   ScrollArea,
   Select,
@@ -700,7 +699,7 @@ function ConnectionDetailPage() {
           <Text size="xs">Tidak ada stack ditemukan di Portainer instance ini.</Text>
         </Alert>
       ) : filteredStacks.length === 0 ? (
-        <Paper withBorder p="lg" radius="md" ta="center" mb="xl">
+        <Box p="lg" ta="center" mb="xl" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
           <TbSearch size={28} style={{ opacity: 0.2, margin: '0 auto 8px' }} />
           <Text size="sm" fw={500} mb={4}>Tidak ada stack yang cocok</Text>
           <Text size="xs" c="dimmed" mb="sm">Coba ubah kata kunci atau reset filter.</Text>
@@ -708,7 +707,7 @@ function ConnectionDetailPage() {
             onClick={() => { setSearch(''); setFilterStatus(null); setFilterType(null); setFilterLinked(null) }}>
             Reset filter
           </Button>
-        </Paper>
+        </Box>
       ) : stackView === 'grid' ? (
         <>
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb={totalPages > 1 ? 'sm' : 'xl'}>
@@ -717,7 +716,7 @@ function ConnectionDetailPage() {
             const runningCount = stackContainers.filter(c => c.state === 'running').length
             const totalCount = stackContainers.length
             return (
-              <Paper key={stack.id} withBorder radius="md" style={{ overflow: 'hidden' }}>
+              <Box key={stack.id} style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
 
                 {/* ── Stack header ─────────────────────────── */}
                 <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
@@ -797,9 +796,9 @@ function ConnectionDetailPage() {
                       <Text size="xs" c="dimmed" py="xs">Tidak ada container di stack ini.</Text>
                     ) : (
                       stackContainers.map(c => (
-                        <Paper
-                          key={c.id} withBorder p="sm" radius="md"
-                          style={{ cursor: 'pointer', borderColor: stateColor[c.state] ? `var(--mantine-color-${stateColor[c.state]}-3)` : undefined }}
+                        <Box
+                          key={c.id} p="sm"
+                          style={{ borderRadius: 'var(--mantine-radius-md)', border: `1px solid ${stateColor[c.state] ? `var(--mantine-color-${stateColor[c.state]}-3)` : 'var(--mantine-color-default-border)'}`, cursor: 'pointer' }}
                           onClick={() => { setLogsStack(stack); setSelectedContainerId(c.id); openLogs() }}
                         >
                           <Group justify="space-between" wrap="nowrap" gap="xs">
@@ -860,7 +859,7 @@ function ConnectionDetailPage() {
                               )}
                             </Group>
                           </Group>
-                        </Paper>
+                        </Box>
                       ))
                     )}
 
@@ -893,7 +892,7 @@ function ConnectionDetailPage() {
                     )}
                   </Stack>
                 </Box>
-              </Paper>
+              </Box>
             )
           })}
         </SimpleGrid>
@@ -911,7 +910,7 @@ function ConnectionDetailPage() {
             const runningCount = stackContainers.filter(c => c.state === 'running').length
             const totalCount = stackContainers.length
             return (
-              <Paper key={stack.id} withBorder radius="md" style={{ overflow: 'hidden' }}>
+              <Box key={stack.id} style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
                 <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
                   <Group justify="space-between" wrap="wrap" gap="xs">
                     <Group gap="sm" style={{ minWidth: 0 }}>
@@ -958,7 +957,7 @@ function ConnectionDetailPage() {
                       <Text size="xs" c="dimmed" py="xs">Tidak ada container di stack ini.</Text>
                     ) : (
                       stackContainers.map(c => (
-                        <Paper key={c.id} withBorder p="sm" radius="md" style={{ cursor: 'pointer' }}
+                        <Box key={c.id} p="sm" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
                           onClick={() => { setLogsStack(stack); setSelectedContainerId(c.id); openLogs() }}>
                           <Group justify="space-between" wrap="nowrap" gap="xs">
                             <Group gap="sm" style={{ minWidth: 0 }}>
@@ -1000,7 +999,7 @@ function ConnectionDetailPage() {
                               )}
                             </Group>
                           </Group>
-                        </Paper>
+                        </Box>
                       ))
                     )}
                     {stack.linkedEnvs.length > 0 && (
@@ -1022,7 +1021,7 @@ function ConnectionDetailPage() {
                     )}
                   </Stack>
                 </Box>
-              </Paper>
+              </Box>
             )
           })}
         </Stack>
@@ -1046,7 +1045,7 @@ function ConnectionDetailPage() {
         </Group>
       } labelPosition="left" />
 
-      <Paper withBorder p="md" radius="md">
+      <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
         {/* Endpoint selector */}
         {endpointIds.length > 1 && (
           <Group mb="md" gap="xs">
@@ -1100,7 +1099,7 @@ function ConnectionDetailPage() {
             <Text size="xs">Tidak ada dangling images. Host Docker bersih!</Text>
           </Alert>
         ) : imagesData?.images && imagesData.images.length > 0 ? (
-          <Paper withBorder radius="sm" style={{ overflow: 'hidden' }} mb="md">
+          <Box mb="md" style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
             <ScrollArea.Autosize mah={200}>
               <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
                 <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
@@ -1123,7 +1122,7 @@ function ConnectionDetailPage() {
                 </Table.Tbody>
               </Table>
             </ScrollArea.Autosize>
-          </Paper>
+          </Box>
         ) : null}
 
         {/* Info jika ada stuck images setelah prune */}
@@ -1191,7 +1190,7 @@ function ConnectionDetailPage() {
             <Text size="xs">Tidak ada stopped containers.</Text>
           </Alert>
         ) : containersData?.containers?.length > 0 ? (
-          <Paper withBorder radius="sm" style={{ overflow: 'hidden' }} mb="md">
+          <Box mb="md" style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
             <ScrollArea.Autosize mah={200}>
               <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
                 <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
@@ -1218,7 +1217,7 @@ function ConnectionDetailPage() {
                 </Table.Tbody>
               </Table>
             </ScrollArea.Autosize>
-          </Paper>
+          </Box>
         ) : null}
 
         {/* ─── Unused Volumes ─── */}
@@ -1267,7 +1266,7 @@ function ConnectionDetailPage() {
             <Text size="xs">Tidak ada unused volumes.</Text>
           </Alert>
         ) : volumesData?.volumes?.length > 0 ? (
-          <Paper withBorder radius="sm" style={{ overflow: 'hidden' }} mb="md">
+          <Box mb="md" style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
             <ScrollArea.Autosize mah={200}>
               <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
                 <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
@@ -1288,7 +1287,7 @@ function ConnectionDetailPage() {
                 </Table.Tbody>
               </Table>
             </ScrollArea.Autosize>
-          </Paper>
+          </Box>
         ) : null}
 
         {/* ─── Unused Networks ─── */}
@@ -1330,7 +1329,7 @@ function ConnectionDetailPage() {
             <Text size="xs">Tidak ada dangling networks.</Text>
           </Alert>
         ) : networksData?.networks?.length > 0 ? (
-          <Paper withBorder radius="sm" style={{ overflow: 'hidden' }} mb="md">
+          <Box mb="md" style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
             <ScrollArea.Autosize mah={200}>
               <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
                 <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
@@ -1353,9 +1352,9 @@ function ConnectionDetailPage() {
                 </Table.Tbody>
               </Table>
             </ScrollArea.Autosize>
-          </Paper>
+          </Box>
         ) : null}
-      </Paper>
+      </Box>
 
       </>}
 
@@ -1404,7 +1403,7 @@ function ConnectionDetailPage() {
                   )}
                 </Group>
               </Group>
-              <Paper withBorder radius="sm" style={{ overflow: 'hidden' }}>
+              <Box style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
                 <CodeEditor
                   value={composeContent}
                   onChange={setComposeContent}
@@ -1413,7 +1412,7 @@ function ConnectionDetailPage() {
                   readOnly={!composeEditing}
                   height={480}
                 />
-              </Paper>
+              </Box>
               {composeEditing && (
                 <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
                   <Text size="xs">Perubahan langsung ke Portainer. Gunakan <strong>Recreate</strong> atau <strong>Repull</strong> setelah save untuk menerapkan ke container.</Text>
@@ -1465,9 +1464,9 @@ function ConnectionDetailPage() {
               ) : (
                 <Stack gap="xs">
                   {(logsStack ? (stackStatusMap[logsStack.id]?.containers ?? []) : []).map(c => (
-                    <Paper
-                      key={c.id} withBorder p="sm" radius="md"
-                      style={{ cursor: 'pointer' }}
+                    <Box
+                      key={c.id} p="sm"
+                      style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
                       onClick={() => setSelectedContainerId(c.id)}
                     >
                       <Group justify="space-between" wrap="nowrap">
@@ -1493,7 +1492,7 @@ function ConnectionDetailPage() {
                           <TbChevronRight size={14} color="var(--mantine-color-dimmed)" />
                         </Group>
                       </Group>
-                    </Paper>
+                    </Box>
                   ))}
                 </Stack>
               )}
@@ -1505,7 +1504,7 @@ function ConnectionDetailPage() {
               {(() => {
                 const c = (logsStack ? (stackStatusMap[logsStack.id]?.containers ?? []) : []).find(x => x.id === selectedContainerId)
                 return c ? (
-                  <Paper withBorder p="xs" radius="md" style={{ background: 'var(--mantine-color-default-hover)' }}>
+                  <Box p="xs" style={{ borderRadius: 'var(--mantine-radius-md)', background: 'var(--mantine-color-default-hover)' }}>
                     <Group gap="sm" wrap="nowrap">
                       <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
                       <Text size="xs" fw={600}>{c.names[0]}</Text>
@@ -1514,7 +1513,7 @@ function ConnectionDetailPage() {
                         {c.image.split('/').pop()}
                       </Text>
                     </Group>
-                  </Paper>
+                  </Box>
                 ) : null
               })()}
 
@@ -1560,7 +1559,7 @@ function ConnectionDetailPage() {
               {logsFetching && logLines.length === 0 ? (
                 <Group justify="center" py="xl"><Loader size="sm" /></Group>
               ) : (
-                <Paper withBorder radius="sm" style={{ overflow: 'hidden' }}>
+                <Box style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
                   <Group px="xs" py={4} justify="space-between" style={{ background: '#161b22', borderBottom: '1px solid #30363d' }}>
                     <Group gap="xs">
                       <Badge size="xs" color="gray" variant="filled">{logLines.length} baris</Badge>
@@ -1599,7 +1598,7 @@ function ConnectionDetailPage() {
                       )}
                     </Box>
                   </ScrollArea.Autosize>
-                </Paper>
+                </Box>
               )}
             </>
           )}
@@ -1650,7 +1649,7 @@ function ConnectionDetailPage() {
             </Group>
 
             {execShowQuickAdd && (
-              <Paper withBorder p="xs" radius="sm" mb="xs" style={{ background: 'var(--mantine-color-body)' }}>
+              <Box p="xs" mb="xs" style={{ borderRadius: 'var(--mantine-radius-sm)', border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-body)' }}>
                 <Group gap="xs" align="flex-end">
                   <TextInput size="xs" label="Label" placeholder="mis: ps" value={execNewQuickLabel}
                     onChange={e => setExecNewQuickLabel(e.target.value)} style={{ width: 100 }} />
@@ -1673,7 +1672,7 @@ function ConnectionDetailPage() {
                     <TbCheck size={12} />
                   </ActionIcon>
                 </Group>
-              </Paper>
+              </Box>
             )}
 
             {execQuickCommands.length > 0 && (

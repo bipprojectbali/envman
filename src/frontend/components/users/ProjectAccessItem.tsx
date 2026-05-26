@@ -1,7 +1,6 @@
 import {
   Badge,
   Box,
-  Card,
   Chip,
   Code,
   Divider,
@@ -75,7 +74,7 @@ export function ProjectAccessItem({ userId, project }: { userId: string; project
   const roleColor = project.projectRole ? ROLE_COLOR[project.projectRole] : 'gray'
 
   return (
-    <Card withBorder radius="md" p="sm" style={{ overflow: 'visible' }}>
+    <Box p="sm" style={{ overflow: 'visible', border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
       {/* Project header */}
       <Group justify="space-between" wrap="nowrap" mb="sm">
         <Group gap="xs" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
@@ -192,6 +191,6 @@ export function ProjectAccessItem({ userId, project }: { userId: string; project
           </Stack>
         </>
       )}
-    </Card>
+    </Box>
   )
 }
