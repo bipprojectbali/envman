@@ -591,7 +591,7 @@ function ConnectionDetailPage() {
       {/* ─── Header ─────────────────────────────────────── */}
       <Group justify="space-between" mb="lg" wrap="nowrap">
         <Group gap="xs" style={{ minWidth: 0 }}>
-          <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => navigate({ to: '/envmanager/connections' })}>
+          <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections' } })}>
             <TbChevronLeft size={16} />
           </ActionIcon>
           <ThemeIcon size={36} radius="md" variant="gradient">

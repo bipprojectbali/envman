@@ -1,5 +1,4 @@
 import {
-  Accordion,
   ActionIcon,
   Alert,
   Anchor,
@@ -10,7 +9,6 @@ import {
   Code,
   CopyButton,
   Divider,
-  Drawer,
   Group,
   Indicator,
   Loader,
@@ -46,6 +44,7 @@ import {
   TbAlertTriangle,
   TbCheck,
   TbChevronDown,
+  TbChevronLeft,
   TbChevronRight,
   TbCopy,
   TbDots,
@@ -397,6 +396,95 @@ function VarsPage() {
 
   const cliCommand = `envman -e ${slug}:${env} -- bun dev`
   const allFilteredSelected = filteredVars.length > 0 && filteredVars.every(v => selectedIds.has(v.id))
+  const projectName: string = projectData?.project?.name ?? slug
+
+  if (integrationsOpen && portainerEnabled) {
+    return (
+      <Stack gap="lg">
+        {/* Breadcrumb */}
+        <Group gap={6} align="center">
+          <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeIntegrations}>
+            <TbChevronLeft size={15} />
+          </ActionIcon>
+          <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeIntegrations}>
+            {projectName}
+          </Anchor>
+          <Text size="sm" c="dimmed">/</Text>
+          <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeIntegrations}>
+            {env}
+          </Anchor>
+          <Text size="sm" c="dimmed">/</Text>
+          <Text size="sm" fw={600}>Integrasi</Text>
+        </Group>
+
+        {/* Portainer section */}
+        <Stack gap="xs">
+          <Group justify="space-between" align="center" wrap="nowrap">
+            <Group gap="xs" wrap="nowrap">
+              <TbBrandDocker size={18} style={{ color: 'var(--mantine-color-cyan-6)', flexShrink: 0 }} />
+              <Box>
+                <Text size="sm" fw={600} lh={1.2}>Portainer</Text>
+                <Text size="xs" c="dimmed" lh={1.4}>Push env vars ke Docker stack</Text>
+              </Box>
+            </Group>
+            <Badge
+              size="xs"
+              variant="dot"
+              color={portainerData?.config ? 'teal' : 'gray'}
+            >
+              {portainerData?.config ? 'Tersambung' : 'Belum tersambung'}
+            </Badge>
+          </Group>
+          <Divider />
+          <PortainerSync slug={slug} env={env} canEdit={canEdit} secretCount={secretCount} />
+        </Stack>
+
+        {/* Sync history — flat list, no accordion */}
+        {portainerData?.config && (
+          <Stack gap="xs">
+            <Group gap="xs" align="center">
+              <TbHistory size={14} style={{ color: 'var(--mantine-color-dimmed)' }} />
+              <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Riwayat Sync</Text>
+              {historyData?.logs?.length > 0 && (
+                <Badge size="xs" variant="outline" color="gray">{historyData.logs.length}</Badge>
+              )}
+            </Group>
+            {!historyData ? (
+              <Group justify="center" py="sm"><Loader size="xs" /></Group>
+            ) : historyData.logs?.length === 0 ? (
+              <Text size="xs" c="dimmed" py={4}>Belum ada riwayat sync.</Text>
+            ) : (
+              <Stack gap={4}>
+                {(historyData.logs as any[]).map((log: any) => (
+                  <Group key={log.id} gap="xs" wrap="nowrap" align="flex-start" py={6} style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+                    <Box style={{ width: 6, height: 6, borderRadius: '50%', marginTop: 6, flexShrink: 0, background: log.ok ? 'var(--mantine-color-teal-5)' : 'var(--mantine-color-red-5)' }} />
+                    <Box style={{ flex: 1, minWidth: 0 }}>
+                      <Group gap={6} wrap="wrap">
+                        <Badge size="xs" color={log.ok ? 'teal' : 'red'} variant="light">{log.ok ? 'Berhasil' : 'Gagal'}</Badge>
+                        <Badge size="xs" variant="outline" color="gray">{log.triggeredBy === 'auto' ? 'auto' : 'manual'}</Badge>
+                        <Text size="xs" c="dimmed">{log.varsCount} vars</Text>
+                        {log.durationMs && <Text size="xs" c="dimmed">{log.durationMs}ms</Text>}
+                      </Group>
+                      <Text size="xs" c="dimmed" mt={2}>
+                        {new Date(log.createdAt).toLocaleString('id-ID')}
+                        {log.user && ` · ${log.user.name}`}
+                      </Text>
+                      {log.error && <Text size="xs" c="red" mt={2}>{log.error}</Text>}
+                    </Box>
+                  </Group>
+                ))}
+              </Stack>
+            )}
+          </Stack>
+        )}
+
+        {/* Coming soon — minimal */}
+        <Text size="xs" c="dimmed">
+          Integrasi lain (Vault, Doppler, Kubernetes) akan tersedia di rilis berikutnya.
+        </Text>
+      </Stack>
+    )
+  }
 
   return (
     <Box>
@@ -1498,108 +1586,6 @@ function VarsPage() {
         canEdit={canEdit}
       />
 
-      {/* ─── Integrations Drawer (Portainer dll.) — hanya jika extension aktif ──────── */}
-      <Drawer
-        opened={integrationsOpen && portainerEnabled}
-        onClose={closeIntegrations}
-        position="right"
-        size={isMobile ? '100%' : 'xl'}
-        title={
-          <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="cyan" radius="sm">
-              <TbPlugConnected size={14} />
-            </ThemeIcon>
-            <Text fw={600}>Integrasi</Text>
-            <Badge size="xs" variant="light" color="gray">{slug}:{env}</Badge>
-          </Group>
-        }
-      >
-        <Stack gap="md">
-          {/* Portainer integration card */}
-          <Paper withBorder p="md" radius="md">
-            <Group justify="space-between" mb="xs" wrap="nowrap">
-              <Group gap="xs" wrap="nowrap">
-                <ThemeIcon size={28} variant="light" color="cyan" radius="md">
-                  <TbBrandDocker size={16} />
-                </ThemeIcon>
-                <Box>
-                  <Text size="sm" fw={600} lh={1.2}>Portainer</Text>
-                  <Text size="xs" c="dimmed" lh={1.2}>Push vars ke Docker stack</Text>
-                </Box>
-              </Group>
-              <Badge
-                size="sm"
-                variant="light"
-                color={portainerData?.config ? 'teal' : 'gray'}
-                leftSection={portainerData?.config ? <TbCheck size={11} /> : undefined}
-              >
-                {portainerData?.config ? 'Tersambung' : 'Belum tersambung'}
-              </Badge>
-            </Group>
-            <Divider mb="md" />
-            <PortainerSync slug={slug} env={env} canEdit={canEdit} secretCount={secretCount} />
-          </Paper>
-
-          {/* History accordion — hanya muncul jika config ada */}
-          {portainerData?.config && (
-            <Accordion variant="separated" radius="md">
-              <Accordion.Item value="history">
-                <Accordion.Control icon={<TbHistory size={16} />}>
-                  <Group justify="space-between" pr="md">
-                    <Text size="sm" fw={600}>Riwayat Sync</Text>
-                    <Badge size="xs" variant="light" color="gray">{historyData?.logs?.length ?? 0} entri</Badge>
-                  </Group>
-                </Accordion.Control>
-                <Accordion.Panel>
-                  {!historyData ? (
-                    <Group justify="center" py="md"><Loader size="sm" /></Group>
-                  ) : historyData.logs?.length === 0 ? (
-                    <Stack align="center" py="md" gap={4}>
-                      <TbHistory size={24} opacity={0.3} />
-                      <Text size="xs" c="dimmed">Belum ada riwayat sync.</Text>
-                    </Stack>
-                  ) : (
-                    <Timeline bulletSize={22} lineWidth={2}>
-                      {(historyData.logs as any[]).map((log: any) => (
-                        <Timeline.Item
-                          key={log.id}
-                          bullet={log.ok ? <TbCheck size={11} /> : <TbAlertTriangle size={11} />}
-                          color={log.ok ? 'teal' : 'red'}
-                          title={
-                            <Group gap="xs">
-                              <Badge size="xs" color={log.ok ? 'teal' : 'red'} variant="light">
-                                {log.ok ? 'Berhasil' : 'Gagal'}
-                              </Badge>
-                              <Badge size="xs" variant="outline" color="gray">
-                                {log.triggeredBy === 'auto' ? 'auto-sync' : 'manual'}
-                              </Badge>
-                            </Group>
-                          }
-                        >
-                          <Text size="xs" c="dimmed" mt={4}>
-                            {new Date(log.createdAt).toLocaleString('id-ID')}
-                            {log.user && ` · ${log.user.name}`}
-                            {` · ${log.varsCount} vars`}
-                            {log.durationMs && ` · ${log.durationMs}ms`}
-                          </Text>
-                          {log.error && <Text size="xs" c="red" mt={2}>{log.error}</Text>}
-                        </Timeline.Item>
-                      ))}
-                    </Timeline>
-                  )}
-                </Accordion.Panel>
-              </Accordion.Item>
-            </Accordion>
-          )}
-
-          {/* Placeholder untuk integrasi masa depan */}
-          <Alert color="gray" variant="light" radius="md" icon={<TbPlugConnected size={14} />}>
-            <Text size="xs">
-              Integrasi lain (Vault, Doppler, Kubernetes) akan tersedia di rilis berikutnya.
-            </Text>
-          </Alert>
-        </Stack>
-      </Drawer>
 
     </Box>
   )

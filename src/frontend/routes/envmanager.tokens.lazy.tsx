@@ -11,7 +11,6 @@ import {
   CopyButton,
   Divider,
   Group,
-  HoverCard,
   Kbd,
   Modal,
   Paper,
@@ -31,7 +30,7 @@ import {
 import { useDebouncedValue, useDisclosure, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, createLazyFileRoute } from '@tanstack/react-router'
+import { Link, createLazyFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -42,8 +41,8 @@ import {
   TbCalendar,
   TbCheck,
   TbChevronDown,
+  TbChevronLeft,
   TbChevronRight,
-  TbClock,
   TbCopy,
   TbFilter,
   TbInfoCircle,
@@ -59,27 +58,16 @@ import {
   TbShieldCheck,
   TbSortAscending,
   TbTag,
-  TbTerminal,
-  TbToggleLeft,
-  TbToggleRight,
   TbTrash,
   TbVariable,
   TbX,
 } from 'react-icons/tb'
+import { TokenCard } from '@/frontend/components/tokens/TokenCard'
+import { TokenDetailView } from '@/frontend/components/tokens/TokenDetailView'
+import { TOKEN_CARD_STYLES, expiryStatus, tagColor } from '@/frontend/components/tokens/token-utils'
+import type { ApiToken } from '@/frontend/components/tokens/token-utils'
 
 export const Route = createLazyFileRoute('/envmanager/tokens')({ component: TokensPage })
-
-interface ApiToken {
-  id: string
-  name: string
-  scopes: string[]
-  tags: string[]
-  canWrite: boolean
-  isDisabled: boolean
-  lastUsedAt: string | null
-  expiresAt: string | null
-  createdAt: string
-}
 
 interface ProjectOption {
   slug: string
@@ -87,84 +75,6 @@ interface ProjectOption {
   environments: { name: string }[]
 }
 
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return 'baru saja'
-  if (m < 60) return `${m} menit lalu`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h} jam lalu`
-  const d = Math.floor(h / 24)
-  if (d < 30) return `${d} hari lalu`
-  return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function absoluteTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('id-ID', {
-    day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
-
-function expiryStatus(expiresAt: string | null): 'none' | 'active' | 'soon' | 'expired' {
-  if (!expiresAt) return 'none'
-  const diff = new Date(expiresAt).getTime() - Date.now()
-  if (diff < 0) return 'expired'
-  if (diff < 7 * 24 * 60 * 60 * 1000) return 'soon'
-  return 'active'
-}
-
-function daysUntil(expiresAt: string): number {
-  return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
-}
-
-const TAG_COLORS = [
-  'red', 'pink', 'grape', 'violet', 'indigo', 'blue',
-  'cyan', 'teal', 'green', 'lime', 'yellow', 'orange',
-] as const
-
-function tagColor(tag: string): string {
-  let h = 0
-  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0
-  return TAG_COLORS[h % TAG_COLORS.length]
-}
-
-const HOVER_STYLES = `
-.envman-token-card {
-  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.15s ease;
-}
-.envman-token-card:not(.is-disabled):not(.is-expired):hover {
-  transform: translateY(-1px);
-  border-color: var(--mantine-color-primary);
-  box-shadow: var(--mantine-shadow-sm);
-}
-`
-
-// ── Scope Badge (clickable link to associated env vars page) ───────────────
-
-function ScopeBadge({ scope, size = 'xs' }: { scope: string; size?: 'xs' | 'sm' }) {
-  const idx = scope.indexOf(':')
-  const linkable = idx > 0 && idx < scope.length - 1
-  if (!linkable) {
-    return <Badge size={size} variant="default" style={{ fontFamily: 'monospace' }}>{scope}</Badge>
-  }
-  const slug = scope.slice(0, idx)
-  const env = scope.slice(idx + 1)
-  return (
-    <Tooltip label={`Buka /envmanager/${slug}/${env}`} openDelay={400} withinPortal>
-      <Link to="/envmanager/$slug/$env" params={{ slug, env }} style={{ textDecoration: 'none' }}>
-        <Badge
-          size={size}
-          variant="dot"
-          color="primary"
-          style={{ fontFamily: 'monospace', cursor: 'pointer' }}
-        >
-          {scope}
-        </Badge>
-      </Link>
-    </Tooltip>
-  )
-}
 
 // ── Scope Selector ──────────────────────────────────────────────────────────
 
@@ -174,9 +84,24 @@ interface ScopeSelectorProps {
   onChange: (v: string[]) => void
 }
 
+const SCOPE_PER_PAGE = 6
+
 function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
   const allAccess = value.length === 0
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [scopeView, setScopeView] = useState<'list' | 'grid'>('list')
+  const [scopePage, setScopePage] = useState(1)
+  const [scopeSearch, setScopeSearch] = useState('')
+
+  const filteredProjects = scopeSearch.trim()
+    ? projects.filter(p =>
+        p.name.toLowerCase().includes(scopeSearch.toLowerCase()) ||
+        p.slug.toLowerCase().includes(scopeSearch.toLowerCase())
+      )
+    : projects
+
+  const totalPages = Math.ceil(filteredProjects.length / SCOPE_PER_PAGE)
+  const paginatedProjects = filteredProjects.slice((scopePage - 1) * SCOPE_PER_PAGE, scopePage * SCOPE_PER_PAGE)
 
   const toggleExpand = (slug: string) => setExpanded(prev => {
     const s = new Set(prev)
@@ -184,12 +109,10 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
     return s
   })
 
-  // When in all-access mode, clicking a scope switches to specific mode with just that scope
   const toggleScope = (scope: string) => {
     if (allAccess) { onChange([scope]); return }
     if (value.includes(scope)) {
-      const next = value.filter(s => s !== scope)
-      onChange(next) // if empty after removal, stays specific (user can click "Semua project" to reset)
+      onChange(value.filter(s => s !== scope))
     } else {
       onChange([...value, scope])
     }
@@ -207,8 +130,114 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
     <Text size="xs" c="dimmed">Belum ada project — token akan punya akses global.</Text>
   )
 
+  const renderListItem = (p: ProjectOption) => {
+    const projectScopes = p.environments.map(e => `${p.slug}:${e.name}`)
+    const selectedCount = allAccess ? 0 : projectScopes.filter(s => value.includes(s)).length
+    const allSelected = !allAccess && selectedCount === projectScopes.length && projectScopes.length > 0
+    const someSelected = !allAccess && selectedCount > 0 && !allSelected
+    const isOpen = expanded.has(p.slug)
+    return (
+      <Paper key={p.slug} withBorder p={0} style={{ overflow: 'hidden', opacity: allAccess ? 0.55 : 1 }}>
+        <Group
+          gap="xs" p="xs"
+          style={{ cursor: 'pointer', background: someSelected || allSelected ? 'var(--mantine-color-violet-light)' : undefined }}
+          onClick={() => { if (p.environments.length > 0) toggleExpand(p.slug) }}
+        >
+          <Checkbox
+            size="xs"
+            checked={allSelected}
+            indeterminate={someSelected}
+            onChange={() => toggleProject(p)}
+            onClick={e => { e.stopPropagation(); toggleProject(p) }}
+          />
+          <TbVariable size={13} style={{ color: 'var(--mantine-color-primary)' }} />
+          <Text size="xs" fw={600} style={{ flex: 1 }}>{p.name}</Text>
+          <Code fz="xs" c="dimmed">{p.slug}</Code>
+          {selectedCount > 0 && <Badge size="xs" color="primary" variant="filled">{selectedCount}/{projectScopes.length}</Badge>}
+          {p.environments.length > 0 && (isOpen ? <TbChevronDown size={13} /> : <TbChevronRight size={13} />)}
+        </Group>
+        <Collapse in={isOpen}>
+          <Stack gap={0} style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
+            {p.environments.map(e => {
+              const scope = `${p.slug}:${e.name}`
+              const checked = !allAccess && value.includes(scope)
+              return (
+                <Group
+                  key={e.name} gap="xs" px="sm" py={6}
+                  style={{ cursor: 'pointer', background: checked ? 'var(--mantine-color-violet-light)' : undefined }}
+                  onClick={() => toggleScope(scope)}
+                >
+                  <Checkbox size="xs" checked={checked} onChange={() => toggleScope(scope)} onClick={e => e.stopPropagation()} />
+                  <Code fz="xs">{e.name}</Code>
+                  <Text size="xs" c="dimmed" style={{ flex: 1 }}>{scope}</Text>
+                </Group>
+              )
+            })}
+            {p.environments.length === 0 && (
+              <Text size="xs" c="dimmed" px="sm" py={6}>Belum ada environment</Text>
+            )}
+          </Stack>
+        </Collapse>
+      </Paper>
+    )
+  }
+
+  const renderGridItem = (p: ProjectOption) => {
+    const projectScopes = p.environments.map(e => `${p.slug}:${e.name}`)
+    const selectedCount = allAccess ? 0 : projectScopes.filter(s => value.includes(s)).length
+    const allSelected = !allAccess && selectedCount === projectScopes.length && projectScopes.length > 0
+    const someSelected = !allAccess && selectedCount > 0 && !allSelected
+    return (
+      <Paper
+        key={p.slug} withBorder p="xs"
+        style={{
+          opacity: allAccess ? 0.55 : 1,
+          background: allSelected || someSelected ? 'var(--mantine-color-violet-light)' : undefined,
+          borderColor: allSelected ? 'var(--mantine-color-primary)' : undefined,
+        }}
+      >
+        <Group gap="xs" mb={6} wrap="nowrap">
+          <Checkbox
+            size="xs"
+            checked={allSelected}
+            indeterminate={someSelected}
+            onChange={() => toggleProject(p)}
+          />
+          <TbVariable size={12} style={{ color: 'var(--mantine-color-primary)', flexShrink: 0 }} />
+          <Text size="xs" fw={700} truncate style={{ flex: 1 }}>{p.name}</Text>
+          <Code fz="xs" c="dimmed">{p.slug}</Code>
+        </Group>
+        {p.environments.length === 0 ? (
+          <Text size="xs" c="dimmed" fs="italic">Belum ada environment</Text>
+        ) : (
+          <Group gap={4} wrap="wrap">
+            {p.environments.map(e => {
+              const scope = `${p.slug}:${e.name}`
+              const checked = !allAccess && value.includes(scope)
+              return (
+                <Badge
+                  key={e.name}
+                  size="xs"
+                  variant={checked ? 'filled' : 'outline'}
+                  color={checked ? 'primary' : 'gray'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => toggleScope(scope)}
+                >
+                  {e.name}
+                </Badge>
+              )
+            })}
+          </Group>
+        )}
+        {selectedCount > 0 && (
+          <Text size="xs" c="primary" mt={4}>{selectedCount}/{projectScopes.length} dipilih</Text>
+        )}
+      </Paper>
+    )
+  }
+
   return (
-    <Stack gap={4}>
+    <Stack gap={6}>
       {/* All access toggle */}
       <Paper
         withBorder p="xs"
@@ -229,72 +258,75 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
         </Group>
       </Paper>
 
-      {/* Per-project selector — always visible */}
-      {projects.map(p => {
-        const projectScopes = p.environments.map(e => `${p.slug}:${e.name}`)
-        const selectedCount = allAccess ? 0 : projectScopes.filter(s => value.includes(s)).length
-        const allSelected = !allAccess && selectedCount === projectScopes.length && projectScopes.length > 0
-        const someSelected = !allAccess && selectedCount > 0 && !allSelected
-        const isOpen = expanded.has(p.slug)
-
-        return (
-          <Paper key={p.slug} withBorder p={0} style={{ overflow: 'hidden', opacity: allAccess ? 0.55 : 1 }}>
-            <Group
-              gap="xs" p="xs"
-              style={{ cursor: 'pointer', background: someSelected || allSelected ? 'var(--mantine-color-violet-light)' : undefined }}
-              onClick={() => { if (p.environments.length > 0) toggleExpand(p.slug) }}
-            >
-              <Checkbox
-                size="xs"
-                checked={allSelected}
-                indeterminate={someSelected}
-                onChange={() => toggleProject(p)}
-                onClick={e => { e.stopPropagation(); toggleProject(p) }}
-              />
-              <TbVariable size={13} style={{ color: 'var(--mantine-color-primary)' }} />
-              <Text size="xs" fw={600} style={{ flex: 1 }}>{p.name}</Text>
-              <Code fz="xs" c="dimmed">{p.slug}</Code>
-              {selectedCount > 0 && <Badge size="xs" color="primary" variant="filled">{selectedCount}/{projectScopes.length}</Badge>}
-              {p.environments.length > 0 && (isOpen ? <TbChevronDown size={13} /> : <TbChevronRight size={13} />)}
-            </Group>
-
-            <Collapse in={isOpen}>
-              <Stack gap={0} style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
-                {p.environments.map(e => {
-                  const scope = `${p.slug}:${e.name}`
-                  const checked = !allAccess && value.includes(scope)
-                  return (
-                    <Group
-                      key={e.name} gap="xs" px="sm" py={6}
-                      style={{ cursor: 'pointer', background: checked ? 'var(--mantine-color-violet-light)' : undefined }}
-                      onClick={() => toggleScope(scope)}
-                    >
-                      <Checkbox size="xs" checked={checked} onChange={() => toggleScope(scope)} onClick={e => e.stopPropagation()} />
-                      <Code fz="xs">{e.name}</Code>
-                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>{scope}</Text>
-                    </Group>
-                  )
-                })}
-                {p.environments.length === 0 && (
-                  <Text size="xs" c="dimmed" px="sm" py={6}>Belum ada environment</Text>
-                )}
-              </Stack>
-            </Collapse>
-          </Paper>
-        )
-      })}
-
-      {!allAccess && (
-        <Group gap="xs">
-          <Text size="xs" c="dimmed">
-            {value.length === 0 ? 'Pilih minimal satu environment, atau klik "Semua project" di atas.' : `${value.length} scope dipilih`}
-          </Text>
-          {value.length > 0 && (
-            <Button size="compact-xs" variant="subtle" color="gray" onClick={() => onChange([])}>
-              Semua project
-            </Button>
-          )}
+      {/* Toolbar: search + view toggle */}
+      <Group gap="xs" wrap="nowrap">
+        <TextInput
+          size="xs"
+          placeholder="Cari project..."
+          leftSection={<TbSearch size={12} />}
+          value={scopeSearch}
+          onChange={e => { setScopeSearch(e.target.value); setScopePage(1) }}
+          rightSection={
+            scopeSearch ? (
+              <ActionIcon size="xs" variant="subtle" onClick={() => { setScopeSearch(''); setScopePage(1) }}>
+                <TbX size={11} />
+              </ActionIcon>
+            ) : null
+          }
+          style={{ flex: 1 }}
+        />
+        <Group gap={2} style={{ flexShrink: 0 }}>
+          <ActionIcon
+            size="xs" variant={scopeView === 'list' ? 'filled' : 'subtle'} color="gray" radius="sm"
+            onClick={() => { setScopeView('list'); setScopePage(1) }}
+            aria-label="Tampilan list"
+          >
+            <TbLayoutList size={12} />
+          </ActionIcon>
+          <ActionIcon
+            size="xs" variant={scopeView === 'grid' ? 'filled' : 'subtle'} color="gray" radius="sm"
+            onClick={() => { setScopeView('grid'); setScopePage(1) }}
+            aria-label="Tampilan grid"
+          >
+            <TbLayoutGrid size={12} />
+          </ActionIcon>
         </Group>
+      </Group>
+      {filteredProjects.length < projects.length && (
+        <Text size="xs" c="dimmed">
+          {filteredProjects.length} dari {projects.length} project
+          {!allAccess && value.length > 0 && ` · ${value.length} scope dipilih`}
+        </Text>
+      )}
+
+      {/* Project list / grid */}
+      {filteredProjects.length === 0 ? (
+        <Text size="xs" c="dimmed" ta="center" py="xs">Tidak ada project yang cocok.</Text>
+      ) : scopeView === 'list' ? (
+        <Stack gap={4}>
+          {paginatedProjects.map(renderListItem)}
+        </Stack>
+      ) : (
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={6}>
+          {paginatedProjects.map(renderGridItem)}
+        </SimpleGrid>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Group justify="center">
+          <Pagination
+            value={scopePage}
+            onChange={setScopePage}
+            total={totalPages}
+            size="xs"
+            withEdges
+          />
+        </Group>
+      )}
+
+      {!allAccess && value.length === 0 && (
+        <Text size="xs" c="dimmed">Pilih minimal satu environment, atau klik "Semua project" di atas.</Text>
       )}
     </Stack>
   )
@@ -303,11 +335,12 @@ function ScopeSelector({ projects, value, onChange }: ScopeSelectorProps) {
 const emptyForm = { name: '', canWrite: false, expiresAt: '', scopes: [] as string[], tags: [] as string[] }
 
 function TokensPage() {
+  const { token: selectedTokenId, edit: isEditing } = Route.useSearch()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: sessionData } = useSession()
   const canCreateToken = hasCapability(sessionData?.user, 'token:create')
   const isMobile = useMediaQuery('(max-width: 48em)')
-  const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false)
   const [editOpen, { open: openEdit, close: closeEdit }] = useDisclosure(false)
   const [editingToken, setEditingToken] = useState<ApiToken | null>(null)
   const [newToken, setNewToken] = useState<string | null>(null)
@@ -349,6 +382,7 @@ function TokensPage() {
   }))
 
   const tokens: ApiToken[] = data?.tokens ?? []
+  const selectedToken = selectedTokenId ? tokens.find(t => t.id === selectedTokenId) ?? null : null
   const activeTokens = tokens.filter(t => expiryStatus(t.expiresAt) !== 'expired' && !t.isDisabled)
   const expiredTokens = tokens.filter(t => expiryStatus(t.expiresAt) === 'expired')
   const disabledTokens = tokens.filter(t => t.isDisabled)
@@ -402,8 +436,8 @@ function TokensPage() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['envman', 'tokens'] })
       setNewToken(data.token)
-      closeCreate()
       setForm(emptyForm)
+      goToList()
       notifyOk('Token berhasil dibuat — salin nilainya sekarang!')
     },
     onError: (e) => notifyErr(e),
@@ -417,8 +451,12 @@ function TokensPage() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['envman', 'tokens'] })
-      closeEdit()
-      setEditingToken(null)
+      if (selectedTokenId) {
+        navigate({ to: '/envmanager/tokens', search: { token: editingToken!.id, edit: undefined } })
+      } else {
+        closeEdit()
+        setEditingToken(null)
+      }
       notifyOk('Token diperbarui')
     },
     onError: (e) => notifyErr(e),
@@ -443,12 +481,14 @@ function TokensPage() {
   })
 
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [revealedValue, setRevealedValue] = useState<{ id: string; token: string } | null>(null)
   const copyToken = useMutation({
     mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/reveal`),
     onSuccess: async (data: { token: string }, id) => {
       try {
         await navigator.clipboard.writeText(data.token)
         setCopiedId(id)
+        setRevealedValue({ id, token: data.token })
         notifyOk('Token disalin ke clipboard')
         setTimeout(() => setCopiedId(prev => (prev === id ? null : prev)), 1500)
       } catch {
@@ -457,6 +497,26 @@ function TokensPage() {
     },
     onError: (e) => notifyErr(e),
   })
+
+  const handleCopyCommand = async (tokenId: string, cmdTemplate: string) => {
+    try {
+      let tokenVal: string
+      if (revealedValue?.id === tokenId) {
+        tokenVal = revealedValue.token
+      } else {
+        const data: { token: string } = await apiFetch(`/api/envman/tokens/${tokenId}/reveal`)
+        tokenVal = data.token
+        setRevealedValue({ id: tokenId, token: tokenVal })
+        setCopiedId(tokenId)
+        setTimeout(() => setCopiedId(prev => (prev === tokenId ? null : prev)), 1500)
+      }
+      const resolved = cmdTemplate.replace(/\[TOKEN\]/g, tokenVal)
+      await navigator.clipboard.writeText(resolved)
+      notifyOk('Command disalin ke clipboard')
+    } catch {
+      notifyErr(new Error('Gagal akses clipboard — coba browser modern atau HTTPS'))
+    }
+  }
 
   const rotateToken = useMutation({
     mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/rotate`, { method: 'POST' }),
@@ -646,10 +706,146 @@ function TokensPage() {
   const hasFilter = debouncedSearch.trim().length > 0 || filterStatus !== 'semua' || filterProjects.length > 0 || filterTags.length > 0
   const resetFilter = () => { setSearch(''); setFilterStatus('semua'); setFilterProjects([]); setFilterTags([]) }
 
+  const goToList = () => navigate({ to: '/envmanager/tokens', search: { token: undefined, edit: undefined } })
+  const goToNew = () => navigate({ to: '/envmanager/tokens', search: { token: 'new', edit: undefined } })
+  const goToDetail = (id: string) => navigate({ to: '/envmanager/tokens', search: { token: id, edit: undefined } })
+  const goToEdit = (id: string) => navigate({ to: '/envmanager/tokens', search: { token: id, edit: true } })
+
+  // Sync edit form when entering route-based edit mode
+  useEffect(() => {
+    if (isEditing && selectedToken && editingToken?.id !== selectedToken.id) {
+      setEditingToken(selectedToken)
+      setEditForm({
+        name: selectedToken.name,
+        canWrite: selectedToken.canWrite,
+        expiresAt: selectedToken.expiresAt ? new Date(selectedToken.expiresAt).toISOString().split('T')[0] : '',
+        scopes: selectedToken.scopes,
+        tags: selectedToken.tags ?? [],
+      })
+    }
+  }, [isEditing, selectedToken?.id])
+
+  if (selectedTokenId === 'new') {
+    return (
+      <Stack gap="md">
+        <Group gap={6} align="center">
+          <ActionIcon variant="subtle" color="gray" size="sm" onClick={goToList}>
+            <TbChevronLeft size={15} />
+          </ActionIcon>
+          <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={goToList}>Tokens</Text>
+          <Text size="sm" c="dimmed">/</Text>
+          <Text size="sm" fw={600}>Buat Token Baru</Text>
+        </Group>
+        <Card withBorder radius="md" p="md">
+          {tokenForm(form, setForm)}
+          <Divider my="md" />
+          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)" mb="md">
+            <Text size="xs" fw={600} mb={4}>Ringkasan token:</Text>
+            <Group gap="xs" wrap="wrap">
+              <Badge size="xs" color={form.canWrite ? 'orange' : 'blue'} variant="light" leftSection={form.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
+                {form.canWrite ? 'read-write' : 'read-only'}
+              </Badge>
+              <Badge size="xs" color="primary" variant="light">
+                {form.scopes.length === 0 ? 'semua project' : `${form.scopes.length} scope`}
+              </Badge>
+              <Badge size="xs" color={form.expiresAt ? 'teal' : 'gray'} variant="light" leftSection={<TbCalendar size={9} />}>
+                {form.expiresAt ? `exp: ${new Date(form.expiresAt).toLocaleDateString('id-ID')}` : 'tidak ada expiry'}
+              </Badge>
+            </Group>
+          </Paper>
+          <Group justify="flex-end" gap="xs">
+            <Button variant="subtle" color="gray" onClick={() => { setForm(emptyForm); goToList() }} disabled={createToken.isPending}>
+              Batal
+            </Button>
+            <Button
+              size="md"
+              leftSection={<TbKey size={16} />}
+              variant="gradient"
+              onClick={() => createToken.mutate(form)}
+              loading={createToken.isPending}
+              disabled={!form.name.trim() || createToken.isPending}
+            >
+              {form.name ? `Buat token "${form.name}"` : 'Buat Token'}
+            </Button>
+          </Group>
+          {createToken.isError && <Text size="xs" c="red" mt="xs">{(createToken.error as Error).message}</Text>}
+        </Card>
+      </Stack>
+    )
+  }
+
+  if (selectedToken && isEditing) {
+    return (
+      <Stack gap="md">
+        <Group gap={6} align="center">
+          <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => goToDetail(selectedToken.id)}>
+            <TbChevronLeft size={15} />
+          </ActionIcon>
+          <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={goToList}>Tokens</Text>
+          <Text size="sm" c="dimmed">/</Text>
+          <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={() => goToDetail(selectedToken.id)}>{selectedToken.name}</Text>
+          <Text size="sm" c="dimmed">/</Text>
+          <Text size="sm" fw={600}>Edit</Text>
+        </Group>
+        <Card withBorder radius="md" p="md">
+          {tokenForm(editForm, setEditForm)}
+          <Divider my="md" />
+          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)" mb="md">
+            <Text size="xs" fw={600} mb={4}>Ringkasan token:</Text>
+            <Group gap="xs" wrap="wrap">
+              <Badge size="xs" color={editForm.canWrite ? 'orange' : 'blue'} variant="light" leftSection={editForm.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
+                {editForm.canWrite ? 'read-write' : 'read-only'}
+              </Badge>
+              <Badge size="xs" color="primary" variant="light">
+                {editForm.scopes.length === 0 ? 'semua project' : `${editForm.scopes.length} scope`}
+              </Badge>
+              <Badge size="xs" color={editForm.expiresAt ? 'teal' : 'gray'} variant="light" leftSection={<TbCalendar size={9} />}>
+                {editForm.expiresAt ? `exp: ${new Date(editForm.expiresAt).toLocaleDateString('id-ID')}` : 'tidak ada expiry'}
+              </Badge>
+            </Group>
+          </Paper>
+          <Group justify="flex-end" gap="xs">
+            <Button variant="subtle" color="gray" onClick={() => goToDetail(selectedToken.id)} disabled={editToken.isPending}>
+              Batal
+            </Button>
+            <Button
+              leftSection={<TbCheck size={14} />}
+              onClick={() => editToken.mutate(editForm)}
+              loading={editToken.isPending}
+              disabled={!editForm.name}
+            >
+              Simpan Perubahan
+            </Button>
+          </Group>
+          {editToken.isError && <Text size="xs" c="red" mt="xs">{(editToken.error as Error).message}</Text>}
+        </Card>
+      </Stack>
+    )
+  }
+
+  if (selectedToken) {
+    return (
+      <TokenDetailView
+        token={selectedToken}
+        isCopied={copiedId === selectedToken.id}
+        togglePending={toggleToken.isPending && toggleToken.variables === selectedToken.id}
+        copyPending={copyToken.isPending && copyToken.variables === selectedToken.id}
+        rotatePending={rotateToken.isPending && rotateToken.variables === selectedToken.id}
+        onBack={goToList}
+        onToggle={() => toggleToken.mutate(selectedToken.id)}
+        onCopy={() => copyToken.mutate(selectedToken.id)}
+        onCopyCommand={(tpl) => handleCopyCommand(selectedToken.id, tpl)}
+        onRotate={() => confirmRotate(selectedToken.id, selectedToken.name)}
+        onEdit={() => goToEdit(selectedToken.id)}
+        onRevoke={() => revokeToken(selectedToken.id, selectedToken.name)}
+      />
+    )
+  }
+
   return (
     <Box>
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
-      <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
+      <style dangerouslySetInnerHTML={{ __html: TOKEN_CARD_STYLES }} />
 
       {/* ─── Header ─────────────────────────── */}
       <Group justify="space-between" mb="md" wrap="nowrap" align="center">
@@ -673,7 +869,7 @@ function TokensPage() {
             </Tooltip>
           )}
           {canCreateToken && (
-            <Button size="sm" leftSection={<TbPlus size={14} />} color="primary" radius="md" onClick={openCreate}>
+            <Button size="sm" leftSection={<TbPlus size={14} />} color="primary" radius="md" onClick={goToNew}>
               Buat Token
             </Button>
           )}
@@ -904,7 +1100,7 @@ function TokensPage() {
             Cocok untuk CI/CD pipeline, deploy script, atau development di laptop pribadi.
           </Text>
           {canCreateToken ? (
-            <Button size="sm" color="primary" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+            <Button size="sm" color="primary" leftSection={<TbPlus size={14} />} onClick={goToNew}>
               Buat Token Pertama
             </Button>
           ) : (
@@ -924,387 +1120,62 @@ function TokensPage() {
         </Card>
       ) : !isError && view === 'grid' ? (
         <>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          {paginatedTokens.map((t) => {
-            const expiry = expiryStatus(t.expiresAt)
-            const isExpired = expiry === 'expired'
-            return (
-              <Card
-                key={t.id} withBorder radius="lg" p="sm"
-                className={`envman-token-card ${t.isDisabled ? 'is-disabled' : ''} ${isExpired ? 'is-expired' : ''}`}
-                style={{
-                  opacity: t.isDisabled ? 0.55 : isExpired ? 0.65 : 1,
-                  borderColor: isExpired ? 'var(--mantine-color-red-3)' : undefined,
-                }}
-              >
-                {/* Top: access icon + actions */}
-                <Group justify="space-between" mb={8} wrap="nowrap">
-                  <Group gap={6} align="center">
-                    <ThemeIcon size={28} radius="md" variant="light" color={t.canWrite ? 'orange' : 'blue'}>
-                      <TbKey size={14} />
-                    </ThemeIcon>
-                    <Badge size="xs" variant="light" color={t.canWrite ? 'orange' : 'blue'}>
-                      {t.canWrite ? 'rw' : 'ro'}
-                    </Badge>
-                    {t.isDisabled && <Badge size="xs" color="gray" variant="filled">off</Badge>}
-                    {isExpired && <Badge size="xs" color="red" variant="filled">expired</Badge>}
-                    {expiry === 'soon' && t.expiresAt && (
-                      <Badge size="xs" color="yellow" variant="light">{daysUntil(t.expiresAt)}h</Badge>
-                    )}
-                  </Group>
-                  <Group gap={2}>
-                    <Tooltip label={t.isDisabled ? 'Aktifkan' : 'Nonaktifkan'} withArrow>
-                      <ActionIcon size="xs" variant="subtle" color={t.isDisabled ? 'gray' : 'teal'}
-                        loading={toggleToken.isPending && toggleToken.variables === t.id}
-                        onClick={() => toggleToken.mutate(t.id)}>
-                        {t.isDisabled ? <TbToggleLeft size={13} /> : <TbToggleRight size={13} />}
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label={copiedId === t.id ? 'Tersalin!' : 'Copy token'} withArrow>
-                      <ActionIcon size="xs" variant="subtle" color={copiedId === t.id ? 'teal' : 'gray'}
-                        loading={copyToken.isPending && copyToken.variables === t.id}
-                        onClick={() => copyToken.mutate(t.id)}>
-                        {copiedId === t.id ? <TbCheck size={12} /> : <TbCopy size={12} />}
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Rotate" withArrow>
-                      <ActionIcon size="xs" variant="subtle" color="yellow"
-                        loading={rotateToken.isPending && rotateToken.variables === t.id}
-                        onClick={() => confirmRotate(t.id, t.name)}>
-                        <TbRefresh size={12} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Usage" withArrow>
-                      <ActionIcon size="xs" variant="subtle" color="gray"
-                        onClick={() => setExpandedUsage(prev => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}>
-                        <TbTerminal size={12} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Edit" withArrow>
-                      <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => openEditModal(t)}>
-                        <TbPencil size={12} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Revoke" withArrow>
-                      <ActionIcon size="xs" variant="subtle" color="red" onClick={() => revokeToken(t.id, t.name)}>
-                        <TbTrash size={12} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
-                </Group>
-
-                {/* Token name — primary element */}
-                <Text fw={700} size="sm" mb={6} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</Text>
-                <Group gap={4} mb={6} wrap="wrap">
-                  {t.scopes.length === 0 ? (
-                    <Badge size="xs" variant="default">semua project</Badge>
-                  ) : (
-                    <>
-                      {t.scopes.slice(0, 3).map(s => <ScopeBadge key={s} scope={s} />)}
-                      {t.scopes.length > 3 && (
-                        <HoverCard width={260} shadow="md" withinPortal position="bottom-start">
-                          <HoverCard.Target>
-                            <Badge size="xs" variant="default" style={{ cursor: 'pointer' }}>+{t.scopes.length - 3}</Badge>
-                          </HoverCard.Target>
-                          <HoverCard.Dropdown>
-                            <Stack gap={4}>
-                              <Text size="xs" c="dimmed">Scope lainnya:</Text>
-                              <Group gap={4} wrap="wrap">
-                                {t.scopes.slice(3).map(s => <ScopeBadge key={s} scope={s} />)}
-                              </Group>
-                            </Stack>
-                          </HoverCard.Dropdown>
-                        </HoverCard>
-                      )}
-                    </>
-                  )}
-                </Group>
-                {t.tags.length > 0 && (
-                  <Group gap={4} mb={6} wrap="wrap">
-                    {t.tags.map(tag => (
-                      <Badge key={tag} size="xs" variant="light" color={tagColor(tag)}>{tag}</Badge>
-                    ))}
-                  </Group>
-                )}
-                <Tooltip label={t.lastUsedAt ? `Terakhir dipakai ${absoluteTime(t.lastUsedAt)}` : 'Belum pernah dipakai'} withArrow>
-                  <Group gap={4} style={{ cursor: 'default' }}>
-                    <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                    <Text size="xs" c="dimmed">
-                      {t.lastUsedAt ? relativeTime(t.lastUsedAt) : <Text component="span" fs="italic">belum dipakai</Text>}
-                    </Text>
-                  </Group>
-                </Tooltip>
-
-                <Collapse in={expandedUsage.has(t.id)}>
-                  <Divider my="xs" />
-                  <Stack gap={6}>
-                    {(() => {
-                      const origin = window.location.origin
-                      const scope = t.scopes.length > 0 ? t.scopes[0] : 'myapp:production'
-                      const [scopeProject, scopeEnv] = scope.includes(':') ? scope.split(':') : [scope, 'production']
-                      return [
-                        { label: 'Login & simpan config', cmd: `envman login ${origin} --token <TOKEN>` },
-                        { label: `Inject vars (${scopeProject}:${scopeEnv})`, cmd: `envman -e ${scopeProject}:${scopeEnv} -- bun start` },
-                        { label: 'CI/CD tanpa login', cmd: `ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<TOKEN> envman -e ${scopeProject}:${scopeEnv} -- bun start` },
-                      ].map(({ label, cmd }) => (
-                        <Box key={label}>
-                          <Text size="xs" c="dimmed" mb={2}>{label}</Text>
-                          <Group gap={4} align="center">
-                            <Code fz="xs" style={{ flex: 1, wordBreak: 'break-all', userSelect: 'all' }}>{cmd}</Code>
-                            <CopyButton value={cmd}>
-                              {({ copied, copy }) => (
-                                <Tooltip label={copied ? 'Copied!' : 'Copy'}>
-                                  <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
-                                    {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
-                                  </ActionIcon>
-                                </Tooltip>
-                              )}
-                            </CopyButton>
-                          </Group>
-                        </Box>
-                      ))
-                    })()}
-                    {t.scopes.length === 0 && (
-                      <Text size="xs" c="dimmed">Token ini punya akses ke semua project. Ganti <Code fz="xs">myapp:production</Code> dengan project:env yang sesuai.</Text>
-                    )}
-                  </Stack>
-                </Collapse>
-              </Card>
-            )
-          })}
-        </SimpleGrid>
-        {tokensTotalPages > 1 && (
-          <Group justify="center" mt="sm">
-            <Pagination value={tokensPage} onChange={setTokensPage} total={tokensTotalPages} size="sm" />
-          </Group>
-        )}
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+            {paginatedTokens.map(t => (
+              <TokenCard
+                key={t.id}
+                token={t}
+                isUsageOpen={expandedUsage.has(t.id)}
+                isCopied={copiedId === t.id}
+                togglePending={toggleToken.isPending && toggleToken.variables === t.id}
+                copyPending={copyToken.isPending && copyToken.variables === t.id}
+                rotatePending={rotateToken.isPending && rotateToken.variables === t.id}
+                onToggle={() => toggleToken.mutate(t.id)}
+                onCopy={() => copyToken.mutate(t.id)}
+                onRotate={() => confirmRotate(t.id, t.name)}
+                onEdit={() => openEditModal(t)}
+                onRevoke={() => revokeToken(t.id, t.name)}
+                onUsageToggle={() => setExpandedUsage(prev => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}
+                onCardClick={() => goToDetail(t.id)}
+              />
+            ))}
+          </SimpleGrid>
+          {tokensTotalPages > 1 && (
+            <Group justify="center" mt="sm">
+              <Pagination value={tokensPage} onChange={setTokensPage} total={tokensTotalPages} size="sm" />
+            </Group>
+          )}
         </>
       ) : !isError ? (
         <>
-        <Stack gap="xs">
-          {paginatedTokens.map((t) => {
-            const expiry = expiryStatus(t.expiresAt)
-            const isExpired = expiry === 'expired'
-            return (
-              <Card
-                key={t.id} withBorder radius="md" p="sm"
-                className={`envman-token-card ${t.isDisabled ? 'is-disabled' : ''} ${isExpired ? 'is-expired' : ''}`}
-                style={{
-                  opacity: t.isDisabled ? 0.55 : isExpired ? 0.65 : 1,
-                  borderColor: isExpired ? 'var(--mantine-color-red-3)' : undefined,
-                }}
-              >
-                <Group justify="space-between" wrap="nowrap" gap="sm">
-                  <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
-                    <ThemeIcon size={32} radius="md" variant="light" color={t.canWrite ? 'orange' : 'blue'}>
-                      <TbKey size={15} />
-                    </ThemeIcon>
-                    <Box style={{ flex: 1, minWidth: 0 }}>
-                      <Group gap={6} mb={3} wrap="nowrap" align="center">
-                        <Text size="sm" fw={700} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</Text>
-                        <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light" style={{ flexShrink: 0 }}>
-                          {t.canWrite ? 'rw' : 'ro'}
-                        </Badge>
-                        {t.isDisabled && <Badge size="xs" color="gray" variant="filled" style={{ flexShrink: 0 }}>off</Badge>}
-                        {expiry === 'expired' && <Badge size="xs" color="red" variant="filled" style={{ flexShrink: 0 }}>expired</Badge>}
-                        {expiry === 'soon' && t.expiresAt && (
-                          <Tooltip label={`Expired ${absoluteTime(t.expiresAt)}`} withArrow>
-                            <Badge size="xs" color="yellow" variant="light" style={{ flexShrink: 0 }}>
-                              {daysUntil(t.expiresAt)}h
-                            </Badge>
-                          </Tooltip>
-                        )}
-                      </Group>
-                      <Group gap="xs" wrap="wrap">
-                        {t.scopes.length === 0 ? (
-                          <Badge size="xs" variant="default">semua project</Badge>
-                        ) : (
-                          <>
-                            {t.scopes.slice(0, 4).map(s => <ScopeBadge key={s} scope={s} />)}
-                            {t.scopes.length > 4 && (
-                              <HoverCard width={260} shadow="md" withinPortal position="bottom-start">
-                                <HoverCard.Target>
-                                  <Badge size="xs" variant="default" style={{ cursor: 'pointer' }}>+{t.scopes.length - 4}</Badge>
-                                </HoverCard.Target>
-                                <HoverCard.Dropdown>
-                                  <Stack gap={4}>
-                                    <Text size="xs" c="dimmed">Scope lainnya:</Text>
-                                    <Group gap={4} wrap="wrap">
-                                      {t.scopes.slice(4).map(s => <ScopeBadge key={s} scope={s} />)}
-                                    </Group>
-                                  </Stack>
-                                </HoverCard.Dropdown>
-                              </HoverCard>
-                            )}
-                          </>
-                        )}
-                        {t.tags.length > 0 && t.tags.map(tag => (
-                          <Badge key={tag} size="xs" variant="light" color={tagColor(tag)}>{tag}</Badge>
-                        ))}
-                        <Tooltip label={t.lastUsedAt ? `Terakhir dipakai ${absoluteTime(t.lastUsedAt)}` : 'Belum pernah dipakai'} withArrow>
-                          <Group gap={3} style={{ cursor: 'default' }}>
-                            <TbClock size={10} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                            <Text size="xs" c="dimmed">
-                              {t.lastUsedAt ? relativeTime(t.lastUsedAt) : <Text component="span" fs="italic">belum dipakai</Text>}
-                            </Text>
-                          </Group>
-                        </Tooltip>
-                        <Tooltip label={`Dibuat ${absoluteTime(t.createdAt)}`} withArrow>
-                          <Text size="xs" c="dimmed" style={{ cursor: 'default' }}>{relativeTime(t.createdAt)}</Text>
-                        </Tooltip>
-                        {t.expiresAt && !isExpired && (
-                          <Tooltip label={absoluteTime(t.expiresAt)}>
-                            <Text size="xs" c={expiry === 'soon' ? 'yellow' : 'dimmed'}>
-                              expires: {new Date(t.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </Text>
-                          </Tooltip>
-                        )}
-                        {isExpired && t.expiresAt && (
-                          <Tooltip label={absoluteTime(t.expiresAt)}>
-                            <Text size="xs" c="red">expired: {new Date(t.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
-                          </Tooltip>
-                        )}
-                      </Group>
-                    </Box>
-                  </Group>
-                  <Group gap={2} wrap="nowrap" style={{ flexShrink: 0 }}>
-                    <Tooltip label={t.isDisabled ? 'Aktifkan' : 'Nonaktifkan'} withArrow>
-                      <ActionIcon size="sm" variant="subtle" color={t.isDisabled ? 'gray' : 'teal'}
-                        loading={toggleToken.isPending && toggleToken.variables === t.id}
-                        onClick={() => toggleToken.mutate(t.id)}>
-                        {t.isDisabled ? <TbToggleLeft size={15} /> : <TbToggleRight size={15} />}
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label={copiedId === t.id ? 'Tersalin!' : 'Copy token'} withArrow>
-                      <ActionIcon size="sm" variant="subtle" color={copiedId === t.id ? 'teal' : 'gray'}
-                        loading={copyToken.isPending && copyToken.variables === t.id}
-                        onClick={() => copyToken.mutate(t.id)}>
-                        {copiedId === t.id ? <TbCheck size={13} /> : <TbCopy size={13} />}
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Rotate" withArrow>
-                      <ActionIcon size="sm" variant="subtle" color="yellow"
-                        loading={rotateToken.isPending && rotateToken.variables === t.id}
-                        onClick={() => confirmRotate(t.id, t.name)}>
-                        <TbRefresh size={13} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Usage" withArrow>
-                      <ActionIcon size="sm" variant="subtle" color="gray"
-                        onClick={() => setExpandedUsage(prev => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}>
-                        <TbTerminal size={13} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Edit" withArrow>
-                      <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEditModal(t)}>
-                        <TbPencil size={13} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Revoke" withArrow>
-                      <ActionIcon size="sm" variant="subtle" color="red" onClick={() => revokeToken(t.id, t.name)}>
-                        <TbTrash size={13} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
-                </Group>
-
-                <Collapse in={expandedUsage.has(t.id)}>
-                  <Divider my="xs" />
-                  <Stack gap={6}>
-                    {(() => {
-                      const origin = window.location.origin
-                      const scope = t.scopes.length > 0 ? t.scopes[0] : 'myapp:production'
-                      const [scopeProject, scopeEnv] = scope.includes(':') ? scope.split(':') : [scope, 'production']
-                      return [
-                        { label: 'Login & simpan config', cmd: `envman login ${origin} --token <TOKEN>` },
-                        { label: `Inject vars (${scopeProject}:${scopeEnv})`, cmd: `envman -e ${scopeProject}:${scopeEnv} -- bun start` },
-                        { label: 'CI/CD tanpa login', cmd: `ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<TOKEN> envman -e ${scopeProject}:${scopeEnv} -- bun start` },
-                      ].map(({ label, cmd }) => (
-                        <Box key={label}>
-                          <Text size="xs" c="dimmed" mb={2}>{label}</Text>
-                          <Group gap={4} align="center">
-                            <Code fz="xs" style={{ flex: 1, wordBreak: 'break-all', userSelect: 'all' }}>{cmd}</Code>
-                            <CopyButton value={cmd}>
-                              {({ copied, copy }) => (
-                                <Tooltip label={copied ? 'Copied!' : 'Copy'}>
-                                  <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
-                                    {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
-                                  </ActionIcon>
-                                </Tooltip>
-                              )}
-                            </CopyButton>
-                          </Group>
-                        </Box>
-                      ))
-                    })()}
-                    {t.scopes.length === 0 && (
-                      <Text size="xs" c="dimmed">Token ini punya akses ke semua project. Ganti <Code fz="xs">myapp:production</Code> dengan project:env yang sesuai.</Text>
-                    )}
-                  </Stack>
-                </Collapse>
-              </Card>
-            )
-          })}
-        </Stack>
-        {tokensTotalPages > 1 && (
-          <Group justify="center" mt="sm">
-            <Pagination value={tokensPage} onChange={setTokensPage} total={tokensTotalPages} size="sm" />
-          </Group>
-        )}
+          <Stack gap="xs">
+            {paginatedTokens.map(t => (
+              <TokenCard
+                key={t.id}
+                token={t}
+                compact
+                isUsageOpen={expandedUsage.has(t.id)}
+                isCopied={copiedId === t.id}
+                togglePending={toggleToken.isPending && toggleToken.variables === t.id}
+                copyPending={copyToken.isPending && copyToken.variables === t.id}
+                rotatePending={rotateToken.isPending && rotateToken.variables === t.id}
+                onToggle={() => toggleToken.mutate(t.id)}
+                onCopy={() => copyToken.mutate(t.id)}
+                onRotate={() => confirmRotate(t.id, t.name)}
+                onEdit={() => openEditModal(t)}
+                onRevoke={() => revokeToken(t.id, t.name)}
+                onUsageToggle={() => setExpandedUsage(prev => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}
+                onCardClick={() => goToDetail(t.id)}
+              />
+            ))}
+          </Stack>
+          {tokensTotalPages > 1 && (
+            <Group justify="center" mt="sm">
+              <Pagination value={tokensPage} onChange={setTokensPage} total={tokensTotalPages} size="sm" />
+            </Group>
+          )}
         </>
       ) : null}
-
-      {/* ─── Create modal ───────────────────── */}
-      <Modal
-        opened={createOpen}
-        onClose={() => { closeCreate(); setForm(emptyForm) }}
-        size="lg"
-        fullScreen={isMobile}
-        title={
-          <Group gap="xs">
-            <ThemeIcon size={28} variant="gradient" radius="md">
-              <TbKey size={15} />
-            </ThemeIcon>
-            <Box>
-              <Text fw={700} size="sm">Buat API Token</Text>
-              <Text size="xs" c="dimmed">Token untuk CLI, CI/CD, atau automation script</Text>
-            </Box>
-          </Group>
-        }
-      >
-        <Stack gap="md">
-          {tokenForm(form, setForm)}
-          <Divider />
-          {/* Summary */}
-          <Paper withBorder p="xs" bg="var(--mantine-color-default-hover)">
-            <Text size="xs" fw={600} mb={4}>Ringkasan token:</Text>
-            <Group gap="xs" wrap="wrap">
-              <Badge size="xs" color={form.canWrite ? 'orange' : 'blue'} variant="light" leftSection={form.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
-                {form.canWrite ? 'read-write' : 'read-only'}
-              </Badge>
-              <Badge size="xs" color="primary" variant="light">
-                {form.scopes.length === 0 ? 'semua project' : `${form.scopes.length} scope`}
-              </Badge>
-              <Badge size="xs" color={form.expiresAt ? 'teal' : 'gray'} variant="light" leftSection={<TbCalendar size={9} />}>
-                {form.expiresAt ? `exp: ${new Date(form.expiresAt).toLocaleDateString('id-ID')}` : 'tidak ada expiry'}
-              </Badge>
-            </Group>
-          </Paper>
-          <Button
-            fullWidth
-            size="md"
-            leftSection={<TbKey size={16} />}
-            variant="gradient"
-           
-            onClick={() => createToken.mutate(form)}
-            loading={createToken.isPending}
-            disabled={!form.name.trim() || createToken.isPending}
-          >
-            {form.name ? `Buat token "${form.name}"` : 'Buat Token'}
-          </Button>
-          {createToken.isError && <Text size="xs" c="red">{(createToken.error as Error).message}</Text>}
-        </Stack>
-      </Modal>
 
       {/* ─── Edit modal ─────────────────────── */}
       <Modal

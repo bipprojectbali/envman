@@ -1,27 +1,14 @@
-import { Box, Container, Group, Stack, Text, ThemeIcon, Title } from '@mantine/core'
-import { createLazyFileRoute } from '@tanstack/react-router'
-import { TbDatabaseExport } from 'react-icons/tb'
-import { BackupPanelContent } from '@/frontend/components/dev/PortainerBackupPanel'
+import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 export const Route = createLazyFileRoute('/envmanager/portainer-backup')({
-  component: PortainerBackupPage,
+  component: PortainerBackupRedirect,
 })
 
-function PortainerBackupPage() {
-  return (
-    <Container size="md">
-      <Stack gap="lg">
-        <Group gap="sm">
-          <ThemeIcon size={44} variant="light" color="cyan" radius="md">
-            <TbDatabaseExport size={22} />
-          </ThemeIcon>
-          <Box>
-            <Title order={3}>Portainer Backup</Title>
-            <Text size="sm" c="dimmed">Backup database dan compose files dari Portainer connections.</Text>
-          </Box>
-        </Group>
-        <BackupPanelContent />
-      </Stack>
-    </Container>
-  )
+function PortainerBackupRedirect() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    navigate({ to: '/envmanager/connections', search: { tab: 'backup' }, replace: true })
+  }, [navigate])
+  return null
 }

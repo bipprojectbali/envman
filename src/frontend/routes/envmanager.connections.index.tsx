@@ -15,6 +15,7 @@ import {
   SimpleGrid,
   Skeleton,
   Stack,
+  Tabs,
   Text,
   TextInput,
   ThemeIcon,
@@ -38,13 +39,18 @@ import {
   TbPlus,
   TbSearch,
   TbTrash,
+  TbDatabaseExport,
   TbX,
 } from 'react-icons/tb'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { BackupPanelContent } from '@/frontend/components/dev/PortainerBackupPanel'
 
 export const Route = createFileRoute('/envmanager/connections/')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) === 'backup' ? 'backup' as const : 'connections' as const,
+  }),
   component: ConnectionsPage,
 })
 
@@ -96,6 +102,7 @@ function ConnectionsPage() {
   const { data: sessionData } = useSession()
   const canViewConnections = hasCapability(sessionData?.user, 'connection:view')
   const canManageConnections = sessionData?.user?.role === 'SUPER_ADMIN'
+  const { tab } = Route.useSearch()
 
   const [modalOpen, { open, close }] = useDisclosure(false)
   const [editTarget, setEditTarget] = useState<Connection | null>(null)
@@ -246,7 +253,14 @@ function ConnectionsPage() {
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
-      {/* ─── Header ─────────────────────────── */}
+      <Tabs value={tab} onChange={(v) => navigate({ to: '/envmanager/connections', search: { tab: (v ?? 'connections') as 'connections' | 'backup' } })}>
+        <Tabs.List mb="md">
+          <Tabs.Tab value="connections" leftSection={<TbPlugConnected size={14} />}>Connections</Tabs.Tab>
+          <Tabs.Tab value="backup" leftSection={<TbDatabaseExport size={14} />}>Backup</Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel value="connections">
+          {/* ─── Header ─────────────────────────── */}
       <Group justify="space-between" mb="md" wrap="nowrap" align="flex-start">
         <Group gap="sm" style={{ minWidth: 0 }}>
           <ThemeIcon size={38} radius="md" variant="light" color="primary">
@@ -505,6 +519,12 @@ function ConnectionsPage() {
           </Group>
         </Stack>
       </Modal>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="backup" pt="xs">
+          <BackupPanelContent />
+        </Tabs.Panel>
+      </Tabs>
     </Box>
   )
 }

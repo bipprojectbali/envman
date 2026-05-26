@@ -573,123 +573,112 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
         /* ─── Configured ────────────────────────────────── */
         <Card withBorder radius="md" p={0} style={{ overflow: 'hidden' }}>
           {/* Header — stack info + status */}
-          <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
-            <Stack gap="xs">
-              {/* Row 1: icon + name + status badges + manage icons */}
-              <Group justify="space-between" wrap="nowrap" gap="sm">
-                <Group gap="sm" style={{ minWidth: 0, flex: 1 }}>
-                  <ThemeIcon
-                    size={36} radius="md" variant="light"
-                    color={syncStatus === 'failed' ? 'red' : syncStatus === 'success' ? 'teal' : 'gray'}
-                  >
-                    {syncStatus === 'failed' ? <TbX size={18} /> : <TbCloud size={18} />}
-                  </ThemeIcon>
-                  <Box style={{ minWidth: 0, flex: 1 }}>
-                    <Group gap="xs" mb={2} wrap="nowrap">
-                      <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {config.stackName}
-                      </Text>
-                      {syncStatus === 'success' && (
-                        <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={9} />}>Synced</Badge>
-                      )}
-                      {syncStatus === 'failed' && (
-                        <Badge size="xs" color="red" variant="light" leftSection={<TbX size={9} />}>Failed</Badge>
-                      )}
-                      {syncStatus === 'never' && (
-                        <Badge size="xs" color="gray" variant="outline">Belum sync</Badge>
-                      )}
-                    </Group>
-                    <Group gap={4} wrap="wrap">
-                      {config.connectionName && (
-                        <Badge size="xs" variant="dot" color="primary" leftSection={<TbPlugConnected size={9} />}>
-                          {config.connectionName}
-                        </Badge>
-                      )}
-                      <Badge size="xs" variant="outline" color="gray">ep#{config.endpointId}</Badge>
-                      <Badge size="xs" variant="outline" color="gray">stack#{config.stackId}</Badge>
-                    </Group>
-                  </Box>
-                </Group>
-
-                {/* Manage icons — edit & delete only */}
-                <Group gap={4} wrap="nowrap">
-                  {sync.isError && (
-                    <Tooltip label={(sync.error as Error).message} position="left" multiline maw={260}>
-                      <Badge size="xs" color="red" variant="light" leftSection={<TbAlertTriangle size={10} />} style={{ cursor: 'help' }}>error</Badge>
-                    </Tooltip>
-                  )}
-                  {canEdit && (
-                    <>
-                      <Tooltip label="Edit konfigurasi">
-                        <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEdit(config!)}>
-                          <TbPencil size={14} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Hapus koneksi">
-                        <ActionIcon size="sm" variant="subtle" color="red" onClick={deleteConfig}>
-                          <TbTrash size={14} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </>
-                  )}
-                </Group>
+          <Box p="sm" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
+            {/* Row 1: stack name + status + manage icons */}
+            <Group justify="space-between" wrap="nowrap" gap="sm" mb={6}>
+              <Group gap="xs" style={{ minWidth: 0, flex: 1 }} wrap="nowrap">
+                <TbCloud
+                  size={15}
+                  style={{
+                    flexShrink: 0,
+                    color: syncStatus === 'failed' ? 'var(--mantine-color-red-5)'
+                      : syncStatus === 'success' ? 'var(--mantine-color-teal-5)'
+                      : 'var(--mantine-color-dimmed)',
+                  }}
+                />
+                <Text fw={600} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {config.stackName}
+                </Text>
+                {syncStatus === 'success' && <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={9} />}>synced</Badge>}
+                {syncStatus === 'failed' && <Badge size="xs" color="red" variant="light" leftSection={<TbX size={9} />}>failed</Badge>}
+                {syncStatus === 'never' && <Badge size="xs" color="gray" variant="outline">belum sync</Badge>}
               </Group>
-
-              {/* Row 2: action buttons — can wrap on narrow panels */}
-              {canEdit && (
-                <Group gap="xs" wrap="wrap">
-                  <Button
-                    size="xs" variant="subtle" color="gray"
-                    leftSection={<TbPlug size={12} />}
-                    onClick={() => openDiff()}
-                  >
-                    Diff
-                  </Button>
-                  <Tooltip label="Pull image terbaru & restart container">
-                    <Button
-                      size="xs" variant="light" color="blue"
-                      leftSection={<TbRefreshDot size={12} />}
-                      loading={repull.isPending}
-                      disabled={!config?.connectionId}
-                      onClick={confirmRepull}
-                    >
-                      Repull
-                    </Button>
+              <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+                {sync.isError && (
+                  <Tooltip label={(sync.error as Error).message} position="left" multiline maw={260}>
+                    <TbAlertTriangle size={14} style={{ color: 'var(--mantine-color-red-5)', cursor: 'help' }} />
                   </Tooltip>
-                  <Tooltip label="Stop → start ulang container (tanpa pull)">
-                    <Button
-                      size="xs" variant="light" color="orange"
-                      leftSection={<TbRefresh size={12} />}
-                      loading={recreate.isPending}
-                      disabled={!config?.connectionId}
-                      onClick={confirmRecreate}
-                    >
-                      Recreate
-                    </Button>
-                  </Tooltip>
-                  {!!config?.connectionId && (
-                    <Tooltip label="Edit compose file">
-                      <Button
-                        size="xs" variant="light" color="violet"
-                        leftSection={<TbCode size={12} />}
-                        onClick={openCompose}
-                      >
-                        Compose
-                      </Button>
+                )}
+                {canEdit && (
+                  <>
+                    <Tooltip label="Edit konfigurasi">
+                      <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => openEdit(config!)}>
+                        <TbPencil size={13} />
+                      </ActionIcon>
                     </Tooltip>
-                  )}
+                    <Tooltip label="Hapus koneksi">
+                      <ActionIcon size="xs" variant="subtle" color="red" onClick={deleteConfig}>
+                        <TbTrash size={13} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </>
+                )}
+              </Group>
+            </Group>
+
+            {/* Row 2: meta info as single dimmed text line */}
+            <Text size="xs" c="dimmed" mb={canEdit ? 8 : 0}>
+              {[
+                config.connectionName,
+                `ep#${config.endpointId}`,
+                `stack#${config.stackId}`,
+              ].filter(Boolean).join(' · ')}
+            </Text>
+
+            {/* Row 3: action buttons */}
+            {canEdit && (
+              <Group gap={6} wrap="wrap">
+                <Button
+                  size="compact-xs" variant="subtle" color="gray"
+                  leftSection={<TbPlug size={11} />}
+                  onClick={() => openDiff()}
+                >
+                  Diff
+                </Button>
+                <Tooltip label="Pull image terbaru & restart container">
                   <Button
-                    size="xs" color="primary"
-                    variant={sync.isPending ? 'filled' : 'light'}
-                    leftSection={sync.isPending ? <Loader size={10} color="white" /> : <TbCloudUpload size={12} />}
-                    onClick={confirmSync}
-                    loading={sync.isPending}
+                    size="compact-xs" variant="light" color="blue"
+                    leftSection={<TbRefreshDot size={11} />}
+                    loading={repull.isPending}
+                    disabled={!config?.connectionId}
+                    onClick={confirmRepull}
                   >
-                    Sync Vars
+                    Repull
                   </Button>
-                </Group>
-              )}
-            </Stack>
+                </Tooltip>
+                <Tooltip label="Stop → start ulang container (tanpa pull)">
+                  <Button
+                    size="compact-xs" variant="light" color="orange"
+                    leftSection={<TbRefresh size={11} />}
+                    loading={recreate.isPending}
+                    disabled={!config?.connectionId}
+                    onClick={confirmRecreate}
+                  >
+                    Recreate
+                  </Button>
+                </Tooltip>
+                {!!config?.connectionId && (
+                  <Tooltip label="Edit compose file">
+                    <Button
+                      size="compact-xs" variant="light" color="violet"
+                      leftSection={<TbCode size={11} />}
+                      onClick={openCompose}
+                    >
+                      Compose
+                    </Button>
+                  </Tooltip>
+                )}
+                <Button
+                  size="compact-xs" color="primary"
+                  variant={sync.isPending ? 'filled' : 'light'}
+                  leftSection={sync.isPending ? <Loader size={9} color="white" /> : <TbCloudUpload size={11} />}
+                  onClick={confirmSync}
+                  loading={sync.isPending}
+                >
+                  Sync Vars
+                </Button>
+              </Group>
+            )}
           </Box>
 
           {/* Body */}

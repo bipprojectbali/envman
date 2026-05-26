@@ -270,7 +270,7 @@ function OverviewPage() {
           sub={tokens.length > activeTokens.length ? `${tokens.length - activeTokens.length} inactive` : 'semua aktif'}
           color="orange"
           loading={loadingTokens}
-          onClick={() => navigate({ to: '/envmanager/tokens' })}
+          onClick={() => navigate({ to: '/envmanager/tokens', search: { token: undefined, edit: undefined } })}
         />
         <StatCard
           icon={TbPlugConnected}
@@ -279,7 +279,7 @@ function OverviewPage() {
           sub="Portainer instance"
           color="teal"
           loading={loadingConnections}
-          onClick={() => navigate({ to: '/envmanager/connections' })}
+          onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections' } })}
         />
         <StatCard
           icon={TbBrandGithub}
@@ -288,7 +288,7 @@ function OverviewPage() {
           sub={publicGists.length > 0 ? `${publicGists.length} public` : 'semua private'}
           color="grape"
           loading={loadingGists}
-          onClick={() => navigate({ to: '/envmanager/gists' })}
+          onClick={() => navigate({ to: '/envmanager/gists', search: { gist: undefined, edit: undefined } })}
         />
         <StatCard
           icon={TbNote}
@@ -393,7 +393,7 @@ function OverviewPage() {
                 <Text fw={600} size="sm">Gists Terbaru</Text>
               </Group>
               <Button size="compact-xs" variant="subtle" color="grape" rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/gists' })}>
+                onClick={() => navigate({ to: '/envmanager/gists', search: { gist: undefined, edit: undefined } })}>
                 Lihat semua
               </Button>
             </Group>
@@ -409,8 +409,8 @@ function OverviewPage() {
                     key={g.id} justify="space-between" p="xs" gap="sm"
                     className="envman-overview-row"
                     role="link" tabIndex={0}
-                    onClick={() => navigate({ to: '/envmanager/gists' })}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate({ to: '/envmanager/gists' }) } }}
+                    onClick={() => navigate({ to: '/envmanager/gists', search: { gist: g.id, edit: undefined } })}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate({ to: '/envmanager/gists', search: { gist: g.id, edit: undefined } }) } }}
                     style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
                   >
                     <Group gap="xs" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
@@ -449,7 +449,7 @@ function OverviewPage() {
                 <Text fw={600} size="sm">API Tokens</Text>
               </Group>
               <Button size="compact-xs" variant="subtle" color="orange" rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/tokens' })}>
+                onClick={() => navigate({ to: '/envmanager/tokens', search: { token: undefined, edit: undefined } })}>
                 Kelola
               </Button>
             </Group>
@@ -516,7 +516,7 @@ function OverviewPage() {
                 <Text fw={600} size="sm">Portainer Connections</Text>
               </Group>
               <Button size="compact-xs" variant="subtle" color="teal" rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/connections' })}>
+                onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections' } })}>
                 Kelola
               </Button>
             </Group>

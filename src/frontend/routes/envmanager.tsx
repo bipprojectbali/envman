@@ -5,6 +5,7 @@ import {
   Badge,
   Box,
   Burger,
+  Container,
   Divider,
   Group,
   Menu,
@@ -24,7 +25,6 @@ import {
   TbBrandGithub,
   TbChevronUp,
   TbDatabase,
-  TbDatabaseExport,
   TbHome,
   TbKey,
   TbLayoutDashboard,
@@ -101,8 +101,7 @@ function EnvManagerLayout() {
   const isGists = pathname.startsWith('/envmanager/gists')
   const isDatabase = pathname.startsWith('/envmanager/database')
   const isUsers = pathname.startsWith('/envmanager/users')
-  const isPortainerBackup = pathname.startsWith('/envmanager/portainer-backup')
-  const isProjectsActive = !isOverview && !isTokens && !isConnections && !isReadme && !isGists && !isDatabase && !isUsers && !isPortainerBackup
+  const isProjectsActive = !isOverview && !isTokens && !isConnections && !isReadme && !isGists && !isDatabase && !isUsers
 
   const mainNav = [
     ...(hasCapability(user, 'menu:overview')
@@ -111,9 +110,6 @@ function EnvManagerLayout() {
     { label: 'Projects', description: 'Kelola environment vars', icon: TbVariable, href: '/envmanager', active: isProjectsActive },
     ...(hasCapability(user, 'menu:tokens')
       ? [{ label: 'Tokens', description: 'API token untuk CLI', icon: TbKey, href: '/envmanager/tokens', active: isTokens }]
-      : []),
-    ...(hasCapability(user, 'menu:connections') && portainerEnabled
-      ? [{ label: 'Connections', description: 'Portainer instances', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections }]
       : []),
     ...(hasCapability(user, 'menu:gists')
       ? [{ label: 'Gists', description: 'Snippets & konfigurasi', icon: TbBrandGithub, href: '/envmanager/gists', active: isGists }]
@@ -137,7 +133,7 @@ function EnvManagerLayout() {
 
   const extensionsNav = [
     ...(portainerEnabled && user?.role === 'SUPER_ADMIN'
-      ? [{ label: 'Portainer', description: 'Backup & jadwal', icon: TbDatabaseExport, href: '/envmanager/portainer-backup', active: isPortainerBackup }]
+      ? [{ label: 'Portainer', description: 'Connections & backup', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections }]
       : []),
   ]
 
@@ -609,7 +605,9 @@ function EnvManagerLayout() {
       </AppShell.Navbar>
 
       <AppShell.Main style={{ paddingBottom: isMobile ? 'calc(64px + env(safe-area-inset-bottom))' : undefined }}>
-        <Outlet />
+        <Container size="xl" px={0}>
+          <Outlet />
+        </Container>
       </AppShell.Main>
 
       {/* ─── Mobile bottom tab bar ──────── */}
