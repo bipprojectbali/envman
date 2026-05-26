@@ -1,8 +1,7 @@
 import {
-  ActionIcon, Badge, Box, Button, Checkbox, Chip, Code, Drawer, Group, Loader, Pagination,
-  Select, Stack, Table, Tabs, Text, Textarea, TextInput, ThemeIcon, Tooltip,
+  ActionIcon, Badge, Box, Button, Checkbox, Chip, Code, Group, Loader, Pagination,
+  Select, Stack, Table, Tabs, Text, Textarea, TextInput, Tooltip,
 } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
@@ -482,7 +481,7 @@ function HistoryTab({ connId }: { connId: string }) {
 
 // ─── Main panel ────────────────────────────────────────────────────────────
 
-function BackupPanelContent() {
+export function BackupPanelContent() {
   const connectionsQ = useQuery<{ connections: Connection[] }>({
     queryKey: ['portainer', 'connections'],
     queryFn: () => apiFetch('/api/envman/portainer/connections'),
@@ -521,33 +520,3 @@ function BackupPanelContent() {
   )
 }
 
-export function PortainerBackupButton() {
-  const [opened, { open, close }] = useDisclosure(false)
-  return (
-    <>
-      <Box
-        component="span"
-        onClick={open}
-        style={{ textDecoration: 'underline', cursor: 'pointer', fontSize: 'var(--mantine-font-size-xs)', color: 'var(--mantine-color-cyan-6)' }}
-      >
-        Kelola backup
-      </Box>
-      <Drawer
-        opened={opened}
-        onClose={close}
-        title={
-          <Group gap="xs">
-            <ThemeIcon size={28} variant="light" color="cyan" radius="md">
-              <TbDatabaseExport size={15} />
-            </ThemeIcon>
-            <Text fw={700} size="sm">Portainer Backup</Text>
-          </Group>
-        }
-        size="lg"
-        position="right"
-      >
-        <BackupPanelContent />
-      </Drawer>
-    </>
-  )
-}

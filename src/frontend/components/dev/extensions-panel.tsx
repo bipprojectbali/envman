@@ -2,7 +2,6 @@ import { Badge, Box, Container, Group, Paper, Stack, Switch, Text, ThemeIcon, Ti
 import { TbPlugConnected, TbPlugOff } from 'react-icons/tb'
 import { notifyErr } from '@/frontend/lib/notify'
 import { useExtensions, useUpdateExtensions } from '@/frontend/hooks/useExtensions'
-import { PortainerBackupButton } from './PortainerBackupPanel'
 
 const EXTENSIONS_META = [
   {
@@ -64,7 +63,7 @@ export function ExtensionsPanel() {
                       <Text size="xs" c="dimmed" style={{ lineHeight: 1.5 }}>
                         {ext_meta.description}
                       </Text>
-                      {enabled && (ext_meta.links.length > 0 || ext_meta.key === 'portainer') && (
+                      {enabled && ext_meta.links.length > 0 && (
                         <Group gap="xs" mt={6}>
                           {ext_meta.links.map((link) => (
                             <Text
@@ -78,7 +77,6 @@ export function ExtensionsPanel() {
                               {link.label}
                             </Text>
                           ))}
-                          {ext_meta.key === 'portainer' && <PortainerBackupButton />}
                         </Group>
                       )}
                     </Box>

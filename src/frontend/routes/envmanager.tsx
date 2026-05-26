@@ -24,6 +24,7 @@ import {
   TbBrandGithub,
   TbChevronUp,
   TbDatabase,
+  TbDatabaseExport,
   TbHome,
   TbKey,
   TbLayoutDashboard,
@@ -100,7 +101,8 @@ function EnvManagerLayout() {
   const isGists = pathname.startsWith('/envmanager/gists')
   const isDatabase = pathname.startsWith('/envmanager/database')
   const isUsers = pathname.startsWith('/envmanager/users')
-  const isProjectsActive = !isOverview && !isTokens && !isConnections && !isReadme && !isGists && !isDatabase && !isUsers
+  const isPortainerBackup = pathname.startsWith('/envmanager/portainer-backup')
+  const isProjectsActive = !isOverview && !isTokens && !isConnections && !isReadme && !isGists && !isDatabase && !isUsers && !isPortainerBackup
 
   const mainNav = [
     ...(hasCapability(user, 'menu:overview')
@@ -131,6 +133,12 @@ function EnvManagerLayout() {
       : []),
     ...(user?.role === 'SUPER_ADMIN' ? [{ label: 'Dev Console', icon: TbCode, href: '/dev', active: false }] : []),
     { label: 'Docs', icon: TbBook, href: '/envmanager/docs', active: isReadme },
+  ]
+
+  const extensionsNav = [
+    ...(portainerEnabled && user?.role === 'SUPER_ADMIN'
+      ? [{ label: 'Portainer', description: 'Backup & jadwal', icon: TbDatabaseExport, href: '/envmanager/portainer-backup', active: isPortainerBackup }]
+      : []),
   ]
 
   // Bottom tab items untuk mobile — visible berdasarkan capability
@@ -415,6 +423,60 @@ function EnvManagerLayout() {
                   <Text size="sm" fw={item.active ? 600 : 500} c={item.active ? 'violet' : 'dimmed'}>{item.label}</Text>
                 </UnstyledButton>
               )
+            )}
+
+            {/* Extensions group — hanya muncul jika ada item aktif */}
+            {extensionsNav.length > 0 && (
+              <>
+                {!collapsed ? (
+                  <Text size="xs" c="dimmed" fw={700} tt="uppercase" mt="md" mb={4} px={4} style={{ letterSpacing: '0.08em' }}>
+                    Extensions
+                  </Text>
+                ) : (
+                  <Divider my="xs" />
+                )}
+                {extensionsNav.map(item =>
+                  collapsed ? (
+                    <Tooltip key={item.href} label={item.label} position="right" withArrow>
+                      <UnstyledButton
+                        onClick={() => { navigate({ to: item.href }); closeMobile() }}
+                        style={{
+                          width: '100%', height: 40,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          borderRadius: 8,
+                          background: item.active ? 'var(--mantine-color-cyan-light)' : undefined,
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
+                        onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                      >
+                        <item.icon size={16} color={item.active ? 'var(--mantine-color-cyan-6)' : 'var(--mantine-color-dimmed)'} />
+                      </UnstyledButton>
+                    </Tooltip>
+                  ) : (
+                    <UnstyledButton
+                      key={item.href}
+                      onClick={() => { navigate({ to: item.href }); closeMobile() }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 10px', minHeight: 38, borderRadius: 8,
+                        background: item.active ? 'var(--mantine-color-cyan-light)' : undefined,
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
+                      onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                    >
+                      <ThemeIcon size={26} variant={item.active ? 'light' : 'subtle'} color={item.active ? 'cyan' : 'gray'} radius="md">
+                        <item.icon size={13} />
+                      </ThemeIcon>
+                      <Box style={{ flex: 1, minWidth: 0 }}>
+                        <Text size="sm" fw={item.active ? 600 : 500} c={item.active ? 'cyan' : 'dimmed'} lh={1.2} truncate>{item.label}</Text>
+                        <Text size="xs" c="dimmed" lh={1.2} mt={1} truncate>{item.description}</Text>
+                      </Box>
+                    </UnstyledButton>
+                  )
+                )}
+              </>
             )}
           </Stack>
         </AppShell.Section>
