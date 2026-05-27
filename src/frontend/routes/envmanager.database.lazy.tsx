@@ -95,7 +95,7 @@ function GenerateTokenSection() {
   }, [tokenResp])
 
   return (
-    <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+    <Box p="md" >
       <Stack gap="sm">
         <Group gap="xs">
           <ThemeIcon size={28} variant="light" color="primary" radius="md">
@@ -195,7 +195,7 @@ function SyncFromSection() {
   }
 
   return (
-    <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+    <Box p="md" >
       <Stack gap="sm">
         <Group gap="xs">
           <ThemeIcon size={28} variant="light" color="teal" radius="md">

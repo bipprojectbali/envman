@@ -258,7 +258,7 @@ export function TokenCard({
       <Box
         p="sm"
         className={cardClass}
-        style={{ ...cardStyle, border: isExpired ? '1px solid var(--mantine-color-red-3)' : '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+        style={{ ...cardStyle, borderBottom: '1px solid var(--mantine-color-default-border)' }}
         onClick={onCardClick}
       >
         <Group justify="space-between" wrap="nowrap" gap="sm">
@@ -294,10 +294,10 @@ export function TokenCard({
     <Box
       p={0}
       className={cardClass}
-      style={{ ...cardStyle, border: isExpired ? '1px solid var(--mantine-color-red-3)' : '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-lg)' }}
+      style={{ ...cardStyle, borderBottom: '1px solid var(--mantine-color-default-border)' }}
       onClick={onCardClick}
     >
-      <Box p="sm">
+      <Box p="sm" >
         <Group justify="space-between" mb={8} wrap="nowrap">
           <Group gap={6} align="center">
             <ThemeIcon size={28} radius="md" variant="light" color={accentColor}>

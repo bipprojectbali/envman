@@ -605,8 +605,8 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
   const searchRef = useRef<HTMLInputElement>(null)
 
   const [search, setSearch] = useState('')
-  const [tagFilter, setTagFilter] = useState<string[]>([])
-  const [sort, setSort] = useState<'updated' | 'created'>('updated')
+  const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: `envman:files:${slug}:tagFilter`, defaultValue: [] })
+  const [sort, setSort] = useLocalStorage<'updated' | 'created'>({ key: `envman:files:${slug}:sort`, defaultValue: 'updated' })
   const [view, setView] = useLocalStorage<'list' | 'grid'>({ key: `envman:files:${slug}:view`, defaultValue: 'list' })
   const [formOpen, { open: openForm, close: closeForm }] = useDisclosure(false)
   const [editingFile, setEditingFile] = useState<ProjectFile | null>(null)
@@ -732,7 +732,7 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
           </Box>
         </Group>
         {canEdit && (
-          <Button type="button" size="sm" color="blue" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+          <Button variant="light" type="button" size="sm" color="blue" leftSection={<TbPlus size={14} />} onClick={openCreate}>
             New File
           </Button>
         )}
@@ -827,7 +827,7 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
           </ThemeIcon>
           <Text fw={500} size="sm" mb={4}>Tidak ada file yang cocok</Text>
           <Text size="xs" c="dimmed" mb="sm">Coba ubah filter atau kata kunci pencarian.</Text>
-          <Button type="button" size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={resetFilter}>Reset filter</Button>
+          <Button type="button" size="xs" variant="light" leftSection={<TbX size={11} />} onClick={resetFilter}>Reset filter</Button>
         </Box>
       )}
 

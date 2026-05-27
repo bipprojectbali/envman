@@ -254,8 +254,8 @@ function EnvManagerLayout() {
                   <Box style={{ position: 'relative', flexShrink: 0 }}>
                     <ThemeIcon
                       size={38}
-                      variant="gradient"
-                     
+                      variant="light"
+                      color="violet"
                       radius="md"
                     >
                       <TbVariable size={20} />
@@ -331,18 +331,15 @@ function EnvManagerLayout() {
                     padding: '10px 10px',
                     minHeight: 46,
                     borderRadius: 10,
-                    background: item.active
-                      ? 'linear-gradient(135deg, var(--mantine-color-violet-light), var(--mantine-color-grape-light))'
-                      : undefined,
                     transition: 'all 0.15s ease',
                   }}
-                  onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
-                  onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '' }}
                 >
                   <ThemeIcon
                     size={34}
-                    variant={item.active ? 'gradient' : 'subtle'}
-                    color={item.active ? undefined : 'gray'}
+                    variant="subtle"
+                    color={item.active ? 'violet' : 'gray'}
                     radius="md"
                   >
                     <item.icon size={16} />

@@ -6,7 +6,6 @@ import {
   Button,
   Group,
   SegmentedControl,
-  SimpleGrid,
   Skeleton,
   Stack,
   Table,
@@ -17,6 +16,7 @@ import {
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
+import { useLocalStorage } from '@mantine/hooks'
 import { useMemo, useState } from 'react'
 import {
   TbBan,
@@ -41,7 +41,7 @@ function UsersPage() {
   const { user: selectedUserId } = Route.useSearch()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState<GlobalRole | 'ALL'>('ALL')
+  const [roleFilter, setRoleFilter] = useLocalStorage<GlobalRole | 'ALL'>({ key: 'envman:users:roleFilter', defaultValue: 'ALL' })
 
   const { data, isLoading } = useQuery<{ users: UserSummary[] }>({
     queryKey: ['admin', 'envman-users'],
@@ -158,26 +158,7 @@ function UsersPage() {
         </Group>
       </Group>
 
-      {/* Stats */}
-      {!isLoading && users.length > 0 && (
-        <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
-          {[
-            { label: 'Total', value: stats.total, color: undefined },
-            { label: 'Active', value: stats.active, color: 'teal' as const },
-            { label: 'Blocked', value: stats.blocked, color: stats.blocked > 0 ? 'red' as const : undefined },
-            { label: 'Admin+', value: stats.adminPlus, color: stats.adminPlus > 0 ? 'violet' as const : undefined },
-          ].map(s => (
-            <Box key={s.label} p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
-              <Text size="xs" c="dimmed" mb={2}>{s.label}</Text>
-              <Text size="xl" fw={700} c={s.color ?? (s.value === 0 ? 'dimmed' : undefined)}>
-                {s.value}
-              </Text>
-            </Box>
-          ))}
-        </SimpleGrid>
-      )}
-
-      {/* Search + role filter */}
+{/* Search + role filter */}
       <Stack gap="xs">
         <TextInput
           size="sm"
@@ -198,6 +179,7 @@ function UsersPage() {
           value={roleFilter}
           onChange={(v) => setRoleFilter(v as GlobalRole | 'ALL')}
           radius="md"
+          style={{ width: 'fit-content' }}
           data={([
             { value: 'ALL', label: 'All' },
             { value: 'USER', label: 'User' },
@@ -221,7 +203,7 @@ function UsersPage() {
       </Stack>
 
       {/* Table */}
-      <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden' }}>
+      <Box style={{  overflow: 'hidden' }}>
         {isLoading ? (
           <Stack gap={0}>
             {Array.from({ length: 5 }).map((_, i) => (

@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
@@ -399,6 +400,18 @@ function ProjectListPage() {
           )}
         </Group>
       </Group>
+
+      {/* Info */}
+      {!isLoading && !isError && (
+        <Alert variant="light" color="violet" mb="md" p="sm" radius="md" icon={<TbFolders size={16} />}>
+          <Text size="sm" fw={500} mb={4}>Apa itu Projects?</Text>
+          <Text size="xs" c="dimmed" lh={1.6}>
+            Projects adalah unit kerja utama — setiap project punya beberapa <strong>environment</strong> (mis. <Code fz="xs">dev</Code>, <Code fz="xs">staging</Code>, <Code fz="xs">production</Code>) yang masing-masing menyimpan <strong>env vars</strong>.
+            Member bisa di-assign sebagai <strong>Owner</strong>, <strong>Editor</strong>, atau <strong>Viewer</strong>.
+            Gunakan <Kbd size="xs">K</Kbd> atau <Kbd size="xs">/</Kbd> untuk cari cepat, pin project favorit, dan filter berdasarkan tag atau status aktif.
+          </Text>
+        </Alert>
+      )}
 
       {/* ─── Toolbar ─── */}
       {!isLoading && !isError && projects.length > 0 && (
@@ -942,11 +955,9 @@ function EditProjectModal({
 
 function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onToggleActive, onTagClick, onClick }: CardProps) {
   const color = roleColor[p.myRole]
-  const bg = isPinned
-    ? 'color-mix(in srgb, var(--mantine-color-violet-3) 12%, var(--mantine-color-body))'
-    : !p.isActive
-      ? 'color-mix(in srgb, var(--mantine-color-gray-3) 15%, var(--mantine-color-body))'
-      : undefined
+  const borderColor = isPinned
+    ? 'color-mix(in srgb, var(--mantine-color-violet-4) 50%, var(--mantine-color-default-border))'
+    : 'var(--mantine-color-default-border)'
   return (
     <Box
       p="md"
@@ -955,7 +966,7 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
       aria-label={`Buka project ${p.name}`}
       onClick={onClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      style={{ borderRadius: 'var(--mantine-radius-lg)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer', display: 'flex', flexDirection: 'column', background: bg }}
+      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
     >
       {/* Top: avatar + badges + actions */}
       <Group justify="space-between" mb="sm" wrap="nowrap" align="flex-start">
@@ -1065,11 +1076,9 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
 
 function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onToggleActive, onTagClick, onClick }: CardProps) {
   const color = roleColor[p.myRole]
-  const bg = isPinned
-    ? 'color-mix(in srgb, var(--mantine-color-violet-3) 12%, var(--mantine-color-body))'
-    : !p.isActive
-      ? 'color-mix(in srgb, var(--mantine-color-gray-3) 15%, var(--mantine-color-body))'
-      : undefined
+  const borderColor = isPinned
+    ? 'color-mix(in srgb, var(--mantine-color-violet-4) 50%, var(--mantine-color-default-border))'
+    : 'var(--mantine-color-default-border)'
   return (
     <Box
       p="sm"
@@ -1078,7 +1087,7 @@ function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
       aria-label={`Buka project ${p.name}`}
       onClick={onClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer', background: bg }}
+      style={{ cursor: 'pointer', borderBottom: '1px solid var(--mantine-color-default-border)' }}
     >
       <Group justify="space-between" wrap="nowrap" gap="sm" align="flex-start">
         {/* Left: avatar + info */}

@@ -677,11 +677,11 @@ function ProjectDetailPage() {
 
             {/* Add environment */}
             {canEdit && (
-              <Box p="sm" mt="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+              <Box p="sm" mt="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)', width: 'fit-content' }}>
                 <Stack gap="xs">
                   <Text size="xs" fw={500} c="dimmed">Tambah environment</Text>
                   <Group gap="xs" align="flex-start" wrap="nowrap">
-                    <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Box style={{ minWidth: 220 }}>
                       <TextInput
                         size="sm"
                         placeholder="production, staging-eu, dev-alice..."

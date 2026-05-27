@@ -560,7 +560,7 @@ function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, 
       aria-label={`Buka connection ${c.name}`}
       onClick={onOpen}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
-      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', border: '1px solid var(--mantine-color-default-border)' }}
+      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column'}}
     >
       <Group justify="space-between" mb="xs" wrap="nowrap">
         <ThemeIcon size={40} radius="md" variant="light" color="primary">
@@ -630,7 +630,7 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
       aria-label={`Buka connection ${c.name}`}
       onClick={onOpen}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
-      style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)' }}
+      style={{ cursor: 'pointer', borderBottom: '1px solid var(--mantine-color-default-border)' }}
     >
       <Group justify="space-between" wrap="nowrap">
         <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>

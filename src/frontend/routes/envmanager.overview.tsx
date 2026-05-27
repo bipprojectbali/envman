@@ -91,10 +91,10 @@ function ProjectInitial({ name }: { name: string }) {
   return (
     <Box style={{
       width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-      background: 'var(--mantine-color-blue-6)',
+      background: 'color-mix(in srgb, var(--mantine-color-blue-5) 25%, transparent)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      <Text size="xs" fw={800} c="white" lh={1}>{initial}</Text>
+      <Text size="xs" fw={800} c="blue" lh={1}>{initial}</Text>
     </Box>
   )
 }

@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   Button,
@@ -541,7 +542,7 @@ function GistCard({
       aria-label={`Buka gist ${gist.title}`}
       onClick={onView}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
-      style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)' }}
+      style={{ cursor: 'pointer', borderBottom: '1px solid var(--mantine-color-default-border)' }}
     >
       <Group justify="space-between" wrap="nowrap" mb={4}>
         <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
@@ -802,9 +803,9 @@ function GistsPage() {
   const isMobile = useMediaQuery('(max-width: 48em)')
 
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'mine' | 'public' | 'private'>('all')
-  const [tagFilter, setTagFilter] = useState<string[]>([])
-  const [sort, setSort] = useState<'updated' | 'created'>('updated')
+  const [filter, setFilter] = useLocalStorage<'all' | 'mine' | 'public' | 'private'>({ key: 'envman:gists:filter', defaultValue: 'all' })
+  const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: 'envman:gists:tagFilter', defaultValue: [] })
+  const [sort, setSort] = useLocalStorage<'updated' | 'created'>({ key: 'envman:gists:sort', defaultValue: 'updated' })
   const [view, setView] = useLocalStorage<'list' | 'grid'>({ key: 'envman:gists:view', defaultValue: 'list' })
   const [debouncedSearch] = useDebouncedValue(search, 150)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -1025,6 +1026,19 @@ function GistsPage() {
           </Button>
         )}
       </Group>
+
+      {/* Info */}
+      {!isLoading && (
+        <Alert variant="light" color="blue" mb="md" p="sm" radius="md" icon={<TbBrandGithub size={16} />}>
+          <Text size="sm" fw={500} mb={4}>Apa itu Gists?</Text>
+          <Text size="xs" c="dimmed" lh={1.6}>
+            Gists adalah tempat menyimpan <strong>snippet, config, atau script</strong> yang bisa diakses oleh tim.
+            Setiap gist bisa berisi satu atau beberapa file dengan syntax highlighting.
+            Gist <strong>Public</strong> terlihat oleh semua member; <strong>Private</strong> hanya terlihat oleh pembuatnya.
+            Gunakan <Kbd size="xs">K</Kbd> untuk membuka pencarian, atau klik <strong>New Gist</strong> untuk mulai membuat.
+          </Text>
+        </Alert>
+      )}
 
       {/* Toolbar */}
       {!isLoading && gists.length > 0 && (

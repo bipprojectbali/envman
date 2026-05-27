@@ -159,7 +159,7 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
   const [opened, { open, close }] = useDisclosure(false)
   const [editing, setEditing] = useState<Alias | null>(null)
   const [search, setSearch] = useState('')
-  const [tagFilter, setTagFilter] = useState<string[]>([])
+  const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: `envman:aliases:${slug}:tagFilter`, defaultValue: [] })
   const [view, setView] = useLocalStorage<'list' | 'grid'>({
     key: `envman:aliases:${slug}:view`,
     defaultValue: 'list',
@@ -268,7 +268,7 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
               </Tooltip>
             </Group>
             {isOwner && (
-              <Button size="sm" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+              <Button variant='light' size="sm" leftSection={<TbPlus size={14} />} onClick={openCreate}>
                 Tambah alias
               </Button>
             )}

@@ -319,8 +319,8 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
   const qc = useQueryClient()
 
   const [search, setSearch] = useState('')
-  const [tagFilter, setTagFilter] = useState<string[]>([])
-  const [sort, setSort] = useState<'updated' | 'created' | 'title'>('updated')
+  const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: `envman:notes:${slug}:tagFilter`, defaultValue: [] })
+  const [sort, setSort] = useLocalStorage<'updated' | 'created' | 'title'>({ key: `envman:notes:${slug}:sort`, defaultValue: 'updated' })
   const [view, setView] = useLocalStorage<'list' | 'grid'>({ key: 'envman:notes:view', defaultValue: 'list' })
   const [debouncedSearch] = useDebouncedValue(search, 150)
   const searchRef = useRef<HTMLInputElement>(null)

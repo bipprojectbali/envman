@@ -348,10 +348,10 @@ function TokensPage() {
   const [editForm, setEditForm] = useState(emptyForm)
   const [expandedUsage, setExpandedUsage] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('semua')
-  const [filterProjects, setFilterProjects] = useState<string[]>([])
-  const [filterTags, setFilterTags] = useState<string[]>([])
-  const [sort, setSort] = useState('terbaru')
+  const [filterStatus, setFilterStatus] = useLocalStorage({ key: 'envman:tokens:filterStatus', defaultValue: 'semua' })
+  const [filterProjects, setFilterProjects] = useLocalStorage<string[]>({ key: 'envman:tokens:filterProjects', defaultValue: [] })
+  const [filterTags, setFilterTags] = useLocalStorage<string[]>({ key: 'envman:tokens:filterTags', defaultValue: [] })
+  const [sort, setSort] = useLocalStorage({ key: 'envman:tokens:sort', defaultValue: 'terbaru' })
   const [view, setView] = useLocalStorage<'grid' | 'list'>({ key: 'envman:tokens:view', defaultValue: 'list' })
 
   const { data, isLoading, isError, error, refetch } = useQuery({
