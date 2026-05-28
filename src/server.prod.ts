@@ -15,7 +15,7 @@ import { env } from './lib/env'
 import { runMigrations } from './lib/migrate'
 
 // ─── Route Classification ──────────────────────────────
-const API_PREFIXES = ['/api/', '/webhook/', '/ws/', '/health', '/download/', '/install']
+const API_PREFIXES = ['/api/', '/webhook/', '/ws/', '/health', '/download/', '/install', '/mcp']
 
 function isApiRoute(pathname: string): boolean {
   return API_PREFIXES.some(p => pathname.startsWith(p)) || pathname === '/health' || pathname === '/install'
