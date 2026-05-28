@@ -14,8 +14,53 @@
  *   bun scripts/copy-migrate.ts <target-path> --force    # overwrite existing files
  */
 
-import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, chmodSync } from "node:fs"
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, readdirSync } from "node:fs"
 import { join, resolve, dirname } from "node:path"
+
+// ─── Auto-detect API prefixes from route source files ────────────────────────
+// Scans src/app.ts + src/routes/**/*.ts for route method calls and extracts
+// the first path segment of each route to build API_PREFIXES automatically.
+function detectApiPrefixes(targetRoot: string): string[] {
+  const files: string[] = []
+
+  function collectTs(dir: string) {
+    if (!existsSync(dir)) return
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) collectTs(full)
+      else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) files.push(full)
+    }
+  }
+
+  // Primary candidates
+  for (const f of ['src/app.ts', 'src/app.tsx', 'src/index.ts', 'src/index.tsx']) {
+    const p = join(targetRoot, f)
+    if (existsSync(p)) files.push(p)
+  }
+  collectTs(join(targetRoot, 'src/routes'))
+
+  const prefixes = new Set<string>()
+  // Match .get('/path', ...), .post(`/path`, ...), .ws('/path', ...) etc.
+  const RE = /\.(get|post|put|delete|patch|all|ws|mount)\s*\(\s*['"`]([^'"`]+)['"`]/g
+
+  for (const file of files) {
+    const content = readFileSync(file, 'utf-8')
+    let m
+    while ((m = RE.exec(content)) !== null) {
+      const p = m[2]
+      if (!p.startsWith('/')) continue
+      const parts = p.split('/').filter(Boolean)
+      if (!parts.length || parts[0].startsWith(':')) continue
+      // Multi-segment → trailing slash prefix (/api/ not /api)
+      prefixes.add(parts.length > 1 ? `/${parts[0]}/` : `/${parts[0]}`)
+    }
+  }
+
+  // Always include /health as a safe default
+  prefixes.add('/health')
+
+  return Array.from(prefixes).sort()
+}
 
 // ─── Args ─────────────────────────────────────────────────────────────────────
 
@@ -171,6 +216,10 @@ console.log()
 
 step(4, "Production server entry")
 
+const detectedPrefixes = detectApiPrefixes(TARGET)
+const prefixesLiteral = detectedPrefixes.map(p => `'${p}'`).join(', ')
+console.log(`  ${green("✓")} Detected API prefixes: ${cyan(prefixesLiteral)}`)
+
 const serverProdTemplate = `/// <reference types="bun-types" />
 /**
  * Production-only server entry point.
@@ -178,8 +227,6 @@ const serverProdTemplate = `/// <reference types="bun-types" />
  *
  * Omits Vite dev middleware so the bundle doesn't pull in devDependencies.
  * Dev workflow unchanged — use src/serve.ts as before.
- *
- * TODO: Review API_PREFIXES and startup tasks to match this project.
  */
 
 import fs from 'node:fs'
@@ -188,11 +235,13 @@ import { env } from './lib/env'
 import { runMigrations } from './lib/migrate'
 
 // ─── Route Classification ──────────────────────────────
-// Add any project-specific prefixes (e.g. '/download/', '/install/', '/mcp')
-const API_PREFIXES = ['/api/', '/webhook/', '/ws/', '/health']
+// Auto-detected from src/app.ts + src/routes/**. Verify and add any missing prefixes.
+const API_PREFIXES = [${prefixesLiteral}]
 
 function isApiRoute(pathname: string): boolean {
-  return API_PREFIXES.some(p => pathname.startsWith(p)) || pathname === '/health'
+  return API_PREFIXES.some(p =>
+    p.endsWith('/') ? pathname.startsWith(p) : pathname === p || pathname.startsWith(p + '/')
+  )
 }
 
 // ─── Frontend Serving (static files from dist/) ───────
@@ -349,9 +398,9 @@ console.log("   MIGRATE_ON_STARTUP=true")
 console.log("   MIGRATE_DATABASE_URL=${DIRECT_URL}  # direct conn (bypass pooler)")
 console.log("   MIGRATE_DB_RETRIES=5               # optional, default 5")
 console.log()
-console.log(cyan("2. Review") + " src/server.prod.ts — check TODO comments:")
-console.log("   • Adjust API_PREFIXES for your routes")
-console.log("   • Add startup tasks (audit log cleanup, cron jobs, etc.)")
+console.log(cyan("2. Review") + " src/server.prod.ts:")
+console.log("   • API_PREFIXES auto-detected — add any missing prefixes manually")
+console.log("   • Add startup tasks if needed (audit log cleanup, cron jobs, etc.)")
 console.log()
 console.log(cyan("3. Test locally:"))
 console.log("   bun run build:server")
