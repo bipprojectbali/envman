@@ -497,3 +497,34 @@ model PortainerBackupSchedule {
 
   @@map("portainer_backup_schedule")
 }
+
+// ─── Migration Test Fixture ───────────────────────────────────────────────────
+// Tabel ini dipakai untuk menguji mekanisme migrasi (custom migrator + Prisma compat).
+// Sengaja mencakup berbagai tipe kolom: enum, json, array, float, nullable, index.
+
+enum TestMigrateKind {
+  ALPHA
+  BETA
+  GAMMA
+}
+
+model TestMigrate {
+  id         String          @id @default(uuid())
+  label      String
+  slug       String          @unique
+  count      Int             @default(0)
+  score      Float?
+  active     Boolean         @default(true)
+  kind       TestMigrateKind @default(ALPHA)
+  meta       Json?
+  tags       String[]        @default([])
+  note       String?
+  resolvedAt DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([kind])
+  @@index([active])
+  @@index([createdAt])
+  @@map("test_migrate")
+}

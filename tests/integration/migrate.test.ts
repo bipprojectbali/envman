@@ -126,12 +126,12 @@ describe("scripts/migrate.ts", () => {
     const { exitCode, output } = await runMigrate();
 
     expect(exitCode).toBe(0);
-    expect(output).toContain("→ Applying 21 migration(s):");
+    expect(output).toContain("→ Applying 22 migration(s):");
     expect(output).toContain("✓ Done");
     expect(output).not.toContain("✗ Migration failed");
 
     const rows = await getMigrations(db);
-    expect(rows).toHaveLength(21);
+    expect(rows).toHaveLength(22);
     expect(rows.every((r) => r.finished_at !== null)).toBe(true);
   });
 
@@ -151,28 +151,26 @@ describe("scripts/migrate.ts", () => {
     await runMigrate();
 
     // Delete the last migration record to simulate it not having been applied.
-    // We only undo the last migration (20260526000000_add_portainer_backup) because
-    // it only adds new tables (easy to DROP, no ALTER TABLE needed).
+    // We only undo the last migration (20260528070104_add_test_migrate) because
+    // it only adds new table+enum (easy to DROP, no ALTER TABLE needed).
     await db`
       DELETE FROM "_prisma_migrations"
-      WHERE migration_name = '20260526000000_add_portainer_backup'
+      WHERE migration_name = '20260528070104_add_test_migrate'
     `;
     // Drop everything the last migration created so re-apply succeeds
-    // Table names are lowercase (portainer_backup) per @@map in Prisma schema
     await db.unsafe(
-      'DROP TABLE IF EXISTS "portainer_backup" CASCADE;' +
-        ' DROP TABLE IF EXISTS "portainer_backup_schedule" CASCADE;' +
-        ' DROP TYPE IF EXISTS "PortainerBackupType";'
+      'DROP TABLE IF EXISTS "test_migrate" CASCADE;' +
+        ' DROP TYPE IF EXISTS "TestMigrateKind";'
     );
 
     const { exitCode, output } = await runMigrate();
     expect(exitCode).toBe(0);
     expect(output).toContain("→ Applying 1 migration(s):");
-    expect(output).toContain("20260526000000_add_portainer_backup");
+    expect(output).toContain("20260528070104_add_test_migrate");
     expect(output).toContain("✓ Done");
 
     const rows = await getMigrations(db);
-    expect(rows).toHaveLength(21);
+    expect(rows).toHaveLength(22);
     expect(rows.every((r) => r.finished_at !== null)).toBe(true);
   });
 
@@ -222,25 +220,24 @@ describe("scripts/migrate.ts", () => {
     await db`
       UPDATE "_prisma_migrations"
       SET finished_at = NULL, applied_steps_count = 0
-      WHERE migration_name = '20260526000000_add_portainer_backup'
+      WHERE migration_name = '20260528070104_add_test_migrate'
     `;
     // Undo the schema changes from that migration so re-apply succeeds
     await db.unsafe(
-      'DROP TABLE IF EXISTS "portainer_backup" CASCADE;' +
-        ' DROP TABLE IF EXISTS "portainer_backup_schedule" CASCADE;' +
-        ' DROP TYPE IF EXISTS "PortainerBackupType";'
+      'DROP TABLE IF EXISTS "test_migrate" CASCADE;' +
+        ' DROP TYPE IF EXISTS "TestMigrateKind";'
     );
 
     // Migrator should see finished_at = NULL → treat as pending → retry
     const { exitCode, output } = await runMigrate();
     expect(exitCode).toBe(0);
-    expect(output).toContain("20260526000000_add_portainer_backup");
+    expect(output).toContain("20260528070104_add_test_migrate");
     expect(output).toContain("✓ Done");
 
     // Verify finished_at is now set (retry succeeded)
     const rows = await db`
       SELECT finished_at FROM "_prisma_migrations"
-      WHERE migration_name = '20260526000000_add_portainer_backup'
+      WHERE migration_name = '20260528070104_add_test_migrate'
     `;
     expect(rows[0]?.finished_at).not.toBeNull();
   });

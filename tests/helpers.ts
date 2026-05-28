@@ -106,5 +106,6 @@ export async function cleanupTestData() {
   await prisma.projectAlias.deleteMany()
   await prisma.projectFile.deleteMany()
   await prisma.project.deleteMany()
+  await prisma.testMigrate.deleteMany()
   await prisma.user.deleteMany()
 }
