@@ -54,9 +54,6 @@ COPY --from=builder /app/dist/cli  ./dist/cli
 # MCP server scripts (dev tooling, mounted via .mcp.json — safe to keep)
 COPY --from=builder /app/scripts  ./scripts
 
-# Ensure volume paths exist
-RUN mkdir -p /app/state /cliproxy-auth
-
 EXPOSE 3000
 
 CMD ["./server"]
