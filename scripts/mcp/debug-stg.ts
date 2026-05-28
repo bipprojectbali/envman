@@ -30,6 +30,7 @@ async function stgCall(toolName: string, args: Record<string, unknown> = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
       Authorization: `Bearer ${MCP_SECRET}`,
     },
     body: JSON.stringify({
