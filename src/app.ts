@@ -691,9 +691,9 @@ attempt=1
 max_attempts=5
 while [ $attempt -le $max_attempts ]; do
   echo "Downloading envman for $PLATFORM... (attempt $attempt/$max_attempts)"
-  # --compressed asks for gzip transport (~60% smaller payload via Content-Encoding);
+  # -L follows the 302 redirect to GitHub Releases.
+  # --compressed declared for compatibility; GitHub serves raw binary regardless.
   # --retry handles transient errors within one curl run, outer loop handles fatal disconnects.
-  # Resume (-C -) not used because Range + Content-Encoding: gzip is not interoperable.
   if curl -fL --compressed --progress-bar --retry 3 --retry-all-errors --retry-delay 2 "$URL" -o "$TMP"; then
     break
   fi
@@ -728,7 +728,7 @@ echo "Run: envman login ${origin} --token <your-token>"
         return { version: pkg.version as string }
       })
 
-      .get('/download/cli/:platform', async ({ params, request, set }) => {
+      .get('/download/cli/:platform', ({ params, set }) => {
         const platforms: Record<string, string> = {
           'linux-x64':    'envman-linux-x64',
           'linux-arm64':  'envman-linux-arm64',
@@ -737,35 +737,14 @@ echo "Run: envman login ${origin} --token <your-token>"
           'windows-x64':  'envman-windows-x64.exe',
         }
         const filename = platforms[params.platform]
-        if (!filename) { set.status = 404; return new Response('Unknown platform', { status: 404 }) }
+        if (!filename) { set.status = 404; return 'Unknown platform' }
 
-        const acceptsGzip = (request.headers.get('accept-encoding') ?? '').toLowerCase().includes('gzip')
-        if (acceptsGzip) {
-          const gzFile = Bun.file(`${process.cwd()}/dist/cli/${filename}.gz`)
-          if (await gzFile.exists()) {
-            return new Response(gzFile, {
-              headers: {
-                'Content-Disposition': `attachment; filename="${filename}"`,
-                'Content-Type': 'application/octet-stream',
-                'Content-Encoding': 'gzip',
-                'Vary': 'Accept-Encoding',
-              },
-            })
-          }
-        }
+        const repo = process.env.GITHUB_REPO ?? 'bipprojectbali/envman'
+        const url = `https://github.com/${repo}/releases/latest/download/${filename}`
 
-        const file = Bun.file(`${process.cwd()}/dist/cli/${filename}`)
-        if (!(await file.exists())) {
-          set.status = 404
-          return new Response('Binary not built yet. Run: bun run build:cli', { status: 404 })
-        }
-        return new Response(file, {
-          headers: {
-            'Content-Disposition': `attachment; filename="${filename}"`,
-            'Content-Type': 'application/octet-stream',
-            'Vary': 'Accept-Encoding',
-          },
-        })
+        set.status = 302
+        set.headers['Location'] = url
+        return null
       })
 
       // ─── Public Docs (raw markdown for AI / crawlers) ─────

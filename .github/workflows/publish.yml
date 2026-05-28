@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ vars.PORTAINER_ENV || 'portainer' }}
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - name: Free disk space
@@ -52,6 +52,37 @@ jobs:
           path: .ci
           sparse-checkout: .github/workflows/script
 
+      # ── Build CLI binaries + upload to GitHub Releases ───────────────────────
+      # CLI binaries are NOT bundled in the Docker image (saves ~450MB).
+      # Download endpoint /download/cli/:platform redirects here (302).
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build CLI binaries (all platforms)
+        run: bun run build:cli
+
+      - name: Upload CLI binaries to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ github.event.inputs.tag }}"
+          # Create release if it doesn't exist yet (idempotent)
+          gh release create "$TAG" \
+            --title "Release $TAG" \
+            --notes "CLI binaries for envman $TAG" \
+            2>/dev/null || true
+          # Upload all binaries (--clobber overwrites if re-running same tag)
+          for f in dist/cli/envman-* dist/cli/*.exe; do
+            [ -f "$f" ] && gh release upload "$TAG" "$f" --clobber
+          done
+          echo "✓ CLI binaries uploaded to $TAG"
+
+      # ── Docker build ──────────────────────────────────────────────────────────
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
