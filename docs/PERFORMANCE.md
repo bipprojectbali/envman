@@ -278,9 +278,12 @@ useQuery({ staleTime: Infinity, refetchInterval: false })
 
 ---
 
-## 11. Docker Multi-Stage Build — Slim Production Image
+## 11. Docker Multi-Stage Build — Zero node_modules di Runtime
 
-Build semua di CI, ship hanya yang diperlukan runtime.
+Kompilasi server dan migrator menjadi self-contained binary menggunakan `bun build --compile`.
+Runtime image tidak membutuhkan `node_modules` sama sekali — semua npm dependency di-embed di binary.
+
+**Estimasi ukuran:** ~600-700MB (dengan node_modules) → ~300-370MB (binary only).
 
 ```dockerfile
 # Stage 1: Install deps saja
@@ -291,20 +294,45 @@ RUN bun install --frozen-lockfile
 # Stage 2: Build artifacts
 FROM deps AS builder
 COPY . .
-RUN bunx prisma generate
-RUN bun run build          # Vite build → dist/
-RUN bun run build:cli      # CLI binary → dist/cli/
+RUN bunx prisma generate        # Generate Prisma client (pure TypeScript di v6)
+RUN bun run build               # Vite build → dist/
+RUN bun run build:cli           # CLI binary → dist/cli/
+RUN bun run build:migrate       # Migrator binary → ./migrate (zero npm dependency)
+RUN bun run build:server        # Server binary → ./server (embed semua npm deps)
 
-# Stage 3: Runtime image — HANYA file yang diperlukan
+# Stage 3: Runtime image — HANYA binary + static files
 FROM oven/bun:1 AS runner
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/generated ./generated
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/migrate   ./migrate
+COPY --from=builder /app/server    ./server
+COPY --from=builder /app/dist      ./dist
+COPY --from=builder /app/public    ./public
+COPY --from=builder /app/prisma/migrations ./prisma/migrations
+COPY --from=builder /app/dist/cli  ./dist/cli
+COPY --from=builder /app/scripts   ./scripts
+CMD ["./server"]
 ```
 
-**Kenapa:** DevDependencies (TypeScript, Vite, ESLint) tidak masuk production image = image lebih kecil = pull lebih cepat = deploy lebih cepat.
+**Yang dihapus dari runner:** `node_modules/` (818MB), `src/`, `generated/`, `package.json`, `tsconfig.json`.
+
+**Kenapa bisa:** Prisma v6 generate pure TypeScript (tidak ada native binary / WASM), sehingga
+`bun build --compile` bisa embed Prisma client sepenuhnya ke dalam binary server.
+
+**Entry point production:** `src/server.prod.ts` — production-only entry, tidak mengimpor Vite/Babel.
+Jangan gunakan `src/index.tsx` sebagai target compile karena pull seluruh devDependency saat bundle.
+
+**Migrator:** `src/lib/migrate.ts` — reusable module, zero npm dep, compatible `_prisma_migrations`.
+Dijalankan di server startup via `runMigrations()` sebelum `app.listen()`. `MIGRATE_ON_STARTUP=false` untuk skip.
+Tidak ada service `migrate` terpisah di compose — satu container, satu proses.
+`scripts/migrate.ts` adalah thin CLI wrapper untuk standalone binary atau manual run.
+
+```bash
+# Build scripts di package.json:
+"build:migrate": "bun build scripts/migrate.ts --compile --target=bun-linux-x64 --outfile migrate",
+"build:server":  "bun build src/server.prod.ts --compile --target=bun-linux-x64 --outfile server",
+```
+
+**Kenapa:** DevDependencies (TypeScript, Vite, ESLint) + prodDependencies semuanya tidak masuk
+production image = image 50%+ lebih kecil = pull lebih cepat = deploy lebih cepat = attack surface lebih kecil.
 
 ---
 
@@ -396,5 +424,7 @@ Ganti `'mantine-color-scheme-value'` dengan key localStorage yang dipakai librar
 - [ ] `Cache-Control: immutable` untuk hashed assets
 - [ ] `Cache-Control: must-revalidate` untuk index.html
 - [ ] Docker multi-stage build (deps → builder → runner)
+- [ ] Compile server ke binary (`bun build src/server.prod.ts --compile`) — eliminasi node_modules di runtime
+- [ ] Compile migrator ke binary (`bun build scripts/migrate.ts --compile`) — zero npm dep di migrate service
 - [ ] Resource limits di compose (CPU, memory, log rotation)
-- [ ] `prisma migrate deploy` di container entrypoint (tidak manual)
+- [ ] Migrate service pakai `./migrate` binary (bukan `bunx prisma migrate deploy`)

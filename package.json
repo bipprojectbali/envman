@@ -19,6 +19,8 @@
     "db:generate": "bunx prisma generate",
     "db:push": "bunx prisma db push",
     "build:cli": "bun run scripts/build-cli.ts",
+    "build:migrate": "bun build scripts/migrate.ts --compile --target=bun-linux-x64 --outfile migrate",
+    "build:server": "bun build src/server.prod.ts --compile --target=bun-linux-x64 --outfile server",
     "cli": "bun src/cli.ts"
   },
   "dependencies": {

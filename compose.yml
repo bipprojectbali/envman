@@ -25,17 +25,18 @@ services:
       # Telegram
       - TELEGRAM_NOTIFY_TOKEN=${TELEGRAM_NOTIFY_TOKEN}
       - TELEGRAM_NOTIFY_CHAT_ID=${TELEGRAM_NOTIFY_CHAT_ID}
+      # Migration (runs at startup via src/lib/migrate.ts)
+      # MIGRATE_ON_STARTUP defaults to true — set to false to skip
+      - MIGRATE_ON_STARTUP=${MIGRATE_ON_STARTUP:-true}
+      # Use DIRECT_URL for migrations to bypass pooler (advisory lock requires direct connection)
+      - MIGRATE_DATABASE_URL=${DIRECT_URL}
+      # MIGRATE_DB_RETRIES defaults to 5 (2s delay each)
     networks:
       - public-net
       - postgres-net-stg
       - redis-net
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          memory: 256M
+    mem_limit: 512m
+    cpus: '1.0'
     logging:
       driver: json-file
       options:
@@ -49,18 +50,6 @@ services:
       - "traefik.http.routers.envman.tls=true"
       - "traefik.http.routers.envman.tls.certresolver=letsencrypt"
       - "traefik.http.services.envman.loadbalancer.server.port=3000"
-
-  migrate:
-    image: ghcr.io/bipprojectbali/envman:stg-latest
-    container_name: envman-stg-migrate
-    restart: "no"
-    entrypoint: ["sh", "-c", "bun prisma migrate deploy"]
-    environment:
-      - DATABASE_URL=${DIRECT_URL}
-      - DIRECT_URL=${DIRECT_URL}
-      - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL}
-    networks:
-      - postgres-net-stg
 
 networks:
   public-net:

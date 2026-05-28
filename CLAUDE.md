@@ -10,6 +10,21 @@ Default to using Bun instead of Node.js.
 
 Elysia.js on Bun. `src/app.ts` — all API routes (exported as `createApp()`). `src/index.tsx` — server entry + Vite middleware. `src/serve.ts` — dev entry (`bun --watch src/serve.ts`).
 
+**Production Docker entry:** `src/server.prod.ts` — production-only, tanpa Vite/Babel import.
+Dikompilasi ke self-contained binary: `bun build src/server.prod.ts --compile --target=bun-linux-x64 --outfile server`.
+Jangan compile `src/index.tsx` langsung — Bun bundler pull `@babel/core` dari `@vitejs/plugin-react`.
+
+**Migration module:** `src/lib/migrate.ts` — reusable, zero npm dep, compatible dengan `_prisma_migrations` table.
+Dijalankan otomatis di server startup (`MIGRATE_ON_STARTUP=true` by default) sebelum `app.listen()`.
+`scripts/migrate.ts` adalah thin CLI wrapper — untuk standalone binary atau manual run.
+Tidak ada lagi `migrate` service terpisah di `compose.yml`.
+
+**ENV vars migration:**
+- `MIGRATE_ON_STARTUP` — default `true`. Set `false` untuk skip.
+- `MIGRATE_DATABASE_URL` — default: `DATABASE_URL`. Set eksplisit ke `DIRECT_URL` jika pakai pooler (advisory lock butuh direct connection). Di compose.yml sudah di-set `MIGRATE_DATABASE_URL=${DIRECT_URL}`.
+- `MIGRATIONS_DIR` — default `./prisma/migrations`.
+- `MIGRATE_DB_RETRIES` — default `5` (2s delay antar retry, untuk wait DB ready).
+
 ## Database
 
 PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`). Schema: `prisma/schema.prisma`. Commands: `bun run db:migrate`, `bun run db:seed`, `bun run db:generate`.
