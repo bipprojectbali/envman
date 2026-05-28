@@ -227,10 +227,10 @@ if (process.env.MIGRATE_ON_STARTUP !== 'false') {
 }
 
 // ─── TODO: Add project-specific startup tasks here ────
-// Examples from envman:
-//   import { syncBackupCrons } from './lib/portainer-cron'
-//   syncBackupCrons().catch(console.error)
-//   setInterval(() => cleanupAuditLogs().catch(console.error), 24 * 60 * 60 * 1000)
+// Examples:
+//   import { cleanupOldLogs } from './lib/cleanup'
+//   cleanupOldLogs().catch(console.error)
+//   setInterval(() => cleanupOldLogs().catch(console.error), 24 * 60 * 60 * 1000)
 
 // ─── Elysia App ────────────────────────────────────────
 import { createApp } from './app'
