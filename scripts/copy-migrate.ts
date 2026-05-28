@@ -32,7 +32,6 @@ function detectApiPrefixes(targetRoot: string): string[] {
     }
   }
 
-  // Primary candidates
   for (const f of ['src/app.ts', 'src/app.tsx', 'src/index.ts', 'src/index.tsx']) {
     const p = join(targetRoot, f)
     if (existsSync(p)) files.push(p)
@@ -44,6 +43,7 @@ function detectApiPrefixes(targetRoot: string): string[] {
   const RE = /\.(get|post|put|delete|patch|all|ws|mount)\s*\(\s*['"`]([^'"`]+)['"`]/g
 
   for (const file of files) {
+    RE.lastIndex = 0  // reset between files — global regex retains lastIndex
     const content = readFileSync(file, 'utf-8')
     let m
     while ((m = RE.exec(content)) !== null) {
@@ -56,9 +56,7 @@ function detectApiPrefixes(targetRoot: string): string[] {
     }
   }
 
-  // Always include /health as a safe default
   prefixes.add('/health')
-
   return Array.from(prefixes).sort()
 }
 
@@ -76,8 +74,31 @@ if (!targetArg) {
 const SOURCE_ROOT = resolve(import.meta.dir, "..")
 const TARGET = resolve(targetArg)
 
+// ─── Validate source files exist ──────────────────────────────────────────────
+
+const SOURCE_MIGRATE_LIB = join(SOURCE_ROOT, "src/lib/migrate.ts")
+const SOURCE_MIGRATE_SCR = join(SOURCE_ROOT, "scripts/migrate.ts")
+
+if (!existsSync(SOURCE_MIGRATE_LIB)) {
+  console.error(`✗ Source file not found: ${SOURCE_MIGRATE_LIB}`)
+  console.error("  Run this script from the envman project root.")
+  process.exit(1)
+}
+if (!existsSync(SOURCE_MIGRATE_SCR)) {
+  console.error(`✗ Source file not found: ${SOURCE_MIGRATE_SCR}`)
+  process.exit(1)
+}
+
+// ─── Validate target ──────────────────────────────────────────────────────────
+
 if (!existsSync(join(TARGET, "package.json"))) {
   console.error(`✗ Not a valid project — no package.json at: ${TARGET}`)
+  process.exit(1)
+}
+
+// Guard: prevent running against envman itself
+if (resolve(TARGET) === resolve(SOURCE_ROOT)) {
+  console.error("✗ Target cannot be the same as the source (envman) project.")
   process.exit(1)
 }
 
@@ -91,42 +112,90 @@ const detect = {
   hasServerProd: existsSync(join(TARGET, "src/server.prod.ts")),
   hasMigrateLib: existsSync(join(TARGET, "src/lib/migrate.ts")),
   hasMigrateScr: existsSync(join(TARGET, "scripts/migrate.ts")),
-  hasBunLock:    existsSync(join(TARGET, "bun.lock")) || existsSync(join(TARGET, "bun.lockb")),
+  hasEnvLib:     existsSync(join(TARGET, "src/lib/env.ts")) || existsSync(join(TARGET, "src/lib/env.js")),
+  hasAppEntry:   existsSync(join(TARGET, "src/app.ts")) || existsSync(join(TARGET, "src/app.tsx")),
   hasPublicDir:  existsSync(join(TARGET, "public")),
-  hasStateDir:   false, // rarely needed in base projects
 }
 
-const pkg = JSON.parse(readFileSync(join(TARGET, "package.json"), "utf-8"))
+// Determine lock file — check specifically which one exists
+const lockFile = existsSync(join(TARGET, "bun.lock")) ? "bun.lock"
+  : existsSync(join(TARGET, "bun.lockb")) ? "bun.lockb"
+  : null
 
-detect.hasStateDir  = !!pkg.scripts?.["start"]?.includes("state")
-const hasBuildCli   = !!pkg.scripts?.["build:cli"]
+let rawPkg: string
+try {
+  rawPkg = readFileSync(join(TARGET, "package.json"), "utf-8")
+} catch (e) {
+  console.error(`✗ Cannot read package.json: ${e}`)
+  process.exit(1)
+}
+
+let pkg: any
+try {
+  pkg = JSON.parse(rawPkg)
+} catch (e) {
+  console.error(`✗ Invalid JSON in package.json: ${e}`)
+  process.exit(1)
+}
+
+// Guard: pkg.scripts might not exist
+if (!pkg.scripts || typeof pkg.scripts !== 'object') pkg.scripts = {}
+
+const hasBuildCli   = !!pkg.scripts["build:cli"]
 const hasMcpScripts = existsSync(join(TARGET, "scripts/mcp"))
+
+// ─── Colors ───────────────────────────────────────────────────────────────────
+
+const dim    = (s: string) => `\x1b[2m${s}\x1b[0m`
+const bold   = (s: string) => `\x1b[1m${s}\x1b[0m`
+const green  = (s: string) => `\x1b[32m${s}\x1b[0m`
+const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`
+const red    = (s: string) => `\x1b[31m${s}\x1b[0m`
+const cyan   = (s: string) => `\x1b[36m${s}\x1b[0m`
+
+// ─── Warnings ─────────────────────────────────────────────────────────────────
+
+const warnings: string[] = []
+
+if (!detect.hasPrisma)
+  warnings.push("prisma/schema.prisma not found — add migrations manually after setup")
+if (!detect.hasEnvLib)
+  warnings.push("src/lib/env.ts not found — server.prod.ts imports './lib/env'; create it or update the import")
+if (!detect.hasAppEntry)
+  warnings.push("src/app.ts not found — server.prod.ts imports './app'; update the import to match your entry file")
+if (!lockFile)
+  warnings.push("No bun.lock / bun.lockb found — Dockerfile will use 'bun.lock' but it doesn't exist yet; run 'bun install' first")
 
 // ─── Report ───────────────────────────────────────────────────────────────────
 
-const dim  = (s: string) => `\x1b[2m${s}\x1b[0m`
-const bold = (s: string) => `\x1b[1m${s}\x1b[0m`
-const green  = (s: string) => `\x1b[32m${s}\x1b[0m`
-const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`
-const cyan   = (s: string) => `\x1b[36m${s}\x1b[0m`
+const fileStatus = (exists: boolean, willOverwrite: boolean) =>
+  !exists         ? dim("missing — will create")
+  : willOverwrite ? yellow("exists — will OVERWRITE (--force)")
+  :                 yellow("exists — will SKIP (use --force to replace)")
 
 console.log()
 console.log(bold("copy-migrate") + " → " + cyan(TARGET))
 console.log()
 console.log("  Detected:")
-console.log(`    src/lib/        ${detect.hasSrcLib ? green("✓") : dim("missing — will create")}`)
-console.log(`    scripts/        ${detect.hasScripts ? green("✓") : dim("missing — will create")}`)
-console.log(`    prisma/         ${detect.hasPrisma ? green("✓") : yellow("⚠ not found — add migrations manually")}`)
-const dockerStatus = !detect.hasDockerfile ? dim("missing — will create")
-  : force ? yellow("exists — will OVERWRITE (--force)")
-  : yellow("exists — will SKIP (use --force to replace)")
-const serverProdStatus = !detect.hasServerProd ? dim("missing — will create")
-  : force ? yellow("exists — will OVERWRITE (--force)")
-  : yellow("exists — will SKIP (use --force to replace)")
-console.log(`    Dockerfile      ${dockerStatus}`)
-console.log(`    server.prod.ts  ${serverProdStatus}`)
-console.log(`    build:cli       ${hasBuildCli ? green("✓ found") : dim("not found — omitted from Dockerfile")}`)
-console.log(`    scripts/mcp/    ${hasMcpScripts ? green("✓ found") : dim("not found — omitted from Dockerfile")}`)
+console.log(`    src/lib/            ${detect.hasSrcLib    ? green("✓") : dim("missing — will create")}`)
+console.log(`    scripts/            ${detect.hasScripts   ? green("✓") : dim("missing — will create")}`)
+console.log(`    prisma/             ${detect.hasPrisma    ? green("✓") : red("✗ not found")}`)
+console.log(`    src/lib/env.ts      ${detect.hasEnvLib    ? green("✓") : red("✗ not found — server.prod.ts will fail to compile")}`)
+console.log(`    src/app.ts          ${detect.hasAppEntry  ? green("✓") : red("✗ not found — update createApp() import manually")}`)
+console.log(`    bun.lock            ${lockFile            ? green(`✓ (${lockFile})`) : red("✗ not found — run bun install first")}`)
+console.log(`    src/lib/migrate.ts  ${fileStatus(detect.hasMigrateLib, force)}`)
+console.log(`    scripts/migrate.ts  ${fileStatus(detect.hasMigrateScr, force)}`)
+console.log(`    Dockerfile          ${fileStatus(detect.hasDockerfile, force)}`)
+console.log(`    server.prod.ts      ${fileStatus(detect.hasServerProd, force)}`)
+console.log(`    build:cli           ${hasBuildCli  ? green("✓ found") : dim("not found — omitted from Dockerfile")}`)
+console.log(`    scripts/mcp/        ${hasMcpScripts ? green("✓ found") : dim("not found — omitted from Dockerfile")}`)
+
+if (warnings.length) {
+  console.log()
+  console.log(yellow("  Warnings:"))
+  for (const w of warnings) console.log(`    ${yellow("⚠")}  ${w}`)
+}
+
 console.log()
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -166,21 +235,13 @@ function writeFile(dest: string, content: string, label: string): boolean {
 // ─── Step 1: src/lib/migrate.ts ───────────────────────────────────────────────
 
 step(1, "Core migrator module")
-copyFile(
-  join(SOURCE_ROOT, "src/lib/migrate.ts"),
-  join(TARGET, "src/lib/migrate.ts"),
-  "src/lib/migrate.ts"
-)
+copyFile(SOURCE_MIGRATE_LIB, join(TARGET, "src/lib/migrate.ts"), "src/lib/migrate.ts")
 console.log()
 
 // ─── Step 2: scripts/migrate.ts ───────────────────────────────────────────────
 
 step(2, "CLI wrapper")
-copyFile(
-  join(SOURCE_ROOT, "scripts/migrate.ts"),
-  join(TARGET, "scripts/migrate.ts"),
-  "scripts/migrate.ts"
-)
+copyFile(SOURCE_MIGRATE_SCR, join(TARGET, "scripts/migrate.ts"), "scripts/migrate.ts")
 console.log()
 
 // ─── Step 3: Patch package.json ───────────────────────────────────────────────
@@ -207,6 +268,7 @@ if (!pkg.scripts["build:server"]) {
 }
 
 if (pkgDirty) {
+  // Preserve original formatting by doing a clean stringify
   writeFileSync(join(TARGET, "package.json"), JSON.stringify(pkg, null, 2) + "\n", "utf-8")
   patched("Saved package.json")
 }
@@ -218,7 +280,13 @@ step(4, "Production server entry")
 
 const detectedPrefixes = detectApiPrefixes(TARGET)
 const prefixesLiteral = detectedPrefixes.map(p => `'${p}'`).join(', ')
-console.log(`  ${green("✓")} Detected API prefixes: ${cyan(prefixesLiteral)}`)
+
+if (detectedPrefixes.length <= 1) {
+  console.log(`  ${yellow("⚠")}  API_PREFIXES only has ${yellow("/health")} — no routes detected in src/app.ts or src/routes/`)
+  console.log(`     Update API_PREFIXES manually in src/server.prod.ts after creation.`)
+} else {
+  console.log(`  ${green("✓")} Detected API prefixes: ${cyan(prefixesLiteral)}`)
+}
 
 const serverProdTemplate = `/// <reference types="bun-types" />
 /**
@@ -307,22 +375,22 @@ if (detect.hasDockerfile && !force) {
   skipped("Dockerfile", "already exists — run with --force to replace")
   console.log()
 } else {
-  const lockFile = detect.hasBunLock ? "bun.lock" : "bun.lockb"
+  const resolvedLockFile = lockFile ?? "bun.lock"
+
+  const cliBuildLine = hasBuildCli
+    ? "\n# CLI binaries\nRUN bun run build:cli\n"
+    : ""
 
   const cliCopyLine = hasBuildCli
     ? "\nCOPY --from=builder /app/dist/cli  ./dist/cli\n"
-    : ""
-
-  const mcpCopyLine = hasMcpScripts
-    ? "COPY --from=builder /app/scripts  ./scripts\n"
     : ""
 
   const publicCopyLine = detect.hasPublicDir
     ? "\nCOPY --from=builder /app/public   ./public"
     : ""
 
-  const cliBuildLine = hasBuildCli
-    ? "\n# CLI binaries\nRUN bun run build:cli\n"
+  const mcpCopyLine = hasMcpScripts
+    ? "COPY --from=builder /app/scripts  ./scripts\n"
     : ""
 
   const dockerfileContent = `FROM oven/bun:1 AS base
@@ -330,7 +398,7 @@ WORKDIR /app
 
 # ── Install deps ──────────────────────────────────────────────────────────────
 FROM base AS deps
-COPY package.json ${lockFile} ./
+COPY package.json ${resolvedLockFile} ./
 RUN bun install --frozen-lockfile
 
 # ── Build ─────────────────────────────────────────────────────────────────────
@@ -391,6 +459,10 @@ CMD ["./server"]
 const line = "─".repeat(52)
 
 console.log(line)
+if (warnings.length) {
+  console.log(yellow(`⚠  ${warnings.length} warning(s) above need attention before building.`))
+  console.log()
+}
 console.log(bold("✅ Done! Review & next steps:"))
 console.log()
 console.log(cyan("1. ENV vars") + " to add in your compose.yml / .env:")
