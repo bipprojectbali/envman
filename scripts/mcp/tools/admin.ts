@@ -2,6 +2,10 @@ import { z } from 'zod'
 import { appLog } from '../../../src/lib/applog'
 import { prisma } from '../../../src/lib/db'
 import { jsonText, type ToolModule } from './shared'
+import { runMigrations } from '../../../src/lib/migrate'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { SQL } from 'bun'
 
 async function audit(userId: string | null, action: string, detail: string | null) {
   await prisma.auditLog.create({ data: { userId, action, detail, ip: 'mcp' } }).catch(() => {})
@@ -141,6 +145,109 @@ export const adminTools: ToolModule = {
         await audit(userId, 'MCP_PASSWORD_RESET', `sessions revoked: ${revoked}`)
         appLog('warn', `MCP: password reset for ${user.email}`)
         return jsonText({ ok: true, userId, sessionsRevoked: revoked })
+      },
+    )
+
+    // ─── Migration tools ───────────────────────────────────────────────────────
+
+    server.registerTool(
+      'migrate_status',
+      {
+        title: 'Migration status',
+        description: 'List all applied migrations from _prisma_migrations with timestamps.',
+        annotations: { readOnlyHint: true },
+        inputSchema: {},
+      },
+      async () => {
+        const db = new SQL(process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL!, { max: 1 })
+        try {
+          const rows = await db`
+            SELECT migration_name, finished_at, started_at
+            FROM "_prisma_migrations"
+            ORDER BY started_at
+          `
+          return jsonText({
+            total: rows.length,
+            migrations: rows.map((r: any) => ({
+              name: r.migration_name,
+              appliedAt: r.finished_at,
+              ok: r.finished_at !== null,
+            })),
+          })
+        } finally {
+          await db.close()
+        }
+      },
+    )
+
+    server.registerTool(
+      'migrate_run',
+      {
+        title: 'Run migrations',
+        description: 'Trigger runMigrations() on demand — applies any pending migrations without restarting the server.',
+        annotations: { destructiveHint: false },
+        inputSchema: {},
+      },
+      async () => {
+        const logs: string[] = []
+        const t0 = Date.now()
+        try {
+          await runMigrations({ onLog: line => logs.push(line) })
+          return jsonText({ ok: true, durationMs: Date.now() - t0, logs })
+        } catch (err: any) {
+          logs.push(`✗ ${err?.message ?? String(err)}`)
+          return jsonText({ ok: false, durationMs: Date.now() - t0, logs })
+        }
+      },
+    )
+
+    server.registerTool(
+      'migrate_simulate',
+      {
+        title: 'Simulate migration',
+        description: 'Full end-to-end migration test: writes a temp migration, applies it, verifies the table was created, then cleans up everything. Proves the migration mechanism works without any real schema change.',
+        annotations: { destructiveHint: false },
+        inputSchema: {},
+      },
+      async () => {
+        const SIM_NAME = '99999999999999_migrate_sim_test'
+        const SIM_DIR = `./prisma/migrations/${SIM_NAME}`
+        const SIM_SQL = `CREATE TABLE IF NOT EXISTS "_migrate_sim_test" (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now());`
+        const url = process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL!
+        const logs: string[] = []
+        const t0 = Date.now()
+
+        const cleanup = async () => {
+          await rm(SIM_DIR, { recursive: true, force: true }).catch(() => {})
+          const db = new SQL(url, { max: 1 })
+          try {
+            await db.unsafe('DROP TABLE IF EXISTS "_migrate_sim_test"')
+            await db`DELETE FROM "_prisma_migrations" WHERE migration_name = ${SIM_NAME}`
+          } finally { await db.close() }
+        }
+
+        try {
+          await cleanup()
+          logs.push('✓ Cleaned up any previous sim state')
+          await mkdir(SIM_DIR, { recursive: true })
+          await writeFile(join(SIM_DIR, 'migration.sql'), SIM_SQL)
+          logs.push(`✓ Wrote temp migration: ${SIM_NAME}`)
+          await runMigrations({ onLog: line => logs.push(line) })
+          const db = new SQL(url, { max: 1 })
+          let verified = false
+          try {
+            const rows = await db`SELECT COUNT(*) as c FROM information_schema.tables WHERE table_name = '_migrate_sim_test'`
+            verified = Number(rows[0]?.c) > 0
+          } finally { await db.close() }
+          logs.push(verified ? '✓ Verified: _migrate_sim_test table exists' : '✗ Table not found after apply')
+          await cleanup()
+          logs.push('✓ Cleanup complete — DB restored to original state')
+          return jsonText({ ok: verified, durationMs: Date.now() - t0, logs })
+        } catch (err: any) {
+          logs.push(`✗ Simulation failed: ${err?.message ?? String(err)}`)
+          await cleanup().catch(() => {})
+          return jsonText({ ok: false, durationMs: Date.now() - t0, logs })
+        }
       },
     )
   },

@@ -64,7 +64,9 @@ async function runMigrate(
   overrideEnv: Record<string, string> = {}
 ): Promise<{ exitCode: number; output: string }> {
   const env: Record<string, string> = {
+    // Explicitly set both to prevent Bun .env auto-load from overriding with dev DB
     DATABASE_URL: MIGRATE_DB_URL,
+    MIGRATE_DATABASE_URL: MIGRATE_DB_URL,
     ...overrideEnv,
   };
   const proc = Bun.spawn([process.execPath, "run", "scripts/migrate.ts"], {
@@ -206,7 +208,7 @@ describe("scripts/migrate.ts", () => {
   });
 
   test("exits with code 1 when DATABASE_URL is empty", async () => {
-    const { exitCode, output } = await runMigrate({ DATABASE_URL: "" });
+    const { exitCode, output } = await runMigrate({ DATABASE_URL: "", MIGRATE_DATABASE_URL: "" });
 
     expect(exitCode).toBe(1);
     expect(output).toContain("DATABASE_URL is not set");

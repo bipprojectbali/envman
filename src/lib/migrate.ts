@@ -27,12 +27,14 @@ const LOCK_RELEASE = "SELECT pg_advisory_unlock(123100735045985)"
 const RETRY_DELAY_MS = 2000
 
 export interface MigrateOptions {
-  /** Direct DB URL. Defaults to MIGRATE_DATABASE_URL ?? DIRECT_URL ?? DATABASE_URL */
+  /** Direct DB URL. Defaults to MIGRATE_DATABASE_URL ?? DATABASE_URL */
   databaseUrl?: string
   /** Path to migrations folder. Defaults to MIGRATIONS_DIR ?? ./prisma/migrations */
   migrationsDir?: string
   /** Connection retries if DB is unreachable. Defaults to MIGRATE_DB_RETRIES ?? 5 */
   retries?: number
+  /** Optional log sink. If provided, replaces console.log output. */
+  onLog?: (line: string) => void
 }
 
 function sha256hex(content: string): string {
@@ -147,7 +149,10 @@ export async function runMigrations(options?: MigrateOptions): Promise<void> {
     options?.retries ??
     parseInt(process.env.MIGRATE_DB_RETRIES ?? "5", 10)
 
-  console.log("→ Acquiring advisory lock…")
+  const log = options?.onLog ?? ((line: string) => console.log(line))
+  const warn = options?.onLog ?? ((line: string) => console.warn(line))
+
+  log("→ Acquiring advisory lock…")
   const db = await connectWithRetry(url, retries)
 
   try {
@@ -157,7 +162,7 @@ export async function runMigrations(options?: MigrateOptions): Promise<void> {
     const all = await listMigrations(migrationsDir)
 
     if (all.length === 0) {
-      console.log("✓ No migration files found in", migrationsDir)
+      log("✓ No migration files found in " + migrationsDir)
       return
     }
 
@@ -168,9 +173,9 @@ export async function runMigrations(options?: MigrateOptions): Promise<void> {
         const body = await readFile(join(migrationsDir, name, "migration.sql"), "utf-8")
         const current = sha256hex(body)
         if (current !== stored) {
-          console.warn(`  ⚠ Checksum mismatch: ${name}`)
-          console.warn(`    Stored:  ${stored}`)
-          console.warn(`    Current: ${current}`)
+          warn(`  ⚠ Checksum mismatch: ${name}`)
+          warn(`    Stored:  ${stored}`)
+          warn(`    Current: ${current}`)
         }
       }
     }
@@ -178,18 +183,17 @@ export async function runMigrations(options?: MigrateOptions): Promise<void> {
     const pending = all.filter(n => !applied.has(n))
 
     if (pending.length === 0) {
-      console.log("✓ Database up to date")
+      log("✓ Database up to date")
       return
     }
 
-    console.log(`→ Applying ${pending.length} migration(s):`)
+    log(`→ Applying ${pending.length} migration(s):`)
     for (const name of pending) {
-      process.stdout.write(`  ${name} … `)
       const t0 = Date.now()
       await applyMigration(db, migrationsDir, name)
-      console.log(`OK (${Date.now() - t0}ms)`)
+      log(`  ${name} … OK (${Date.now() - t0}ms)`)
     }
-    console.log("✓ Done")
+    log("✓ Done")
   } finally {
     await db.unsafe(LOCK_RELEASE)
     await db.close()
