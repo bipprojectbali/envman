@@ -22,9 +22,10 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDebouncedValue, useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { useDebouncedValue, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   TbCheck,
@@ -608,10 +609,10 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
   const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: `envman:files:${slug}:tagFilter`, defaultValue: [] })
   const [sort, setSort] = useLocalStorage<'updated' | 'created'>({ key: `envman:files:${slug}:sort`, defaultValue: 'updated' })
   const [view, setView] = useLocalStorage<'list' | 'grid'>({ key: `envman:files:${slug}:view`, defaultValue: 'list' })
-  const [formOpen, { open: openForm, close: closeForm }] = useDisclosure(false)
-  const [editingFile, setEditingFile] = useState<ProjectFile | null>(null)
   const [viewFile, setViewFile] = useState<ProjectFile | null>(null)
   const [debouncedSearch] = useDebouncedValue(search, 150)
+  const navigate = useNavigate()
+  const { tab, fileId, fileNew } = useSearch({ from: '/envmanager/$slug/' })
 
   const canManageFile = (authorId: string) => isOwner || authorId === myUserId
 
@@ -622,6 +623,9 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
   })
 
   const files = data?.files ?? []
+  const editingFile = fileId ? (files.find(f => f.id === fileId) ?? null) : null
+  const formOpen = fileNew || !!editingFile
+  const closeForm = () => navigate({ to: '/envmanager/$slug', params: { slug }, search: { tab, fileId: undefined, fileNew: false } })
 
   const allTags = useMemo(() => [...new Set(files.flatMap(f => f.tags))].sort(), [files])
 
@@ -653,8 +657,8 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
   const totalPages = Math.ceil(filtered.length / FILES_PER_PAGE)
   const paginated = filtered.slice((page - 1) * FILES_PER_PAGE, page * FILES_PER_PAGE)
 
-  const openEdit = (file: ProjectFile) => { setEditingFile(file); openForm() }
-  const openCreate = () => { setEditingFile(null); openForm() }
+  const openEdit = (file: ProjectFile) => navigate({ to: '/envmanager/$slug', params: { slug }, search: { tab, fileId: file.id, fileNew: false } })
+  const openCreate = () => navigate({ to: '/envmanager/$slug', params: { slug }, search: { tab, fileNew: true, fileId: undefined } })
 
   const deleteFile = (f: ProjectFile) => {
     const modalId = `delete-file-${f.id}`
@@ -717,7 +721,7 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
         file={viewFile}
         onClose={() => setViewFile(null)}
         canManage={viewFile ? canManageFile(viewFile.author.id) : false}
-        onEdit={() => { setEditingFile(viewFile); setViewFile(null); openForm() }}
+        onEdit={() => { openEdit(viewFile!); setViewFile(null) }}
       />
 
       {/* Header */}
@@ -761,7 +765,6 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
               <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon>
             ) : undefined}
             radius="md"
-            maw={540}
           />
           <Group justify="space-between" wrap="wrap" gap="xs">
             <Group gap="xs" wrap="wrap">

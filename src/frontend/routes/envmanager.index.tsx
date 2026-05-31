@@ -189,7 +189,7 @@ function ProjectListPage() {
       setForm({ slug: '', name: '', description: '', tags: [] })
       setSlugManual(false)
       notifyOk('Project berhasil dibuat')
-      navigate({ to: '/envmanager/$slug', params: { slug: res.project.slug }, search: { tab: 'environments' } })
+      navigate({ to: '/envmanager/$slug', params: { slug: res.project.slug }, search: { tab: 'environments', fileId: undefined, fileNew: false } })
     },
     onError: (e) => notifyErr(e),
   })
@@ -356,7 +356,7 @@ function ProjectListPage() {
   const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0 || statusFilter !== 'all'
 
   const openProject = (slug: string) =>
-    navigate({ to: '/envmanager/$slug', params: { slug }, search: { tab: 'environments' } })
+    navigate({ to: '/envmanager/$slug', params: { slug }, search: { tab: 'environments', fileId: undefined, fileNew: false } })
 
   return (
     <Box>
@@ -1007,9 +1007,9 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
       <Text fw={700} size="sm" lh={1.3} mb={2} truncate>{p.name}</Text>
 
       {/* Slug */}
-      <Code fz="xs" c="dimmed" mb={6} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <Text fz="xs" c="blue.9" mb={6} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {p.slug}
-      </Code>
+      </Text>
 
       {/* Description */}
       <Text

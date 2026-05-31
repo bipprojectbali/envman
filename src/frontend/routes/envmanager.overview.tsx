@@ -332,7 +332,7 @@ function OverviewPage() {
             <Stack gap={6}>
               {recentProjects.map((p: any) => {
                 const envs: any[] = p.environments ?? []
-                const goTo = () => navigate({ to: '/envmanager/$slug', params: { slug: p.slug }, search: { tab: 'environments' } })
+                const goTo = () => navigate({ to: '/envmanager/$slug', params: { slug: p.slug }, search: { tab: 'environments', fileId: undefined, fileNew: false } })
                 return (
                   <Group
                     key={p.slug}

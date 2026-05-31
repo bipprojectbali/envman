@@ -141,7 +141,7 @@ function ProjectDetailPage() {
   const [debouncedSearch] = useDebouncedValue(envSearch, 120)
 
   const setTab = (t: string) =>
-    navigate({ to: '/envmanager/$slug', params: { slug }, search: prev => ({ ...prev, tab: t as 'environments' | 'notes' }) })
+    navigate({ to: '/envmanager/$slug', params: { slug }, search: prev => ({ ...prev, tab: t as 'environments' | 'notes', fileId: (prev as any).fileId, fileNew: (prev as any).fileNew ?? false }) })
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['envman', 'project', slug],
@@ -616,7 +616,7 @@ function ProjectDetailPage() {
                                 </Badge>
                               </Group>
                               <Group gap={6} wrap="nowrap" align="center">
-                                <Box style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
+                                <Box >
                                   <Code fz="xs" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                     {slug}:{e.name}
                                   </Code>

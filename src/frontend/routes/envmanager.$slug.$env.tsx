@@ -504,7 +504,7 @@ function VarsPage() {
           <TbChevronRight size={12} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
           <Anchor
             size="xs" c="dimmed"
-            onClick={() => navigate({ to: '/envmanager/$slug', params: { slug }, search: { tab: 'environments' } })}
+            onClick={() => navigate({ to: '/envmanager/$slug', params: { slug }, search: { tab: 'environments', fileId: undefined, fileNew: false } })}
             style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: isMobile ? 80 : 160 }}
           >
             {slug}
