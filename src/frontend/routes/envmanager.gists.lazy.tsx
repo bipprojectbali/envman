@@ -1043,7 +1043,6 @@ function GistsPage() {
       {/* Toolbar */}
       {!isLoading && gists.length > 0 && (
         <Stack gap="xs" mb="md">
-          {/* Search — selalu full width */}
           <TextInput
             ref={searchRef}
             size="sm"
@@ -1051,6 +1050,7 @@ function GistsPage() {
             leftSection={<TbSearch size={14} />}
             value={search}
             onChange={e => setSearch(e.target.value)}
+            maw={540}
             rightSection={
               search ? (
                 <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setSearch('')}>

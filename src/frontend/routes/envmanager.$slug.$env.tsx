@@ -649,13 +649,13 @@ function VarsPage() {
       {/* ─── Toolbar ─────────────────────────── */}
       <Stack gap="xs" mb="sm">
 
-        {/* Row 1: Search — full width */}
         <TextInput
           size="sm"
           placeholder="Cari key atau value..."
           leftSection={<TbSearch size={14} />}
           value={search}
           onChange={e => setSearch(e.target.value)}
+          maw={540}
           rightSection={
             search || filterType !== 'all' || filterDisabled !== 'all' ? (
               <Tooltip label="Reset semua filter">

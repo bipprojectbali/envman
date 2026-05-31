@@ -39,7 +39,7 @@ type SyncResp = { ok: boolean; tables: Record<string, number>; durationMs: numbe
 
 function DatabasePage() {
   return (
-    <Stack gap="lg" p="md">
+    <Stack gap="lg" p="md" maw={700} mx="auto">
       <Group gap="sm">
         <ThemeIcon size={36} variant="gradient" radius="md">
           <TbDatabase size={20} />

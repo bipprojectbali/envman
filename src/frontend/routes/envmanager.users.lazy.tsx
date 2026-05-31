@@ -173,6 +173,7 @@ function UsersPage() {
           ) : undefined}
           rightSectionWidth={search ? 32 : undefined}
           radius="md"
+          maw={540}
         />
         <SegmentedControl
           size="xs"

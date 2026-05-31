@@ -416,12 +416,12 @@ function ProjectListPage() {
       {/* ─── Toolbar ─── */}
       {!isLoading && !isError && projects.length > 0 && (
         <Stack gap="xs" mb="md">
-          {/* Search — selalu full width */}
           <TextInput
             ref={searchRef}
             size="sm"
             placeholder="Cari project, slug, deskripsi, atau tag..."
             leftSection={<TbSearch size={14} />}
+            maw={540}
             rightSection={
               search ? (
                 <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
