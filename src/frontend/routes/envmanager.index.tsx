@@ -382,17 +382,6 @@ function ProjectListPage() {
           )}
         </Box>
         <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-          {projects.length > 0 && (
-            <Tooltip label={view === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
-              <ActionIcon
-                size="md" variant="default" radius="md"
-                aria-label="Ganti tampilan"
-                onClick={() => setView(v => v === 'grid' ? 'list' : 'grid')}
-              >
-                {view === 'grid' ? <TbLayoutList size={15} /> : <TbLayoutGrid size={15} />}
-              </ActionIcon>
-            </Tooltip>
-          )}
           {canCreateProject && (
             <Button size="sm" leftSection={<TbPlus size={14} />} color="primary" onClick={openCreate} radius="md">
               New Project
@@ -441,6 +430,15 @@ function ProjectListPage() {
 
           {/* Filter row — wrap di mobile */}
           <Group gap="xs" wrap="wrap">
+            <Tooltip label={view === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
+              <ActionIcon
+                size="md" variant="default" radius="md"
+                aria-label="Ganti tampilan"
+                onClick={() => setView(v => v === 'grid' ? 'list' : 'grid')}
+              >
+                {view === 'grid' ? <TbLayoutList size={15} /> : <TbLayoutGrid size={15} />}
+              </ActionIcon>
+            </Tooltip>
             {allTags.length > 0 && (
               <MultiSelectChips
                 size="sm"
@@ -966,7 +964,7 @@ function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
       aria-label={`Buka project ${p.name}`}
       onClick={onClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', border: `1px solid ${borderColor}`, borderRadius: 8 }}
     >
       {/* Top: avatar + badges + actions */}
       <Group justify="space-between" mb="sm" wrap="nowrap" align="flex-start">
@@ -1087,7 +1085,7 @@ function ProjectListCard({ project: p, isPinned, onPin, onEdit, onDelete, onTogg
       aria-label={`Buka project ${p.name}`}
       onClick={onClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      style={{ cursor: 'pointer', borderBottom: '1px solid var(--mantine-color-default-border)' }}
+      style={{ cursor: 'pointer', borderBottom: '1px solid var(--mantine-color-default-border)', border: `1px solid ${borderColor}`, borderRadius: 8 }}
     >
       <Group justify="space-between" wrap="nowrap" gap="sm" align="flex-start">
         {/* Left: avatar + info */}

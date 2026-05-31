@@ -872,14 +872,6 @@ function TokensPage() {
           )}
         </Box>
         <Group gap="xs" wrap="nowrap">
-          {tokens.length > 0 && (
-            <Tooltip label={view === 'list' ? 'Tampilan grid' : 'Tampilan list'}>
-              <ActionIcon size="md" variant="default" radius="md" aria-label="Ganti tampilan"
-                onClick={() => setView(v => v === 'list' ? 'grid' : 'list')}>
-                {view === 'list' ? <TbLayoutGrid size={15} /> : <TbLayoutList size={15} />}
-              </ActionIcon>
-            </Tooltip>
-          )}
           {canCreateToken && (
             <Button size="sm" leftSection={<TbPlus size={14} />} color="primary" radius="md" onClick={goToNew}>
               Buat Token
@@ -916,6 +908,12 @@ function TokensPage() {
 
           {/* Filter row — wrap di mobile */}
           <Group gap="xs" wrap="wrap">
+            <Tooltip label={view === 'list' ? 'Tampilan grid' : 'Tampilan list'}>
+              <ActionIcon size="md" variant="default" radius="md" aria-label="Ganti tampilan"
+                onClick={() => setView(v => v === 'list' ? 'grid' : 'list')}>
+                {view === 'list' ? <TbLayoutGrid size={15} /> : <TbLayoutList size={15} />}
+              </ActionIcon>
+            </Tooltip>
             <SegmentedControl
               size="xs"
               value={filterStatus}

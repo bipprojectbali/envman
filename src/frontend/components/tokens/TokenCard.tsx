@@ -156,6 +156,7 @@ export function TokenCard({
   const expiry = expiryStatus(token.expiresAt)
   const isExpired = expiry === 'expired'
   const accentColor = token.canWrite ? 'orange' : 'blue'
+  const borderColor = `var(--mantine-color-${accentColor}-5)`
 
   const statusBadges = (
     <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
@@ -258,7 +259,7 @@ export function TokenCard({
       <Box
         p="sm"
         className={cardClass}
-        style={{ ...cardStyle, borderBottom: '1px solid var(--mantine-color-default-border)' }}
+        style={{ ...cardStyle, border: `1px solid ${borderColor}`, borderRadius: 8 }}
         onClick={onCardClick}
       >
         <Group justify="space-between" wrap="nowrap" gap="sm">
