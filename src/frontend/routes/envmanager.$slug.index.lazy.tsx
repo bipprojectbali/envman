@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Code,
+  CopyButton,
   Group,
   Kbd,
   Select,
@@ -25,8 +26,10 @@ import { useMemo, useRef, useState } from 'react'
 import {
   TbAlertTriangle,
   TbArrowLeft,
+  TbCheck,
   TbChevronRight,
   TbClock,
+  TbCopy,
   TbFolders,
   TbInfoCircle,
   TbLayoutGrid,
@@ -616,11 +619,20 @@ function ProjectDetailPage() {
                                 </Badge>
                               </Group>
                               <Group gap={6} wrap="nowrap" align="center">
-                                <Box >
+                                <Group gap={4} wrap="nowrap" align="center" onClick={ev => ev.stopPropagation()}>
                                   <Code fz="xs" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                     {slug}:{e.name}
                                   </Code>
-                                </Box>
+                                  <CopyButton value={`${slug}:${e.name}`} timeout={2000}>
+                                    {({ copied, copy }) => (
+                                      <Tooltip label={copied ? 'Tersalin!' : 'Copy'} withArrow>
+                                        <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} style={{ flexShrink: 0 }} onClick={copy}>
+                                          {copied ? <TbCheck size={10} /> : <TbCopy size={10} />}
+                                        </ActionIcon>
+                                      </Tooltip>
+                                    )}
+                                  </CopyButton>
+                                </Group>
                                 {e.createdAt && (
                                   <Tooltip label={`Dibuat ${new Date(e.createdAt).toLocaleString('id-ID')}`} withArrow>
                                     <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
