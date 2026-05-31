@@ -542,7 +542,7 @@ function GistCard({
       aria-label={`Buka gist ${gist.title}`}
       onClick={onView}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
-      style={{ cursor: 'pointer', borderBottom: '1px solid var(--mantine-color-default-border)' }}
+      style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}
     >
       <Group justify="space-between" wrap="nowrap" mb={4}>
         <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
@@ -623,9 +623,9 @@ function GistCard({
 
       {/* File preview */}
       {firstFile && (
-        <Code block style={{ fontSize: 11, maxHeight: 80, overflow: 'hidden', marginBottom: 6 }}>
-          {firstFile.content.split('\n').slice(0, 4).join('\n') || '(kosong)'}
-        </Code>
+        <Text lineClamp={4} style={{ fontSize: 11, fontFamily: 'monospace', marginBottom: 6, whiteSpace: 'pre-wrap' }}>
+          {firstFile.content || '(kosong)'}
+        </Text>
       )}
 
       <Group gap={4} wrap="wrap" align="center">
