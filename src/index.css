@@ -7,10 +7,6 @@
 }
 body {
   margin: 0;
-  display: grid;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
   position: relative;
 }
 body::before {
@@ -76,16 +72,6 @@ body::before {
   to {
     transform: rotate(360deg);
   }
-}
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-code {
-  background-color: #1a1a1a;
-  padding: 0.2em 0.4em;
-  border-radius: 0.3em;
-  font-family: monospace;
 }
 .api-tester {
   margin: 2rem auto 0;

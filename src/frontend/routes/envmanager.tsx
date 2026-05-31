@@ -602,7 +602,7 @@ function EnvManagerLayout() {
       </AppShell.Navbar>
 
       <AppShell.Main style={{ paddingBottom: isMobile ? 'calc(64px + env(safe-area-inset-bottom))' : undefined }}>
-        <Container size="xl" px={0}>
+        <Container size="lg" px={0}>
           <Outlet />
         </Container>
       </AppShell.Main>
