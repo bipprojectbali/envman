@@ -82,6 +82,7 @@ interface EnvSearch {
   compare?: boolean;
   integrations?: boolean;
   editEnv?: boolean;
+  bulk?: boolean;
 }
 
 const truthy = (v: unknown) => v === true || v === "true" || v === "1";
@@ -92,6 +93,7 @@ export const Route = createFileRoute("/envmanager/$slug/$env")({
     compare: truthy(search.compare) ? true : undefined,
     integrations: truthy(search.integrations) ? true : undefined,
     editEnv: truthy(search.editEnv) ? true : undefined,
+    bulk: truthy(search.bulk) ? true : undefined,
   }),
 });
 
@@ -131,13 +133,13 @@ function VarsPage() {
 
   // modals
   const [addOpen, { open: openAdd, close: closeAdd }] = useDisclosure(false);
-  const [bulkOpen, { open: openBulk, close: closeBulk }] = useDisclosure(false);
 
   // Compare modal — state disinkron dengan ?compare=1 di URL agar reload tidak menutup modal
   const {
     compare: compareSearch,
     integrations: integrationsSearch,
     editEnv: editEnvSearch,
+    bulk: bulkSearch,
   } = Route.useSearch();
   const compareOpen = compareSearch === true;
   const openCompare = () =>
@@ -186,6 +188,23 @@ function VarsPage() {
       to: ".",
       params: { slug, env },
       search: (prev) => ({ ...prev, editEnv: undefined }),
+      replace: true,
+    });
+
+  // Paste .env modal — via query agar reload tidak menutup
+  const bulkOpen = bulkSearch === true;
+  const openBulk = () =>
+    navigate({
+      to: ".",
+      params: { slug, env },
+      search: (prev) => ({ ...prev, bulk: true }),
+      replace: true,
+    });
+  const closeBulk = () =>
+    navigate({
+      to: ".",
+      params: { slug, env },
+      search: (prev) => ({ ...prev, bulk: undefined }),
       replace: true,
     });
 
@@ -783,6 +802,247 @@ function VarsPage() {
           Integrasi lain (Vault, Doppler, Kubernetes) akan tersedia di rilis
           berikutnya.
         </Text>
+      </Stack>
+    );
+  }
+
+  if (editEnvOpen) {
+    return (
+      <Stack gap="lg">
+        {/* Breadcrumb */}
+        <Group gap={6} align="center">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            onClick={closeEditEnv}
+          >
+            <TbChevronLeft size={15} />
+          </ActionIcon>
+          <Anchor
+            component="span"
+            size="sm"
+            c="dimmed"
+            style={{ cursor: "pointer" }}
+            onClick={closeEditEnv}
+          >
+            {env}
+          </Anchor>
+          <TbChevronRight
+            size={12}
+            style={{ color: "var(--mantine-color-dimmed)", flexShrink: 0 }}
+          />
+          <Text size="sm" fw={600}>
+            Edit .env
+          </Text>
+          <Badge size="xs" variant="outline" color="gray">
+            {slug}:{env}
+          </Badge>
+        </Group>
+
+        <Stack gap="sm">
+          {secretCount > 0 && (
+            <Alert
+              color="orange"
+              icon={<TbAlertTriangle size={14} />}
+              py="xs"
+              title="Secret vars disembunyikan"
+              styles={{ title: { fontSize: 12 } }}
+            >
+              <Text size="xs">
+                <strong>{secretCount} secret var</strong> tidak ditampilkan —
+                akan tetap dipertahankan.
+              </Text>
+            </Alert>
+          )}
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>
+              Konten .env
+            </Text>
+            <Text size="xs" c="dimmed">
+              Format KEY=value per baris. Komentar (#) diabaikan.
+            </Text>
+            <CodeEditor
+              value={editEnvText}
+              onChange={setEditEnvText}
+              language="ini"
+              filename=".env"
+              height={400}
+              noMinimap
+            />
+          </Stack>
+          <Group justify="space-between" align="center" wrap="wrap" gap="xs">
+            {parsedEditEnv.length > 0 ? (
+              <Badge
+                variant="light"
+                color="blue"
+                leftSection={<TbCheck size={11} />}
+              >
+                {parsedEditEnv.length} variabel
+              </Badge>
+            ) : (
+              <Text size="xs" c="dimmed">
+                Belum ada variabel valid
+              </Text>
+            )}
+            {secretCount > 0 && (
+              <Text size="xs" c="dimmed">
+                {secretCount} secret dipertahankan
+              </Text>
+            )}
+          </Group>
+          <Group justify="flex-end">
+            <Button
+              onClick={() => editEnvSave.mutate()}
+              loading={editEnvSave.isPending}
+              disabled={parsedEditEnv.length === 0}
+              leftSection={<TbCheck size={14} />}
+            >
+              {parsedEditEnv.length > 0
+                ? `Simpan ${parsedEditEnv.length} variabel`
+                : "Simpan"}
+            </Button>
+          </Group>
+        </Stack>
+      </Stack>
+    );
+  }
+
+  if (bulkOpen) {
+    return (
+      <Stack gap="lg">
+        {/* Breadcrumb */}
+        <Group gap={6} align="center">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            onClick={() => {
+              closeBulk();
+              setBulkText("");
+              setBulkAllSecret(false);
+            }}
+          >
+            <TbChevronLeft size={15} />
+          </ActionIcon>
+          <Anchor
+            component="span"
+            size="sm"
+            c="dimmed"
+            style={{ cursor: "pointer" }}
+            onClick={() => {
+              closeBulk();
+              setBulkText("");
+              setBulkAllSecret(false);
+            }}
+          >
+            {env}
+          </Anchor>
+          <TbChevronRight
+            size={12}
+            style={{ color: "var(--mantine-color-dimmed)", flexShrink: 0 }}
+          />
+          <Text size="sm" fw={600}>
+            Paste .env
+          </Text>
+        </Group>
+
+        <Stack gap="sm">
+          <Textarea
+            label="Konten .env"
+            description="Komentar (#) dan baris kosong diabaikan."
+            placeholder={
+              'DATABASE_URL=postgres://...\nREDIS_URL=redis://...\nAPI_KEY="nilai dengan spasi"'
+            }
+            value={bulkText}
+            onChange={(e) => setBulkText(e.target.value)}
+            autoFocus
+            autosize
+            minRows={isMobile ? 4 : 6}
+            maxRows={isMobile ? 10 : 16}
+            styles={{
+              input: { fontFamily: "monospace", fontSize: isMobile ? 13 : 12 },
+            }}
+          />
+          {parsedBulk.length > 0 && (
+            <>
+              <Group justify="space-between" align="center" wrap="wrap" gap="xs">
+                <Badge
+                  variant="light"
+                  color="blue"
+                  leftSection={<TbCheck size={11} />}
+                >
+                  {parsedBulk.length} variabel terdeteksi
+                </Badge>
+                <Checkbox
+                  size="xs"
+                  label="Semua sebagai secret"
+                  checked={bulkAllSecret}
+                  onChange={(e) => setBulkAllSecret(e.currentTarget.checked)}
+                />
+              </Group>
+              <Box
+                style={{
+                  borderRadius: "var(--mantine-radius-sm)",
+                  border: "1px solid var(--mantine-color-default-border)",
+                  overflow: "hidden",
+                }}
+              >
+                <ScrollArea.Autosize mah={isMobile ? 160 : 200}>
+                  <Table fz="xs" horizontalSpacing="xs" verticalSpacing={4} highlightOnHover>
+                    <Table.Thead
+                      style={{ background: "var(--mantine-color-default-hover)" }}
+                    >
+                      <Table.Tr>
+                        <Table.Th>Key</Table.Th>
+                        <Table.Th>Value</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {parsedBulk.map(({ key, value }) => (
+                        <Table.Tr key={key}>
+                          <Table.Td>
+                            <Code fz="xs" fw={600}>
+                              {key}
+                            </Code>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text
+                              fz="xs"
+                              ff="monospace"
+                              c={!value ? "dimmed" : undefined}
+                              fs={!value ? "italic" : undefined}
+                            >
+                              {bulkAllSecret ? "••••••••" : value || "(kosong)"}
+                            </Text>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </ScrollArea.Autosize>
+              </Box>
+            </>
+          )}
+          {bulkText.trim() && parsedBulk.length === 0 && (
+            <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
+              <Text size="xs">
+                Tidak ada <Code fz="xs">KEY=value</Code> yang valid.
+              </Text>
+            </Alert>
+          )}
+          <Button
+            onClick={() => bulkImport.mutate()}
+            loading={bulkImport.isPending}
+            disabled={parsedBulk.length === 0}
+            leftSection={<TbFileImport size={14} />}
+            fullWidth
+          >
+            {parsedBulk.length > 0
+              ? `Import ${parsedBulk.length} variabel`
+              : "Import"}
+          </Button>
+        </Stack>
       </Stack>
     );
   }
@@ -2281,226 +2541,6 @@ function VarsPage() {
           )}
         </Box>
       )}
-
-      {/* ═══════════════════════════════════════
-          MODAL: Paste .env
-      ═══════════════════════════════════════ */}
-      <Modal
-        opened={bulkOpen}
-        onClose={closeBulk}
-        fullScreen={isMobile}
-        size="lg"
-        title={
-          <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="blue" radius="sm">
-              <TbFileImport size={14} />
-            </ThemeIcon>
-            <Text fw={600} size="sm">
-              Paste .env
-            </Text>
-          </Group>
-        }
-      >
-        <Stack gap="sm">
-          <Textarea
-            label="Konten .env"
-            description="Komentar (#) dan baris kosong diabaikan."
-            placeholder={
-              'DATABASE_URL=postgres://...\nREDIS_URL=redis://...\nAPI_KEY="nilai dengan spasi"'
-            }
-            value={bulkText}
-            onChange={(e) => setBulkText(e.target.value)}
-            autosize
-            minRows={isMobile ? 4 : 6}
-            maxRows={isMobile ? 10 : 16}
-            styles={{
-              input: { fontFamily: "monospace", fontSize: isMobile ? 13 : 12 },
-            }}
-          />
-          {parsedBulk.length > 0 && (
-            <>
-              <Group
-                justify="space-between"
-                align="center"
-                wrap="wrap"
-                gap="xs"
-              >
-                <Badge
-                  variant="light"
-                  color="blue"
-                  leftSection={<TbCheck size={11} />}
-                >
-                  {parsedBulk.length} variabel terdeteksi
-                </Badge>
-                <Checkbox
-                  size="xs"
-                  label="Semua sebagai secret"
-                  checked={bulkAllSecret}
-                  onChange={(e) => setBulkAllSecret(e.currentTarget.checked)}
-                />
-              </Group>
-              <Box
-                style={{
-                  borderRadius: "var(--mantine-radius-sm)",
-                  border: "1px solid var(--mantine-color-default-border)",
-                  overflow: "hidden",
-                }}
-              >
-                <ScrollArea.Autosize mah={isMobile ? 160 : 200}>
-                  <Table
-                    fz="xs"
-                    horizontalSpacing="xs"
-                    verticalSpacing={4}
-                    highlightOnHover
-                  >
-                    <Table.Thead
-                      style={{
-                        background: "var(--mantine-color-default-hover)",
-                      }}
-                    >
-                      <Table.Tr>
-                        <Table.Th>Key</Table.Th>
-                        <Table.Th>Value</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {parsedBulk.map(({ key, value }) => (
-                        <Table.Tr key={key}>
-                          <Table.Td>
-                            <Code fz="xs" fw={600}>
-                              {key}
-                            </Code>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text
-                              fz="xs"
-                              ff="monospace"
-                              c={!value ? "dimmed" : undefined}
-                              fs={!value ? "italic" : undefined}
-                            >
-                              {bulkAllSecret ? "••••••••" : value || "(kosong)"}
-                            </Text>
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                </ScrollArea.Autosize>
-              </Box>
-            </>
-          )}
-          {bulkText.trim() && parsedBulk.length === 0 && (
-            <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-              <Text size="xs">
-                Tidak ada <Code fz="xs">KEY=value</Code> yang valid.
-              </Text>
-            </Alert>
-          )}
-          <Button
-            onClick={() => bulkImport.mutate()}
-            loading={bulkImport.isPending}
-            disabled={parsedBulk.length === 0}
-            leftSection={<TbFileImport size={14} />}
-            fullWidth
-          >
-            {parsedBulk.length > 0
-              ? `Import ${parsedBulk.length} variabel`
-              : "Import"}
-          </Button>
-        </Stack>
-      </Modal>
-
-      {/* ═══════════════════════════════════════
-          MODAL: Edit .env
-      ═══════════════════════════════════════ */}
-      <Modal
-        opened={editEnvOpen}
-        onClose={closeEditEnv}
-        fullScreen={isMobile}
-        size="lg"
-        title={
-          <Group gap="xs" wrap="nowrap">
-            <ThemeIcon size="sm" variant="light" color="primary" radius="sm">
-              <TbPencil size={14} />
-            </ThemeIcon>
-            <Text fw={600} size="sm">
-              Edit .env
-            </Text>
-            <Badge
-              size="xs"
-              variant="outline"
-              color="gray"
-              style={{ flexShrink: 0 }}
-            >
-              {slug}:{env}
-            </Badge>
-          </Group>
-        }
-      >
-        <Stack gap="sm">
-          {secretCount > 0 && (
-            <Alert
-              color="orange"
-              icon={<TbAlertTriangle size={14} />}
-              py="xs"
-              title="Secret vars disembunyikan"
-              styles={{ title: { fontSize: 12 } }}
-            >
-              <Text size="xs">
-                <strong>{secretCount} secret var</strong> tidak ditampilkan —
-                akan tetap dipertahankan.
-              </Text>
-            </Alert>
-          )}
-          <Stack gap={4}>
-            <Text size="sm" fw={500}>
-              Konten .env
-            </Text>
-            <Text size="xs" c="dimmed">
-              Format KEY=value per baris. Komentar (#) diabaikan.
-            </Text>
-            <CodeEditor
-              value={editEnvText}
-              onChange={setEditEnvText}
-              language="ini"
-              filename=".env"
-              height={400}
-              noMinimap
-            />
-          </Stack>
-          <Group justify="space-between" align="center" wrap="wrap" gap="xs">
-            {parsedEditEnv.length > 0 ? (
-              <Badge
-                variant="light"
-                color="blue"
-                leftSection={<TbCheck size={11} />}
-              >
-                {parsedEditEnv.length} variabel
-              </Badge>
-            ) : (
-              <Text size="xs" c="dimmed">
-                Belum ada variabel valid
-              </Text>
-            )}
-            {secretCount > 0 && (
-              <Text size="xs" c="dimmed">
-                {secretCount} secret dipertahankan
-              </Text>
-            )}
-          </Group>
-          <Button
-            onClick={() => editEnvSave.mutate()}
-            loading={editEnvSave.isPending}
-            disabled={parsedEditEnv.length === 0}
-            leftSection={<TbCheck size={14} />}
-            fullWidth
-          >
-            {parsedEditEnv.length > 0
-              ? `Simpan ${parsedEditEnv.length} variabel`
-              : "Simpan"}
-          </Button>
-        </Stack>
-      </Modal>
 
       {/* ═══════════════════════════════════════
           MODAL: Tambah variabel
