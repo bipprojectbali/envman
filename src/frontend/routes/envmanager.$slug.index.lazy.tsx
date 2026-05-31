@@ -519,7 +519,6 @@ function ProjectDetailPage() {
               <>
                 {/* Toolbar */}
                 <Stack gap="xs" mb="sm">
-                  {/* Search — full width own row */}
                   {envs.length > 2 && (
                     <TextInput
                       ref={searchRef}
@@ -528,6 +527,7 @@ function ProjectDetailPage() {
                       leftSection={<TbSearch size={14} />}
                       value={envSearch}
                       onChange={e => setEnvSearch(e.target.value)}
+                      maw={540}
                       rightSection={
                         envSearch ? (
                           <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setEnvSearch('')}>

@@ -228,6 +228,7 @@ function PublicGistsPage() {
                 <TbX size={11} />
               </ActionIcon>
             ) : undefined}
+            maw={540}
           />
 
           {isLoading ? (

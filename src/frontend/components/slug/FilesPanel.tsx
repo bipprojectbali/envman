@@ -761,6 +761,7 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
               <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon>
             ) : undefined}
             radius="md"
+            maw={540}
           />
           <Group justify="space-between" wrap="wrap" gap="xs">
             <Group gap="xs" wrap="wrap">

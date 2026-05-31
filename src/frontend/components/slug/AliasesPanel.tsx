@@ -243,6 +243,7 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           radius="md"
+          maw={540}
         />
         <Group justify="space-between" wrap="wrap" gap="xs">
           <MultiSelectChips

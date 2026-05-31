@@ -484,6 +484,7 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId, setOpe
             leftSection={<TbSearch size={13} />}
             value={search}
             onChange={e => setSearch(e.target.value)}
+            maw={540}
             rightSection={
               search ? (
                 <ActionIcon size="xs" variant="subtle" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
