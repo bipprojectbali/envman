@@ -259,7 +259,7 @@ export function TokenCard({
       <Box
         p="sm"
         className={cardClass}
-        style={{ ...cardStyle, border: `1px solid ${borderColor}`, borderRadius: 8 }}
+        style={{ ...cardStyle, border: `1px solid var(--mantine-color-default-border)`, borderRadius: 8 }}
         onClick={onCardClick}
       >
         <Group justify="space-between" wrap="nowrap" gap="sm">
@@ -295,7 +295,7 @@ export function TokenCard({
     <Box
       p={0}
       className={cardClass}
-      style={{ ...cardStyle, borderBottom: '1px solid var(--mantine-color-default-border)' }}
+      style={{ ...cardStyle, border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}
       onClick={onCardClick}
     >
       <Box p="sm" >

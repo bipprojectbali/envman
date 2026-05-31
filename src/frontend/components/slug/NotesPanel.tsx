@@ -216,7 +216,7 @@ function NoteCardList({ note, canEdit, isOwner, myUserId, onView, onEdit, onDele
       aria-label={`Note: ${note.title}`}
       onClick={onView}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
-      style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)', borderLeft: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined }}
+      style={{ cursor: 'pointer', border: note.pinned ? '0.1px solid var(--mantine-color-blue-5)' : '1px solid var(--mantine-color-default-border)', borderRadius: 9 }}
     >
       <Group justify="space-between" wrap="nowrap" gap="xs">
         <Box style={{ flex: 1, minWidth: 0 }}>
@@ -268,8 +268,8 @@ function NoteCardGrid({ note, canEdit, isOwner, myUserId, onView, onEdit, onDele
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
       style={{
         cursor: 'pointer',
-        border: '1px solid var(--mantine-color-default-border)',
-        borderTop: note.pinned ? '3px solid var(--mantine-color-yellow-5)' : undefined,
+        border: note.pinned ? '0.1px solid var(--mantine-color-blue-5)' : '1px solid var(--mantine-color-default-border)',
+        borderRadius: 9,
         display: 'flex',
         flexDirection: 'column',
         minHeight: 156,
