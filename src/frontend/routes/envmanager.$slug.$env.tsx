@@ -631,7 +631,7 @@ function VarsPage() {
               </>
             )}
           </Group>
-          <Group gap={4} wrap="nowrap" align="center">
+          <Group gap={4} wrap="nowrap" align="center" maw={540}>
             <Code fz={10} style={{ flex: 1, wordBreak: 'break-all' }}>{cliCommand}</Code>
             <CopyButton value={cliCommand}>
               {({ copied, copy }) => (
