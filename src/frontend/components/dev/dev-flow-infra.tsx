@@ -1,9 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
 import { SegmentedControl } from '@mantine/core'
+import { type Edge, type Node, useEdgesState, useNodesState, useReactFlow } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
-import {
-  type Edge, type Node, useEdgesState, useNodesState, useReactFlow,
-} from '@xyflow/react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 const elk = new ELK()
 export type LayoutType = 'horizontal' | 'vertical' | 'radial' | 'force'

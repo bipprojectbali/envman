@@ -1,10 +1,10 @@
 import { Elysia } from 'elysia'
 import { appLog } from '../lib/applog'
-import { prisma } from '../lib/db'
-import { requireAuth, unauthorized, forbidden } from '../lib/auth-middleware'
 import { audit } from '../lib/audit'
-import { getIp } from '../lib/request'
+import { forbidden, requireAuth, unauthorized } from '../lib/auth-middleware'
+import { prisma } from '../lib/db'
 import { hasCapability } from '../lib/permissions'
+import { getIp } from '../lib/request'
 
 function getAllowedStatusTransitions(current: string, role: 'QC' | 'ADMIN' | 'SUPER_ADMIN'): string[] {
   const isQc = role === 'QC' || role === 'SUPER_ADMIN'
@@ -74,7 +74,10 @@ export const ticketsRouter = new Elysia()
         evidence: { orderBy: { createdAt: 'asc' } },
       },
     })
-    if (!ticket) { set.status = 404; return { error: 'Ticket not found' } }
+    if (!ticket) {
+      set.status = 404
+      return { error: 'Ticket not found' }
+    }
     return { ticket }
   })
 
@@ -86,9 +89,16 @@ export const ticketsRouter = new Elysia()
     if (!isQcOrSuper && !hasCapability(caller, 'ticket:create')) return forbidden(set)
 
     const body = (await request.json()) as {
-      title?: string; description?: string; priority?: string; route?: string; assigneeId?: string
+      title?: string
+      description?: string
+      priority?: string
+      route?: string
+      assigneeId?: string
     }
-    if (!body.title || !body.description) { set.status = 400; return { error: 'title dan description wajib diisi' } }
+    if (!body.title || !body.description) {
+      set.status = 400
+      return { error: 'title dan description wajib diisi' }
+    }
 
     const ticket = await prisma.ticket.create({
       data: {
@@ -111,11 +121,18 @@ export const ticketsRouter = new Elysia()
     if (caller.role === 'USER') return forbidden(set)
 
     const current = await prisma.ticket.findUnique({ where: { id: params.id } })
-    if (!current) { set.status = 404; return { error: 'Ticket not found' } }
+    if (!current) {
+      set.status = 404
+      return { error: 'Ticket not found' }
+    }
 
     const body = (await request.json()) as {
-      title?: string; description?: string; priority?: string; route?: string | null
-      status?: string; assigneeId?: string | null
+      title?: string
+      description?: string
+      priority?: string
+      route?: string | null
+      status?: string
+      assigneeId?: string | null
     }
     const data: Record<string, unknown> = {}
     if (body.title !== undefined) data.title = body.title
@@ -128,7 +145,9 @@ export const ticketsRouter = new Elysia()
       const allowed = getAllowedStatusTransitions(current.status, caller.role as 'QC' | 'ADMIN' | 'SUPER_ADMIN')
       if (!allowed.includes(body.status)) {
         set.status = 400
-        return { error: `Transisi status tidak diizinkan untuk role ${caller.role}: ${current.status} → ${body.status}` }
+        return {
+          error: `Transisi status tidak diizinkan untuk role ${caller.role}: ${current.status} → ${body.status}`,
+        }
       }
       data.status = body.status
       if (body.status === 'CLOSED') data.closedAt = new Date()
@@ -146,10 +165,16 @@ export const ticketsRouter = new Elysia()
     if (caller.role === 'USER') return forbidden(set)
 
     const ticket = await prisma.ticket.findUnique({ where: { id: params.id }, select: { id: true } })
-    if (!ticket) { set.status = 404; return { error: 'Ticket not found' } }
+    if (!ticket) {
+      set.status = 404
+      return { error: 'Ticket not found' }
+    }
 
     const { body } = (await request.json()) as { body?: string }
-    if (!body?.trim()) { set.status = 400; return { error: 'body wajib diisi' } }
+    if (!body?.trim()) {
+      set.status = 400
+      return { error: 'body wajib diisi' }
+    }
 
     const comment = await prisma.ticketComment.create({
       data: {
@@ -169,10 +194,16 @@ export const ticketsRouter = new Elysia()
     if (caller.role === 'USER') return forbidden(set)
 
     const ticket = await prisma.ticket.findUnique({ where: { id: params.id }, select: { id: true } })
-    if (!ticket) { set.status = 404; return { error: 'Ticket not found' } }
+    if (!ticket) {
+      set.status = 404
+      return { error: 'Ticket not found' }
+    }
 
     const body = (await request.json()) as { kind?: string; url?: string; note?: string }
-    if (!body.kind || !body.url) { set.status = 400; return { error: 'kind dan url wajib diisi' } }
+    if (!body.kind || !body.url) {
+      set.status = 400
+      return { error: 'kind dan url wajib diisi' }
+    }
 
     const evidence = await prisma.ticketEvidence.create({
       data: { ticketId: params.id, kind: body.kind, url: body.url, note: body.note ?? null },

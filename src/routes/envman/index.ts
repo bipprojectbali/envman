@@ -1,21 +1,20 @@
 import { Elysia } from 'elysia'
-import { tokensRouter } from './tokens'
-import { projectsRouter } from './projects'
-import { portainerRouter } from './portainer'
-import { portainerBackupRouter } from './portainer-backup'
-import { notesRouter } from './notes'
-import { aliasesRouter } from './aliases'
-import { filesRouter } from './files'
-import { gistsRouter } from './gists'
-import { databaseRouter } from './database'
-import { adminUsersRouter } from './admin-users'
-import { pmAuditRouter } from './pm-audit'
-import { mcpAuditRouter } from './mcp-audit'
-
-// Misc envman routes (status, whoami, user lookup)
-import { prisma } from '../../lib/db'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { hasMasterKey } from '../../lib/crypto'
+// Misc envman routes (status, whoami, user lookup)
+import { prisma } from '../../lib/db'
+import { adminUsersRouter } from './admin-users'
+import { aliasesRouter } from './aliases'
+import { databaseRouter } from './database'
+import { filesRouter } from './files'
+import { gistsRouter } from './gists'
+import { mcpAuditRouter } from './mcp-audit'
+import { notesRouter } from './notes'
+import { pmAuditRouter } from './pm-audit'
+import { portainerRouter } from './portainer'
+import { portainerBackupRouter } from './portainer-backup'
+import { projectsRouter } from './projects'
+import { tokensRouter } from './tokens'
 
 const envmanMiscRouter = new Elysia()
 

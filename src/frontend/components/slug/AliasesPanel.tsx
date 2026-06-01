@@ -1,13 +1,15 @@
 import {
   ActionIcon,
   Alert,
+  Anchor,
   Badge,
   Box,
   Button,
   Code,
   CopyButton,
+  Divider,
   Group,
-  Modal,
+  Paper,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -18,11 +20,26 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDisclosure, useLocalStorage } from '@mantine/hooks'
+import { useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
-import { TbCheck, TbCopy, TbInfoCircle, TbLayoutGrid, TbLayoutList, TbPencil, TbPlus, TbSearch, TbTag, TbTerminal2, TbTrash } from 'react-icons/tb'
+import {
+  TbCheck,
+  TbChevronLeft,
+  TbChevronRight,
+  TbCopy,
+  TbInfoCircle,
+  TbLayoutGrid,
+  TbLayoutList,
+  TbPencil,
+  TbPlus,
+  TbSearch,
+  TbTag,
+  TbTerminal2,
+  TbTrash,
+} from 'react-icons/tb'
 import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -47,13 +64,6 @@ interface FormState {
 
 const emptyForm = (): FormState => ({ name: '', args: '', description: '', tags: [] })
 
-interface AliasModalProps {
-  slug: string
-  opened: boolean
-  editing: Alias | null
-  onClose: () => void
-}
-
 function AliasForm({ slug, editing, onClose }: { slug: string; editing: Alias | null; onClose: () => void }) {
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState>(
@@ -63,15 +73,16 @@ function AliasForm({ slug, editing, onClose }: { slug: string; editing: Alias | 
   )
 
   const save = useMutation({
-    mutationFn: () => editing
-      ? apiFetch(`/api/envman/projects/${slug}/aliases/${editing.name}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ args: form.args, description: form.description, tags: form.tags }),
-        })
-      : apiFetch(`/api/envman/projects/${slug}/aliases`, {
-          method: 'POST',
-          body: JSON.stringify({ name: form.name, args: form.args, description: form.description, tags: form.tags }),
-        }),
+    mutationFn: () =>
+      editing
+        ? apiFetch(`/api/envman/projects/${slug}/aliases/${editing.name}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ args: form.args, description: form.description, tags: form.tags }),
+          })
+        : apiFetch(`/api/envman/projects/${slug}/aliases`, {
+            method: 'POST',
+            body: JSON.stringify({ name: form.name, args: form.args, description: form.description, tags: form.tags }),
+          }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['envman', 'aliases', slug] })
       notifyOk(editing ? 'Alias diperbarui' : 'Alias dibuat')
@@ -88,7 +99,7 @@ function AliasForm({ slug, editing, onClose }: { slug: string; editing: Alias | 
           description="Huruf kecil, angka, tanda hubung. Contoh: deploy, start-dev"
           placeholder="deploy"
           value={form.name}
-          onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           required
         />
       )}
@@ -97,15 +108,19 @@ function AliasForm({ slug, editing, onClose }: { slug: string; editing: Alias | 
         description="Argumen yang disimpan — apa yang biasanya kamu ketik setelah envman"
         placeholder="-e myapp:production -- docker compose up -d"
         value={form.args}
-        onChange={e => setForm(f => ({ ...f, args: e.target.value }))}
+        onChange={(e) => setForm((f) => ({ ...f, args: e.target.value }))}
         autosize
         minRows={2}
         required
       />
       {form.name && !editing && (
         <Box>
-          <Text size="xs" c="dimmed" mb={4}>Preview perintah:</Text>
-          <Code block fz="xs">envman run {slug}:{form.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')}</Code>
+          <Text size="xs" c="dimmed" mb={4}>
+            Preview perintah:
+          </Text>
+          <Code block fz="xs">
+            envman run {slug}:{form.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')}
+          </Code>
         </Box>
       )}
       <TextInput
@@ -113,17 +128,19 @@ function AliasForm({ slug, editing, onClose }: { slug: string; editing: Alias | 
         description="Opsional — penjelasan singkat apa yang dilakukan alias ini"
         placeholder="Deploy ke production dengan rebuild image"
         value={form.description}
-        onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+        onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
       />
       <TagsInput
         label="Tags"
         description="Opsional — untuk organisasi dan filter. Tekan Enter untuk tambah tag."
         placeholder="ci, deploy, docker"
         value={form.tags}
-        onChange={v => setForm(f => ({ ...f, tags: v }))}
+        onChange={(v) => setForm((f) => ({ ...f, tags: v }))}
       />
       <Group justify="flex-end" mt="xs">
-        <Button variant="default" onClick={onClose}>Batal</Button>
+        <Button variant="default" onClick={onClose}>
+          Batal
+        </Button>
         <Button
           onClick={() => save.mutate()}
           loading={save.isPending}
@@ -136,19 +153,6 @@ function AliasForm({ slug, editing, onClose }: { slug: string; editing: Alias | 
   )
 }
 
-function AliasModal({ slug, opened, editing, onClose }: AliasModalProps) {
-  return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title={editing ? `Edit alias: ${editing.name}` : 'Tambah alias baru'}
-      size="lg"
-    >
-      {opened && <AliasForm slug={slug} editing={editing} onClose={onClose} />}
-    </Modal>
-  )
-}
-
 export interface AliasesPanelProps {
   slug: string
   isOwner: boolean
@@ -156,10 +160,15 @@ export interface AliasesPanelProps {
 
 export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
   const qc = useQueryClient()
-  const [opened, { open, close }] = useDisclosure(false)
-  const [editing, setEditing] = useState<Alias | null>(null)
+  const navigate = useNavigate()
+  const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, noteId, noteNew, viewNoteId } = useSearch({
+    from: '/envmanager/$slug/',
+  })
   const [search, setSearch] = useState('')
-  const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: `envman:aliases:${slug}:tagFilter`, defaultValue: [] })
+  const [tagFilter, setTagFilter] = useLocalStorage<string[]>({
+    key: `envman:aliases:${slug}:tagFilter`,
+    defaultValue: [],
+  })
   const [view, setView] = useLocalStorage<'list' | 'grid'>({
     key: `envman:aliases:${slug}:view`,
     defaultValue: 'list',
@@ -185,15 +194,16 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
     let list = [...aliases]
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter(a =>
-        a.name.toLowerCase().includes(q) ||
-        a.args.toLowerCase().includes(q) ||
-        (a.description?.toLowerCase().includes(q) ?? false) ||
-        a.tags.some(t => t.toLowerCase().includes(q)),
+      list = list.filter(
+        (a) =>
+          a.name.toLowerCase().includes(q) ||
+          a.args.toLowerCase().includes(q) ||
+          (a.description?.toLowerCase().includes(q) ?? false) ||
+          a.tags.some((t) => t.toLowerCase().includes(q)),
       )
     }
     if (tagFilter.length > 0) {
-      list = list.filter(a => tagFilter.every(t => a.tags.includes(t)))
+      list = list.filter((a) => tagFilter.every((t) => a.tags.includes(t)))
     }
     return list
   }, [aliases, search, tagFilter])
@@ -207,8 +217,24 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
     onError: (e) => notifyErr(e),
   })
 
-  const openEdit = (alias: Alias) => { setEditing(alias); open() }
-  const openCreate = () => { setEditing(null); open() }
+  const openEdit = (alias: Alias) =>
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: { tab, fileId, fileNew, viewFileId, aliasId: alias.id, aliasNew: false, noteId, noteNew, viewNoteId },
+    })
+  const openCreate = () =>
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: true, noteId, noteNew, viewNoteId },
+    })
+  const closeForm = () =>
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: false, noteId, noteNew, viewNoteId },
+    })
 
   const confirmDelete = (alias: Alias) => {
     modals.openConfirmModal({
@@ -224,104 +250,165 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
     })
   }
 
-  if (isLoading) {
+  const formOpen = aliasNew || !!aliasId
+  if (formOpen) {
+    const editingAlias = aliasId ? (aliases.find((a) => a.id === aliasId) ?? null) : null
     return (
-      <Stack gap="xs">
-        {[0, 1, 2].map(i => <Skeleton key={i} height={80} radius="md" />)}
-      </Stack>
+      <Paper withBorder p="md" radius="md">
+        <Stack gap="lg">
+          <Group gap={6} align="center">
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeForm}>
+              <TbChevronLeft size={15} />
+            </ActionIcon>
+            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeForm}>
+              Aliases
+            </Anchor>
+            <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
+            <Text size="sm" fw={600}>
+              {aliasId ? (editingAlias ? `Edit: ${editingAlias.name}` : '...') : 'Tambah Alias Baru'}
+            </Text>
+          </Group>
+          <Divider />
+          {isLoading && aliasId ? (
+            <Skeleton height={200} radius="md" />
+          ) : (
+            <AliasForm slug={slug} editing={editingAlias} onClose={closeForm} />
+          )}
+        </Stack>
+      </Paper>
     )
   }
 
   return (
-    <>
-      <Stack gap="xs">
-        {/* ── Toolbar ────────────────────────────────── */}
-        <TextInput
-          size="sm"
-          placeholder="Cari alias, args, atau tags..."
-          leftSection={<TbSearch size={13} />}
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          radius="md"
-          maw={540}
+    <Stack gap="xs">
+      {/* ── Toolbar ────────────────────────────────── */}
+      <TextInput
+        size="sm"
+        placeholder="Cari alias, args, atau tags..."
+        leftSection={<TbSearch size={13} />}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        radius="md"
+        maw={540}
+      />
+      <Group justify="space-between" wrap="wrap" gap="xs">
+        <MultiSelectChips
+          value={tagFilter}
+          onChange={setTagFilter}
+          options={allTags}
+          label="Tags"
+          icon={<TbTag size={12} />}
+          width={120}
+          disabled={allTags.length === 0}
         />
-        <Group justify="space-between" wrap="wrap" gap="xs">
-          <MultiSelectChips
-            value={tagFilter}
-            onChange={setTagFilter}
-            options={allTags}
-            label="Tags"
-            icon={<TbTag size={12} />}
-            width={120}
-            disabled={allTags.length === 0}
-          />
-          <Group gap="xs" wrap="nowrap">
-            <Group gap={4}>
-              <Tooltip label="List view" withArrow>
-                <ActionIcon size="sm" variant={view === 'list' ? 'filled' : 'subtle'} color="blue" onClick={() => setView('list')}>
-                  <TbLayoutList size={14} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Grid view" withArrow>
-                <ActionIcon size="sm" variant={view === 'grid' ? 'filled' : 'subtle'} color="blue" onClick={() => setView('grid')}>
-                  <TbLayoutGrid size={14} />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-            {isOwner && (
-              <Button variant='light' size="sm" leftSection={<TbPlus size={14} />} onClick={openCreate}>
-                Tambah alias
-              </Button>
-            )}
+        <Group gap="xs" wrap="nowrap">
+          <Group gap={4}>
+            <Tooltip label="List view" withArrow>
+              <ActionIcon
+                size="sm"
+                variant={view === 'list' ? 'filled' : 'subtle'}
+                color="blue"
+                onClick={() => setView('list')}
+              >
+                <TbLayoutList size={14} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Grid view" withArrow>
+              <ActionIcon
+                size="sm"
+                variant={view === 'grid' ? 'filled' : 'subtle'}
+                color="blue"
+                onClick={() => setView('grid')}
+              >
+                <TbLayoutGrid size={14} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
+          {isOwner && (
+            <Button variant="light" size="sm" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+              Tambah alias
+            </Button>
+          )}
         </Group>
+      </Group>
 
-        {tagFilter.length > 0 && (
-          <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />
-        )}
+      {tagFilter.length > 0 && <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />}
 
-        <Alert
-          variant="light" color="blue" radius="md" p="xs"
-          icon={<TbInfoCircle size={15} />}
-          styles={{ message: { fontSize: 'var(--mantine-font-size-xs)' }, body: { gap: 4 } }}
-        >
-          Alias menyimpan perintah lengkap agar bisa dijalankan singkat dari terminal.
-          Jalankan dengan: <Code fz="xs">envman run {slug}:nama-alias</Code>. Bisa menyertakan multi-source env, flags, dan perintah apapun.
-        </Alert>
+      <Alert
+        variant="light"
+        color="blue"
+        radius="md"
+        p="xs"
+        icon={<TbInfoCircle size={15} />}
+        styles={{ message: { fontSize: 'var(--mantine-font-size-xs)' }, body: { gap: 4 } }}
+      >
+        Alias menyimpan perintah lengkap agar bisa dijalankan singkat dari terminal. Jalankan dengan:{' '}
+        <Code fz="xs">envman run {slug}:nama-alias</Code>. Bisa menyertakan multi-source env, flags, dan perintah
+        apapun.
+      </Alert>
 
-        {/* ── List ───────────────────────────────────── */}
-        {aliases.length === 0 ? (
-          <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
-            <ThemeIcon size={48} radius="xl" variant="light" color="blue" mx="auto" mb="sm">
-              <TbTerminal2 size={24} />
-            </ThemeIcon>
-            <Text fw={600} mb={4}>Belum ada alias</Text>
-            <Text size="sm" c="dimmed" maw={420} mx="auto" mb={isOwner ? 'md' : 0}>
-              Alias menyimpan perintah panjang supaya bisa dipanggil singkat via{' '}
-              <Code fz="xs">envman run {slug}:nama-alias</Code>.
-            </Text>
-            {isOwner && (
-              <Button size="xs" leftSection={<TbPlus size={14} />} onClick={openCreate} variant="light">
-                Buat alias pertama
-              </Button>
-            )}
-          </Box>
-        ) : filtered.length === 0 ? (
-          <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
-            <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
-              <TbSearch size={22} />
-            </ThemeIcon>
-            <Text fw={500} size="sm" mb={4}>Tidak ada alias yang cocok</Text>
-            <Text size="xs" c="dimmed">Coba ubah filter atau kata kunci pencarian.</Text>
-          </Box>
-        ) : (
-          (() => {
-            const cards = filtered.map(alias => (
-            <Box key={alias.id} p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+      {/* ── Loading ─────────────────────────────────── */}
+      {isLoading && (
+        <Stack gap="xs">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} height={80} radius="md" />
+          ))}
+        </Stack>
+      )}
+
+      {/* ── List ───────────────────────────────────── */}
+      {!isLoading && aliases.length === 0 && (
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
+          <ThemeIcon size={48} radius="xl" variant="light" color="blue" mx="auto" mb="sm">
+            <TbTerminal2 size={24} />
+          </ThemeIcon>
+          <Text fw={600} mb={4}>
+            Belum ada alias
+          </Text>
+          <Text size="sm" c="dimmed" maw={420} mx="auto" mb={isOwner ? 'md' : 0}>
+            Alias menyimpan perintah panjang supaya bisa dipanggil singkat via{' '}
+            <Code fz="xs">envman run {slug}:nama-alias</Code>.
+          </Text>
+          {isOwner && (
+            <Button size="xs" leftSection={<TbPlus size={14} />} onClick={openCreate} variant="light">
+              Buat alias pertama
+            </Button>
+          )}
+        </Box>
+      )}
+
+      {!isLoading && aliases.length > 0 && filtered.length === 0 && (
+        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
+          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
+            <TbSearch size={22} />
+          </ThemeIcon>
+          <Text fw={500} size="sm" mb={4}>
+            Tidak ada alias yang cocok
+          </Text>
+          <Text size="xs" c="dimmed">
+            Coba ubah filter atau kata kunci pencarian.
+          </Text>
+        </Box>
+      )}
+
+      {!isLoading &&
+        filtered.length > 0 &&
+        (() => {
+          const cards = filtered.map((alias) => (
+            <Box
+              key={alias.id}
+              p="sm"
+              style={{
+                border: '1px solid var(--mantine-color-default-border)',
+                borderRadius: 'var(--mantine-radius-md)',
+              }}
+            >
               <Group justify="space-between" wrap="nowrap" align="flex-start">
                 <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
                   <Group gap="xs" wrap="nowrap">
-                    <Code fz="sm" fw={700}>{alias.name}</Code>
+                    <Code fz="sm" fw={700}>
+                      {alias.name}
+                    </Code>
                     <CopyButton value={`envman run ${slug}:${alias.name}`} timeout={2000}>
                       {({ copied, copy }) => (
                         <Tooltip label={copied ? 'Disalin!' : `Salin: envman run ${slug}:${alias.name}`} withArrow>
@@ -333,14 +420,14 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                     </CopyButton>
                     {alias.tags.length > 0 && (
                       <Group gap={4} wrap="wrap">
-                        {alias.tags.map(tag => (
+                        {alias.tags.map((tag) => (
                           <Badge
                             key={tag}
                             size="xs"
                             variant="light"
                             color="blue"
                             style={{ cursor: 'pointer' }}
-                            onClick={() => !tagFilter.includes(tag) && setTagFilter(f => [...f, tag])}
+                            onClick={() => !tagFilter.includes(tag) && setTagFilter((f) => [...f, tag])}
                           >
                             {tag}
                           </Badge>
@@ -363,10 +450,17 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                     </CopyButton>
                   </Group>
                   {alias.description && (
-                    <Text size="xs" c="dimmed">{alias.description}</Text>
+                    <Text size="xs" c="dimmed">
+                      {alias.description}
+                    </Text>
                   )}
                   <Text size="xs" c="dimmed">
-                    dibuat oleh {alias.creator.name} · {new Date(alias.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    dibuat oleh {alias.creator.name} ·{' '}
+                    {new Date(alias.createdAt).toLocaleDateString('id-ID', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
                   </Text>
                 </Stack>
 
@@ -386,17 +480,15 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                 )}
               </Group>
             </Box>
-            ))
-            return view === 'grid' ? (
-              <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{cards}</SimpleGrid>
-            ) : (
-              <>{cards}</>
-            )
-          })()
-        )}
-      </Stack>
-
-      <AliasModal slug={slug} opened={opened} editing={editing} onClose={close} />
-    </>
+          ))
+          return view === 'grid' ? (
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">
+              {cards}
+            </SimpleGrid>
+          ) : (
+            cards
+          )
+        })()}
+    </Stack>
   )
 }

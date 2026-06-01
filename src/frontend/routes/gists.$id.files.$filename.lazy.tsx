@@ -14,26 +14,30 @@ import {
 } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, useNavigate, useParams } from '@tanstack/react-router'
-import {
-  TbArrowLeft,
-  TbBrandGithub,
-  TbCheck,
-  TbCopy,
-  TbExternalLink,
-  TbLayoutDashboard,
-  TbLogin,
-} from 'react-icons/tb'
-import { ThemeToggle } from '@/frontend/components/ThemeToggle'
+import { TbArrowLeft, TbBrandGithub, TbCheck, TbCopy, TbExternalLink, TbLayoutDashboard, TbLogin } from 'react-icons/tb'
 import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
+import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { getDefaultRoute, useSession } from '@/frontend/hooks/useAuth'
 
 export const Route = createLazyFileRoute('/gists/$id/files/$filename')({ component: FilePreviewPage })
 
 const LANG_COLORS: Record<string, string> = {
-  javascript: 'yellow', typescript: 'blue', python: 'green', go: 'cyan',
-  rust: 'orange', bash: 'gray', sql: 'violet', json: 'teal', yaml: 'lime',
-  html: 'red', css: 'indigo', markdown: 'gray', dockerfile: 'blue',
-  prisma: 'violet', toml: 'orange', plaintext: 'gray',
+  javascript: 'yellow',
+  typescript: 'blue',
+  python: 'green',
+  go: 'cyan',
+  rust: 'orange',
+  bash: 'gray',
+  sql: 'violet',
+  json: 'teal',
+  yaml: 'lime',
+  html: 'red',
+  css: 'indigo',
+  markdown: 'gray',
+  dockerfile: 'blue',
+  prisma: 'violet',
+  toml: 'orange',
+  plaintext: 'gray',
 }
 const getLangColor = (lang: string) => LANG_COLORS[lang] ?? 'gray'
 
@@ -58,13 +62,14 @@ function FilePreviewPage() {
 
   const { data, isLoading, isError } = useQuery<{ gist: PublicGist }>({
     queryKey: ['public', 'gist', id],
-    queryFn: () => fetch(`/api/public/gists/${id}`).then(async r => {
-      if (!r.ok) throw new Error((await r.json()).error ?? `HTTP ${r.status}`)
-      return r.json()
-    }),
+    queryFn: () =>
+      fetch(`/api/public/gists/${id}`).then(async (r) => {
+        if (!r.ok) throw new Error((await r.json()).error ?? `HTTP ${r.status}`)
+        return r.json()
+      }),
   })
 
-  const file = data?.gist.files.find(f => f.filename === decodedFilename)
+  const file = data?.gist.files.find((f) => f.filename === decodedFilename)
   const isMarkdown = file?.language === 'markdown'
   const lineCount = file ? file.content.split('\n').length : 0
 
@@ -76,14 +81,24 @@ function FilePreviewPage() {
   return (
     <Box style={{ minHeight: '100vh', background: 'var(--mantine-color-body)' }}>
       {/* Navbar */}
-      <Box style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-body)', position: 'sticky', top: 0, zIndex: 100 }}>
+      <Box
+        style={{
+          borderBottom: '1px solid var(--mantine-color-default-border)',
+          background: 'var(--mantine-color-body)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+        }}
+      >
         <Container size="lg" py="xs">
           <Group justify="space-between">
             <Group gap="xs" style={{ cursor: 'pointer' }} onClick={() => navigate({ to: '/gists' })}>
               <ThemeIcon size={28} variant="gradient" radius="md">
                 <TbBrandGithub size={14} />
               </ThemeIcon>
-              <Text fw={800} size="sm">Public Gists</Text>
+              <Text fw={800} size="sm">
+                Public Gists
+              </Text>
             </Group>
             <Group gap="xs">
               <ThemeToggle size="sm" />
@@ -106,12 +121,21 @@ function FilePreviewPage() {
       <Container size="lg" py="xl">
         {/* Breadcrumb */}
         <Group gap="xs" mb="md" wrap="nowrap" style={{ minWidth: 0 }}>
-          <Button size="xs" variant="subtle" color="gray" leftSection={<TbArrowLeft size={13} />}
-            onClick={() => navigate({ to: '/gists/$id', params: { id } })}>
+          <Button
+            size="xs"
+            variant="subtle"
+            color="gray"
+            leftSection={<TbArrowLeft size={13} />}
+            onClick={() => navigate({ to: '/gists/$id', params: { id } })}
+          >
             {isLoading ? '…' : (data?.gist.title ?? 'Gist')}
           </Button>
-          <Text size="xs" c="dimmed">/</Text>
-          <Text size="xs" fw={600} truncate>{decodedFilename}</Text>
+          <Text size="xs" c="dimmed">
+            /
+          </Text>
+          <Text size="xs" fw={600} truncate>
+            {decodedFilename}
+          </Text>
         </Group>
 
         {isLoading ? (
@@ -120,12 +144,18 @@ function FilePreviewPage() {
             <Skeleton height={400} radius="md" />
           </Stack>
         ) : isError || !data || !file ? (
-          <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+          <Box
+            p="xl"
+            ta="center"
+            style={{
+              border: '1px dashed var(--mantine-color-default-border)',
+              borderRadius: 'var(--mantine-radius-md)',
+            }}
+          >
             <Text size="sm" fw={500} c="red">
               {!data ? 'Gist tidak ditemukan atau bersifat private.' : `File "${decodedFilename}" tidak ditemukan.`}
             </Text>
-            <Button size="xs" variant="subtle" mt="sm"
-              onClick={() => navigate({ to: '/gists/$id', params: { id } })}>
+            <Button size="xs" variant="subtle" mt="sm" onClick={() => navigate({ to: '/gists/$id', params: { id } })}>
               Kembali ke gist
             </Button>
           </Box>
@@ -134,25 +164,42 @@ function FilePreviewPage() {
             {/* File header */}
             <Group justify="space-between" wrap="nowrap">
               <Group gap="xs" style={{ minWidth: 0 }}>
-                <Badge size="sm" variant="dot" color={getLangColor(file.language)}>{file.language}</Badge>
-                <Text size="xs" c="dimmed">{lineCount} lines</Text>
-                <Text size="xs" c="dimmed">·</Text>
-                <Text size="xs" c="dimmed">{new Blob([file.content]).size.toLocaleString()} bytes</Text>
+                <Badge size="sm" variant="dot" color={getLangColor(file.language)}>
+                  {file.language}
+                </Badge>
+                <Text size="xs" c="dimmed">
+                  {lineCount} lines
+                </Text>
+                <Text size="xs" c="dimmed">
+                  ·
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {new Blob([file.content]).size.toLocaleString()} bytes
+                </Text>
               </Group>
               <Group gap={4} wrap="nowrap">
                 <CopyButton value={file.content} timeout={2000}>
                   {({ copied, copy }) => (
-                    <Button size="xs" variant="subtle" color={copied ? 'teal' : 'gray'}
+                    <Button
+                      size="xs"
+                      variant="subtle"
+                      color={copied ? 'teal' : 'gray'}
                       leftSection={copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
-                      onClick={copy}>
+                      onClick={copy}
+                    >
                       {copied ? 'Tersalin!' : 'Copy'}
                     </Button>
                   )}
                 </CopyButton>
                 <Button
-                  size="xs" variant="subtle" color="gray"
+                  size="xs"
+                  variant="subtle"
+                  color="gray"
                   leftSection={<TbExternalLink size={13} />}
-                  component="a" href={rawUrl} target="_blank" rel="noopener noreferrer"
+                  component="a"
+                  href={rawUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
                   Raw
                 </Button>
@@ -160,7 +207,13 @@ function FilePreviewPage() {
             </Group>
 
             {/* Content */}
-            <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden' }}>
+            <Box
+              style={{
+                border: '1px solid var(--mantine-color-default-border)',
+                borderRadius: 'var(--mantine-radius-md)',
+                overflow: 'hidden',
+              }}
+            >
               {isMarkdown ? (
                 <Box p="md">
                   <MarkdownRenderer>{file.content}</MarkdownRenderer>
@@ -182,6 +235,7 @@ function FilePreviewPage() {
                     }}
                   >
                     {file.content.split('\n').map((_, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: index is line number
                       <div key={i + 1}>{i + 1}</div>
                     ))}
                   </Box>
@@ -207,20 +261,24 @@ function FilePreviewPage() {
             {/* File links in gist */}
             {data.gist.files.length > 1 && (
               <Group gap="xs">
-                <Text size="xs" c="dimmed">Files lain:</Text>
+                <Text size="xs" c="dimmed">
+                  Files lain:
+                </Text>
                 {data.gist.files
-                  .filter(f => f.filename !== file.filename)
-                  .map(f => (
+                  .filter((f) => f.filename !== file.filename)
+                  .map((f) => (
                     <Button
                       key={f.filename}
                       size="xs"
                       variant="subtle"
                       color="gray"
-                      onClick={() => navigate({
-                        to: '/gists/$id/files/$filename',
-                        params: { id, filename: encodeURIComponent(f.filename) },
-                        search: { q: undefined, tags: undefined },
-                      })}
+                      onClick={() =>
+                        navigate({
+                          to: '/gists/$id/files/$filename',
+                          params: { id, filename: encodeURIComponent(f.filename) },
+                          search: { q: undefined, tags: undefined },
+                        })
+                      }
                     >
                       {f.filename}
                     </Button>

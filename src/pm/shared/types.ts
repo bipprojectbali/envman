@@ -3,18 +3,18 @@
 
 export interface DaemonHealth {
   ok: true
-  version: string                     // daemon binary version
+  version: string // daemon binary version
   pid: number
   uptimeMs: number
-  startedAt: number                   // epoch ms
+  startedAt: number // epoch ms
   processCount: number
-  diskFull: boolean                   // flag dari log manager
+  diskFull: boolean // flag dari log manager
 }
 
 export interface ApiError {
   ok: false
-  error: string                       // human-readable message
-  code: string                        // machine-readable, mis. "INVALID_AUTH"
+  error: string // human-readable message
+  code: string // machine-readable, mis. "INVALID_AUTH"
   requestId?: string
 }
 

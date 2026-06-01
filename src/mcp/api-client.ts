@@ -1,8 +1,8 @@
 // Non-exiting API client. Variant of CLI's apiFetch — but never calls process.exit.
 // Bug A1 mitigation: 401 must not kill the MCP server process.
 
-import { mapHttpError, NetworkError } from './errors'
 import { HTTP_TIMEOUT_READ_MS, HTTP_TIMEOUT_WRITE_MS } from './constants'
+import { mapHttpError, NetworkError } from './errors'
 
 export interface Config {
   server: string

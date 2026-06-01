@@ -5,13 +5,13 @@
 //   E2 ✓ Server unreachable → retry exponential, fallback graceful
 //   E4 ✓ Semua HTTP call pakai AbortSignal.timeout, async non-blocking
 
-import { existsSync, readFileSync } from 'fs'
-import { log } from './logger'
+import { existsSync, readFileSync } from 'node:fs'
 import { paths } from '../shared/paths'
+import { log } from './logger'
 
 export interface ServerConfig {
-  server: string  // base URL, e.g. "https://envman.example.com"
-  token: string   // API token
+  server: string // base URL, e.g. "https://envman.example.com"
+  token: string // API token
 }
 
 export class ServerNotConfiguredError extends Error {
@@ -39,11 +39,11 @@ export interface EnvVar {
 }
 
 export interface EnvSourceData {
-  vars: Record<string, string>  // resolved KEY=VALUE
+  vars: Record<string, string> // resolved KEY=VALUE
 }
 
 export interface AliasResolveData {
-  args: string  // raw alias args string, mis. "-e myapp:dev -- bun index.js"
+  args: string // raw alias args string, mis. "-e myapp:dev -- bun index.js"
   project: { slug: string; name: string }
   alias: { name: string; description: string | null; tags: string[] }
 }
@@ -68,8 +68,8 @@ export function readServerConfig(configPath?: string): ServerConfig {
 
 export interface ClientOptions {
   config?: ServerConfig
-  timeoutMs?: number      // default 10_000
-  maxRetries?: number     // default 3
+  timeoutMs?: number // default 10_000
+  maxRetries?: number // default 3
 }
 
 export class EnvmanServerClient {
@@ -109,13 +109,8 @@ export class EnvmanServerClient {
    * Post audit event ke server (Phase 5 — endpoint baru di server).
    * Fire-and-forget — kegagalan tidak menghentikan proses lifecycle.
    */
-  async postAudit(event: {
-    action: string
-    detail?: string
-    processName?: string
-    processId?: string
-  }): Promise<void> {
-    if (this.tokenInvalid) return  // skip silently kalau token mati
+  async postAudit(event: { action: string; detail?: string; processName?: string; processId?: string }): Promise<void> {
+    if (this.tokenInvalid) return // skip silently kalau token mati
     try {
       await this.request<{ ok: true }>('POST', '/api/envman/pm/audit', event)
     } catch (e: any) {
@@ -137,7 +132,7 @@ export class EnvmanServerClient {
         const res = await fetch(url, {
           method,
           headers: {
-            'authorization': `Bearer ${this.config.token}`,
+            authorization: `Bearer ${this.config.token}`,
             'content-type': 'application/json',
             'user-agent': 'envman-pm-daemon',
           },
@@ -153,7 +148,7 @@ export class EnvmanServerClient {
         if (!res.ok) {
           let errText = `HTTP ${res.status}`
           try {
-            const errBody = await res.json() as any
+            const errBody = (await res.json()) as any
             if (errBody.error) errText = `${errText}: ${errBody.error}`
           } catch {}
           // 4xx (kecuali 401) tidak di-retry — itu request error
@@ -164,7 +159,7 @@ export class EnvmanServerClient {
           throw new Error(errText)
         }
 
-        return await res.json() as T
+        return (await res.json()) as T
       } catch (e: any) {
         if (e instanceof ServerAuthError) throw e
         lastError = e
@@ -173,7 +168,7 @@ export class EnvmanServerClient {
 
         if (attempt < this.maxRetries && (isTimeout || isNetErr || e.message.startsWith('HTTP 5'))) {
           log.warn('envman server retry', { attempt, delayMs, error: e.message })
-          await new Promise(r => setTimeout(r, delayMs))
+          await new Promise((r) => setTimeout(r, delayMs))
           delayMs = Math.min(delayMs * 2, 8000)
           continue
         }

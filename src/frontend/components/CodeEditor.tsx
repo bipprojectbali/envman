@@ -41,21 +41,25 @@ export function CodeEditor(props: CodeEditorProps) {
   }
 
   return (
-    <Suspense fallback={
-      <div style={{
-        height: typeof props.height === 'number' ? props.height : props.minHeight ?? 200,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--mantine-color-dimmed)',
-        fontSize: 13,
-        background: 'var(--mantine-color-default-hover)',
-        border: '1px solid var(--mantine-color-default-border)',
-        borderRadius: 4,
-      }}>
-        Loading code editor…
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div
+          style={{
+            height: typeof props.height === 'number' ? props.height : (props.minHeight ?? 200),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--mantine-color-dimmed)',
+            fontSize: 13,
+            background: 'var(--mantine-color-default-hover)',
+            border: '1px solid var(--mantine-color-default-border)',
+            borderRadius: 4,
+          }}
+        >
+          Loading code editor…
+        </div>
+      }
+    >
       <MonacoCodeEditor {...props} />
     </Suspense>
   )

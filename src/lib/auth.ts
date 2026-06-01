@@ -5,7 +5,11 @@ import { env } from './env'
 
 function getIp(ctx: { request?: Request } | null): string {
   if (!ctx?.request) return 'unknown'
-  return ctx.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ctx.request.headers.get('x-real-ip') ?? 'unknown'
+  return (
+    ctx.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    ctx.request.headers.get('x-real-ip') ??
+    'unknown'
+  )
 }
 
 function audit(userId: string | null, action: string, detail: string | null, ip: string) {
@@ -35,11 +39,11 @@ export const auth = betterAuth({
   },
 
   session: {
-    expiresIn: 60 * 60 * 24,       // 24 jam
-    updateAge: 60 * 60,             // refresh token setiap 1 jam jika aktif
+    expiresIn: 60 * 60 * 24, // 24 jam
+    updateAge: 60 * 60, // refresh token setiap 1 jam jika aktif
     cookieCache: {
       enabled: true,
-      maxAge: 5 * 60,               // cache session di cookie selama 5 menit
+      maxAge: 5 * 60, // cache session di cookie selama 5 menit
     },
   },
 
@@ -64,7 +68,7 @@ export const auth = betterAuth({
     session: {
       create: {
         // Cek blocked user sebelum session dibuat → return false = session tidak jadi dibuat
-        before: async (session, ctx) => {
+        before: async (session, _ctx) => {
           const user = await prisma.user.findUnique({
             where: { id: session.userId as string },
             select: { blocked: true, role: true, email: true },

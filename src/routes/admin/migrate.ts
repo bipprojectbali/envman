@@ -1,8 +1,8 @@
-import { Elysia } from 'elysia'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SQL } from 'bun'
-import { requireSuperAdmin, unauthorized, forbidden } from '../../lib/auth-middleware'
+import { Elysia } from 'elysia'
+import { forbidden, requireSuperAdmin, unauthorized } from '../../lib/auth-middleware'
 import { runMigrations } from '../../lib/migrate'
 
 const SIM_NAME = '99999999999999_migrate_sim_test'
@@ -55,7 +55,7 @@ export const adminMigrateRouter = new Elysia()
     const logs: string[] = []
     const t0 = Date.now()
     try {
-      await runMigrations({ onLog: line => logs.push(line) })
+      await runMigrations({ onLog: (line) => logs.push(line) })
       return { ok: true, durationMs: Date.now() - t0, logs }
     } catch (err: any) {
       logs.push(`✗ ${err?.message ?? String(err)}`)
@@ -97,7 +97,7 @@ export const adminMigrateRouter = new Elysia()
       logs.push(`✓ Wrote temp migration: ${SIM_NAME}`)
 
       // Step 3: run migrations — should detect and apply exactly 1
-      await runMigrations({ onLog: line => logs.push(line) })
+      await runMigrations({ onLog: (line) => logs.push(line) })
 
       // Step 4: verify the sim table was created in DB
       const db = new SQL(dbUrl(), { max: 1 })

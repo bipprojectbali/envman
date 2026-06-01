@@ -1,6 +1,6 @@
 import { Elysia } from 'elysia'
+import { forbidden, requireSuperAdmin } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
-import { requireSuperAdmin, forbidden } from '../../lib/auth-middleware'
 import { getOnlineUserIds } from '../../lib/presence'
 import { parseSchema } from '../../lib/schema-parser'
 
@@ -12,7 +12,7 @@ export const adminAnalyticsRouter = new Elysia()
     return { online: getOnlineUserIds() }
   })
 
-      // ─── Schema API (SUPER_ADMIN only) ──────────────────
+  // ─── Schema API (SUPER_ADMIN only) ──────────────────
   .get('/api/admin/schema', async ({ request, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
@@ -25,9 +25,9 @@ export const adminAnalyticsRouter = new Elysia()
     }
     const raw = fs.readFileSync(schemaPath, 'utf-8')
     return { schema: parseSchema(raw) }
-      })
+  })
 
-      // ─── Routes Metadata API (SUPER_ADMIN only) ─────────
+  // ─── Routes Metadata API (SUPER_ADMIN only) ─────────
   .get('/api/admin/routes', async ({ request, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
@@ -272,7 +272,13 @@ export const adminAnalyticsRouter = new Elysia()
       },
       // Utility
       { method: 'GET', path: '/health', auth: 'public', category: 'utility', description: 'Health check' },
-      { method: 'GET', path: '/api/version', auth: 'public', category: 'utility', description: 'App name and version from package.json' },
+      {
+        method: 'GET',
+        path: '/api/version',
+        auth: 'public',
+        category: 'utility',
+        description: 'App name and version from package.json',
+      },
       { method: 'GET', path: '/api/hello', auth: 'public', category: 'utility', description: 'Hello world (GET)' },
       { method: 'PUT', path: '/api/hello', auth: 'public', category: 'utility', description: 'Hello world (PUT)' },
       {
@@ -305,9 +311,9 @@ export const adminAnalyticsRouter = new Elysia()
       routes,
       summary: { total: routes.length, byMethod, byAuth, byCategory },
     }
-      })
+  })
 
-      // ─── Project Structure API (SUPER_ADMIN only) ──────
+  // ─── Project Structure API (SUPER_ADMIN only) ──────
   .get('/api/admin/project-structure', async ({ request, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
@@ -450,9 +456,9 @@ export const adminAnalyticsRouter = new Elysia()
       directories: dirs,
       summary: { totalFiles: files.length, totalLines, totalExports, totalImports, byCategory },
     }
-      })
+  })
 
-      // ─── Environment Map API (SUPER_ADMIN only) ─────────
+  // ─── Environment Map API (SUPER_ADMIN only) ─────────
   .get('/api/admin/env-map', async ({ request, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
@@ -597,9 +603,9 @@ export const adminAnalyticsRouter = new Elysia()
         byCategory,
       },
     }
-      })
+  })
 
-      // ─── Test Coverage Map API (SUPER_ADMIN only) ──────
+  // ─── Test Coverage Map API (SUPER_ADMIN only) ──────
   .get('/api/admin/test-coverage', async ({ request, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
@@ -710,9 +716,9 @@ export const adminAnalyticsRouter = new Elysia()
         coveragePercent: Math.round(((covered + partial * 0.5) / sourceFiles.length) * 100),
       },
     }
-      })
+  })
 
-      // ─── Dependencies Graph API (SUPER_ADMIN only) ─────
+  // ─── Dependencies Graph API (SUPER_ADMIN only) ─────
   .get('/api/admin/dependencies', async ({ request, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
@@ -799,9 +805,9 @@ export const adminAnalyticsRouter = new Elysia()
       packages: allPkgs,
       summary: { total: allPkgs.length, runtime, dev, byCategory },
     }
-      })
+  })
 
-      // ─── Migrations Timeline API (SUPER_ADMIN only) ────
+  // ─── Migrations Timeline API (SUPER_ADMIN only) ────
   .get('/api/admin/migrations', async ({ request, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
@@ -864,9 +870,9 @@ export const adminAnalyticsRouter = new Elysia()
         totalChanges,
       },
     }
-      })
+  })
 
-      // ─── Sessions Live API (SUPER_ADMIN only) ──────────
+  // ─── Sessions Live API (SUPER_ADMIN only) ──────────
   .get('/api/admin/sessions', async ({ request, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
@@ -912,4 +918,4 @@ export const adminAnalyticsRouter = new Elysia()
         byRole,
       },
     }
-      })
+  })

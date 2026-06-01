@@ -2,9 +2,9 @@
 
 import { z } from 'zod'
 import { apiCall } from '../api-client'
-import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 import { toErrorResponse } from '../errors'
 import { SlugRef } from '../schemas/common'
+import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 
 const ProjectsListInputSchema = z.object({}).strict()
 
@@ -14,16 +14,18 @@ const ProjectMemberSchema = z.object({
   user: z.object({ id: z.string(), name: z.string(), email: z.string() }).optional(),
 })
 
-const ProjectSchema = z.object({
-  id: z.string(),
-  slug: z.string(),
-  name: z.string(),
-  description: z.string().nullable().optional(),
-  tags: z.array(z.string()),
-  myRole: z.string().optional(),
-  environments: z.array(z.object({ name: z.string() })).optional(),
-  members: z.array(ProjectMemberSchema).optional(),
-}).passthrough()
+const ProjectSchema = z
+  .object({
+    id: z.string(),
+    slug: z.string(),
+    name: z.string(),
+    description: z.string().nullable().optional(),
+    tags: z.array(z.string()),
+    myRole: z.string().optional(),
+    environments: z.array(z.object({ name: z.string() })).optional(),
+    members: z.array(ProjectMemberSchema).optional(),
+  })
+  .passthrough()
 
 const ProjectsListOutputSchema = z.object({
   projects: z.array(ProjectSchema),
@@ -72,8 +74,12 @@ ERRORS:
 NOTES:
   - Use this before vars_list / aliases_list to confirm which environments and members exist.`
 
-interface ProjectsListResponse { projects: unknown[] }
-interface ProjectGetResponse { project: unknown }
+interface ProjectsListResponse {
+  projects: unknown[]
+}
+interface ProjectGetResponse {
+  project: unknown
+}
 
 export const projectsModule: ToolModule = {
   register(server, ctx) {

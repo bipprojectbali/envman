@@ -79,14 +79,21 @@ function ProfilePage() {
         </Group>
 
         {/* Avatar card */}
-        <Box p="lg" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+        <Box
+          p="lg"
+          style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+        >
           <Stack align="center" gap="sm">
             <Avatar color="blue" radius="xl" size={72} variant="gradient" gradient={{ from: 'blue', to: 'violet' }}>
               {user?.name?.charAt(0).toUpperCase()}
             </Avatar>
             <Box ta="center">
-              <Text fw={600} size="md">{user?.name}</Text>
-              <Text c="dimmed" size="sm" style={{ wordBreak: 'break-all' }}>{user?.email}</Text>
+              <Text fw={600} size="md">
+                {user?.name}
+              </Text>
+              <Text c="dimmed" size="sm" style={{ wordBreak: 'break-all' }}>
+                {user?.email}
+              </Text>
             </Box>
             <Badge color={roleBadgeColor[user?.role ?? 'USER']} variant="light" size="md">
               {user?.role}
@@ -95,10 +102,15 @@ function ProfilePage() {
         </Box>
 
         {/* Info */}
-        <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+        <Box
+          p="md"
+          style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+        >
           <Group gap="xs" mb="sm">
             <TbUser size={15} />
-            <Text fw={600} size="sm">Account Info</Text>
+            <Text fw={600} size="sm">
+              Account Info
+            </Text>
           </Group>
           <Divider mb="sm" />
           <Stack gap="xs">
@@ -106,10 +118,14 @@ function ProfilePage() {
               { label: 'Name', value: user?.name },
               { label: 'Email', value: user?.email },
               { label: 'Role', value: user?.role },
-            ].map(row => (
+            ].map((row) => (
               <Group key={row.label} justify="space-between" wrap="nowrap">
-                <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>{row.label}</Text>
-                <Text size="sm" ta="right" style={{ wordBreak: 'break-all', minWidth: 0 }}>{row.value}</Text>
+                <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>
+                  {row.label}
+                </Text>
+                <Text size="sm" ta="right" style={{ wordBreak: 'break-all', minWidth: 0 }}>
+                  {row.value}
+                </Text>
               </Group>
             ))}
           </Stack>

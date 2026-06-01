@@ -14,15 +14,15 @@
  *                             defaults to: 5
  */
 
-import { readdir, readFile } from "node:fs/promises"
-import { join } from "node:path"
-import { createHash, randomUUID } from "node:crypto"
-import { SQL } from "bun"
+import { createHash, randomUUID } from 'node:crypto'
+import { readdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { SQL } from 'bun'
 
 // Embed as literal to avoid BigInt parameter binding bug in some Bun 1.2.x versions.
 // 123100735045985 = 0x707269736D61 = "prisma" as ASCII int8.
-const LOCK_ACQUIRE = "SELECT pg_advisory_lock(123100735045985)"
-const LOCK_RELEASE = "SELECT pg_advisory_unlock(123100735045985)"
+const LOCK_ACQUIRE = 'SELECT pg_advisory_lock(123100735045985)'
+const LOCK_RELEASE = 'SELECT pg_advisory_unlock(123100735045985)'
 
 const RETRY_DELAY_MS = 2000
 
@@ -38,7 +38,7 @@ export interface MigrateOptions {
 }
 
 function sha256hex(content: string): string {
-  return createHash("sha256").update(content).digest("hex")
+  return createHash('sha256').update(content).digest('hex')
 }
 
 async function ensureTable(db: SQL): Promise<void> {
@@ -67,14 +67,14 @@ async function getApplied(db: SQL): Promise<Map<string, string>> {
 async function listMigrations(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true })
   return entries
-    .filter(e => e.isDirectory() && /^\d{14}_/.test(e.name))
-    .map(e => e.name)
+    .filter((e) => e.isDirectory() && /^\d{14}_/.test(e.name))
+    .map((e) => e.name)
     .sort()
 }
 
 async function applyMigration(db: SQL, migrationsDir: string, name: string): Promise<void> {
-  const sqlPath = join(migrationsDir, name, "migration.sql")
-  const body = await readFile(sqlPath, "utf-8")
+  const sqlPath = join(migrationsDir, name, 'migration.sql')
+  const body = await readFile(sqlPath, 'utf-8')
   const checksum = sha256hex(body)
   const id = randomUUID()
 
@@ -110,7 +110,11 @@ async function connectWithRetry(url: string, retries: number): Promise<SQL> {
       return db
     } catch (err) {
       last = err
-      if (db) { try { await db.close() } catch {} }
+      if (db) {
+        try {
+          await db.close()
+        } catch {}
+      }
       if (attempt < retries) {
         console.warn(`  DB not ready (attempt ${attempt}/${retries}), retry in ${RETRY_DELAY_MS}ms…`)
         await Bun.sleep(RETRY_DELAY_MS)
@@ -129,30 +133,20 @@ async function connectWithRetry(url: string, retries: number): Promise<SQL> {
  * @throws if DB is unreachable after all retries, or if a migration SQL fails.
  */
 export async function runMigrations(options?: MigrateOptions): Promise<void> {
-  const url =
-    options?.databaseUrl ??
-    process.env.MIGRATE_DATABASE_URL ??
-    process.env.DATABASE_URL
+  const url = options?.databaseUrl ?? process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL
 
   if (!url) {
-    throw new Error(
-      "DATABASE_URL is not set — provide MIGRATE_DATABASE_URL or DATABASE_URL"
-    )
+    throw new Error('DATABASE_URL is not set — provide MIGRATE_DATABASE_URL or DATABASE_URL')
   }
 
-  const migrationsDir =
-    options?.migrationsDir ??
-    process.env.MIGRATIONS_DIR ??
-    "./prisma/migrations"
+  const migrationsDir = options?.migrationsDir ?? process.env.MIGRATIONS_DIR ?? './prisma/migrations'
 
-  const retries =
-    options?.retries ??
-    parseInt(process.env.MIGRATE_DB_RETRIES ?? "5", 10)
+  const retries = options?.retries ?? parseInt(process.env.MIGRATE_DB_RETRIES ?? '5', 10)
 
   const log = options?.onLog ?? ((line: string) => console.log(line))
   const warn = options?.onLog ?? ((line: string) => console.warn(line))
 
-  log("→ Acquiring advisory lock…")
+  log('→ Acquiring advisory lock…')
   const db = await connectWithRetry(url, retries)
 
   try {
@@ -162,7 +156,7 @@ export async function runMigrations(options?: MigrateOptions): Promise<void> {
     const all = await listMigrations(migrationsDir)
 
     if (all.length === 0) {
-      log("✓ No migration files found in " + migrationsDir)
+      log(`✓ No migration files found in ${migrationsDir}`)
       return
     }
 
@@ -170,7 +164,7 @@ export async function runMigrations(options?: MigrateOptions): Promise<void> {
     for (const name of all) {
       const stored = applied.get(name)
       if (stored) {
-        const body = await readFile(join(migrationsDir, name, "migration.sql"), "utf-8")
+        const body = await readFile(join(migrationsDir, name, 'migration.sql'), 'utf-8')
         const current = sha256hex(body)
         if (current !== stored) {
           warn(`  ⚠ Checksum mismatch: ${name}`)
@@ -180,10 +174,10 @@ export async function runMigrations(options?: MigrateOptions): Promise<void> {
       }
     }
 
-    const pending = all.filter(n => !applied.has(n))
+    const pending = all.filter((n) => !applied.has(n))
 
     if (pending.length === 0) {
-      log("✓ Database up to date")
+      log('✓ Database up to date')
       return
     }
 
@@ -193,7 +187,7 @@ export async function runMigrations(options?: MigrateOptions): Promise<void> {
       await applyMigration(db, migrationsDir, name)
       log(`  ${name} … OK (${Date.now() - t0}ms)`)
     }
-    log("✓ Done")
+    log('✓ Done')
   } finally {
     await db.unsafe(LOCK_RELEASE)
     await db.close()

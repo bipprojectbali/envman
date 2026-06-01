@@ -1,9 +1,9 @@
 import { Elysia } from 'elysia'
-import { adminUsersRouter } from './users'
-import { adminLogsRouter } from './logs'
 import { adminAnalyticsRouter } from './analytics'
 import { adminExtensionsRouter } from './extensions'
+import { adminLogsRouter } from './logs'
 import { adminMigrateRouter } from './migrate'
+import { adminUsersRouter } from './users'
 
 export const adminRouter = new Elysia()
   .use(adminUsersRouter)

@@ -1,10 +1,10 @@
 import { Code, useMantineColorScheme } from '@mantine/core'
+import { useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeSlug from 'rehype-slug'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { useRef, useEffect } from 'react'
+import { oneLight, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import rehypeSlug from 'rehype-slug'
+import remarkGfm from 'remark-gfm'
 
 interface MarkdownRendererProps {
   children: string
@@ -70,7 +70,11 @@ export function MarkdownRenderer({ children, fontSize = 14 }: MarkdownRendererPr
             const lang = /language-(\w+)/.exec(className || '')?.[1]
             const inline = !className
             if (inline) {
-              return <code {...rest} className={className}>{codeChildren}</code>
+              return (
+                <code {...rest} className={className}>
+                  {codeChildren}
+                </code>
+              )
             }
             return lang ? (
               <SyntaxHighlighter

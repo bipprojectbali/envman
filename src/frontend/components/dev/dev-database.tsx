@@ -1,30 +1,5 @@
-import {
-  ActionIcon,
-  AppShell,
-  Avatar,
-  Badge,
-  Box,
-  Burger,
-  Container,
-  Group,
-  Menu,
-  NavLink,
-  Pagination,
-  SegmentedControl,
-  Select,
-  SimpleGrid,
-  Stack,
-  Switch,
-  Table,
-  Text,
-  TextInput,
-  ThemeIcon,
-  Title,
-  Tooltip,
-} from '@mantine/core'
-import { useDisclosure, useMediaQuery } from '@mantine/hooks'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createLazyFileRoute, Outlet, useMatchRoute, useNavigate } from '@tanstack/react-router'
+import { ActionIcon, Badge, Container, Group, Stack, Text, Title, Tooltip } from '@mantine/core'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Background,
   Controls,
@@ -39,51 +14,10 @@ import {
   useNodesState,
   useReactFlow,
 } from '@xyflow/react'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import '@xyflow/react/dist/style.css'
-import { modals } from '@mantine/modals'
-import {
-  TbBook,
-  TbBug,
-  TbChevronRight,
-  TbCircleFilled,
-  TbCode,
-  TbDatabase,
-  TbDots,
-  TbFileText,
-  TbLayoutDashboard,
-  TbLayoutSidebarLeftCollapse,
-  TbLayoutSidebarLeftExpand,
-  TbLock,
-  TbLockOpen,
-  TbLogout,
-  TbRefresh,
-  TbServer,
-  TbSettings,
-  TbSearch,
-  TbShieldCheck,
-  TbShieldOff,
-  TbX,
-  TbSitemap,
-  TbTrash,
-  TbUser,
-  TbUserSearch,
-  TbUsers,
-  TbVariable,
-  TbWifi,
-  TbPuzzle,
-  TbPlugConnected,
-  TbPlugOff,
-} from 'react-icons/tb'
-import { ThemeToggle } from '@/frontend/components/ThemeToggle'
-import { TicketsPanel } from '@/frontend/components/TicketsPanel'
-import { type Role, useLogout, useSession } from '@/frontend/hooks/useAuth'
-import { usePresence } from '@/frontend/hooks/usePresence'
-import { useExtensions, useUpdateExtensions } from '@/frontend/hooks/useExtensions'
+import { TbRefresh } from 'react-icons/tb'
 import { getLayoutedElements, LayoutSelector } from './dev-flow-infra'
-
-
 
 // ─── Database Panel (React Flow) ───────────────────────
 

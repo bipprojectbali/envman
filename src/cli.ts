@@ -1,15 +1,17 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
-import { homedir, tmpdir } from 'os'
-import { basename, join } from 'path'
-import { spawn, spawnSync } from 'child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { basename, join } from 'node:path'
 
 const CONFIG_DIR = join(homedir(), '.config', 'envman')
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const UPDATE_CACHE_FILE = join(CONFIG_DIR, 'update-check.json')
+
 import { version as PKG_VERSION } from '../package.json'
+
 const VERSION = PKG_VERSION
-const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000  // 15 menit
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000 // 15 menit
 
 interface Config {
   server: string
@@ -63,9 +65,9 @@ function resolveAuth(localVars: Record<string, string>): Config {
   }
   console.error(
     '[envman] Not authenticated. Options:\n' +
-    '  1. Run: envman login <server-url> --token <token>\n' +
-    '  2. Set env vars: ENVMAN_SERVER=<url> ENVMAN_TOKEN=<token>\n' +
-    '  3. Add ENVMAN_SERVER and ENVMAN_TOKEN to a local file passed with -e'
+      '  1. Run: envman login <server-url> --token <token>\n' +
+      '  2. Set env vars: ENVMAN_SERVER=<url> ENVMAN_TOKEN=<token>\n' +
+      '  3. Add ENVMAN_SERVER and ENVMAN_TOKEN to a local file passed with -e',
   )
   process.exit(1)
 }
@@ -146,8 +148,14 @@ async function cmdLogin(args: string[]) {
   const server = args[0]
   const tokenIdx = args.indexOf('--token')
   const token = tokenIdx !== -1 ? args[tokenIdx + 1] : null
-  if (!server) { console.error('Usage: envman login <server-url> --token <token>'); process.exit(1) }
-  if (!token) { console.error('--token <token> required'); process.exit(1) }
+  if (!server) {
+    console.error('Usage: envman login <server-url> --token <token>')
+    process.exit(1)
+  }
+  if (!token) {
+    console.error('--token <token> required')
+    process.exit(1)
+  }
   const cfg = { server, token }
   try {
     const data = await apiFetch(cfg, '/api/envman/whoami')
@@ -163,7 +171,7 @@ async function cmdLogin(args: string[]) {
 
 async function cmdLogout() {
   if (existsSync(CONFIG_FILE)) {
-    const { unlinkSync } = await import('fs')
+    const { unlinkSync } = await import('node:fs')
     unlinkSync(CONFIG_FILE)
   }
   console.log('Logged out.')
@@ -194,17 +202,42 @@ function isProjectFileRef(arg: string): boolean {
 // Detect bare-name imports (not relative, not built-in, not bun:/node: prefix).
 // Used to decide whether to enable Bun --install=auto for piped scripts.
 const NODE_BUILTINS = new Set([
-  'fs', 'path', 'os', 'http', 'https', 'crypto', 'child_process', 'util',
-  'stream', 'events', 'url', 'querystring', 'buffer', 'process', 'zlib',
-  'net', 'dns', 'tls', 'cluster', 'worker_threads', 'readline', 'assert',
-  'console', 'timers', 'string_decoder', 'punycode', 'vm', 'v8', 'perf_hooks',
+  'fs',
+  'path',
+  'os',
+  'http',
+  'https',
+  'crypto',
+  'child_process',
+  'util',
+  'stream',
+  'events',
+  'url',
+  'querystring',
+  'buffer',
+  'process',
+  'zlib',
+  'net',
+  'dns',
+  'tls',
+  'cluster',
+  'worker_threads',
+  'readline',
+  'assert',
+  'console',
+  'timers',
+  'string_decoder',
+  'punycode',
+  'vm',
+  'v8',
+  'perf_hooks',
 ])
 
 export function detectsNpmImports(content: string): boolean {
   const patterns = [
-    /^\s*import\s+(?:[^'"]+?\s+from\s+)?["']([^"']+)["']/gm,  // ESM static import
-    /\brequire\s*\(\s*["']([^"']+)["']/g,                      // CJS require
-    /\bimport\s*\(\s*["']([^"']+)["']/g,                       // dynamic import()
+    /^\s*import\s+(?:[^'"]+?\s+from\s+)?["']([^"']+)["']/gm, // ESM static import
+    /\brequire\s*\(\s*["']([^"']+)["']/g, // CJS require
+    /\bimport\s*\(\s*["']([^"']+)["']/g, // dynamic import()
   ]
   for (const re of patterns) {
     for (const match of content.matchAll(re)) {
@@ -213,7 +246,7 @@ export function detectsNpmImports(content: string): boolean {
       if (spec.startsWith('./') || spec.startsWith('../') || spec.startsWith('/')) continue
       if (spec.startsWith('bun:') || spec.startsWith('node:')) continue
       if (NODE_BUILTINS.has(spec)) continue
-      return true  // bare specifier = npm package
+      return true // bare specifier = npm package
     }
   }
   return false
@@ -225,8 +258,10 @@ function buildStdinCommand(cmd: string[], opts: { bunAutoInstall?: boolean } = {
   const name = basename(cmd[0])
   const rest = cmd.slice(1)
   switch (name) {
-    case 'bash': case 'sh': case 'zsh':
-      return [cmd[0], '-s', ...rest]           // bash -s reads from stdin, $@ preserved
+    case 'bash':
+    case 'sh':
+    case 'zsh':
+      return [cmd[0], '-s', ...rest] // bash -s reads from stdin, $@ preserved
     case 'bun': {
       // --install=fallback: install missing packages ke global cache, bekerja
       // bahkan kalau ada node_modules di walk-up (mis. user di dalam project Node,
@@ -238,20 +273,24 @@ function buildStdinCommand(cmd: string[], opts: { bunAutoInstall?: boolean } = {
       return [cmd[0], ...installFlag, 'run', '-', ...rest]
     }
     case 'node':
-      return [cmd[0], ...rest]                 // node reads JS from stdin
-    case 'python3': case 'python':
-      return [cmd[0], '-', ...rest]            // python3 -
+      return [cmd[0], ...rest] // node reads JS from stdin
+    case 'python3':
+    case 'python':
+      return [cmd[0], '-', ...rest] // python3 -
     case 'deno':
       return [cmd[0], 'run', '-', ...rest]
     default:
-      return null                              // fallback: secure temp file
+      return null // fallback: secure temp file
   }
 }
 
 // ─── Run ─────────────────────────────────────────────────────────────────────
 
 async function cmdRun(sources: string[], command: string[], serverWins: boolean, projectSlugHint = '') {
-  if (command.length === 0) { console.error('No command specified after --'); process.exit(1) }
+  if (command.length === 0) {
+    console.error('No command specified after --')
+    process.exit(1)
+  }
 
   // Step 1: Parse all local files first (needed for auth resolution)
   const localVars: Record<string, string> = {}
@@ -265,12 +304,15 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
   const cfg = resolveAuth(localVars)
 
   // Step 3: Fetch server envs and merge all sources in order
-  let merged: Record<string, string> = {}
+  const merged: Record<string, string> = {}
   for (const src of sources) {
-    if (src.startsWith('files:')) continue  // handled separately below
+    if (src.startsWith('files:')) continue // handled separately below
     if (src.includes(':')) {
       const [project, env] = src.split(':')
-      if (!env) { console.error(`Invalid format: '${src}' — expected project:env`); process.exit(1) }
+      if (!env) {
+        console.error(`Invalid format: '${src}' — expected project:env`)
+        process.exit(1)
+      }
       const data = await apiFetch(cfg, `/api/envman/projects/${project}/environments/${env}/vars/export`)
       Object.assign(merged, data.vars)
     } else {
@@ -281,9 +323,7 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
   }
 
   // Step 4: Final merge with process.env
-  const finalEnv = serverWins
-    ? { ...merged, ...process.env }
-    : { ...process.env, ...merged }
+  const finalEnv = serverWins ? { ...merged, ...process.env } : { ...process.env, ...merged }
 
   // Step 5: Resolve file reference in command args (zero disk write via stdin)
   // Supports two syntaxes:
@@ -294,7 +334,7 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
   let fileContent: string | null = null
   let resolvedFilename = ''
   const transformedCommand = [...command]
-  const fileArgIdx = transformedCommand.findIndex(a => a.startsWith('files:') || isProjectFileRef(a))
+  const fileArgIdx = transformedCommand.findIndex((a) => a.startsWith('files:') || isProjectFileRef(a))
 
   if (fileArgIdx !== -1) {
     const fileRef = transformedCommand[fileArgIdx]
@@ -307,13 +347,20 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
       // Legacy files: syntax
       const refBody = fileRef.slice(6)
       const parts = refBody.split('/')
-      const inferredSlug = sources.find(s => s.includes(':') && !s.startsWith('files:'))?.split(':')[0] ?? projectSlugHint
+      const inferredSlug =
+        sources.find((s) => s.includes(':') && !s.startsWith('files:'))?.split(':')[0] ?? projectSlugHint
       if (parts.length >= 3) {
-        slug = parts[0]; prefix = parts[1]; resolvedFilename = parts.slice(2).join('/')
+        slug = parts[0]
+        prefix = parts[1]
+        resolvedFilename = parts.slice(2).join('/')
       } else if (parts.length === 2) {
-        slug = inferredSlug; prefix = parts[0]; resolvedFilename = parts[1]
+        slug = inferredSlug
+        prefix = parts[0]
+        resolvedFilename = parts[1]
       } else {
-        slug = inferredSlug; prefix = parts[0]; resolvedFilename = ''
+        slug = inferredSlug
+        prefix = parts[0]
+        resolvedFilename = ''
       }
     } else {
       // New project:path syntax — slug is always explicit (before colon)
@@ -322,15 +369,19 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
       const filePath = fileRef.slice(colonIdx + 1)
       const parts = filePath.split('/')
       if (parts.length >= 2) {
-        prefix = parts[0]; resolvedFilename = parts.slice(1).join('/')
+        prefix = parts[0]
+        resolvedFilename = parts.slice(1).join('/')
       } else {
         // e.g. "project:deploy.sh" — treat whole segment as prefix (single-file entry)
-        prefix = filePath; resolvedFilename = ''
+        prefix = filePath
+        resolvedFilename = ''
       }
     }
 
     if (!slug) {
-      console.error(`[envman] Cannot infer project slug for "${fileRef}". Use project:path/file.ext syntax or add -e project:env.`)
+      console.error(
+        `[envman] Cannot infer project slug for "${fileRef}". Use project:path/file.ext syntax or add -e project:env.`,
+      )
       process.exit(1)
     }
 
@@ -365,17 +416,25 @@ async function cmdRun(sources: string[], command: string[], serverWins: boolean,
       const tmpDir = mkdtempSync(join(tmpdir(), 'envman-'))
       const tmpFile = join(tmpDir, basename(resolvedFilename || 'script'))
       writeFileSync(tmpFile, fileContent, { mode: 0o600 })
-      const cleanup = () => { try { rmSync(tmpDir, { recursive: true, force: true }) } catch {} }
+      const cleanup = () => {
+        try {
+          rmSync(tmpDir, { recursive: true, force: true })
+        } catch {}
+      }
       process.on('exit', cleanup)
       const result = spawnSync(transformedCommand[0], [tmpFile, ...transformedCommand.slice(1)], {
-        env: finalEnv, stdio: 'inherit', shell: false,
+        env: finalEnv,
+        stdio: 'inherit',
+        shell: false,
       })
       cleanup()
       process.exit(result.status ?? 0)
     }
   } else {
     const result = spawnSync(command[0], command.slice(1), {
-      env: finalEnv, stdio: 'inherit', shell: false,
+      env: finalEnv,
+      stdio: 'inherit',
+      shell: false,
     })
     process.exit(result.status ?? 0)
   }
@@ -397,22 +456,30 @@ async function cmdAlias(args: string[]) {
     const a = args[i]
     if (refFound) {
       // After ref: everything is passed through to the command
-      passthroughArgs.push(a); i++
+      passthroughArgs.push(a)
+      i++
     } else if (a === '-e') {
       const val = args[i + 1]
-      if (!val) { console.error('-e requires a value'); process.exit(1) }
-      extraSources.push(val); i += 2
+      if (!val) {
+        console.error('-e requires a value')
+        process.exit(1)
+      }
+      extraSources.push(val)
+      i += 2
     } else if (a === '--server-wins') {
-      extraServerWins = true; i++
+      extraServerWins = true
+      i++
     } else if (!a.startsWith('-')) {
-      ref = a; refFound = true; i++
+      ref = a
+      refFound = true
+      i++
     } else {
       console.error(`Unknown flag: ${a}\nUsage: envman run [-e <source>]... <project>:<alias> [args...]`)
       process.exit(1)
     }
   }
 
-  if (!ref || !ref.includes(':')) {
+  if (!ref?.includes(':')) {
     console.error('Usage: envman run [-e <source>]... <project>:<alias>')
     process.exit(1)
   }
@@ -443,10 +510,15 @@ async function cmdAlias(args: string[]) {
     const flag = flagParts[j]
     if (flag === '-e') {
       const val = flagParts[j + 1]
-      if (!val) { console.error('-e requires a value'); process.exit(1) }
-      storedSources.push(val); j += 2
+      if (!val) {
+        console.error('-e requires a value')
+        process.exit(1)
+      }
+      storedSources.push(val)
+      j += 2
     } else if (flag === '--server-wins') {
-      storedServerWins = true; j++
+      storedServerWins = true
+      j++
     } else {
       console.error(`Unknown flag in alias: ${flag}`)
       process.exit(1)
@@ -473,7 +545,10 @@ async function downloadBinary(url: string, timeoutMs = 10 * 60 * 1000, showProgr
       headers: { 'Accept-Encoding': 'gzip' },
       signal: controller.signal,
     })
-    if (!res.ok || !res.body) { clearTimeout(timer); return null }
+    if (!res.ok || !res.body) {
+      clearTimeout(timer)
+      return null
+    }
 
     const chunks: Buffer[] = []
     const reader = res.body.getReader()
@@ -487,7 +562,10 @@ async function downloadBinary(url: string, timeoutMs = 10 * 60 * 1000, showProgr
       received += value.length
       if (showProgress) {
         const mb = Math.floor(received / (1024 * 1024))
-        if (mb > lastMb) { process.stdout.write('.'); lastMb = mb }
+        if (mb > lastMb) {
+          process.stdout.write('.')
+          lastMb = mb
+        }
       }
     }
     clearTimeout(timer)
@@ -507,8 +585,11 @@ async function cmdUpdate() {
   const server = cfg.server.replace(/\/$/, '')
   console.log(`Memeriksa update...`)
   const res = await fetch(`${server}/download/cli/version`).catch(() => null)
-  if (!res?.ok) { console.error('Tidak bisa cek versi dari server.'); process.exit(1) }
-  const { version: latest } = await res.json() as { version: string }
+  if (!res?.ok) {
+    console.error('Tidak bisa cek versi dari server.')
+    process.exit(1)
+  }
+  const { version: latest } = (await res.json()) as { version: string }
   if (latest === VERSION) {
     console.log(`✓ envman v${VERSION} sudah versi terbaru.`)
     // Update cache
@@ -520,13 +601,16 @@ async function cmdUpdate() {
   process.stdout.write('Mengunduh')
   const platform = detectPlatform()
   const buf = await downloadBinary(`${server}/download/cli/${platform}`, 10 * 60 * 1000, true)
-  if (!buf) { console.error('Download gagal atau timeout. Cek koneksi ke server.'); process.exit(1) }
+  if (!buf) {
+    console.error('Download gagal atau timeout. Cek koneksi ke server.')
+    process.exit(1)
+  }
 
   const tmpBin = join(tmpdir(), `envman-update-${Date.now()}`)
   writeFileSync(tmpBin, buf, { mode: 0o755 })
 
   const binaryPath = process.execPath
-  const { renameSync } = await import('fs')
+  const { renameSync } = await import('node:fs')
   try {
     rmSync(binaryPath, { force: true })
     renameSync(tmpBin, binaryPath)
@@ -624,7 +708,7 @@ async function main() {
       const server = serverUrl.replace(/\/$/, '')
       const res = await fetch(`${server}/download/cli/version`)
       if (!res.ok) process.exit(0)
-      const { version: latest } = await res.json() as { version: string }
+      const { version: latest } = (await res.json()) as { version: string }
 
       if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true })
 
@@ -637,7 +721,7 @@ async function main() {
       // Download new binary (silent, 8-min timeout)
       const platform = detectPlatform()
       const buf = await downloadBinary(`${server}/download/cli/${platform}`, 8 * 60 * 1000, false)
-      if (!buf || buf.length < 1_000_000) process.exit(0)  // sanity: null or < 1MB = skip
+      if (!buf || buf.length < 1_000_000) process.exit(0) // sanity: null or < 1MB = skip
 
       const tmpBin = join(tmpdir(), `envman-bg-${Date.now()}`)
       writeFileSync(tmpBin, buf, { mode: 0o755 })
@@ -646,7 +730,7 @@ async function main() {
       // tapi tetap update cache sehingga notice muncul dan user bisa run 'envman update'
       let replaced = false
       try {
-        const { renameSync } = await import('fs')
+        const { renameSync } = await import('node:fs')
         rmSync(binaryPath, { force: true })
         renameSync(tmpBin, binaryPath)
         replaced = true
@@ -655,11 +739,14 @@ async function main() {
         rmSync(tmpBin, { force: true })
       }
 
-      writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({
-        checkedAt: Date.now(),
-        latestVersion: latest,
-        autoUpdated: replaced,  // true = replaced in bg, false = needs manual 'envman update'
-      }))
+      writeFileSync(
+        UPDATE_CACHE_FILE,
+        JSON.stringify({
+          checkedAt: Date.now(),
+          latestVersion: latest,
+          autoUpdated: replaced, // true = replaced in bg, false = needs manual 'envman update'
+        }),
+      )
     } catch {}
     process.exit(0)
   }
@@ -674,25 +761,39 @@ async function main() {
   }
 
   if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
-    printHelp(); return
+    printHelp()
+    return
   }
   if (args[0] === '--version' || args[0] === '-v') {
-    console.log(VERSION); return
+    console.log(VERSION)
+    return
   }
 
   switch (args[0]) {
-    case 'login':  await cmdLogin(args.slice(1)); return
-    case 'logout': await cmdLogout(); return
-    case 'whoami': await cmdWhoami(); return
-    case 'update': await cmdUpdate(); return
-    case 'run':    await cmdAlias(args.slice(1)); return
+    case 'login':
+      await cmdLogin(args.slice(1))
+      return
+    case 'logout':
+      await cmdLogout()
+      return
+    case 'whoami':
+      await cmdWhoami()
+      return
+    case 'update':
+      await cmdUpdate()
+      return
+    case 'run':
+      await cmdAlias(args.slice(1))
+      return
     case 'pm': {
       const { cmdPm } = await import('./pm/cli/pm-commands')
-      await cmdPm(args.slice(1)); return
+      await cmdPm(args.slice(1))
+      return
     }
     case 'mcp': {
       const { runMcpServer } = await import('./mcp')
-      await runMcpServer(args.slice(1)); return
+      await runMcpServer(args.slice(1))
+      return
     }
     case 'daemon-internal': {
       // Hidden subcommand — di-spawn oleh `envman daemon start`.
@@ -722,19 +823,25 @@ async function main() {
     const flag = flagArgs[i]
     if (flag === '-e') {
       const val = flagArgs[i + 1]
-      if (!val) { console.error('-e requires a value'); process.exit(1) }
+      if (!val) {
+        console.error('-e requires a value')
+        process.exit(1)
+      }
       sources.push(val)
       i += 2
     } else if (flag === '--server-wins') {
-      serverWins = true; i++
+      serverWins = true
+      i++
     } else {
       console.error(`Unknown flag: ${flag}\nRun 'envman --help' for usage.`)
       process.exit(1)
     }
   }
 
-  if (sources.length === 0 && !command.some(a => a.startsWith('files:') || isProjectFileRef(a))) {
-    console.error('Specify at least one -e source, or reference a project file directly.\nUsage: envman -e project:env -- command\n       envman -- bash myapp:scripts/deploy.sh')
+  if (sources.length === 0 && !command.some((a) => a.startsWith('files:') || isProjectFileRef(a))) {
+    console.error(
+      'Specify at least one -e source, or reference a project file directly.\nUsage: envman -e project:env -- command\n       envman -- bash myapp:scripts/deploy.sh',
+    )
     process.exit(1)
   }
 
@@ -743,7 +850,7 @@ async function main() {
 
 // Guard with import.meta.main so helpers can be imported in tests without triggering CLI
 if (import.meta.main) {
-  main().catch(err => {
+  main().catch((err) => {
     console.error('Fatal:', err.message)
     process.exit(1)
   })

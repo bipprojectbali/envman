@@ -5,12 +5,11 @@
 //   D2: cek existing daemon via PidFile sebelum spawn (race kemungkinan
 //       masih ada tapi window kecil; daemon main akan refuse di O_EXCL)
 
-import { spawnSync } from 'child_process'
-import { existsSync, mkdirSync, openSync } from 'fs'
-import { paths } from '../shared/paths'
+import { existsSync, mkdirSync, openSync } from 'node:fs'
 import { PidFile } from '../daemon/pidfile'
-import { DaemonClient, DaemonNotRunningError } from './client'
+import { paths } from '../shared/paths'
 import type { DaemonHealth } from '../shared/types'
+import { DaemonClient, DaemonNotRunningError } from './client'
 
 /**
  * Get command untuk re-spawn binary ini sebagai daemon.
@@ -18,7 +17,7 @@ import type { DaemonHealth } from '../shared/types'
  */
 function getDaemonSpawnCmd(): string[] {
   const execPath = process.execPath
-  const argv0Base = (process.argv[1] ?? '').split('/').pop() ?? ''
+  const _argv0Base = (process.argv[1] ?? '').split('/').pop() ?? ''
   // Heuristik: kalau execPath include 'bun' atau argv[1] adalah .ts file,
   // berarti dev mode — perlu pass script path
   const isDev = execPath.includes('bun') && process.argv[1]?.endsWith('.ts')
@@ -80,7 +79,7 @@ export async function cmdDaemonStart(): Promise<void> {
         // not ready yet
       }
     }
-    await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
   }
 
   console.error(`Daemon did not become ready within ${READY_TIMEOUT_MS}ms`)
@@ -164,7 +163,7 @@ export async function cmdDaemonStop(): Promise<void> {
       console.log('Daemon stopped')
       return
     }
-    await new Promise(r => setTimeout(r, 100))
+    await new Promise((r) => setTimeout(r, 100))
   }
 
   // Last resort SIGKILL

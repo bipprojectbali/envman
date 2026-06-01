@@ -29,7 +29,7 @@ export const DEFAULT_INHERIT_ALLOWLIST: readonly string[] = [
 export const STRIP_ALWAYS: readonly string[] = [
   'ENVMAN_TOKEN',
   'ENVMAN_SERVER',
-  'ENVMAN_PM_HOME',  // jangan biarkan child manipulate daemon paths
+  'ENVMAN_PM_HOME', // jangan biarkan child manipulate daemon paths
 ] as const
 
 export interface ResolveEnvParams {
@@ -56,9 +56,8 @@ export interface ResolveEnvParams {
  */
 export function resolveChildEnv(params: ResolveEnvParams): Record<string, string> {
   const daemonEnv = params.daemonEnv ?? process.env
-  const allowlist = new Set<string>(params.extraAllowlist
-    ? [...DEFAULT_INHERIT_ALLOWLIST, ...params.extraAllowlist]
-    : DEFAULT_INHERIT_ALLOWLIST,
+  const allowlist = new Set<string>(
+    params.extraAllowlist ? [...DEFAULT_INHERIT_ALLOWLIST, ...params.extraAllowlist] : DEFAULT_INHERIT_ALLOWLIST,
   )
   const stripSet = new Set<string>(STRIP_ALWAYS)
 
@@ -102,7 +101,10 @@ export function resolveChildEnv(params: ResolveEnvParams): Record<string, string
  * Stub untuk sekarang — Phase 5+ akan return sha256.
  */
 export function hashEnv(env: Record<string, string>): string {
-  const sorted = Object.keys(env).sort().map(k => `${k}=${env[k]}`).join('\n')
+  const sorted = Object.keys(env)
+    .sort()
+    .map((k) => `${k}=${env[k]}`)
+    .join('\n')
   // Pakai Bun.hash kalau ada, atau fallback ke string length untuk Phase 2 placeholder
   // Phase 5+ akan ganti ke sha256.
   if (typeof (globalThis as any).Bun?.hash === 'function') {

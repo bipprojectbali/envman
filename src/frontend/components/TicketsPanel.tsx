@@ -17,13 +17,12 @@ import {
   Textarea,
   TextInput,
   Title,
-  Tooltip,
 } from '@mantine/core'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMediaQuery } from '@mantine/hooks'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { TbBug, TbCheck, TbChevronRight, TbMessagePlus, TbPaperclip, TbPlus, TbRefresh, TbRotate } from 'react-icons/tb'
-import { type Role, useSession, hasCapability } from '@/frontend/hooks/useAuth'
+import { hasCapability, type Role, useSession } from '@/frontend/hooks/useAuth'
 
 type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'READY_FOR_QC' | 'REOPENED' | 'CLOSED'
 type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
@@ -181,17 +180,34 @@ export function TicketsPanel() {
         {/* Mobile: card list */}
         {isMobile ? (
           <Stack gap="xs">
-            {isLoading && <Text ta="center" c="dimmed" py="md" size="sm">Loading…</Text>}
+            {isLoading && (
+              <Text ta="center" c="dimmed" py="md" size="sm">
+                Loading…
+              </Text>
+            )}
             {!isLoading && tickets.length === 0 && (
-              <Box p="lg" ta="center" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
-                <Text size="sm" c="dimmed">Tidak ada ticket</Text>
+              <Box
+                p="lg"
+                ta="center"
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 'var(--mantine-radius-md)',
+                }}
+              >
+                <Text size="sm" c="dimmed">
+                  Tidak ada ticket
+                </Text>
               </Box>
             )}
             {tickets.map((t) => (
               <Box
                 key={t.id}
                 p="sm"
-                style={{ cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+                style={{
+                  cursor: 'pointer',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 'var(--mantine-radius-md)',
+                }}
                 onClick={() => setDetailId(t.id)}
               >
                 <Group justify="space-between" mb={6} wrap="nowrap">
@@ -205,14 +221,33 @@ export function TicketsPanel() {
                   </Group>
                   <TbChevronRight size={14} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
                 </Group>
-                <Text size="sm" fw={500} lineClamp={2} mb={4}>{t.title}</Text>
-                {t.route && <Text size="xs" c="dimmed" mb={4} lineClamp={1}>{t.route}</Text>}
+                <Text size="sm" fw={500} lineClamp={2} mb={4}>
+                  {t.title}
+                </Text>
+                {t.route && (
+                  <Text size="xs" c="dimmed" mb={4} lineClamp={1}>
+                    {t.route}
+                  </Text>
+                )}
                 <Group gap="xs">
-                  <Text size="xs" c="dimmed">{t.reporter.name}</Text>
-                  {t.assignee && <><Text size="xs" c="dimmed">→</Text><Text size="xs">{t.assignee.name}</Text></>}
+                  <Text size="xs" c="dimmed">
+                    {t.reporter.name}
+                  </Text>
+                  {t.assignee && (
+                    <>
+                      <Text size="xs" c="dimmed">
+                        →
+                      </Text>
+                      <Text size="xs">{t.assignee.name}</Text>
+                    </>
+                  )}
                   <Group gap={4} ml="auto">
-                    <Badge size="xs" variant="default">{t._count.comments}c</Badge>
-                    <Badge size="xs" variant="default">{t._count.evidence}e</Badge>
+                    <Badge size="xs" variant="default">
+                      {t._count.comments}c
+                    </Badge>
+                    <Badge size="xs" variant="default">
+                      {t._count.evidence}e
+                    </Badge>
                   </Group>
                 </Group>
               </Box>
@@ -220,7 +255,13 @@ export function TicketsPanel() {
           </Stack>
         ) : (
           /* Desktop: scrollable table */
-          <Box p={0} style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+          <Box
+            p={0}
+            style={{
+              border: '1px solid var(--mantine-color-default-border)',
+              borderRadius: 'var(--mantine-radius-md)',
+            }}
+          >
             <ScrollArea>
               <Table striped highlightOnHover style={{ minWidth: 680 }}>
                 <Table.Thead>
@@ -238,14 +279,18 @@ export function TicketsPanel() {
                   {isLoading && (
                     <Table.Tr>
                       <Table.Td colSpan={7}>
-                        <Text ta="center" c="dimmed" py="md">Loading…</Text>
+                        <Text ta="center" c="dimmed" py="md">
+                          Loading…
+                        </Text>
                       </Table.Td>
                     </Table.Tr>
                   )}
                   {!isLoading && tickets.length === 0 && (
                     <Table.Tr>
                       <Table.Td colSpan={7}>
-                        <Text ta="center" c="dimmed" py="md">No tickets</Text>
+                        <Text ta="center" c="dimmed" py="md">
+                          No tickets
+                        </Text>
                       </Table.Td>
                     </Table.Tr>
                   )}
@@ -262,10 +307,18 @@ export function TicketsPanel() {
                         </Badge>
                       </Table.Td>
                       <Table.Td>
-                        <Text size="sm" fw={500} lineClamp={1}>{t.title}</Text>
-                        {t.route && <Text size="xs" c="dimmed">{t.route}</Text>}
+                        <Text size="sm" fw={500} lineClamp={1}>
+                          {t.title}
+                        </Text>
+                        {t.route && (
+                          <Text size="xs" c="dimmed">
+                            {t.route}
+                          </Text>
+                        )}
                       </Table.Td>
-                      <Table.Td><Text size="xs">{t.reporter.name}</Text></Table.Td>
+                      <Table.Td>
+                        <Text size="xs">{t.reporter.name}</Text>
+                      </Table.Td>
                       <Table.Td>
                         <Text size="xs" c={t.assignee ? undefined : 'dimmed'}>
                           {t.assignee?.name ?? '—'}
@@ -273,11 +326,17 @@ export function TicketsPanel() {
                       </Table.Td>
                       <Table.Td>
                         <Group gap={4}>
-                          <Badge size="xs" variant="default">{t._count.comments}c</Badge>
-                          <Badge size="xs" variant="default">{t._count.evidence}e</Badge>
+                          <Badge size="xs" variant="default">
+                            {t._count.comments}c
+                          </Badge>
+                          <Badge size="xs" variant="default">
+                            {t._count.evidence}e
+                          </Badge>
                         </Group>
                       </Table.Td>
-                      <Table.Td><TbChevronRight size={14} /></Table.Td>
+                      <Table.Td>
+                        <TbChevronRight size={14} />
+                      </Table.Td>
                     </Table.Tr>
                   ))}
                 </Table.Tbody>
@@ -454,7 +513,13 @@ function TicketDetailModal({
             )}
           </Group>
 
-          <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}>
+          <Box
+            p="sm"
+            style={{
+              border: '1px solid var(--mantine-color-default-border)',
+              borderRadius: 'var(--mantine-radius-sm)',
+            }}
+          >
             <Text size="xs" c="dimmed" mb={4}>
               Description
             </Text>
@@ -478,7 +543,13 @@ function TicketDetailModal({
           </Group>
 
           {/* Status actions */}
-          <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}>
+          <Box
+            p="sm"
+            style={{
+              border: '1px solid var(--mantine-color-default-border)',
+              borderRadius: 'var(--mantine-radius-sm)',
+            }}
+          >
             <Text size="xs" c="dimmed" mb={6}>
               Actions
             </Text>
@@ -558,7 +629,13 @@ function TicketDetailModal({
           </Box>
 
           {/* Comments */}
-          <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}>
+          <Box
+            p="sm"
+            style={{
+              border: '1px solid var(--mantine-color-default-border)',
+              borderRadius: 'var(--mantine-radius-sm)',
+            }}
+          >
             <Text size="xs" c="dimmed" mb={6}>
               Comments ({ticket.comments.length})
             </Text>
@@ -569,7 +646,14 @@ function TicketDetailModal({
                 </Text>
               )}
               {ticket.comments.map((c) => (
-                <Box key={c.id} p="xs" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-xs)' }}>
+                <Box
+                  key={c.id}
+                  p="xs"
+                  style={{
+                    border: '1px solid var(--mantine-color-default-border)',
+                    borderRadius: 'var(--mantine-radius-xs)',
+                  }}
+                >
                   <Group gap="xs" mb={2}>
                     <Badge
                       size="xs"
@@ -611,7 +695,13 @@ function TicketDetailModal({
           </Box>
 
           {/* Evidence */}
-          <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}>
+          <Box
+            p="sm"
+            style={{
+              border: '1px solid var(--mantine-color-default-border)',
+              borderRadius: 'var(--mantine-radius-sm)',
+            }}
+          >
             <Text size="xs" c="dimmed" mb={6}>
               Evidence ({ticket.evidence.length})
             </Text>

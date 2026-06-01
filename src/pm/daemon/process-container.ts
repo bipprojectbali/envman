@@ -8,19 +8,19 @@
 //   P6 ✓ Force kill timeout race antara process.exited dan setTimeout
 //   E5 ✓ State machine lock untuk prevent stop-during-start race
 
-import { log } from './logger'
-import { resolveChildEnv, hashEnv } from './env-resolver'
 import {
+  type BackoffConfig,
+  type BackoffState,
+  computeDelayMs,
+  DEFAULT_BACKOFF,
   newBackoffState,
   recordExit,
-  computeDelayMs,
   resetBackoff,
-  type BackoffState,
-  type BackoffConfig,
-  DEFAULT_BACKOFF,
 } from './backoff'
-import { LogWriter } from './log-writer'
+import { hashEnv, resolveChildEnv } from './env-resolver'
 import { LogTailer } from './log-tailer'
+import { LogWriter } from './log-writer'
+import { log } from './logger'
 
 /**
  * Kirim signal ke seluruh process group (negative PID).
@@ -34,24 +34,26 @@ function killGroup(pid: number, signal: NodeJS.Signals): void {
   try {
     process.kill(-pid, signal)
   } catch (e: any) {
-    if (e.code === 'ESRCH') return  // group empty / no longer exists
+    if (e.code === 'ESRCH') return // group empty / no longer exists
     // Fallback: coba kill single pid (mungkin detached failed dan child di-spawn flat)
-    try { process.kill(pid, signal) } catch {}
+    try {
+      process.kill(pid, signal)
+    } catch {}
   }
 }
 
 export type ProcessStatus =
-  | 'starting'      // proses sedang spawn / belum minUptime
-  | 'online'        // proses jalan stabil
-  | 'stopping'      // SIGTERM dikirim, tunggu exit
-  | 'stopped'       // user-requested stop, tidak akan auto-restart
-  | 'errored'       // exit dengan non-zero code, autorestart=false
-  | 'quarantined'   // crash-loop terdeteksi, paused
+  | 'starting' // proses sedang spawn / belum minUptime
+  | 'online' // proses jalan stabil
+  | 'stopping' // SIGTERM dikirim, tunggu exit
+  | 'stopped' // user-requested stop, tidak akan auto-restart
+  | 'errored' // exit dengan non-zero code, autorestart=false
+  | 'quarantined' // crash-loop terdeteksi, paused
 
 export interface ProcessOptions {
   autorestart: boolean
-  killTimeoutMs: number     // default 5000
-  backoff?: BackoffConfig   // default DEFAULT_BACKOFF
+  killTimeoutMs: number // default 5000
+  backoff?: BackoffConfig // default DEFAULT_BACKOFF
 }
 
 export const DEFAULT_PROCESS_OPTIONS: ProcessOptions = {
@@ -62,7 +64,7 @@ export const DEFAULT_PROCESS_OPTIONS: ProcessOptions = {
 
 export interface EnvSource {
   type: 'envman' | 'file'
-  ref: string  // "myapp:dev" atau "/path/.env"
+  ref: string // "myapp:dev" atau "/path/.env"
 }
 
 export interface ProcessConfig {
@@ -89,8 +91,8 @@ export interface ProcessSnapshot {
   cwd: string
   pid: number | null
   status: ProcessStatus
-  startedAt: number | null     // epoch ms, null kalau belum pernah start
-  uptimeMs: number              // 0 kalau tidak running
+  startedAt: number | null // epoch ms, null kalau belum pernah start
+  uptimeMs: number // 0 kalau tidak running
   restartCount: number
   lastExitCode: number | null
   lastError: string | null
@@ -200,7 +202,7 @@ export class ProcessContainer {
       // Fallback ke single-pid kill kalau pgkill error (mis. ESRCH = sudah mati).
       killGroup(proc.pid, 'SIGTERM')
 
-      const timeoutP = new Promise<'timeout'>(r => setTimeout(() => r('timeout'), this.options.killTimeoutMs))
+      const timeoutP = new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), this.options.killTimeoutMs))
       const exitedP = proc.exited.then(() => 'exited' as const)
       const winner = await Promise.race([exitedP, timeoutP])
 
@@ -212,7 +214,7 @@ export class ProcessContainer {
         })
         killGroup(proc.pid, 'SIGKILL')
         // Wait briefly for kernel to reap
-        await Promise.race([proc.exited, new Promise(r => setTimeout(r, 500))])
+        await Promise.race([proc.exited, new Promise((r) => setTimeout(r, 500))])
       }
 
       this.subprocess = null
@@ -332,11 +334,13 @@ export class ProcessContainer {
     }, minUptime)
 
     // Monitor exit
-    this.subprocess.exited.then((code) => {
-      this.handleExit(code)
-    }).catch((e) => {
-      log.error('exited promise rejected', { name: this.config.name, error: e.message })
-    })
+    this.subprocess.exited
+      .then((code) => {
+        this.handleExit(code)
+      })
+      .catch((e) => {
+        log.error('exited promise rejected', { name: this.config.name, error: e.message })
+      })
 
     // Pipe stdout/stderr ke LogWriter (Phase 3)
     if (this.logWriter) {
@@ -445,7 +449,7 @@ export class ProcessContainer {
       delayMs,
       restartCount: this.backoffState.restartCount,
     })
-    this.status = 'starting'  // optimistik — actual spawn setelah delay
+    this.status = 'starting' // optimistik — actual spawn setelah delay
     this.restartTimer = setTimeout(() => {
       this.restartTimer = null
       this.doSpawn()
@@ -458,7 +462,9 @@ export class ProcessContainer {
   private async runOp<T>(fn: () => Promise<T>): Promise<T> {
     const previous = this.opLock
     let resolve: () => void
-    this.opLock = new Promise(r => { resolve = r })
+    this.opLock = new Promise((r) => {
+      resolve = r
+    })
     try {
       await previous
       return await fn()

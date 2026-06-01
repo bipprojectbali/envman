@@ -2,20 +2,33 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/frontend/lib/api'
 
 interface Ticket {
-  id: string; title: string; description: string
-  status: string; priority: string; route: string | null
-  createdAt: string; updatedAt: string; closedAt: string | null
+  id: string
+  title: string
+  description: string
+  status: string
+  priority: string
+  route: string | null
+  createdAt: string
+  updatedAt: string
+  closedAt: string | null
   reporter: { id: string; name: string; email: string; role: string }
   assignee: { id: string; name: string; email: string; role: string } | null
   _count: { comments: number; evidence: number }
 }
-interface TicketsPage { tickets: Ticket[]; nextCursor?: string; hasMore: boolean }
+interface TicketsPage {
+  tickets: Ticket[]
+  nextCursor?: string
+  hasMore: boolean
+}
 
 const LIMIT = 50
 
 interface TicketFilters {
-  status?: string; priority?: string; assigneeId?: string
-  reporterId?: string; mine?: boolean
+  status?: string
+  priority?: string
+  assigneeId?: string
+  reporterId?: string
+  mine?: boolean
 }
 
 export function useTicketsInfinite(filters: TicketFilters = {}) {

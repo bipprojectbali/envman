@@ -1,13 +1,27 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/frontend/lib/api'
 
-interface GistFile { filename: string; content: string; language: string }
+interface GistFile {
+  filename: string
+  content: string
+  language: string
+}
 interface Gist {
-  id: string; title: string; description: string; files: GistFile[]
-  isPublic: boolean; tags: string[]; createdAt: string; updatedAt: string
+  id: string
+  title: string
+  description: string
+  files: GistFile[]
+  isPublic: boolean
+  tags: string[]
+  createdAt: string
+  updatedAt: string
   user: { id: string; name: string }
 }
-interface GistsPage { gists: Gist[]; nextCursor?: string; total: number }
+interface GistsPage {
+  gists: Gist[]
+  nextCursor?: string
+  total: number
+}
 
 const LIMIT = 20
 

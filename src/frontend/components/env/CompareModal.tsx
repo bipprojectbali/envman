@@ -1,18 +1,14 @@
 import {
   ActionIcon,
-  Alert,
   Badge,
   Box,
   Button,
-  Checkbox,
   Code,
   CopyButton,
-  Divider,
   Group,
   Loader,
   Modal,
   ScrollArea,
-  SegmentedControl,
   Stack,
   Switch,
   Text,
@@ -101,12 +97,16 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
     queryKey: ['envman', 'compare', slug, env, canEdit],
     queryFn: async () => {
       if (canEdit) {
-        const res = await apiFetch<{ vars: Record<string, string> }>(`/api/envman/projects/${slug}/environments/${env}/vars/export`)
+        const res = await apiFetch<{ vars: Record<string, string> }>(
+          `/api/envman/projects/${slug}/environments/${env}/vars/export`,
+        )
         const out: Record<string, ServerVarNorm> = {}
         for (const [k, v] of Object.entries(res.vars)) out[k] = { value: v, isSecret: false, masked: false }
         return out
       }
-      const res = await apiFetch<{ vars: Array<{ key: string; value: string; isSecret: boolean }> }>(`/api/envman/projects/${slug}/environments/${env}/vars?limit=10000`)
+      const res = await apiFetch<{ vars: Array<{ key: string; value: string; isSecret: boolean }> }>(
+        `/api/envman/projects/${slug}/environments/${env}/vars?limit=10000`,
+      )
       const out: Record<string, ServerVarNorm> = {}
       for (const v of res.vars) out[v.key] = { value: v.value, isSecret: v.isSecret, masked: v.value === '***' }
       return out
@@ -151,13 +151,14 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
     return c
   }, [rows])
 
-  const filteredRows = filter === 'all' ? rows : rows.filter(r => r.category === filter)
+  const filteredRows = filter === 'all' ? rows : rows.filter((r) => r.category === filter)
 
   // ── Mutations ────────────────────────────────────────────────────────────
   // Upsert via POST (existing var → update, new var → create).
   const upsertOne = (key: string, value: string, isSecret: boolean) =>
     apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
-      method: 'POST', body: JSON.stringify({ key, value, isSecret }),
+      method: 'POST',
+      body: JSON.stringify({ key, value, isSecret }),
     })
 
   const invalidate = () => {
@@ -167,27 +168,36 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
 
   const applySingle = useMutation<unknown, Error, DiffRow>({
     mutationFn: (row) => upsertOne(row.key, row.localValue!, row.category === 'onlyLocal' ? addAsSecret : row.isSecret),
-    onSuccess: (_, row) => { invalidate(); notifyOk(`${row.key} disinkronkan`) },
+    onSuccess: (_, row) => {
+      invalidate()
+      notifyOk(`${row.key} disinkronkan`)
+    },
     onError: (e) => notifyErr(e),
   })
 
   const applyAllDiff = useMutation<number, Error, void>({
     mutationFn: async () => {
-      const targets = rows.filter(r => r.category === 'diff')
-      await Promise.all(targets.map(r => upsertOne(r.key, r.localValue!, r.isSecret)))
+      const targets = rows.filter((r) => r.category === 'diff')
+      await Promise.all(targets.map((r) => upsertOne(r.key, r.localValue!, r.isSecret)))
       return targets.length
     },
-    onSuccess: (n) => { invalidate(); notifyOk(`${n} variabel di-update dari local`) },
+    onSuccess: (n) => {
+      invalidate()
+      notifyOk(`${n} variabel di-update dari local`)
+    },
     onError: (e) => notifyErr(e),
   })
 
   const applyAllMissing = useMutation<number, Error, void>({
     mutationFn: async () => {
-      const targets = rows.filter(r => r.category === 'onlyLocal')
-      await Promise.all(targets.map(r => upsertOne(r.key, r.localValue!, addAsSecret)))
+      const targets = rows.filter((r) => r.category === 'onlyLocal')
+      await Promise.all(targets.map((r) => upsertOne(r.key, r.localValue!, addAsSecret)))
       return targets.length
     },
-    onSuccess: (n) => { invalidate(); notifyOk(`${n} variabel ditambahkan ke envman`) },
+    onSuccess: (n) => {
+      invalidate()
+      notifyOk(`${n} variabel ditambahkan ke envman`)
+    },
     onError: (e) => notifyErr(e),
   })
 
@@ -204,7 +214,8 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
     return Object.entries(serverVars)
       .filter(([, v]) => !v.masked)
       .map(([k, v]) => {
-        const needsQuotes = v.value.includes(' ') || v.value.includes('#') || v.value.includes('"') || v.value.includes("'")
+        const needsQuotes =
+          v.value.includes(' ') || v.value.includes('#') || v.value.includes('"') || v.value.includes("'")
         return needsQuotes ? `${k}="${v.value.replace(/"/g, '\\"')}"` : `${k}=${v.value}`
       })
       .join('\n')
@@ -222,7 +233,9 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
         <Group gap="xs">
           <TbGitCompare size={18} />
           <Text fw={600}>Bandingkan dengan .env local</Text>
-          <Badge size="xs" variant="light" color="blue">{slug}:{env}</Badge>
+          <Badge size="xs" variant="light" color="blue">
+            {slug}:{env}
+          </Badge>
         </Group>
       }
       styles={{ body: { padding: 0 } }}
@@ -232,7 +245,7 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
         <Box px="md" py="xs" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
           <Group justify="space-between" gap="xs" wrap="wrap">
             <Group gap="xs" wrap="wrap">
-              {(['diff', 'onlyLocal', 'onlySrv', 'sync', 'uncertain'] as Category[]).map(c => {
+              {(['diff', 'onlyLocal', 'onlySrv', 'sync', 'uncertain'] as Category[]).map((c) => {
                 const meta = CATEGORY_META[c]
                 const Icon = meta.icon
                 const n = counts[c]
@@ -245,7 +258,7 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
                       color={meta.color}
                       leftSection={<Icon size={12} />}
                       style={{ cursor: 'pointer' }}
-                      onClick={() => setFilter(prev => prev === c ? 'all' : c)}
+                      onClick={() => setFilter((prev) => (prev === c ? 'all' : c))}
                     >
                       {n} {meta.label}
                     </Badge>
@@ -266,7 +279,9 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
               </Tooltip>
               {canEdit && counts.diff > 0 && (
                 <Button
-                  size="xs" color="yellow" variant="light"
+                  size="xs"
+                  color="yellow"
+                  variant="light"
                   leftSection={<TbArrowRight size={13} />}
                   loading={applyAllDiff.isPending}
                   onClick={() => applyAllDiff.mutate()}
@@ -276,7 +291,8 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
               )}
               {canEdit && counts.onlyLocal > 0 && (
                 <Button
-                  size="xs" color="blue"
+                  size="xs"
+                  color="blue"
                   leftSection={<TbPlus size={13} />}
                   loading={applyAllMissing.isPending}
                   onClick={() => applyAllMissing.mutate()}
@@ -291,15 +307,32 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
         {/* ─── Split: paste area | diff result ──────────────────────── */}
         <Box style={{ flex: 1, display: 'flex', minHeight: 0 }}>
           {/* LEFT: paste textarea */}
-          <Box style={{ width: 380, flexShrink: 0, borderRight: '1px solid var(--mantine-color-default-border)', display: 'flex', flexDirection: 'column' }}>
-            <Group justify="space-between" px="md" py="xs" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
-              <Text size="xs" fw={600} c="dimmed">PASTE .ENV LOCAL</Text>
+          <Box
+            style={{
+              width: 380,
+              flexShrink: 0,
+              borderRight: '1px solid var(--mantine-color-default-border)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <Group
+              justify="space-between"
+              px="md"
+              py="xs"
+              style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
+            >
+              <Text size="xs" fw={600} c="dimmed">
+                PASTE .ENV LOCAL
+              </Text>
               <Group gap={4}>
                 {Object.keys(localVars).length > 0 && (
-                  <Badge size="xs" variant="light" color="blue">{Object.keys(localVars).length} keys</Badge>
+                  <Badge size="xs" variant="light" color="blue">
+                    {Object.keys(localVars).length} keys
+                  </Badge>
                 )}
                 <Tooltip label={revealLocal ? 'Sembunyikan value' : 'Tampilkan value'}>
-                  <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setRevealLocal(v => !v)}>
+                  <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setRevealLocal((v) => !v)}>
                     {revealLocal ? <TbEyeOff size={12} /> : <TbEye size={12} />}
                   </ActionIcon>
                 </Tooltip>
@@ -308,7 +341,7 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
             <Textarea
               placeholder={`DATABASE_URL=postgres://...\nAPI_KEY=xxx\nPORT=3000\n\n# Komentar diabaikan`}
               value={localText}
-              onChange={e => setLocalText(e.target.value)}
+              onChange={(e) => setLocalText(e.target.value)}
               minRows={20}
               autosize={false}
               styles={{
@@ -330,7 +363,7 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
                   size="xs"
                   label={<Text size="xs">Tambah sebagai secret</Text>}
                   checked={addAsSecret}
-                  onChange={e => setAddAsSecret(e.currentTarget.checked)}
+                  onChange={(e) => setAddAsSecret(e.currentTarget.checked)}
                 />
               </Box>
             )}
@@ -341,14 +374,11 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
             {!hasInput ? (
               <EmptyState />
             ) : isLoading ? (
-              <Group justify="center" mt={120}><Loader /></Group>
+              <Group justify="center" mt={120}>
+                <Loader />
+              </Group>
             ) : (
-              <DiffList
-                rows={filteredRows}
-                canEdit={canEdit}
-                applySingle={applySingle}
-                addAsSecret={addAsSecret}
-              />
+              <DiffList rows={filteredRows} canEdit={canEdit} applySingle={applySingle} addAsSecret={addAsSecret} />
             )}
           </Box>
         </Box>
@@ -358,12 +388,18 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
           <Box px="md" py="xs" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
             <Group justify="space-between">
               <Text size="xs" c="dimmed">
-                <TbInfoCircle size={12} style={{ verticalAlign: 'middle' }} /> {' '}
-                Ada {counts.onlySrv} variabel di envman yang belum di local.
+                <TbInfoCircle size={12} style={{ verticalAlign: 'middle' }} /> Ada {counts.onlySrv} variabel di envman
+                yang belum di local.
               </Text>
               <CopyButton value={serverAsEnvText} timeout={2000}>
                 {({ copied, copy }) => (
-                  <Button size="compact-xs" variant="light" color={copied ? 'teal' : 'orange'} leftSection={copied ? <TbCheck size={12} /> : <TbCopy size={12} />} onClick={copy}>
+                  <Button
+                    size="compact-xs"
+                    variant="light"
+                    color={copied ? 'teal' : 'orange'}
+                    leftSection={copied ? <TbCheck size={12} /> : <TbCopy size={12} />}
+                    onClick={copy}
+                  >
                     {copied ? 'Disalin' : `Copy semua envman → clipboard`}
                   </Button>
                 )}
@@ -382,7 +418,9 @@ function EmptyState() {
     <Stack align="center" justify="center" style={{ flex: 1 }} gap="md" p="xl">
       <TbGitCompare size={48} opacity={0.3} />
       <Stack gap={4} align="center">
-        <Text size="sm" fw={600}>Paste .env local untuk mulai membandingkan</Text>
+        <Text size="sm" fw={600}>
+          Paste .env local untuk mulai membandingkan
+        </Text>
         <Text size="xs" c="dimmed" ta="center" maw={360}>
           Hasil perbandingan akan tampil di sini: key yang sama, beda value, hanya di local, atau hanya di envman.
         </Text>
@@ -408,7 +446,7 @@ function DiffList({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
   const toggleRow = (key: string) =>
-    setExpandedRows(prev => {
+    setExpandedRows((prev) => {
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
       return next
@@ -418,26 +456,45 @@ function DiffList({
     return (
       <Stack align="center" justify="center" style={{ flex: 1 }} gap="xs" p="xl">
         <TbCheck size={32} opacity={0.4} />
-        <Text size="sm" c="dimmed">Tidak ada perbedaan untuk filter ini.</Text>
+        <Text size="sm" c="dimmed">
+          Tidak ada perbedaan untuk filter ini.
+        </Text>
       </Stack>
     )
   }
   return (
     <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <Group justify="space-between" px="md" py={6} style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
-        <Text size="xs" fw={600} c="dimmed">HASIL ({rows.length})</Text>
+      <Group
+        justify="space-between"
+        px="md"
+        py={6}
+        style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
+      >
+        <Text size="xs" fw={600} c="dimmed">
+          HASIL ({rows.length})
+        </Text>
         <Group gap={4}>
           <Tooltip label={expandedAll ? 'Compact semua' : 'Expand semua untuk lihat full value'}>
             <Button
-              size="compact-xs" variant="subtle" color="gray"
-              leftSection={<TbChevronDown size={11} style={{ transform: expandedAll ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }} />}
-              onClick={() => { setExpandedAll(v => !v); setExpandedRows(new Set()) }}
+              size="compact-xs"
+              variant="subtle"
+              color="gray"
+              leftSection={
+                <TbChevronDown
+                  size={11}
+                  style={{ transform: expandedAll ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }}
+                />
+              }
+              onClick={() => {
+                setExpandedAll((v) => !v)
+                setExpandedRows(new Set())
+              }}
             >
               {expandedAll ? 'Compact' : 'Expand'}
             </Button>
           </Tooltip>
           <Tooltip label={revealValues ? 'Sembunyikan value' : 'Tampilkan value'}>
-            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setRevealValues(v => !v)}>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setRevealValues((v) => !v)}>
               {revealValues ? <TbEyeOff size={12} /> : <TbEye size={12} />}
             </ActionIcon>
           </Tooltip>
@@ -445,10 +502,14 @@ function DiffList({
       </Group>
       <ScrollArea style={{ flex: 1 }}>
         <Stack gap={2} p="xs">
-          {rows.map(row => (
+          {rows.map((row) => (
             <DiffRowItem
-              key={row.key} row={row} canEdit={canEdit} applySingle={applySingle}
-              addAsSecret={addAsSecret} revealValues={revealValues}
+              key={row.key}
+              row={row}
+              canEdit={canEdit}
+              applySingle={applySingle}
+              addAsSecret={addAsSecret}
+              revealValues={revealValues}
               expanded={expandedAll || expandedRows.has(row.key)}
               onToggle={() => toggleRow(row.key)}
             />
@@ -493,19 +554,34 @@ function DiffRowItem({
   const expandable = row.category !== 'uncertain'
 
   return (
-    <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }} p={0}>
+    <Box
+      style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}
+      p={0}
+    >
       {/* ── Header row (compact, clickable) ─────────────── */}
       <Group
-        gap="xs" wrap="nowrap" align="center" px="sm" py={6}
+        gap="xs"
+        wrap="nowrap"
+        align="center"
+        px="sm"
+        py={6}
         style={{ cursor: expandable ? 'pointer' : 'default' }}
         onClick={expandable ? onToggle : undefined}
       >
         <Tooltip label={meta.label} withArrow>
-          <Badge size="xs" variant="light" color={meta.color} leftSection={<Icon size={10} />} style={{ flexShrink: 0, minWidth: 22 }}>
+          <Badge
+            size="xs"
+            variant="light"
+            color={meta.color}
+            leftSection={<Icon size={10} />}
+            style={{ flexShrink: 0, minWidth: 22 }}
+          >
             {''}
           </Badge>
         </Tooltip>
-        <Code fz={12} style={{ flexShrink: 0, fontWeight: 600 }}>{row.key}</Code>
+        <Code fz={12} style={{ flexShrink: 0, fontWeight: 600 }}>
+          {row.key}
+        </Code>
         {row.isSecret && (
           <Tooltip label="Secret">
             <TbShieldLock size={11} style={{ color: 'var(--mantine-color-red-5)', flexShrink: 0 }} />
@@ -522,17 +598,15 @@ function DiffRowItem({
                 <ValuePill value={showValue(row.serverValue)} label="envman" color="orange" struck />
               </>
             )}
-            {row.category === 'sync' && (
-              <ValuePill value={showValue(row.localValue)} label="sama" color="teal" />
-            )}
-            {row.category === 'onlyLocal' && (
-              <ValuePill value={showValue(row.localValue)} label="local" color="blue" />
-            )}
+            {row.category === 'sync' && <ValuePill value={showValue(row.localValue)} label="sama" color="teal" />}
+            {row.category === 'onlyLocal' && <ValuePill value={showValue(row.localValue)} label="local" color="blue" />}
             {row.category === 'onlySrv' && (
               <ValuePill value={showValue(row.serverValue)} label="envman" color="orange" />
             )}
             {row.category === 'uncertain' && (
-              <Text size="xs" c="dimmed">Secret di envman — tidak bisa dibandingkan</Text>
+              <Text size="xs" c="dimmed">
+                Secret di envman — tidak bisa dibandingkan
+              </Text>
             )}
           </Box>
         )}
@@ -541,11 +615,13 @@ function DiffRowItem({
         {expanded && <Box style={{ flex: 1 }} />}
 
         {/* Per-row actions */}
-        <Group gap={4} style={{ flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+        <Group gap={4} style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
           {canEdit && row.category === 'diff' && (
             <Tooltip label="Pakai value local, update ke envman">
               <Button
-                size="compact-xs" variant="light" color="yellow"
+                size="compact-xs"
+                variant="light"
+                color="yellow"
                 leftSection={<TbArrowRight size={11} />}
                 loading={isPending}
                 onClick={() => applySingle.mutate(row)}
@@ -557,7 +633,9 @@ function DiffRowItem({
           {canEdit && row.category === 'onlyLocal' && (
             <Tooltip label={addAsSecret ? 'Tambah sebagai secret ke envman' : 'Tambah ke envman'}>
               <Button
-                size="compact-xs" variant="light" color="blue"
+                size="compact-xs"
+                variant="light"
+                color="blue"
                 leftSection={<TbPlus size={11} />}
                 loading={isPending}
                 onClick={() => applySingle.mutate(row)}
@@ -599,22 +677,43 @@ function DiffRowItem({
           {row.category === 'diff' && (
             <Stack gap={6} mt={6}>
               <ValueBlock label="local" value={showFullValue(row.localValue)} rawValue={row.localValue} color="blue" />
-              <ValueBlock label="envman (akan diganti)" value={showFullValue(row.serverValue)} rawValue={row.serverValue} color="orange" struck />
+              <ValueBlock
+                label="envman (akan diganti)"
+                value={showFullValue(row.serverValue)}
+                rawValue={row.serverValue}
+                color="orange"
+                struck
+              />
             </Stack>
           )}
           {row.category === 'sync' && (
             <Box mt={6}>
-              <ValueBlock label="sama di kedua sisi" value={showFullValue(row.localValue)} rawValue={row.localValue} color="teal" />
+              <ValueBlock
+                label="sama di kedua sisi"
+                value={showFullValue(row.localValue)}
+                rawValue={row.localValue}
+                color="teal"
+              />
             </Box>
           )}
           {row.category === 'onlyLocal' && (
             <Box mt={6}>
-              <ValueBlock label="local (akan ditambahkan)" value={showFullValue(row.localValue)} rawValue={row.localValue} color="blue" />
+              <ValueBlock
+                label="local (akan ditambahkan)"
+                value={showFullValue(row.localValue)}
+                rawValue={row.localValue}
+                color="blue"
+              />
             </Box>
           )}
           {row.category === 'onlySrv' && (
             <Box mt={6}>
-              <ValueBlock label="envman (belum di local)" value={showFullValue(row.serverValue)} rawValue={row.serverValue} color="orange" />
+              <ValueBlock
+                label="envman (belum di local)"
+                value={showFullValue(row.serverValue)}
+                rawValue={row.serverValue}
+                color="orange"
+              />
             </Box>
           )}
         </Box>
@@ -627,7 +726,9 @@ function DiffRowItem({
 function ValuePill({ value, label, color, struck }: { value: string; label: string; color: string; struck?: boolean }) {
   return (
     <Box style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, flex: 1 }}>
-      <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>{label}:</Text>
+      <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+        {label}:
+      </Text>
       <Code
         fz={11}
         style={{
@@ -668,8 +769,12 @@ function ValueBlock({
     <Box>
       <Group gap={6} mb={3} justify="space-between">
         <Group gap={6}>
-          <Badge size="xs" variant="filled" color={color}>{label}</Badge>
-          <Text size="xs" c="dimmed">{chars} chars{lines > 1 && ` · ${lines} baris`}</Text>
+          <Badge size="xs" variant="filled" color={color}>
+            {label}
+          </Badge>
+          <Text size="xs" c="dimmed">
+            {chars} chars{lines > 1 && ` · ${lines} baris`}
+          </Text>
         </Group>
         {rawValue !== undefined && rawValue.length > 0 && (
           <CopyButton value={rawValue} timeout={2000}>
@@ -701,7 +806,11 @@ function ValueBlock({
           overflowY: 'auto',
         }}
       >
-        {value || <Text component="span" c="dimmed" fs="italic">(kosong)</Text>}
+        {value || (
+          <Text component="span" c="dimmed" fs="italic">
+            (kosong)
+          </Text>
+        )}
       </Box>
     </Box>
   )

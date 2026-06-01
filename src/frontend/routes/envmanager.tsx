@@ -21,9 +21,9 @@ import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from '
 import { useState } from 'react'
 import {
   TbBook,
-  TbCode,
   TbBrandGithub,
   TbChevronUp,
+  TbCode,
   TbDatabase,
   TbHome,
   TbKey,
@@ -101,23 +101,66 @@ function EnvManagerLayout() {
   const isGists = pathname.startsWith('/envmanager/gists')
   const isDatabase = pathname.startsWith('/envmanager/database')
   const isUsers = pathname.startsWith('/envmanager/users')
-  const isProjectsActive = !isOverview && !isTokens && !isConnections && !isReadme && !isGists && !isDatabase && !isUsers
+  const isProjectsActive =
+    !isOverview && !isTokens && !isConnections && !isReadme && !isGists && !isDatabase && !isUsers
 
   const mainNav = [
     ...(hasCapability(user, 'menu:overview')
-      ? [{ label: 'Overview', description: 'Ringkasan semua resources', icon: TbHome, href: '/envmanager/overview', active: isOverview }]
+      ? [
+          {
+            label: 'Overview',
+            description: 'Ringkasan semua resources',
+            icon: TbHome,
+            href: '/envmanager/overview',
+            active: isOverview,
+          },
+        ]
       : []),
-    { label: 'Projects', description: 'Kelola environment vars', icon: TbVariable, href: '/envmanager', active: isProjectsActive },
+    {
+      label: 'Projects',
+      description: 'Kelola environment vars',
+      icon: TbVariable,
+      href: '/envmanager',
+      active: isProjectsActive,
+    },
     ...(hasCapability(user, 'menu:tokens')
-      ? [{ label: 'Tokens', description: 'API token untuk CLI', icon: TbKey, href: '/envmanager/tokens', active: isTokens }]
+      ? [
+          {
+            label: 'Tokens',
+            description: 'API token untuk CLI',
+            icon: TbKey,
+            href: '/envmanager/tokens',
+            active: isTokens,
+          },
+        ]
       : []),
     ...(hasCapability(user, 'menu:gists')
-      ? [{ label: 'Gists', description: 'Snippets & konfigurasi', icon: TbBrandGithub, href: '/envmanager/gists', active: isGists }]
+      ? [
+          {
+            label: 'Gists',
+            description: 'Snippets & konfigurasi',
+            icon: TbBrandGithub,
+            href: '/envmanager/gists',
+            active: isGists,
+          },
+        ]
       : []),
     ...(user?.role === 'SUPER_ADMIN'
       ? [
-          { label: 'Database', description: 'Sync data dari remote', icon: TbDatabase, href: '/envmanager/database', active: isDatabase },
-          { label: 'Users', description: 'Kelola akses user', icon: TbUsers, href: '/envmanager/users', active: isUsers },
+          {
+            label: 'Database',
+            description: 'Sync data dari remote',
+            icon: TbDatabase,
+            href: '/envmanager/database',
+            active: isDatabase,
+          },
+          {
+            label: 'Users',
+            description: 'Kelola akses user',
+            icon: TbUsers,
+            href: '/envmanager/users',
+            active: isUsers,
+          },
         ]
       : []),
   ]
@@ -133,7 +176,15 @@ function EnvManagerLayout() {
 
   const extensionsNav = [
     ...(portainerEnabled && (user?.role === 'SUPER_ADMIN' || hasCapability(user, 'menu:connections'))
-      ? [{ label: 'Portainer', description: 'Connections & backup', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections }]
+      ? [
+          {
+            label: 'Portainer',
+            description: 'Connections & backup',
+            icon: TbPlugConnected,
+            href: '/envmanager/connections',
+            active: isConnections,
+          },
+        ]
       : []),
   ]
 
@@ -159,7 +210,11 @@ function EnvManagerLayout() {
       padding={{ base: 'sm', sm: 'md' }}
     >
       {/* ─── Mobile header ──────────────── */}
-      <AppShell.Header px="sm" hiddenFrom="sm" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+      <AppShell.Header
+        px="sm"
+        hiddenFrom="sm"
+        style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
+      >
         <Group h="100%" justify="space-between">
           <Group gap="xs">
             <Burger opened={mobileOpened} onClick={toggleMobile} size="sm" />
@@ -181,7 +236,9 @@ function EnvManagerLayout() {
                   }}
                 />
               </Box>
-              <Text fw={800} size="sm">Env Manager</Text>
+              <Text fw={800} size="sm">
+                Env Manager
+              </Text>
             </Group>
           </Group>
           <Group gap={6}>
@@ -189,13 +246,7 @@ function EnvManagerLayout() {
             <Menu position="bottom-end" withArrow shadow="md" width={200}>
               <Menu.Target>
                 <Box style={{ position: 'relative', cursor: 'pointer' }}>
-                  <Avatar
-                    color="primary"
-                    radius="xl"
-                    size="sm"
-                    variant="gradient"
-                   
-                  >
+                  <Avatar color="primary" radius="xl" size="sm" variant="gradient">
                     {user?.name?.charAt(0).toUpperCase()}
                   </Avatar>
                   <Box
@@ -214,8 +265,12 @@ function EnvManagerLayout() {
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>
-                  <Text size="xs" fw={600}>{user?.name}</Text>
-                  <Text size="xs" c="dimmed" truncate>{user?.email}</Text>
+                  <Text size="xs" fw={600}>
+                    {user?.name}
+                  </Text>
+                  <Text size="xs" c="dimmed" truncate>
+                    {user?.email}
+                  </Text>
                 </Menu.Label>
                 <Menu.Item leftSection={<TbUser size={14} />} onClick={() => navigate({ to: '/profile' })}>
                   Profile
@@ -232,19 +287,12 @@ function EnvManagerLayout() {
 
       {/* ─── Sidebar (desktop only) ─────── */}
       <AppShell.Navbar p={collapsed ? 'xs' : 'md'} style={{ overflow: 'hidden' }}>
-
         {/* Logo */}
         <AppShell.Section mb="sm">
           <Group gap="xs" justify={collapsed ? 'center' : 'space-between'} wrap="nowrap">
             {collapsed ? (
               <Tooltip label="Expand sidebar" position="right" withArrow>
-                <ActionIcon
-                  variant="gradient"
-                 
-                  size="lg"
-                  onClick={toggleSidebar}
-                  radius="md"
-                >
+                <ActionIcon variant="gradient" size="lg" onClick={toggleSidebar} radius="md">
                   <TbLayoutSidebarLeftExpand size={18} />
                 </ActionIcon>
               </Tooltip>
@@ -252,12 +300,7 @@ function EnvManagerLayout() {
               <>
                 <Group gap="xs" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
                   <Box style={{ position: 'relative', flexShrink: 0 }}>
-                    <ThemeIcon
-                      size={38}
-                      variant="light"
-                      color="violet"
-                      radius="md"
-                    >
+                    <ThemeIcon size={38} variant="light" color="violet" radius="md">
                       <TbVariable size={20} />
                     </ThemeIcon>
                     {/* Online dot indicator */}
@@ -275,8 +318,12 @@ function EnvManagerLayout() {
                     />
                   </Box>
                   <Box style={{ flex: 1, minWidth: 0 }}>
-                    <Text fw={800} size="sm" lh={1.2} truncate>Env Manager</Text>
-                    <Text size="xs" c="dimmed" lh={1.2} truncate>Collaboration workspace</Text>
+                    <Text fw={800} size="sm" lh={1.2} truncate>
+                      Env Manager
+                    </Text>
+                    <Text size="xs" c="dimmed" lh={1.2} truncate>
+                      Collaboration workspace
+                    </Text>
                   </Box>
                 </Group>
                 <Tooltip label="Collapse sidebar" position="bottom" withArrow>
@@ -297,11 +344,14 @@ function EnvManagerLayout() {
                 Workspace
               </Text>
             )}
-            {mainNav.map(item =>
+            {mainNav.map((item) =>
               collapsed ? (
                 <Tooltip key={item.href} label={item.label} position="right" withArrow>
                   <UnstyledButton
-                    onClick={() => { navigate({ to: item.href }); closeMobile() }}
+                    onClick={() => {
+                      navigate({ to: item.href })
+                      closeMobile()
+                    }}
                     style={{
                       width: '100%',
                       height: 44,
@@ -314,16 +364,27 @@ function EnvManagerLayout() {
                         : undefined,
                       transition: 'all 0.15s',
                     }}
-                    onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
-                    onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                    onMouseEnter={(e) => {
+                      if (!item.active)
+                        (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!item.active) (e.currentTarget as HTMLElement).style.background = ''
+                    }}
                   >
-                    <item.icon size={18} color={item.active ? 'var(--mantine-color-primary)' : 'var(--mantine-color-dimmed)'} />
+                    <item.icon
+                      size={18}
+                      color={item.active ? 'var(--mantine-color-primary)' : 'var(--mantine-color-dimmed)'}
+                    />
                   </UnstyledButton>
                 </Tooltip>
               ) : (
                 <UnstyledButton
                   key={item.href}
-                  onClick={() => { navigate({ to: item.href }); closeMobile() }}
+                  onClick={() => {
+                    navigate({ to: item.href })
+                    closeMobile()
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -333,22 +394,29 @@ function EnvManagerLayout() {
                     borderRadius: 10,
                     transition: 'all 0.15s ease',
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '' }}
+                  onMouseEnter={(e) => {
+                    ;(e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    ;(e.currentTarget as HTMLElement).style.background = ''
+                  }}
                 >
-                  <ThemeIcon
-                    size={34}
-                    variant="subtle"
-                    color={item.active ? 'violet' : 'gray'}
-                    radius="md"
-                  >
+                  <ThemeIcon size={34} variant="subtle" color={item.active ? 'violet' : 'gray'} radius="md">
                     <item.icon size={16} />
                   </ThemeIcon>
                   <Box style={{ flex: 1, minWidth: 0 }}>
-                    <Text size="sm" fw={item.active ? 700 : 500} c={item.active ? 'violet' : undefined} lh={1.2} truncate>
+                    <Text
+                      size="sm"
+                      fw={item.active ? 700 : 500}
+                      c={item.active ? 'violet' : undefined}
+                      lh={1.2}
+                      truncate
+                    >
                       {item.label}
                     </Text>
-                    <Text size="xs" c="dimmed" lh={1.2} mt={1} truncate>{item.description}</Text>
+                    <Text size="xs" c="dimmed" lh={1.2} mt={1} truncate>
+                      {item.description}
+                    </Text>
                   </Box>
                   {item.active && (
                     <Box
@@ -361,22 +429,34 @@ function EnvManagerLayout() {
                     />
                   )}
                 </UnstyledButton>
-              )
+              ),
             )}
 
             {!collapsed ? (
-              <Text size="xs" c="dimmed" fw={700} tt="uppercase" mt="md" mb={4} px={4} style={{ letterSpacing: '0.08em' }}>
+              <Text
+                size="xs"
+                c="dimmed"
+                fw={700}
+                tt="uppercase"
+                mt="md"
+                mb={4}
+                px={4}
+                style={{ letterSpacing: '0.08em' }}
+              >
                 Other
               </Text>
             ) : (
               <Divider my="xs" />
             )}
 
-            {otherNav.map(item =>
+            {otherNav.map((item) =>
               collapsed ? (
                 <Tooltip key={item.href} label={item.label} position="right" withArrow>
                   <UnstyledButton
-                    onClick={() => { navigate({ to: item.href }); closeMobile() }}
+                    onClick={() => {
+                      navigate({ to: item.href })
+                      closeMobile()
+                    }}
                     style={{
                       width: '100%',
                       height: 40,
@@ -387,16 +467,27 @@ function EnvManagerLayout() {
                       background: item.active ? 'var(--mantine-color-violet-light)' : undefined,
                       transition: 'all 0.15s',
                     }}
-                    onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
-                    onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                    onMouseEnter={(e) => {
+                      if (!item.active)
+                        (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!item.active) (e.currentTarget as HTMLElement).style.background = ''
+                    }}
                   >
-                    <item.icon size={16} color={item.active ? 'var(--mantine-color-primary)' : 'var(--mantine-color-dimmed)'} />
+                    <item.icon
+                      size={16}
+                      color={item.active ? 'var(--mantine-color-primary)' : 'var(--mantine-color-dimmed)'}
+                    />
                   </UnstyledButton>
                 </Tooltip>
               ) : (
                 <UnstyledButton
                   key={item.href}
-                  onClick={() => { navigate({ to: item.href }); closeMobile() }}
+                  onClick={() => {
+                    navigate({ to: item.href })
+                    closeMobile()
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -407,67 +498,129 @@ function EnvManagerLayout() {
                     background: item.active ? 'var(--mantine-color-violet-light)' : undefined,
                     transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
-                  onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                  onMouseEnter={(e) => {
+                    if (!item.active)
+                      (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!item.active) (e.currentTarget as HTMLElement).style.background = ''
+                  }}
                 >
-                  <ThemeIcon size={26} variant={item.active ? 'light' : 'subtle'} color={item.active ? 'violet' : 'gray'} radius="md">
+                  <ThemeIcon
+                    size={26}
+                    variant={item.active ? 'light' : 'subtle'}
+                    color={item.active ? 'violet' : 'gray'}
+                    radius="md"
+                  >
                     <item.icon size={13} />
                   </ThemeIcon>
-                  <Text size="sm" fw={item.active ? 600 : 500} c={item.active ? 'violet' : 'dimmed'}>{item.label}</Text>
+                  <Text size="sm" fw={item.active ? 600 : 500} c={item.active ? 'violet' : 'dimmed'}>
+                    {item.label}
+                  </Text>
                 </UnstyledButton>
-              )
+              ),
             )}
 
             {/* Extensions group — hanya muncul jika ada item aktif */}
             {extensionsNav.length > 0 && (
               <>
                 {!collapsed ? (
-                  <Text size="xs" c="dimmed" fw={700} tt="uppercase" mt="md" mb={4} px={4} style={{ letterSpacing: '0.08em' }}>
+                  <Text
+                    size="xs"
+                    c="dimmed"
+                    fw={700}
+                    tt="uppercase"
+                    mt="md"
+                    mb={4}
+                    px={4}
+                    style={{ letterSpacing: '0.08em' }}
+                  >
                     Extensions
                   </Text>
                 ) : (
                   <Divider my="xs" />
                 )}
-                {extensionsNav.map(item =>
+                {extensionsNav.map((item) =>
                   collapsed ? (
                     <Tooltip key={item.href} label={item.label} position="right" withArrow>
                       <UnstyledButton
-                        onClick={() => { navigate({ to: item.href }); closeMobile() }}
+                        onClick={() => {
+                          navigate({ to: item.href })
+                          closeMobile()
+                        }}
                         style={{
-                          width: '100%', height: 40,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          width: '100%',
+                          height: 40,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                           borderRadius: 8,
                           background: item.active ? 'var(--mantine-color-cyan-light)' : undefined,
                           transition: 'all 0.15s',
                         }}
-                        onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
-                        onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                        onMouseEnter={(e) => {
+                          if (!item.active)
+                            (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)'
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!item.active) (e.currentTarget as HTMLElement).style.background = ''
+                        }}
                       >
-                        <item.icon size={16} color={item.active ? 'var(--mantine-color-cyan-6)' : 'var(--mantine-color-dimmed)'} />
+                        <item.icon
+                          size={16}
+                          color={item.active ? 'var(--mantine-color-cyan-6)' : 'var(--mantine-color-dimmed)'}
+                        />
                       </UnstyledButton>
                     </Tooltip>
                   ) : (
                     <UnstyledButton
                       key={item.href}
-                      onClick={() => { navigate({ to: item.href }); closeMobile() }}
+                      onClick={() => {
+                        navigate({ to: item.href })
+                        closeMobile()
+                      }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '8px 10px', minHeight: 38, borderRadius: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '8px 10px',
+                        minHeight: 38,
+                        borderRadius: 8,
                         background: item.active ? 'var(--mantine-color-cyan-light)' : undefined,
                         transition: 'all 0.15s',
                       }}
-                      onMouseEnter={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)' }}
-                      onMouseLeave={e => { if (!item.active) (e.currentTarget as HTMLElement).style.background = '' }}
+                      onMouseEnter={(e) => {
+                        if (!item.active)
+                          (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!item.active) (e.currentTarget as HTMLElement).style.background = ''
+                      }}
                     >
-                      <ThemeIcon size={26} variant={item.active ? 'light' : 'subtle'} color={item.active ? 'cyan' : 'gray'} radius="md">
+                      <ThemeIcon
+                        size={26}
+                        variant={item.active ? 'light' : 'subtle'}
+                        color={item.active ? 'cyan' : 'gray'}
+                        radius="md"
+                      >
                         <item.icon size={13} />
                       </ThemeIcon>
                       <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text size="sm" fw={item.active ? 600 : 500} c={item.active ? 'cyan' : 'dimmed'} lh={1.2} truncate>{item.label}</Text>
-                        <Text size="xs" c="dimmed" lh={1.2} mt={1} truncate>{item.description}</Text>
+                        <Text
+                          size="sm"
+                          fw={item.active ? 600 : 500}
+                          c={item.active ? 'cyan' : 'dimmed'}
+                          lh={1.2}
+                          truncate
+                        >
+                          {item.label}
+                        </Text>
+                        <Text size="xs" c="dimmed" lh={1.2} mt={1} truncate>
+                          {item.description}
+                        </Text>
                       </Box>
                     </UnstyledButton>
-                  )
+                  ),
                 )}
               </>
             )}
@@ -482,10 +635,7 @@ function EnvManagerLayout() {
               <Menu position="right-end" withArrow shadow="md" width={220}>
                 <Menu.Target>
                   <Box style={{ position: 'relative', cursor: 'pointer' }}>
-                    <Avatar
-                      color="primary" radius="xl" size="md"
-                      variant="gradient"
-                    >
+                    <Avatar color="primary" radius="xl" size="md" variant="gradient">
                       {user?.name?.charAt(0).toUpperCase()}
                     </Avatar>
                     <Box
@@ -504,8 +654,12 @@ function EnvManagerLayout() {
                 </Menu.Target>
                 <Menu.Dropdown>
                   <Menu.Label>
-                    <Text size="xs" fw={600}>{user?.name}</Text>
-                    <Text size="xs" c="dimmed" truncate>{user?.email}</Text>
+                    <Text size="xs" fw={600}>
+                      {user?.name}
+                    </Text>
+                    <Text size="xs" c="dimmed" truncate>
+                      {user?.email}
+                    </Text>
                   </Menu.Label>
                   <Menu.Item leftSection={<TbUser size={14} />} component="a" href="/profile">
                     Profile
@@ -530,15 +684,16 @@ function EnvManagerLayout() {
                       background: 'var(--mantine-color-default-hover)',
                       transition: 'background 0.15s',
                     }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-violet-light)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)'}
+                    onMouseEnter={(e) =>
+                      ((e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-violet-light)')
+                    }
+                    onMouseLeave={(e) =>
+                      ((e.currentTarget as HTMLElement).style.background = 'var(--mantine-color-default-hover)')
+                    }
                   >
                     <Group gap="xs" wrap="nowrap">
                       <Box style={{ position: 'relative', flexShrink: 0 }}>
-                        <Avatar
-                          color="primary" radius="xl" size="md"
-                          variant="gradient"
-                        >
+                        <Avatar color="primary" radius="xl" size="md" variant="gradient">
                           {user?.name?.charAt(0).toUpperCase()}
                         </Avatar>
                         <Box
@@ -580,7 +735,9 @@ function EnvManagerLayout() {
                           flexShrink: 0,
                         }}
                       />
-                      <Text size="xs" c="dimmed" truncate>{user?.email}</Text>
+                      <Text size="xs" c="dimmed" truncate>
+                        {user?.email}
+                      </Text>
                     </Group>
                   </Menu.Label>
                   <Menu.Item leftSection={<TbUser size={14} />} component="a" href="/profile">
@@ -593,7 +750,9 @@ function EnvManagerLayout() {
                 </Menu.Dropdown>
               </Menu>
               <Group gap="xs" justify="space-between" mt="xs" px={4}>
-                <Text size="xs" c="dimmed">Theme</Text>
+                <Text size="xs" c="dimmed">
+                  Theme
+                </Text>
                 <ThemeToggle size="sm" />
               </Group>
             </Box>
@@ -624,10 +783,13 @@ function EnvManagerLayout() {
             boxShadow: '0 -2px 8px rgba(0,0,0,0.04)',
           }}
         >
-          {bottomTabs.map(tab => (
+          {bottomTabs.map((tab) => (
             <UnstyledButton
               key={tab.href}
-              onClick={() => { navigate({ to: tab.href }); closeMobile() }}
+              onClick={() => {
+                navigate({ to: tab.href })
+                closeMobile()
+              }}
               style={{
                 flex: 1,
                 display: 'flex',

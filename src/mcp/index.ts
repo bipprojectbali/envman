@@ -8,10 +8,11 @@
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { version as PKG_VERSION } from '../../package.json'
-import { resolveMcpAuth, fetchWhoami, MissingAuthError } from './auth'
-import { buildServer } from './server-factory'
-import { log } from './logger'
+import type { Config } from './api-client'
 import { emitAudit } from './audit'
+import { fetchWhoami, MissingAuthError, resolveMcpAuth, type WhoamiResult } from './auth'
+import { log } from './logger'
+import { buildServer } from './server-factory'
 import type { ToolContext } from './shared'
 
 interface CliFlags {
@@ -25,11 +26,19 @@ function parseFlags(args: string[]): CliFlags {
   const flags: CliFlags = { write: false, debug: false, version: false, help: false }
   for (const a of args) {
     switch (a) {
-      case '--write': flags.write = true; break
-      case '--debug': flags.debug = true; break
-      case '--version': flags.version = true; break
+      case '--write':
+        flags.write = true
+        break
+      case '--debug':
+        flags.debug = true
+        break
+      case '--version':
+        flags.version = true
+        break
       case '--help':
-      case '-h': flags.help = true; break
+      case '-h':
+        flags.help = true
+        break
       default:
         // Unknown flag — log to stderr but don't crash (forward compat)
         process.stderr.write(`envman mcp: unknown flag ignored: ${a}\n`)
@@ -122,11 +131,15 @@ export async function runMcpServer(argv: string[]): Promise<void> {
     log.info('stdin EOF, shutting down')
     void shutdown(0)
   })
-  process.on('SIGTERM', () => { void shutdown(0) })
-  process.on('SIGINT', () => { void shutdown(0) })
+  process.on('SIGTERM', () => {
+    void shutdown(0)
+  })
+  process.on('SIGINT', () => {
+    void shutdown(0)
+  })
 
   // ─── Auth resolution ────────────────────────────────────────────────────────
-  let cfg
+  let cfg: Config
   try {
     cfg = resolveMcpAuth()
   } catch (e) {
@@ -140,7 +153,7 @@ export async function runMcpServer(argv: string[]): Promise<void> {
   log.info('auth resolved', { server: cfg.server })
 
   // ─── Probe whoami (verify token + get canWrite/scopes) ──────────────────────
-  let whoami
+  let whoami: WhoamiResult
   try {
     whoami = await fetchWhoami(cfg)
   } catch (e) {

@@ -17,18 +17,41 @@ import {
 } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, useNavigate, useParams } from '@tanstack/react-router'
-import { TbArrowLeft, TbBrandGithub, TbCheck, TbCopy, TbExternalLink, TbGlobe, TbLayoutDashboard, TbLogin, TbMaximize, TbUser } from 'react-icons/tb'
-import { ThemeToggle } from '@/frontend/components/ThemeToggle'
+import {
+  TbArrowLeft,
+  TbBrandGithub,
+  TbCheck,
+  TbCopy,
+  TbExternalLink,
+  TbGlobe,
+  TbLayoutDashboard,
+  TbLogin,
+  TbMaximize,
+  TbUser,
+} from 'react-icons/tb'
 import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
+import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { getDefaultRoute, useSession } from '@/frontend/hooks/useAuth'
 
 export const Route = createLazyFileRoute('/gists/$id')({ component: PublicGistDetailPage })
 
 const LANG_COLORS: Record<string, string> = {
-  javascript: 'yellow', typescript: 'blue', python: 'green', go: 'cyan',
-  rust: 'orange', bash: 'gray', sql: 'violet', json: 'teal', yaml: 'lime',
-  html: 'red', css: 'indigo', markdown: 'gray', dockerfile: 'blue',
-  prisma: 'violet', toml: 'orange', plaintext: 'gray',
+  javascript: 'yellow',
+  typescript: 'blue',
+  python: 'green',
+  go: 'cyan',
+  rust: 'orange',
+  bash: 'gray',
+  sql: 'violet',
+  json: 'teal',
+  yaml: 'lime',
+  html: 'red',
+  css: 'indigo',
+  markdown: 'gray',
+  dockerfile: 'blue',
+  prisma: 'violet',
+  toml: 'orange',
+  plaintext: 'gray',
 }
 const getLangColor = (lang: string) => LANG_COLORS[lang] ?? 'gray'
 
@@ -63,10 +86,11 @@ function PublicGistDetailPage() {
 
   const { data, isLoading, isError } = useQuery<{ gist: PublicGist }>({
     queryKey: ['public', 'gist', id],
-    queryFn: () => fetch(`/api/public/gists/${id}`).then(async r => {
-      if (!r.ok) throw new Error((await r.json()).error ?? `HTTP ${r.status}`)
-      return r.json()
-    }),
+    queryFn: () =>
+      fetch(`/api/public/gists/${id}`).then(async (r) => {
+        if (!r.ok) throw new Error((await r.json()).error ?? `HTTP ${r.status}`)
+        return r.json()
+      }),
   })
 
   const handleNav = () => {
@@ -80,14 +104,24 @@ function PublicGistDetailPage() {
   return (
     <Box style={{ minHeight: '100vh', background: 'var(--mantine-color-body)' }}>
       {/* Navbar */}
-      <Box style={{ borderBottom: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-body)', position: 'sticky', top: 0, zIndex: 100 }}>
+      <Box
+        style={{
+          borderBottom: '1px solid var(--mantine-color-default-border)',
+          background: 'var(--mantine-color-body)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+        }}
+      >
         <Container size="lg" py="xs">
           <Group justify="space-between">
             <Group gap="xs" style={{ cursor: 'pointer' }} onClick={() => navigate({ to: '/gists' })}>
               <ThemeIcon size={28} variant="gradient" radius="md">
                 <TbBrandGithub size={14} />
               </ThemeIcon>
-              <Text fw={800} size="sm">Public Gists</Text>
+              <Text fw={800} size="sm">
+                Public Gists
+              </Text>
             </Group>
             <Group gap="xs">
               <ThemeToggle size="sm" />
@@ -110,7 +144,13 @@ function PublicGistDetailPage() {
       <Container size="lg" py="xl">
         {/* Breadcrumb */}
         <Group gap="xs" mb="md">
-          <Button size="xs" variant="subtle" color="gray" leftSection={<TbArrowLeft size={13} />} onClick={() => navigate({ to: '/gists' })}>
+          <Button
+            size="xs"
+            variant="subtle"
+            color="gray"
+            leftSection={<TbArrowLeft size={13} />}
+            onClick={() => navigate({ to: '/gists' })}
+          >
             Public Gists
           </Button>
         </Group>
@@ -122,8 +162,17 @@ function PublicGistDetailPage() {
             <Skeleton height={300} radius="md" />
           </Stack>
         ) : isError || !data ? (
-          <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
-            <Text size="sm" fw={500} c="red">Gist tidak ditemukan atau bersifat private.</Text>
+          <Box
+            p="xl"
+            ta="center"
+            style={{
+              border: '1px dashed var(--mantine-color-default-border)',
+              borderRadius: 'var(--mantine-radius-md)',
+            }}
+          >
+            <Text size="sm" fw={500} c="red">
+              Gist tidak ditemukan atau bersifat private.
+            </Text>
             <Button size="xs" variant="subtle" mt="sm" onClick={() => navigate({ to: '/gists' })}>
               Kembali
             </Button>
@@ -142,19 +191,35 @@ function GistDetail({ gist }: { gist: PublicGist }) {
       {/* Header */}
       <Box>
         <Group gap="xs" mb={4} align="center">
-          <Text size="xl" fw={800}>{gist.title}</Text>
-          <Badge size="sm" variant="light" color="teal" leftSection={<TbGlobe size={9} />}>public</Badge>
+          <Text size="xl" fw={800}>
+            {gist.title}
+          </Text>
+          <Badge size="sm" variant="light" color="teal" leftSection={<TbGlobe size={9} />}>
+            public
+          </Badge>
         </Group>
-        {gist.description && <Text size="sm" c="dimmed" mb={8}>{gist.description}</Text>}
+        {gist.description && (
+          <Text size="sm" c="dimmed" mb={8}>
+            {gist.description}
+          </Text>
+        )}
         <Group gap={8}>
           <Group gap={4}>
             <TbUser size={13} color="var(--mantine-color-dimmed)" />
-            <Text size="xs" c="dimmed">{gist.user.name}</Text>
+            <Text size="xs" c="dimmed">
+              {gist.user.name}
+            </Text>
           </Group>
-          <Text size="xs" c="dimmed">·</Text>
-          <Text size="xs" c="dimmed">Diperbarui {relTime(gist.updatedAt)}</Text>
-          {gist.tags.map(tag => (
-            <Badge key={tag} size="xs" variant="outline" color="gray">{tag}</Badge>
+          <Text size="xs" c="dimmed">
+            ·
+          </Text>
+          <Text size="xs" c="dimmed">
+            Diperbarui {relTime(gist.updatedAt)}
+          </Text>
+          {gist.tags.map((tag) => (
+            <Badge key={tag} size="xs" variant="outline" color="gray">
+              {tag}
+            </Badge>
           ))}
         </Group>
       </Box>
@@ -164,16 +229,23 @@ function GistDetail({ gist }: { gist: PublicGist }) {
       {/* Files as tabs */}
       <Tabs defaultValue={gist.files[0]?.filename}>
         <Tabs.List>
-          {gist.files.map(f => (
+          {gist.files.map((f) => (
             <Tabs.Tab key={f.filename} value={f.filename}>
               <Group gap={6}>
-                <Box style={{ width: 8, height: 8, borderRadius: '50%', background: `var(--mantine-color-${getLangColor(f.language)}-5)` }} />
+                <Box
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: `var(--mantine-color-${getLangColor(f.language)}-5)`,
+                  }}
+                />
                 <Code fz={11}>{f.filename}</Code>
               </Group>
             </Tabs.Tab>
           ))}
         </Tabs.List>
-        {gist.files.map(f => (
+        {gist.files.map((f) => (
           <Tabs.Panel key={f.filename} value={f.filename} pt="sm">
             <FilePanel gistId={gist.id} file={f} />
           </Tabs.Panel>
@@ -189,12 +261,27 @@ function FilePanel({ gistId, file }: { gistId: string; file: GistFile }) {
   const isMarkdown = file.language === 'markdown'
 
   return (
-    <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden' }}>
+    <Box
+      style={{
+        border: '1px solid var(--mantine-color-default-border)',
+        borderRadius: 'var(--mantine-radius-md)',
+        overflow: 'hidden',
+      }}
+    >
       {/* Toolbar */}
-      <Group justify="space-between" px="sm" py="xs" style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+      <Group
+        justify="space-between"
+        px="sm"
+        py="xs"
+        style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
+      >
         <Group gap={6}>
-          <Badge size="xs" variant="dot" color={getLangColor(file.language)}>{file.language}</Badge>
-          <Text size="xs" c="dimmed">{file.content.split('\n').length} lines</Text>
+          <Badge size="xs" variant="dot" color={getLangColor(file.language)}>
+            {file.language}
+          </Badge>
+          <Text size="xs" c="dimmed">
+            {file.content.split('\n').length} lines
+          </Text>
         </Group>
         <Group gap={4}>
           <CopyButton value={file.content} timeout={2000}>
@@ -212,7 +299,15 @@ function FilePanel({ gistId, file }: { gistId: string; file: GistFile }) {
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Buka raw">
-            <ActionIcon size="sm" variant="subtle" color="gray" component="a" href={rawUrl} target="_blank" rel="noopener noreferrer">
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              color="gray"
+              component="a"
+              href={rawUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <TbExternalLink size={13} />
             </ActionIcon>
           </Tooltip>

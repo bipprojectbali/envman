@@ -33,7 +33,7 @@ async function serveFrontend(request: Request): Promise<Response> {
     const spaPrefixes = ['/gists/', '/envmanager/', '/dashboard', '/dev', '/profile', '/login', '/blocked', '/docs']
     const isSpaRoute =
       pathname === '/' ||
-      spaPrefixes.some(p => pathname.startsWith(p)) ||
+      spaPrefixes.some((p) => pathname.startsWith(p)) ||
       (!pathname.includes('.') && !pathname.startsWith('/@') && !pathname.startsWith('/__open-stack-frame-in-editor'))
     if (isSpaRoute) {
       const htmlPath = path.resolve('index.html')
@@ -151,9 +151,7 @@ async function serveFrontend(request: Request): Promise<Response> {
     return new Response(Bun.file(filePath), {
       headers: {
         'Content-Type': contentType[ext] ?? 'application/octet-stream',
-        'Cache-Control': isHashed
-          ? 'public, max-age=31536000, immutable'
-          : 'public, max-age=0, must-revalidate',
+        'Cache-Control': isHashed ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate',
       },
     })
   }
@@ -171,6 +169,7 @@ async function serveFrontend(request: Request): Promise<Response> {
 
 // ─── Portainer Backup Crons ───────────────────────────
 import { syncBackupCrons } from './lib/portainer-cron'
+
 syncBackupCrons().catch(console.error)
 
 // ─── Audit Log Rotation ───────────────────────────────

@@ -9,14 +9,14 @@
 //   file.log.1   → file.log.2 (becomes .gz in background, see compressInBackground)
 //   file.log.5   → DELETE (oldest, beyond cap)
 
-import { existsSync, renameSync, unlinkSync, statSync } from 'fs'
-import { log } from './logger'
+import { existsSync, renameSync, unlinkSync } from 'node:fs'
 import type { LogWriter } from './log-writer'
+import { log } from './logger'
 
 export interface RotatorOptions {
-  maxSizeBytes: number          // default 10 * 1024 * 1024
-  maxFiles: number              // default 5
-  checkIntervalMs: number       // default 60_000
+  maxSizeBytes: number // default 10 * 1024 * 1024
+  maxFiles: number // default 5
+  checkIntervalMs: number // default 60_000
 }
 
 export const DEFAULT_ROTATOR: RotatorOptions = {
@@ -41,7 +41,7 @@ export class LogRotator {
   start(): void {
     if (this.interval) return
     this.interval = setInterval(() => {
-      this.checkAndRotate().catch(e => log.error('rotation check failed', { error: e.message }))
+      this.checkAndRotate().catch((e) => log.error('rotation check failed', { error: e.message }))
     }, this.opts.checkIntervalMs)
   }
 
@@ -93,8 +93,16 @@ export class LogRotator {
 
     // Step 1: hapus paling lama (uncompressed + gz variant)
     const oldest = `${path}.${maxFiles}`
-    if (existsSync(oldest)) { try { unlinkSync(oldest) } catch {} }
-    if (existsSync(`${oldest}.gz`)) { try { unlinkSync(`${oldest}.gz`) } catch {} }
+    if (existsSync(oldest)) {
+      try {
+        unlinkSync(oldest)
+      } catch {}
+    }
+    if (existsSync(`${oldest}.gz`)) {
+      try {
+        unlinkSync(`${oldest}.gz`)
+      } catch {}
+    }
 
     // Step 2: shift dari N-1 ke N
     for (let i = maxFiles - 1; i >= 1; i--) {
@@ -153,36 +161,44 @@ export class LogRotator {
       const proc = Bun.spawn(['gzip', '-f', tmpPath], {
         stdio: ['ignore', 'ignore', 'pipe'],
       })
-      proc.exited.then((code) => {
-        this.compressing.delete(path)
-        if (code !== 0) {
-          log.warn('gzip exited with non-zero', { path, code })
-          // Cleanup tmp kalau gagal
-          if (existsSync(tmpPath)) { try { unlinkSync(tmpPath) } catch {} }
-          return
-        }
-        // gzip menambah .gz ke nama: tmp → tmp.gz
-        const gzTmp = `${tmpPath}.gz`
-        if (!existsSync(gzTmp)) {
-          log.warn('gzip output missing', { gzTmp })
-          return
-        }
-        // Step 3: rename ke final (atomic)
-        try {
-          renameSync(gzTmp, finalPath)
-        } catch (e: any) {
-          log.warn('rename gz to final failed', { gzTmp, finalPath, error: e.message })
-        }
-      }).catch((e) => {
-        log.warn('gzip await failed', { path, error: e.message })
-        this.compressing.delete(path)
-      })
+      proc.exited
+        .then((code) => {
+          this.compressing.delete(path)
+          if (code !== 0) {
+            log.warn('gzip exited with non-zero', { path, code })
+            // Cleanup tmp kalau gagal
+            if (existsSync(tmpPath)) {
+              try {
+                unlinkSync(tmpPath)
+              } catch {}
+            }
+            return
+          }
+          // gzip menambah .gz ke nama: tmp → tmp.gz
+          const gzTmp = `${tmpPath}.gz`
+          if (!existsSync(gzTmp)) {
+            log.warn('gzip output missing', { gzTmp })
+            return
+          }
+          // Step 3: rename ke final (atomic)
+          try {
+            renameSync(gzTmp, finalPath)
+          } catch (e: any) {
+            log.warn('rename gz to final failed', { gzTmp, finalPath, error: e.message })
+          }
+        })
+        .catch((e) => {
+          log.warn('gzip await failed', { path, error: e.message })
+          this.compressing.delete(path)
+        })
     } catch (e: any) {
       // gzip binary not found atau spawn error
       log.warn('gzip spawn failed', { path, error: e.message })
       this.compressing.delete(path)
       // Restore: tmp back to .1 (uncompressed)
-      try { renameSync(tmpPath, path) } catch {}
+      try {
+        renameSync(tmpPath, path)
+      } catch {}
     }
   }
 }

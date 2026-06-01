@@ -21,7 +21,6 @@ import {
   TbArrowRight,
   TbBrandGithub,
   TbChevronRight,
-  TbClock,
   TbFileCode,
   TbFolders,
   TbGlobe,
@@ -55,8 +54,11 @@ function relativeTime(dateStr: string): string {
 
 function absoluteTime(dateStr: string) {
   return new Date(dateStr).toLocaleString('id-ID', {
-    day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
@@ -89,12 +91,21 @@ const envColor = (name: string) => {
 function ProjectInitial({ name }: { name: string }) {
   const initial = (name.trim()[0] ?? '?').toUpperCase()
   return (
-    <Box style={{
-      width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-      background: 'color-mix(in srgb, var(--mantine-color-blue-5) 25%, transparent)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <Text size="xs" fw={800} c="blue" lh={1}>{initial}</Text>
+    <Box
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        flexShrink: 0,
+        background: 'color-mix(in srgb, var(--mantine-color-blue-5) 25%, transparent)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Text size="xs" fw={800} c="blue" lh={1}>
+        {initial}
+      </Text>
     </Box>
   )
 }
@@ -125,8 +136,21 @@ function StatCard({
       tabIndex={clickable ? 0 : undefined}
       aria-label={clickable ? `Buka ${label}` : undefined}
       onClick={onClick}
-      onKeyDown={clickable ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() } } : undefined}
-      style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: clickable ? 'pointer' : undefined }}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick?.()
+              }
+            }
+          : undefined
+      }
+      style={{
+        borderRadius: 'var(--mantine-radius-md)',
+        border: '1px solid var(--mantine-color-default-border)',
+        cursor: clickable ? 'pointer' : undefined,
+      }}
     >
       <Group justify="space-between" align="center" mb={8}>
         <ThemeIcon size={32} radius="md" variant="light" color={color}>
@@ -137,10 +161,18 @@ function StatCard({
       {loading ? (
         <Skeleton height={26} width={48} mb={4} />
       ) : (
-        <Text fw={800} size="xl" lh={1} mb={4}>{value}</Text>
+        <Text fw={800} size="xl" lh={1} mb={4}>
+          {value}
+        </Text>
       )}
-      <Text size="xs" fw={600} c="dimmed">{label}</Text>
-      {sub && <Text size="xs" c="dimmed" mt={2} lineClamp={1}>{sub}</Text>}
+      <Text size="xs" fw={600} c="dimmed">
+        {label}
+      </Text>
+      {sub && (
+        <Text size="xs" c="dimmed" mt={2} lineClamp={1}>
+          {sub}
+        </Text>
+      )}
     </Box>
   )
 }
@@ -148,7 +180,13 @@ function StatCard({
 function OverviewPage() {
   const navigate = useNavigate()
 
-  const { data: projectsData, isLoading: loadingProjects, isError: errorProjects, refetch: refetchProjects, dataUpdatedAt } = useQuery({
+  const {
+    data: projectsData,
+    isLoading: loadingProjects,
+    isError: errorProjects,
+    refetch: refetchProjects,
+    dataUpdatedAt,
+  } = useQuery({
     queryKey: ['envman', 'projects'],
     queryFn: () => apiFetch('/api/envman/projects'),
     staleTime: 5 * 60_000,
@@ -214,7 +252,9 @@ function OverviewPage() {
       {/* ─── Header ─────────────────────── */}
       <Group justify="space-between" mb={{ base: 'md', sm: 'xl' }} wrap="nowrap" align="center">
         <Box>
-          <Text fw={800} size="xl" lh={1.2}>Overview</Text>
+          <Text fw={800} size="xl" lh={1.2}>
+            Overview
+          </Text>
           {dataUpdatedAt > 0 && (
             <Tooltip label={`Diperbarui ${absoluteTime(new Date(dataUpdatedAt).toISOString())}`} withArrow>
               <Text size="xs" c="dimmed" mt={2} style={{ cursor: 'default' }}>
@@ -225,7 +265,9 @@ function OverviewPage() {
         </Box>
         <Tooltip label="Refresh data" withArrow>
           <ActionIcon
-            size="md" variant="default" radius="md"
+            size="md"
+            variant="default"
+            radius="md"
             aria-label="Refresh data"
             loading={isLoading}
             onClick={() => refetchProjects()}
@@ -236,8 +278,19 @@ function OverviewPage() {
       </Group>
 
       {errorProjects && (
-        <Alert color="red" icon={<TbAlertTriangle size={14} />} mb="md" withCloseButton onClose={() => refetchProjects()}>
-          <Text size="xs">Gagal memuat data project. <Text component="span" td="underline" style={{ cursor: 'pointer' }} onClick={() => refetchProjects()}>Coba lagi</Text></Text>
+        <Alert
+          color="red"
+          icon={<TbAlertTriangle size={14} />}
+          mb="md"
+          withCloseButton
+          onClose={() => refetchProjects()}
+        >
+          <Text size="xs">
+            Gagal memuat data project.{' '}
+            <Text component="span" td="underline" style={{ cursor: 'pointer' }} onClick={() => refetchProjects()}>
+              Coba lagi
+            </Text>
+          </Text>
         </Alert>
       )}
 
@@ -250,7 +303,7 @@ function OverviewPage() {
           sub={`${totalEnvs} environment`}
           color="primary"
           loading={loadingProjects}
-          onClick={() => navigate({ to: '/envmanager' })}
+          onClick={() => navigate({ to: '/envmanager', search: { create: false, editSlug: undefined } })}
         />
         <StatCard
           icon={TbVariable}
@@ -298,33 +351,59 @@ function OverviewPage() {
       </SimpleGrid>
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: 'sm', md: 'md' }}>
-
         {/* ─── Projects list ──────────────── */}
-        <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+        <Box
+          p="md"
+          style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}
+        >
           <Group justify="space-between" mb="md">
             <Group gap="xs">
               <ThemeIcon size={24} radius="sm" variant="light" color="primary">
                 <TbFolders size={13} />
               </ThemeIcon>
-              <Text fw={600} size="sm">Projects</Text>
+              <Text fw={600} size="sm">
+                Projects
+              </Text>
               {!loadingProjects && projects.length > 0 && (
-                <Badge size="xs" variant="light" color="primary" circle>{projects.length}</Badge>
+                <Badge size="xs" variant="light" color="primary" circle>
+                  {projects.length}
+                </Badge>
               )}
             </Group>
-            <Button size="compact-xs" variant="subtle" color="primary" rightSection={<TbArrowRight size={12} />}
-              onClick={() => navigate({ to: '/envmanager' })}>
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              color="primary"
+              rightSection={<TbArrowRight size={12} />}
+              onClick={() => navigate({ to: '/envmanager', search: { create: false, editSlug: undefined } })}
+            >
               Lihat semua
             </Button>
           </Group>
 
           {loadingProjects ? (
             <Stack gap="xs">
-              {[1, 2, 3].map(i => <Skeleton key={i} height={52} radius="md" />)}
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} height={52} radius="md" />
+              ))}
             </Stack>
           ) : recentProjects.length === 0 ? (
-            <Box p="lg" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
-              <Text size="sm" c="dimmed" mb="xs">Belum ada project</Text>
-              <Button size="xs" leftSection={<TbPlus size={13} />} onClick={() => navigate({ to: '/envmanager' })}>
+            <Box
+              p="lg"
+              ta="center"
+              style={{
+                border: '1px dashed var(--mantine-color-default-border)',
+                borderRadius: 'var(--mantine-radius-md)',
+              }}
+            >
+              <Text size="sm" c="dimmed" mb="xs">
+                Belum ada project
+              </Text>
+              <Button
+                size="xs"
+                leftSection={<TbPlus size={13} />}
+                onClick={() => navigate({ to: '/envmanager', search: { create: false, editSlug: undefined } })}
+              >
                 Buat Project
               </Button>
             </Box>
@@ -332,7 +411,22 @@ function OverviewPage() {
             <Stack gap={6}>
               {recentProjects.map((p: any) => {
                 const envs: any[] = p.environments ?? []
-                const goTo = () => navigate({ to: '/envmanager/$slug', params: { slug: p.slug }, search: { tab: 'environments', fileId: undefined, fileNew: false } })
+                const goTo = () =>
+                  navigate({
+                    to: '/envmanager/$slug',
+                    params: { slug: p.slug },
+                    search: {
+                      tab: 'environments',
+                      fileId: undefined,
+                      fileNew: false,
+                      viewFileId: undefined,
+                      aliasId: undefined,
+                      aliasNew: false,
+                      noteId: undefined,
+                      noteNew: false,
+                      viewNoteId: undefined,
+                    },
+                  })
                 return (
                   <Group
                     key={p.slug}
@@ -340,29 +434,54 @@ function OverviewPage() {
                     p="sm"
                     gap="sm"
                     className="envman-overview-row"
-                    role="link" tabIndex={0}
+                    role="link"
+                    tabIndex={0}
                     aria-label={`Buka project ${p.name}`}
                     onClick={goTo}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTo() } }}
-                    style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        goTo()
+                      }
+                    }}
+                    style={{
+                      borderRadius: 8,
+                      border: '1px solid var(--mantine-color-default-border)',
+                      cursor: 'pointer',
+                    }}
                   >
                     <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
                       <ProjectInitial name={p.name} />
                       <Box style={{ flex: 1, minWidth: 0 }}>
                         <Group gap={6} mb={3} wrap="nowrap">
-                          <Text size="sm" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <Text
+                            size="sm"
+                            fw={600}
+                            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          >
                             {p.name}
                           </Text>
-                          <Code fz="xs" style={{ flexShrink: 0 }}>{p.slug}</Code>
+                          <Code fz="xs" style={{ flexShrink: 0 }}>
+                            {p.slug}
+                          </Code>
                         </Group>
                         <Group gap={4} wrap="wrap">
                           {envs.slice(0, 4).map((e: any) => (
                             <Badge key={e.name} size="xs" variant="light" color={envColor(e.name)}>
-                              {e.name}{e._count?.vars != null && ` · ${e._count.vars}`}
+                              {e.name}
+                              {e._count?.vars != null && ` · ${e._count.vars}`}
                             </Badge>
                           ))}
-                          {envs.length > 4 && <Text size="xs" c="dimmed">+{envs.length - 4}</Text>}
-                          {envs.length === 0 && <Text size="xs" c="dimmed" fs="italic">belum ada env</Text>}
+                          {envs.length > 4 && (
+                            <Text size="xs" c="dimmed">
+                              +{envs.length - 4}
+                            </Text>
+                          )}
+                          {envs.length === 0 && (
+                            <Text size="xs" c="dimmed" fs="italic">
+                              belum ada env
+                            </Text>
+                          )}
                         </Group>
                       </Box>
                     </Group>
@@ -371,7 +490,9 @@ function OverviewPage() {
                 )
               })}
               {projects.length > 5 && (
-                <Text size="xs" c="dimmed" ta="center" mt={2}>+{projects.length - 5} project lainnya</Text>
+                <Text size="xs" c="dimmed" ta="center" mt={2}>
+                  +{projects.length - 5} project lainnya
+                </Text>
               )}
             </Stack>
           )}
@@ -379,50 +500,93 @@ function OverviewPage() {
 
         {/* ─── Right column ──────────────── */}
         <Stack gap="md">
-
           {/* Gists */}
-          <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+          <Box
+            p="md"
+            style={{
+              borderRadius: 'var(--mantine-radius-md)',
+              border: '1px solid var(--mantine-color-default-border)',
+            }}
+          >
             <Group justify="space-between" mb="md">
               <Group gap="xs">
                 <ThemeIcon size={24} radius="sm" variant="light" color="grape">
                   <TbBrandGithub size={13} />
                 </ThemeIcon>
-                <Text fw={600} size="sm">Gists Terbaru</Text>
+                <Text fw={600} size="sm">
+                  Gists Terbaru
+                </Text>
               </Group>
-              <Button size="compact-xs" variant="subtle" color="grape" rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/gists', search: { gist: undefined, edit: undefined } })}>
+              <Button
+                size="compact-xs"
+                variant="subtle"
+                color="grape"
+                rightSection={<TbArrowRight size={12} />}
+                onClick={() => navigate({ to: '/envmanager/gists', search: { gist: undefined, edit: undefined } })}
+              >
                 Lihat semua
               </Button>
             </Group>
 
             {loadingGists ? (
-              <Stack gap="xs">{[1, 2].map(i => <Skeleton key={i} height={44} radius="md" />)}</Stack>
+              <Stack gap="xs">
+                {[1, 2].map((i) => (
+                  <Skeleton key={i} height={44} radius="md" />
+                ))}
+              </Stack>
             ) : gists.length === 0 ? (
-              <Text size="xs" c="dimmed" ta="center" py="sm">Belum ada gist</Text>
+              <Text size="xs" c="dimmed" ta="center" py="sm">
+                Belum ada gist
+              </Text>
             ) : (
               <Stack gap={6}>
                 {recentGists.map((g: any) => (
                   <Group
-                    key={g.id} justify="space-between" p="xs" gap="sm"
+                    key={g.id}
+                    justify="space-between"
+                    p="xs"
+                    gap="sm"
                     className="envman-overview-row"
-                    role="link" tabIndex={0}
+                    role="link"
+                    tabIndex={0}
                     onClick={() => navigate({ to: '/envmanager/gists', search: { gist: g.id, edit: undefined } })}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate({ to: '/envmanager/gists', search: { gist: g.id, edit: undefined } }) } }}
-                    style={{ borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate({ to: '/envmanager/gists', search: { gist: g.id, edit: undefined } })
+                      }
+                    }}
+                    style={{
+                      borderRadius: 8,
+                      border: '1px solid var(--mantine-color-default-border)',
+                      cursor: 'pointer',
+                    }}
                   >
                     <Group gap="xs" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
                       <TbFileCode size={14} style={{ color: 'var(--mantine-color-grape-5)', flexShrink: 0 }} />
                       <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text size="xs" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Text
+                          size="xs"
+                          fw={600}
+                          style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        >
                           {g.title}
                         </Text>
                         <Group gap={4} mt={2}>
-                          <Text size="xs" c="dimmed">{g.files?.length ?? 0} file</Text>
-                          <Badge size="xs" variant="light" color={g.isPublic ? 'teal' : 'gray'}
-                            leftSection={g.isPublic ? <TbGlobe size={8} /> : <TbLock size={8} />}>
+                          <Text size="xs" c="dimmed">
+                            {g.files?.length ?? 0} file
+                          </Text>
+                          <Badge
+                            size="xs"
+                            variant="light"
+                            color={g.isPublic ? 'teal' : 'gray'}
+                            leftSection={g.isPublic ? <TbGlobe size={8} /> : <TbLock size={8} />}
+                          >
                             {g.isPublic ? 'public' : 'private'}
                           </Badge>
-                          <Text size="xs" c="dimmed">{relativeTime(g.updatedAt)}</Text>
+                          <Text size="xs" c="dimmed">
+                            {relativeTime(g.updatedAt)}
+                          </Text>
                         </Group>
                       </Box>
                     </Group>
@@ -430,49 +594,82 @@ function OverviewPage() {
                   </Group>
                 ))}
                 {gists.length > 4 && (
-                  <Text size="xs" c="dimmed" ta="center">+{gists.length - 4} gist lainnya</Text>
+                  <Text size="xs" c="dimmed" ta="center">
+                    +{gists.length - 4} gist lainnya
+                  </Text>
                 )}
               </Stack>
             )}
           </Box>
 
           {/* Tokens */}
-          <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+          <Box
+            p="md"
+            style={{
+              borderRadius: 'var(--mantine-radius-md)',
+              border: '1px solid var(--mantine-color-default-border)',
+            }}
+          >
             <Group justify="space-between" mb="md">
               <Group gap="xs">
                 <ThemeIcon size={24} radius="sm" variant="light" color="orange">
                   <TbKey size={13} />
                 </ThemeIcon>
-                <Text fw={600} size="sm">API Tokens</Text>
+                <Text fw={600} size="sm">
+                  API Tokens
+                </Text>
               </Group>
-              <Button size="compact-xs" variant="subtle" color="orange" rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/tokens', search: { token: undefined, edit: undefined } })}>
+              <Button
+                size="compact-xs"
+                variant="subtle"
+                color="orange"
+                rightSection={<TbArrowRight size={12} />}
+                onClick={() => navigate({ to: '/envmanager/tokens', search: { token: undefined, edit: undefined } })}
+              >
                 Kelola
               </Button>
             </Group>
 
             {loadingTokens ? (
-              <Stack gap="xs">{[1, 2].map(i => <Skeleton key={i} height={40} radius="md" />)}</Stack>
+              <Stack gap="xs">
+                {[1, 2].map((i) => (
+                  <Skeleton key={i} height={40} radius="md" />
+                ))}
+              </Stack>
             ) : tokens.length === 0 ? (
-              <Text size="xs" c="dimmed" ta="center" py="sm">Belum ada token</Text>
+              <Text size="xs" c="dimmed" ta="center" py="sm">
+                Belum ada token
+              </Text>
             ) : (
               <Stack gap="xs">
                 {/* Stats summary */}
                 <Group gap="lg">
                   <Group gap={5}>
                     <TbShieldCheck size={13} style={{ color: 'var(--mantine-color-teal-6)' }} />
-                    <Text size="xs" fw={600}>{activeTokens.length}</Text>
-                    <Text size="xs" c="dimmed">aktif</Text>
+                    <Text size="xs" fw={600}>
+                      {activeTokens.length}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      aktif
+                    </Text>
                   </Group>
                   <Group gap={5}>
                     <TbLockOpen size={13} style={{ color: 'var(--mantine-color-orange-5)' }} />
-                    <Text size="xs" fw={600}>{tokens.filter((t: any) => t.canWrite).length}</Text>
-                    <Text size="xs" c="dimmed">read-write</Text>
+                    <Text size="xs" fw={600}>
+                      {tokens.filter((t: any) => t.canWrite).length}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      read-write
+                    </Text>
                   </Group>
                   {tokens.some((t: any) => t.isDisabled) && (
                     <Group gap={5}>
-                      <Text size="xs" fw={600} c="dimmed">{tokens.filter((t: any) => t.isDisabled).length}</Text>
-                      <Text size="xs" c="dimmed">disabled</Text>
+                      <Text size="xs" fw={600} c="dimmed">
+                        {tokens.filter((t: any) => t.isDisabled).length}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        disabled
+                      </Text>
                     </Group>
                   )}
                 </Group>
@@ -480,20 +677,37 @@ function OverviewPage() {
                 {recentTokens.length > 0 && (
                   <>
                     <Divider />
-                    <Text size="xs" c="dimmed" fw={500}>Terakhir digunakan</Text>
+                    <Text size="xs" c="dimmed" fw={500}>
+                      Terakhir digunakan
+                    </Text>
                     {recentTokens.map((t: any) => (
                       <Group key={t.id} justify="space-between">
                         <Group gap={6}>
-                          <Badge size="xs" color={t.canWrite ? 'orange' : 'blue'} variant="light"
-                            leftSection={t.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}>
+                          <Badge
+                            size="xs"
+                            color={t.canWrite ? 'orange' : 'blue'}
+                            variant="light"
+                            leftSection={t.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}
+                          >
                             {t.canWrite ? 'rw' : 'ro'}
                           </Badge>
-                          <Text size="xs" fw={500} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>
+                          <Text
+                            size="xs"
+                            fw={500}
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: 130,
+                            }}
+                          >
                             {t.name}
                           </Text>
                         </Group>
                         <Tooltip label={`Terakhir dipakai ${absoluteTime(t.lastUsedAt)}`} withArrow>
-                          <Text size="xs" c="dimmed">{relativeTime(t.lastUsedAt)}</Text>
+                          <Text size="xs" c="dimmed">
+                            {relativeTime(t.lastUsedAt)}
+                          </Text>
                         </Tooltip>
                       </Group>
                     ))}
@@ -504,16 +718,29 @@ function OverviewPage() {
           </Box>
 
           {/* Connections */}
-          <Box p="md" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+          <Box
+            p="md"
+            style={{
+              borderRadius: 'var(--mantine-radius-md)',
+              border: '1px solid var(--mantine-color-default-border)',
+            }}
+          >
             <Group justify="space-between" mb="md">
               <Group gap="xs">
                 <ThemeIcon size={24} radius="sm" variant="light" color="teal">
                   <TbPlugConnected size={13} />
                 </ThemeIcon>
-                <Text fw={600} size="sm">Portainer Connections</Text>
+                <Text fw={600} size="sm">
+                  Portainer Connections
+                </Text>
               </Group>
-              <Button size="compact-xs" variant="subtle" color="teal" rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections' } })}>
+              <Button
+                size="compact-xs"
+                variant="subtle"
+                color="teal"
+                rightSection={<TbArrowRight size={12} />}
+                onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections' } })}
+              >
                 Kelola
               </Button>
             </Group>
@@ -521,22 +748,35 @@ function OverviewPage() {
             {loadingConnections ? (
               <Skeleton height={40} radius="md" />
             ) : connections.length === 0 ? (
-              <Text size="xs" c="dimmed" ta="center" py="sm">Belum ada connection</Text>
+              <Text size="xs" c="dimmed" ta="center" py="sm">
+                Belum ada connection
+              </Text>
             ) : (
               <Stack gap={6}>
                 {connections.map((c: any) => (
                   <Group key={c.id} justify="space-between" align="center">
                     <Group gap={8}>
-                      <Box style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--mantine-color-teal-5)', flexShrink: 0 }} />
-                      <Text size="xs" fw={500}>{c.name}</Text>
+                      <Box
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: 'var(--mantine-color-teal-5)',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Text size="xs" fw={500}>
+                        {c.name}
+                      </Text>
                     </Group>
-                    <Badge size="xs" variant="light" color="teal">{c._count?.configs ?? 0} env</Badge>
+                    <Badge size="xs" variant="light" color="teal">
+                      {c._count?.configs ?? 0} env
+                    </Badge>
                   </Group>
                 ))}
               </Stack>
             )}
           </Box>
-
         </Stack>
       </SimpleGrid>
     </Box>

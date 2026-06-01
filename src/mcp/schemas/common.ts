@@ -10,7 +10,10 @@ export const SlugRef = z
   .string()
   .min(1, 'Slug must not be empty')
   .max(64, 'Slug must be at most 64 characters')
-  .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/, 'Slug must be lowercase alphanumeric with optional hyphens (e.g., "my-app")')
+  .regex(
+    /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/,
+    'Slug must be lowercase alphanumeric with optional hyphens (e.g., "my-app")',
+  )
   .describe('Project slug — URL-safe identifier shown in the envman dashboard URL.')
 
 export const EnvName = z
@@ -24,7 +27,10 @@ export const VarKey = z
   .string()
   .min(1, 'Key must not be empty')
   .max(255, 'Key must be at most 255 characters')
-  .regex(/^[A-Z_][A-Z0-9_]*$/, 'Key must be SCREAMING_SNAKE_CASE (uppercase letters, digits, underscores; must start with letter or underscore)')
+  .regex(
+    /^[A-Z_][A-Z0-9_]*$/,
+    'Key must be SCREAMING_SNAKE_CASE (uppercase letters, digits, underscores; must start with letter or underscore)',
+  )
   .describe('Environment variable key in SCREAMING_SNAKE_CASE.')
 
 export const AliasName = z

@@ -2,35 +2,34 @@ import { cors } from '@elysiajs/cors'
 import { html } from '@elysiajs/html'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { Elysia } from 'elysia'
+import pkg from '../package.json'
 import { createMcpServer, type McpScope } from '../scripts/mcp/server'
 import { appLog } from './lib/applog'
-import { auth } from './lib/auth'
 import { audit } from './lib/audit'
+import { auth } from './lib/auth'
+import { requireAuth } from './lib/auth-middleware'
 import { prisma } from './lib/db'
 import { env } from './lib/env'
-import { requireAuth } from './lib/auth-middleware'
 import { addConnection, broadcastToAdmins, removeConnection } from './lib/presence'
 import { getIp, getPublicOrigin } from './lib/request'
 import { adminRouter } from './routes/admin/index'
-import { ticketsRouter } from './routes/tickets'
 import { envmanRouter } from './routes/envman/index'
+import { ticketsRouter } from './routes/tickets'
 import { v1Router } from './routes/v1/index'
-import pkg from '../package.json'
-
 
 // Inject `env_file: - stack.env` into every Docker Compose service that lacks it.
 // Portainer writes Env[] to stack.env for variable substitution; without env_file in
 // the service definition those vars never reach the container environment.
-function injectEnvFileIntoCompose(content: string): string {
+function _injectEnvFileIntoCompose(content: string): string {
   const lines = content.split('\n')
   // Two-pass: first collect where to insert, then build result
   const insertAfter = new Map<number, string[]>() // line index → lines to insert after it
 
   let inServices = false
-  let serviceIndent = -1   // indent of service names (e.g. 2)
-  let propIndent = -1       // indent of service properties (e.g. 4)
+  let serviceIndent = -1 // indent of service names (e.g. 2)
+  let propIndent = -1 // indent of service properties (e.g. 4)
   let serviceHasEnvFile = false
-  let lastPropLine = -1     // last content line inside current service
+  let lastPropLine = -1 // last content line inside current service
 
   const flushService = () => {
     if (lastPropLine >= 0 && !serviceHasEnvFile && propIndent >= 0) {
@@ -53,7 +52,10 @@ function injectEnvFileIntoCompose(content: string): string {
         serviceIndent = -1
         propIndent = -1
       } else {
-        if (inServices) { flushService(); inServices = false }
+        if (inServices) {
+          flushService()
+          inServices = false
+        }
       }
       continue
     }
@@ -207,7 +209,7 @@ ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<TOKEN> envman -e myapp:production -- bun s
 # GitHub Actions
 # env:
 #   ENVMAN_SERVER: ${origin}
-#   ENVMAN_TOKEN: \$\{{ secrets.ENVMAN_TOKEN }}
+#   ENVMAN_TOKEN: $\{{ secrets.ENVMAN_TOKEN }}
 # run: envman -e myapp:production -- bun start
 \`\`\`
 
@@ -466,7 +468,7 @@ export function createApp() {
         const setCookie = baRes.headers.get('set-cookie')
         if (setCookie) set.headers['set-cookie'] = setCookie
 
-        const baBody = await baRes.json() as { user: Record<string, unknown> }
+        const _baBody = (await baRes.json()) as { user: Record<string, unknown> }
         const user = await prisma.user.findUnique({
           where: { email },
           select: { id: true, name: true, email: true, role: true },
@@ -556,10 +558,13 @@ export function createApp() {
         })
         appLog('info', `Login (Google): ${dbUser?.email} (${dbUser?.role})`, getIp(request))
         const defaultRoute =
-          dbUser?.role === 'SUPER_ADMIN' ? '/dev' :
-          dbUser?.role === 'QC' ? '/dashboard' :
-          dbUser?.role === 'ADMIN' ? '/envmanager' :
-          '/profile'
+          dbUser?.role === 'SUPER_ADMIN'
+            ? '/dev'
+            : dbUser?.role === 'QC'
+              ? '/dashboard'
+              : dbUser?.role === 'ADMIN'
+                ? '/envmanager'
+                : '/profile'
         set.status = 302
         set.headers.location = defaultRoute
       })
@@ -593,7 +598,7 @@ export function createApp() {
       .use(adminRouter)
       .use(ticketsRouter)
       .use(envmanRouter)
-      .use(v1Router)       // Versioned API — /api/v1/*
+      .use(v1Router) // Versioned API — /api/v1/*
 
       // ─── WebSocket: presence ─────────────────────────
       // Auth via session cookie pada handshake. Admin (ADMIN/SUPER_ADMIN) menerima
@@ -601,7 +606,10 @@ export function createApp() {
       .ws('/ws/presence', {
         async beforeHandle({ request, set }) {
           const caller = await requireAuth(request)
-          if (!caller) { set.status = 401; return 'Unauthorized' }
+          if (!caller) {
+            set.status = 401
+            return 'Unauthorized'
+          }
           // Pass caller ke open() lewat WeakMap (di-keyed oleh request)
           presenceAuth.set(request, caller)
         },
@@ -609,7 +617,10 @@ export function createApp() {
           const req = (ws.data as { request: Request }).request
           const caller = presenceAuth.get(req)
           presenceAuth.delete(req)
-          if (!caller) { ws.close(); return }
+          if (!caller) {
+            ws.close()
+            return
+          }
           const isAdmin = caller.role === 'ADMIN' || caller.role === 'SUPER_ADMIN'
           ;(ws.data as { userId?: string }).userId = caller.userId
           addConnection(ws, caller.userId, isAdmin)
@@ -658,7 +669,6 @@ export function createApp() {
         name: pkg.name,
         version: pkg.version,
       }))
-
 
       // ─── CLI Download ─────────────────────────────────────
       .get('/install', ({ request }) => {
@@ -730,20 +740,23 @@ echo "Run: envman login ${origin} --token <your-token>"
 
       .get('/download/cli/:platform', ({ params, set }) => {
         const platforms: Record<string, string> = {
-          'linux-x64':    'envman-linux-x64',
-          'linux-arm64':  'envman-linux-arm64',
-          'darwin-x64':   'envman-darwin-x64',
+          'linux-x64': 'envman-linux-x64',
+          'linux-arm64': 'envman-linux-arm64',
+          'darwin-x64': 'envman-darwin-x64',
           'darwin-arm64': 'envman-darwin-arm64',
-          'windows-x64':  'envman-windows-x64.exe',
+          'windows-x64': 'envman-windows-x64.exe',
         }
         const filename = platforms[params.platform]
-        if (!filename) { set.status = 404; return 'Unknown platform' }
+        if (!filename) {
+          set.status = 404
+          return 'Unknown platform'
+        }
 
         const repo = process.env.GITHUB_REPO ?? 'bipprojectbali/envman'
         const url = `https://github.com/${repo}/releases/latest/download/${filename}`
 
         set.status = 302
-        set.headers['Location'] = url
+        set.headers.Location = url
         return null
       })
 

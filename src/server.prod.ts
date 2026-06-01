@@ -18,7 +18,7 @@ import { runMigrations } from './lib/migrate'
 const API_PREFIXES = ['/api/', '/webhook/', '/ws/', '/health', '/download/', '/install', '/mcp']
 
 function isApiRoute(pathname: string): boolean {
-  return API_PREFIXES.some(p => pathname.startsWith(p)) || pathname === '/health' || pathname === '/install'
+  return API_PREFIXES.some((p) => pathname.startsWith(p)) || pathname === '/health' || pathname === '/install'
 }
 
 // ─── Frontend Serving (production only — static files from dist/) ──────────
@@ -43,9 +43,7 @@ async function serveFrontend(request: Request): Promise<Response> {
     return new Response(Bun.file(filePath), {
       headers: {
         'Content-Type': contentType[ext] ?? 'application/octet-stream',
-        'Cache-Control': isHashed
-          ? 'public, max-age=31536000, immutable'
-          : 'public, max-age=0, must-revalidate',
+        'Cache-Control': isHashed ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate',
       },
     })
   }
@@ -68,6 +66,7 @@ if (process.env.MIGRATE_ON_STARTUP !== 'false') {
 
 // ─── Portainer Backup Crons ───────────────────────────
 import { syncBackupCrons } from './lib/portainer-cron'
+
 syncBackupCrons().catch(console.error)
 
 // ─── Audit Log Rotation ───────────────────────────────

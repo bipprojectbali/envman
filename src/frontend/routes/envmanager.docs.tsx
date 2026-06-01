@@ -280,9 +280,7 @@ function DocsPage() {
           --color-prettylights-syntax-constant-other-reference-link: #a5d6ff;
         }
       `}</style>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-        {buildDocs(origin)}
-      </ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{buildDocs(origin)}</ReactMarkdown>
     </Box>
   )
 }

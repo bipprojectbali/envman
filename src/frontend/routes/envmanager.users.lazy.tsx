@@ -14,24 +14,15 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
 import { useLocalStorage } from '@mantine/hooks'
+import { useQuery } from '@tanstack/react-query'
+import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
-import {
-  TbBan,
-  TbCheck,
-  TbChevronLeft,
-  TbSearch,
-  TbShieldCheck,
-  TbUsers,
-  TbX,
-} from 'react-icons/tb'
-import { apiFetch } from '@/frontend/lib/api'
-import { notifyErr, notifyOk } from '@/frontend/lib/notify'
-import { UserDrawerContent } from '@/frontend/components/users/UserDrawerContent'
-import { GLOBAL_ROLE_COLOR } from '@/frontend/components/users/types'
+import { TbBan, TbCheck, TbChevronLeft, TbSearch, TbShieldCheck, TbUsers, TbX } from 'react-icons/tb'
 import type { GlobalRole, UserSummary } from '@/frontend/components/users/types'
+import { GLOBAL_ROLE_COLOR } from '@/frontend/components/users/types'
+import { UserDrawerContent } from '@/frontend/components/users/UserDrawerContent'
+import { apiFetch } from '@/frontend/lib/api'
 
 export const Route = createLazyFileRoute('/envmanager/users')({
   component: UsersPage,
@@ -41,7 +32,10 @@ function UsersPage() {
   const { user: selectedUserId } = Route.useSearch()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useLocalStorage<GlobalRole | 'ALL'>({ key: 'envman:users:roleFilter', defaultValue: 'ALL' })
+  const [roleFilter, setRoleFilter] = useLocalStorage<GlobalRole | 'ALL'>({
+    key: 'envman:users:roleFilter',
+    defaultValue: 'ALL',
+  })
 
   const { data, isLoading } = useQuery<{ users: UserSummary[] }>({
     queryKey: ['admin', 'envman-users'],
@@ -50,34 +44,37 @@ function UsersPage() {
 
   const users = data?.users ?? []
 
-  const stats = useMemo(() => ({
-    total: users.length,
-    active: users.filter(u => !u.blocked).length,
-    blocked: users.filter(u => u.blocked).length,
-    adminPlus: users.filter(u => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN').length,
-  }), [users])
+  const stats = useMemo(
+    () => ({
+      total: users.length,
+      active: users.filter((u) => !u.blocked).length,
+      blocked: users.filter((u) => u.blocked).length,
+      adminPlus: users.filter((u) => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN').length,
+    }),
+    [users],
+  )
 
-  const roleCounts = useMemo(() => ({
-    ALL: users.length,
-    USER: users.filter(u => u.role === 'USER').length,
-    QC: users.filter(u => u.role === 'QC').length,
-    ADMIN: users.filter(u => u.role === 'ADMIN').length,
-    SUPER_ADMIN: users.filter(u => u.role === 'SUPER_ADMIN').length,
-  }), [users])
+  const roleCounts = useMemo(
+    () => ({
+      ALL: users.length,
+      USER: users.filter((u) => u.role === 'USER').length,
+      QC: users.filter((u) => u.role === 'QC').length,
+      ADMIN: users.filter((u) => u.role === 'ADMIN').length,
+      SUPER_ADMIN: users.filter((u) => u.role === 'SUPER_ADMIN').length,
+    }),
+    [users],
+  )
 
   const filtered = useMemo(() => {
-    let list = roleFilter === 'ALL' ? users : users.filter(u => u.role === roleFilter)
+    const list = roleFilter === 'ALL' ? users : users.filter((u) => u.role === roleFilter)
     const q = search.trim().toLowerCase()
     if (!q) return list
-    return list.filter(u =>
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q),
-    )
+    return list.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
   }, [users, search, roleFilter])
 
   // Detail view
   if (selectedUserId) {
-    const selectedUser = users.find(u => u.id === selectedUserId)
+    const selectedUser = users.find((u) => u.id === selectedUserId)
     return (
       <Stack gap="lg" p="md">
         <Group gap={6} align="center">
@@ -97,7 +94,9 @@ function UsersPage() {
           >
             Users
           </Text>
-          <Text size="sm" c="dimmed">/</Text>
+          <Text size="sm" c="dimmed">
+            /
+          </Text>
           {selectedUser ? (
             <Group gap="xs" wrap="nowrap">
               <Avatar
@@ -109,13 +108,19 @@ function UsersPage() {
               >
                 {selectedUser.name.charAt(0).toUpperCase()}
               </Avatar>
-              <Text size="sm" fw={600}>{selectedUser.name}</Text>
+              <Text size="sm" fw={600}>
+                {selectedUser.name}
+              </Text>
               {selectedUser.blocked && (
-                <Badge size="xs" color="red" variant="filled" leftSection={<TbBan size={9} />}>Blocked</Badge>
+                <Badge size="xs" color="red" variant="filled" leftSection={<TbBan size={9} />}>
+                  Blocked
+                </Badge>
               )}
             </Group>
           ) : (
-            <Text size="sm" fw={600}>User Access</Text>
+            <Text size="sm" fw={600}>
+              User Access
+            </Text>
           )}
         </Group>
         <UserDrawerContent userId={selectedUserId} />
@@ -132,33 +137,51 @@ function UsersPage() {
             <TbUsers size={20} />
           </ThemeIcon>
           <Box style={{ minWidth: 0 }}>
-            <Text fw={800} size="xl" lh={1.2}>User Management</Text>
+            <Text fw={800} size="xl" lh={1.2}>
+              User Management
+            </Text>
             {!isLoading && users.length > 0 ? (
               <Group gap={4} mt={2} wrap="wrap">
-                <Text size="xs" c="dimmed">{users.length} user</Text>
-                <Text size="xs" c="dimmed">·</Text>
-                <Text size="xs" c="dimmed">{stats.active} aktif</Text>
+                <Text size="xs" c="dimmed">
+                  {users.length} user
+                </Text>
+                <Text size="xs" c="dimmed">
+                  ·
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {stats.active} aktif
+                </Text>
                 {stats.blocked > 0 && (
                   <>
-                    <Text size="xs" c="dimmed">·</Text>
-                    <Text size="xs" c="dimmed">{stats.blocked} blocked</Text>
+                    <Text size="xs" c="dimmed">
+                      ·
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {stats.blocked} blocked
+                    </Text>
                   </>
                 )}
                 {stats.adminPlus > 0 && (
                   <>
-                    <Text size="xs" c="dimmed">·</Text>
-                    <Text size="xs" c="dimmed">{stats.adminPlus} admin+</Text>
+                    <Text size="xs" c="dimmed">
+                      ·
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {stats.adminPlus} admin+
+                    </Text>
                   </>
                 )}
               </Group>
             ) : (
-              <Text size="xs" c="dimmed" mt={2}>Kelola role global dan akses per project.</Text>
+              <Text size="xs" c="dimmed" mt={2}>
+                Kelola role global dan akses per project.
+              </Text>
             )}
           </Box>
         </Group>
       </Group>
 
-{/* Search + role filter */}
+      {/* Search + role filter */}
       <Stack gap="xs">
         <TextInput
           size="sm"
@@ -166,11 +189,13 @@ function UsersPage() {
           leftSection={<TbSearch size={14} />}
           value={search}
           onChange={(e) => setSearch(e.currentTarget.value)}
-          rightSection={search ? (
-            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setSearch('')}>
-              <TbX size={12} />
-            </ActionIcon>
-          ) : undefined}
+          rightSection={
+            search ? (
+              <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setSearch('')}>
+                <TbX size={12} />
+              </ActionIcon>
+            ) : undefined
+          }
           rightSectionWidth={search ? 32 : undefined}
           radius="md"
           maw={540}
@@ -181,13 +206,15 @@ function UsersPage() {
           onChange={(v) => setRoleFilter(v as GlobalRole | 'ALL')}
           radius="md"
           style={{ width: 'fit-content' }}
-          data={([
-            { value: 'ALL', label: 'All' },
-            { value: 'USER', label: 'User' },
-            { value: 'QC', label: 'QC' },
-            { value: 'ADMIN', label: 'Admin' },
-            { value: 'SUPER_ADMIN', label: 'Super' },
-          ] as { value: keyof typeof roleCounts; label: string }[]).map(({ value, label }) => ({
+          data={(
+            [
+              { value: 'ALL', label: 'All' },
+              { value: 'USER', label: 'User' },
+              { value: 'QC', label: 'QC' },
+              { value: 'ADMIN', label: 'Admin' },
+              { value: 'SUPER_ADMIN', label: 'Super' },
+            ] as { value: keyof typeof roleCounts; label: string }[]
+          ).map(({ value, label }) => ({
             value,
             label: (
               <Group gap={4} wrap="nowrap" justify="center">
@@ -204,10 +231,10 @@ function UsersPage() {
       </Stack>
 
       {/* Table */}
-      <Box style={{  overflow: 'hidden' }}>
+      <Box style={{ overflow: 'hidden' }}>
         {isLoading ? (
           <Stack gap={0}>
-            {Array.from({ length: 5 }).map((_, i) => (
+            {[0, 1, 2, 3, 4].map((i) => (
               <Box
                 key={i}
                 p="sm"
@@ -231,10 +258,22 @@ function UsersPage() {
             <ThemeIcon size={44} radius="xl" variant="light" color="gray">
               <TbSearch size={22} />
             </ThemeIcon>
-            <Text fw={500} size="sm">Tidak ada user yang cocok</Text>
-            <Text size="xs" c="dimmed" ta="center">Coba ubah filter atau hapus kata kunci pencarian.</Text>
+            <Text fw={500} size="sm">
+              Tidak ada user yang cocok
+            </Text>
+            <Text size="xs" c="dimmed" ta="center">
+              Coba ubah filter atau hapus kata kunci pencarian.
+            </Text>
             {(search || roleFilter !== 'ALL') && (
-              <Button size="xs" variant="subtle" mt={4} onClick={() => { setSearch(''); setRoleFilter('ALL') }}>
+              <Button
+                size="xs"
+                variant="subtle"
+                mt={4}
+                onClick={() => {
+                  setSearch('')
+                  setRoleFilter('ALL')
+                }}
+              >
                 Reset filter
               </Button>
             )}
@@ -253,7 +292,7 @@ function UsersPage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {filtered.map(u => (
+              {filtered.map((u) => (
                 <Table.Tr
                   key={u.id}
                   onClick={() => navigate({ to: '/envmanager/users', search: { user: u.id } })}
@@ -271,39 +310,64 @@ function UsersPage() {
                         {u.name.charAt(0).toUpperCase()}
                       </Avatar>
                       <div>
-                        <Text size="sm" fw={500}>{u.name}</Text>
-                        <Text size="xs" c="dimmed">{u.email}</Text>
+                        <Text size="sm" fw={500}>
+                          {u.name}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {u.email}
+                        </Text>
                       </div>
                     </Group>
                   </Table.Td>
                   <Table.Td>
-                    <Badge size="sm" color={GLOBAL_ROLE_COLOR[u.role]} variant="light">{u.role}</Badge>
+                    <Badge size="sm" color={GLOBAL_ROLE_COLOR[u.role]} variant="light">
+                      {u.role}
+                    </Badge>
                   </Table.Td>
                   <Table.Td>
-                    {u.blocked
-                      ? <Badge size="xs" color="red" variant="light" leftSection={<TbBan size={10} />}>Blocked</Badge>
-                      : <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={10} />}>Active</Badge>
-                    }
+                    {u.blocked ? (
+                      <Badge size="xs" color="red" variant="light" leftSection={<TbBan size={10} />}>
+                        Blocked
+                      </Badge>
+                    ) : (
+                      <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={10} />}>
+                        Active
+                      </Badge>
+                    )}
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="sm" fw={u.projectCount > 0 ? 500 : undefined} c={u.projectCount > 0 ? undefined : 'dimmed'}>
+                    <Text
+                      size="sm"
+                      fw={u.projectCount > 0 ? 500 : undefined}
+                      c={u.projectCount > 0 ? undefined : 'dimmed'}
+                    >
                       {u.projectCount > 0 ? u.projectCount : '—'}
                     </Text>
                   </Table.Td>
                   <Table.Td ta="right">
                     {u.envOverrideCount > 0 ? (
-                      <Badge size="xs" color="orange" variant="light">{u.envOverrideCount}</Badge>
+                      <Badge size="xs" color="orange" variant="light">
+                        {u.envOverrideCount}
+                      </Badge>
                     ) : (
-                      <Text size="xs" c="dimmed">—</Text>
+                      <Text size="xs" c="dimmed">
+                        —
+                      </Text>
                     )}
                   </Table.Td>
                   <Table.Td ta="right">
                     {u.role === 'SUPER_ADMIN' ? (
-                      <Badge size="xs" color="red" variant="light">all</Badge>
+                      <Badge size="xs" color="red" variant="light">
+                        all
+                      </Badge>
                     ) : u.permissions.length > 0 ? (
-                      <Badge size="xs" color="violet" variant="light">{u.permissions.length}</Badge>
+                      <Badge size="xs" color="violet" variant="light">
+                        {u.permissions.length}
+                      </Badge>
                     ) : (
-                      <Text size="xs" c="dimmed">—</Text>
+                      <Text size="xs" c="dimmed">
+                        —
+                      </Text>
                     )}
                   </Table.Td>
                   <Table.Td>

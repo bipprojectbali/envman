@@ -1,11 +1,7 @@
-import { redis } from './redis'
 import { prisma } from './db'
+import { redis } from './redis'
 
-export async function withCache<T>(
-  key: string,
-  ttlSeconds: number,
-  fetcher: () => Promise<T>,
-): Promise<T> {
+export async function withCache<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
   try {
     const cached = await redis.get(key)
     if (cached) return JSON.parse(cached) as T
@@ -67,14 +63,10 @@ export async function invalidateProjectCaches(slug: string, extraUserIds: string
         select: { id: true },
       }),
     ])
-    const userIds = new Set<string>([
-      ...members.map(m => m.userId),
-      ...superAdmins.map(u => u.id),
-      ...extraUserIds,
-    ])
+    const userIds = new Set<string>([...members.map((m) => m.userId), ...superAdmins.map((u) => u.id), ...extraUserIds])
     if (userIds.size === 0) return
     await invalidateCache(
-      ...Array.from(userIds).map(uid => cacheKeys.projectList(uid)),
+      ...Array.from(userIds).map((uid) => cacheKeys.projectList(uid)),
       cacheKeys.projectDetail(slug),
     )
   } catch {

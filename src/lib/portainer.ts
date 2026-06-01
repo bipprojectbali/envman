@@ -31,7 +31,10 @@ export function injectEnvFileIntoCompose(content: string): string {
         serviceIndent = -1
         propIndent = -1
       } else {
-        if (inServices) { flushService(); inServices = false }
+        if (inServices) {
+          flushService()
+          inServices = false
+        }
       }
       continue
     }

@@ -49,9 +49,7 @@ import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { TicketsPanel } from '@/frontend/components/TicketsPanel'
 import { useLogout, useSession } from '@/frontend/hooks/useAuth'
 
-
 export const Route = createLazyFileRoute('/dashboard')({ component: DashboardPage })
-
 
 type NavItem = {
   label: string
@@ -244,22 +242,52 @@ function DashboardPage() {
           {user?.role === 'SUPER_ADMIN' &&
             (collapsed ? (
               <Tooltip label="Dev Console" position="right">
-                <ActionIcon variant="subtle" color="gray" size="lg" component="a" href="/dev" mt={8} style={{ width: '100%' }}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  component="a"
+                  href="/dev"
+                  mt={8}
+                  style={{ width: '100%' }}
+                >
                   <TbCode size={18} />
                 </ActionIcon>
               </Tooltip>
             ) : (
-              <NavLink label="Dev Console" leftSection={<TbCode size={18} />} rightSection={<TbChevronRight size={14} />} component="a" href="/dev" variant="light" mb={4} />
+              <NavLink
+                label="Dev Console"
+                leftSection={<TbCode size={18} />}
+                rightSection={<TbChevronRight size={14} />}
+                component="a"
+                href="/dev"
+                variant="light"
+                mb={4}
+              />
             ))}
 
           {collapsed ? (
             <Tooltip label="Docs" position="right">
-              <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })} mt={8} style={{ width: '100%' }}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="lg"
+                onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })}
+                mt={8}
+                style={{ width: '100%' }}
+              >
                 <TbBook size={18} />
               </ActionIcon>
             </Tooltip>
           ) : (
-            <NavLink label="Docs" leftSection={<TbBook size={18} />} rightSection={<TbChevronRight size={14} />} onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })} variant="light" mb={4} />
+            <NavLink
+              label="Docs"
+              leftSection={<TbBook size={18} />}
+              rightSection={<TbChevronRight size={14} />}
+              onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })}
+              variant="light"
+              mb={4}
+            />
           )}
         </AppShell.Section>
 
@@ -369,7 +397,14 @@ function OverviewPanel() {
 
         <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }}>
           {statsData.map((stat) => (
-            <Box key={stat.title} p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+            <Box
+              key={stat.title}
+              p="lg"
+              style={{
+                borderRadius: 'var(--mantine-radius-md)',
+                border: '1px solid var(--mantine-color-default-border)',
+              }}
+            >
               <Group justify="space-between" mb="xs">
                 <Text size="xs" c="dimmed" fw={600} tt="uppercase">
                   {stat.title}
@@ -399,7 +434,13 @@ function OverviewPanel() {
         </SimpleGrid>
 
         <SimpleGrid cols={{ base: 1, md: 2 }}>
-          <Box p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+          <Box
+            p="lg"
+            style={{
+              borderRadius: 'var(--mantine-radius-md)',
+              border: '1px solid var(--mantine-color-default-border)',
+            }}
+          >
             <Text fw={600} mb="md">
               Traffic Source
             </Text>
@@ -423,7 +464,13 @@ function OverviewPanel() {
             </Stack>
           </Box>
 
-          <Box p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+          <Box
+            p="lg"
+            style={{
+              borderRadius: 'var(--mantine-radius-md)',
+              border: '1px solid var(--mantine-color-default-border)',
+            }}
+          >
             <Text fw={600} mb="md">
               Performance
             </Text>
@@ -500,7 +547,14 @@ function AnalyticsPanel() {
             { label: 'Bounce Rate', value: '32.4%', diff: -3 },
             { label: 'Avg. Session', value: '4m 23s', diff: 8 },
           ].map((stat) => (
-            <Box key={stat.label} p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+            <Box
+              key={stat.label}
+              p="lg"
+              style={{
+                borderRadius: 'var(--mantine-radius-md)',
+                border: '1px solid var(--mantine-color-default-border)',
+              }}
+            >
               <Text size="xs" c="dimmed" fw={600} tt="uppercase">
                 {stat.label}
               </Text>
@@ -521,7 +575,10 @@ function AnalyticsPanel() {
           ))}
         </SimpleGrid>
 
-        <Box p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+        <Box
+          p="lg"
+          style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}
+        >
           <Text fw={600} mb="md">
             Top Pages
           </Text>
@@ -597,7 +654,13 @@ function OrdersPanel() {
           </Badge>
         </Group>
 
-        <Box style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
+        <Box
+          style={{
+            borderRadius: 'var(--mantine-radius-md)',
+            border: '1px solid var(--mantine-color-default-border)',
+            overflow: 'hidden',
+          }}
+        >
           <Table highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -656,7 +719,10 @@ function RecentActivityTable() {
   ]
 
   return (
-    <Box p="lg" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
+    <Box
+      p="lg"
+      style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}
+    >
       <Text fw={600} mb="md">
         Recent Activity
       </Text>

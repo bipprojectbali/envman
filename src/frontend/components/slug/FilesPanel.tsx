@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   Alert,
+  Anchor,
   Badge,
   Box,
   Button,
@@ -8,8 +9,8 @@ import {
   CopyButton,
   Divider,
   Group,
-  Modal,
   Pagination,
+  Paper,
   SegmentedControl,
   Select,
   SimpleGrid,
@@ -17,22 +18,19 @@ import {
   Stack,
   Tabs,
   Text,
-  Textarea,
   TextInput,
   ThemeIcon,
   Tooltip,
-} from "@mantine/core";
-import {
-  useDebouncedValue,
-  useLocalStorage,
-  useMediaQuery,
-} from "@mantine/hooks";
-import { modals } from "@mantine/modals";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+} from '@mantine/core'
+import { useDebouncedValue, useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { modals } from '@mantine/modals'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   TbCheck,
+  TbChevronLeft,
+  TbChevronRight,
   TbCopy,
   TbEdit,
   TbEye,
@@ -48,180 +46,171 @@ import {
   TbTag,
   TbTrash,
   TbX,
-} from "react-icons/tb";
-import { CodeEditor } from "@/frontend/components/CodeEditor";
-import { MarkdownRenderer } from "@/frontend/components/MarkdownRenderer";
-import {
-  MultiSelectChips,
-  MultiSelectChipsRow,
-} from "@/frontend/components/MultiSelectChips";
-import { apiFetch } from "@/frontend/lib/api";
-import { notifyErr, notifyOk } from "@/frontend/lib/notify";
+} from 'react-icons/tb'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
+import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
+import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
+import { apiFetch } from '@/frontend/lib/api'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FileEntry {
-  filename: string;
-  content: string;
-  language: string;
+  filename: string
+  content: string
+  language: string
 }
 
 export interface ProjectFile {
-  id: string;
-  title: string;
-  description: string;
-  prefix: string | null;
-  files: FileEntry[];
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-  author: { id: string; name: string };
+  id: string
+  title: string
+  description: string
+  prefix: string | null
+  files: FileEntry[]
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+  author: { id: string; name: string }
 }
 
 export interface FilesPanelProps {
-  slug: string;
-  isOwner: boolean;
-  myUserId: string;
-  canEdit: boolean;
+  slug: string
+  isOwner: boolean
+  myUserId: string
+  canEdit: boolean
 }
 
 // ─── Language constants ───────────────────────────────────────────────────────
 
 const LANGUAGES = [
-  "plaintext",
-  "bash",
-  "javascript",
-  "typescript",
-  "python",
-  "go",
-  "rust",
-  "java",
-  "kotlin",
-  "swift",
-  "c",
-  "cpp",
-  "csharp",
-  "php",
-  "ruby",
-  "elixir",
-  "haskell",
-  "scala",
-  "r",
-  "sql",
-  "html",
-  "css",
-  "scss",
-  "json",
-  "yaml",
-  "toml",
-  "xml",
-  "markdown",
-  "dockerfile",
-  "nginx",
-  "prisma",
-  "graphql",
-];
+  'plaintext',
+  'bash',
+  'javascript',
+  'typescript',
+  'python',
+  'go',
+  'rust',
+  'java',
+  'kotlin',
+  'swift',
+  'c',
+  'cpp',
+  'csharp',
+  'php',
+  'ruby',
+  'elixir',
+  'haskell',
+  'scala',
+  'r',
+  'sql',
+  'html',
+  'css',
+  'scss',
+  'json',
+  'yaml',
+  'toml',
+  'xml',
+  'markdown',
+  'dockerfile',
+  'nginx',
+  'prisma',
+  'graphql',
+]
 
 const LANG_EXT: Record<string, string> = {
-  plaintext: "txt",
-  bash: "sh",
-  javascript: "js",
-  typescript: "ts",
-  python: "py",
-  go: "go",
-  rust: "rs",
-  java: "java",
-  kotlin: "kt",
-  swift: "swift",
-  c: "c",
-  cpp: "cpp",
-  csharp: "cs",
-  php: "php",
-  ruby: "rb",
-  elixir: "ex",
-  haskell: "hs",
-  scala: "scala",
-  r: "r",
-  sql: "sql",
-  html: "html",
-  css: "css",
-  scss: "scss",
-  json: "json",
-  yaml: "yml",
-  toml: "toml",
-  xml: "xml",
-  markdown: "md",
-  dockerfile: "Dockerfile",
-  nginx: "conf",
-  prisma: "prisma",
-  graphql: "graphql",
-};
-const getExt = (lang: string) => LANG_EXT[lang] ?? "txt";
+  plaintext: 'txt',
+  bash: 'sh',
+  javascript: 'js',
+  typescript: 'ts',
+  python: 'py',
+  go: 'go',
+  rust: 'rs',
+  java: 'java',
+  kotlin: 'kt',
+  swift: 'swift',
+  c: 'c',
+  cpp: 'cpp',
+  csharp: 'cs',
+  php: 'php',
+  ruby: 'rb',
+  elixir: 'ex',
+  haskell: 'hs',
+  scala: 'scala',
+  r: 'r',
+  sql: 'sql',
+  html: 'html',
+  css: 'css',
+  scss: 'scss',
+  json: 'json',
+  yaml: 'yml',
+  toml: 'toml',
+  xml: 'xml',
+  markdown: 'md',
+  dockerfile: 'Dockerfile',
+  nginx: 'conf',
+  prisma: 'prisma',
+  graphql: 'graphql',
+}
+const getExt = (lang: string) => LANG_EXT[lang] ?? 'txt'
 
-function adjustFilenameForLang(
-  filename: string,
-  oldLang: string,
-  newLang: string,
-): string {
-  const oldExt = getExt(oldLang);
-  const newExt = getExt(newLang);
-  if (oldExt === newExt) return filename;
-  if (newExt === "Dockerfile") return "Dockerfile";
-  if (filename === "Dockerfile" && oldLang === "dockerfile")
-    return `file.${newExt}`;
-  const lastDot = filename.lastIndexOf(".");
-  if (lastDot === -1)
-    return filename ? `${filename}.${newExt}` : `file.${newExt}`;
-  const base = filename.slice(0, lastDot);
-  const currentExt = filename.slice(lastDot + 1);
-  if (currentExt === oldExt) return `${base}.${newExt}`;
-  return filename;
+function adjustFilenameForLang(filename: string, oldLang: string, newLang: string): string {
+  const oldExt = getExt(oldLang)
+  const newExt = getExt(newLang)
+  if (oldExt === newExt) return filename
+  if (newExt === 'Dockerfile') return 'Dockerfile'
+  if (filename === 'Dockerfile' && oldLang === 'dockerfile') return `file.${newExt}`
+  const lastDot = filename.lastIndexOf('.')
+  if (lastDot === -1) return filename ? `${filename}.${newExt}` : `file.${newExt}`
+  const base = filename.slice(0, lastDot)
+  const currentExt = filename.slice(lastDot + 1)
+  if (currentExt === oldExt) return `${base}.${newExt}`
+  return filename
 }
 
 const LANG_COLORS: Record<string, string> = {
-  javascript: "yellow",
-  typescript: "blue",
-  python: "green",
-  go: "cyan",
-  rust: "orange",
-  bash: "gray",
-  sql: "violet",
-  json: "teal",
-  yaml: "lime",
-  html: "red",
-  css: "indigo",
-  markdown: "gray",
-  dockerfile: "blue",
-  prisma: "violet",
-  toml: "orange",
-  plaintext: "gray",
-};
-const getLangColor = (lang: string) => LANG_COLORS[lang] ?? "gray";
+  javascript: 'yellow',
+  typescript: 'blue',
+  python: 'green',
+  go: 'cyan',
+  rust: 'orange',
+  bash: 'gray',
+  sql: 'violet',
+  json: 'teal',
+  yaml: 'lime',
+  html: 'red',
+  css: 'indigo',
+  markdown: 'gray',
+  dockerfile: 'blue',
+  prisma: 'violet',
+  toml: 'orange',
+  plaintext: 'gray',
+}
+const getLangColor = (lang: string) => LANG_COLORS[lang] ?? 'gray'
 
 function relTime(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "baru saja";
-  if (m < 60) return `${m}m lalu`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}j lalu`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `${d}h lalu`;
-  return new Date(iso).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'baru saja'
+  if (m < 60) return `${m}m lalu`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}j lalu`
+  const d = Math.floor(h / 24)
+  if (d < 30) return `${d}h lalu`
+  return new Date(iso).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 function absoluteTime(iso: string) {
-  return new Date(iso).toLocaleString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 const HOVER_STYLES = `
@@ -237,45 +226,35 @@ const HOVER_STYLES = `
   outline: 2px solid var(--mantine-color-blue-5);
   outline-offset: 2px;
 }
-`;
+`
 
 // ─── FileForm ─────────────────────────────────────────────────────────────────
 
 function slugifyPrefix(title: string): string {
   return title
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
-function FileForm({
-  slug,
-  file,
-  onClose,
-}: {
-  slug: string;
-  file?: ProjectFile;
-  onClose: () => void;
-}) {
-  const qc = useQueryClient();
-  const [title, setTitle] = useState(file?.title ?? "");
-  const [description, setDescription] = useState(file?.description ?? "");
-  const [prefix, setPrefix] = useState(file?.prefix ?? "");
-  const [prefixManual, setPrefixManual] = useState(!!file?.prefix);
-  const [tags, setTags] = useState<string[]>(file?.tags ?? []);
-  const [tagInput, setTagInput] = useState("");
+function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [title, setTitle] = useState(file?.title ?? '')
+  const [description, setDescription] = useState(file?.description ?? '')
+  const [prefix, setPrefix] = useState(file?.prefix ?? '')
+  const [prefixManual, setPrefixManual] = useState(!!file?.prefix)
+  const [tags, setTags] = useState<string[]>(file?.tags ?? [])
+  const [tagInput, setTagInput] = useState('')
   const [files, setFiles] = useState<FileEntry[]>(
-    file?.files.length
-      ? file.files
-      : [{ filename: "file1.txt", content: "", language: "plaintext" }],
-  );
-  const [activeFile, setActiveFile] = useState(0);
-  const [preview, setPreview] = useState<"write" | "preview">("write");
+    file?.files.length ? file.files : [{ filename: 'file1.txt', content: '', language: 'plaintext' }],
+  )
+  const [activeFile, setActiveFile] = useState(0)
+  const [preview, setPreview] = useState<'write' | 'preview'>('write')
 
   const handleTitleChange = (val: string) => {
-    setTitle(val);
-    if (!prefixManual) setPrefix(slugifyPrefix(val));
-  };
+    setTitle(val)
+    if (!prefixManual) setPrefix(slugifyPrefix(val))
+  }
 
   const save = useMutation({
     mutationFn: () => {
@@ -285,49 +264,43 @@ function FileForm({
         prefix: prefix.trim() || null,
         files,
         tags,
-      };
+      }
       return file
         ? apiFetch(`/api/envman/projects/${slug}/files/${file.id}`, {
-            method: "PUT",
+            method: 'PUT',
             body: JSON.stringify(body),
           })
         : apiFetch(`/api/envman/projects/${slug}/files`, {
-            method: "POST",
+            method: 'POST',
             body: JSON.stringify(body),
-          });
+          })
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["envman", "files", slug] });
-      notifyOk(file ? "File diperbarui" : "File dibuat");
-      onClose();
+      qc.invalidateQueries({ queryKey: ['envman', 'files', slug] })
+      notifyOk(file ? 'File diperbarui' : 'File dibuat')
+      onClose()
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const addFile = () => {
-    const n = files.length + 1;
-    setFiles((f) => [
-      ...f,
-      { filename: `file${n}.txt`, content: "", language: "plaintext" },
-    ]);
-    setActiveFile(files.length);
-  };
+    const n = files.length + 1
+    setFiles((f) => [...f, { filename: `file${n}.txt`, content: '', language: 'plaintext' }])
+    setActiveFile(files.length)
+  }
 
   const removeFile = (i: number) => {
-    if (files.length === 1) return;
-    setFiles((f) => f.filter((_, idx) => idx !== i));
-    setActiveFile(Math.max(0, i - 1));
-  };
+    if (files.length === 1) return
+    setFiles((f) => f.filter((_, idx) => idx !== i))
+    setActiveFile(Math.max(0, i - 1))
+  }
 
   const updateFile = (i: number, patch: Partial<FileEntry>) =>
-    setFiles((f) => f.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+    setFiles((f) => f.map((x, idx) => (idx === i ? { ...x, ...patch } : x)))
 
-  const totalLines = files.reduce(
-    (sum, f) => sum + (f.content ? f.content.split("\n").length : 0),
-    0,
-  );
-  const totalChars = files.reduce((sum, f) => sum + f.content.length, 0);
-  const canSave = !!title.trim() && files.every((f) => f.filename.trim());
+  const totalLines = files.reduce((sum, f) => sum + (f.content ? f.content.split('\n').length : 0), 0)
+  const totalChars = files.reduce((sum, f) => sum + f.content.length, 0)
+  const canSave = !!title.trim() && files.every((f) => f.filename.trim())
 
   return (
     <Stack gap="md">
@@ -339,7 +312,7 @@ function FileForm({
           onChange={(e) => handleTitleChange(e.target.value)}
           autoFocus={!file}
           onKeyDown={(e) => {
-            if (e.key === "Enter") e.preventDefault();
+            if (e.key === 'Enter') e.preventDefault()
           }}
           required
         />
@@ -348,23 +321,23 @@ function FileForm({
           description={
             prefix ? (
               <span>
-                CLI path: <Code fz="xs">{slug}:prefix/filename.ext</Code> atau{" "}
+                CLI path: <Code fz="xs">{slug}:prefix/filename.ext</Code> atau{' '}
                 <Code fz="xs">files:{prefix}/filename</Code>
               </span>
             ) : (
-              "Auto-generate dari judul. Tidak berubah saat rename judul."
+              'Auto-generate dari judul. Tidak berubah saat rename judul.'
             )
           }
           placeholder="compose-dev"
           value={prefix}
           onChange={(e) => {
-            setPrefixManual(true);
-            setPrefix(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+            setPrefixManual(true)
+            setPrefix(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") e.preventDefault();
+            if (e.key === 'Enter') e.preventDefault()
           }}
-          styles={{ input: { fontFamily: "ui-monospace, monospace" } }}
+          styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
         />
         <TextInput
           label="Deskripsi"
@@ -372,7 +345,7 @@ function FileForm({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") e.preventDefault();
+            if (e.key === 'Enter') e.preventDefault()
           }}
           size="sm"
         />
@@ -405,23 +378,18 @@ function FileForm({
           </Button>
         </Group>
 
-        <Tabs
-          value={String(activeFile)}
-          onChange={(v) => setActiveFile(Number(v))}
-          variant="outline"
-          radius="md"
-        >
+        <Tabs value={String(activeFile)} onChange={(v) => setActiveFile(Number(v))} variant="outline" radius="md">
           <Tabs.List>
             {files.map((f, i) => (
               <Tabs.Tab
-                key={i}
+                key={f.filename || i}
                 value={String(i)}
                 leftSection={
                   <Box
                     style={{
                       width: 8,
                       height: 8,
-                      borderRadius: "50%",
+                      borderRadius: '50%',
                       backgroundColor: `var(--mantine-color-${getLangColor(f.language)}-5)`,
                     }}
                   />
@@ -435,8 +403,8 @@ function FileForm({
                         variant="subtle"
                         color="red"
                         onClick={(e) => {
-                          e.stopPropagation();
-                          removeFile(i);
+                          e.stopPropagation()
+                          removeFile(i)
                         }}
                       >
                         <TbX size={10} />
@@ -449,9 +417,9 @@ function FileForm({
                   size="xs"
                   style={{
                     maxWidth: 140,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {f.filename || `file${i + 1}`}
@@ -461,7 +429,7 @@ function FileForm({
           </Tabs.List>
 
           {files.map((f, i) => (
-            <Tabs.Panel key={i} value={String(i)} pt="sm">
+            <Tabs.Panel key={f.filename || i} value={String(i)} pt="sm">
               <Stack gap="xs">
                 <Group gap="xs" align="flex-end" wrap="nowrap">
                   <TextInput
@@ -469,11 +437,9 @@ function FileForm({
                     size="xs"
                     placeholder="filename.ext"
                     value={f.filename}
-                    onChange={(e) =>
-                      updateFile(i, { filename: e.target.value })
-                    }
+                    onChange={(e) => updateFile(i, { filename: e.target.value })}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") e.preventDefault();
+                      if (e.key === 'Enter') e.preventDefault()
                     }}
                     style={{ flex: 1 }}
                     leftSection={<TbFileCode size={12} />}
@@ -483,15 +449,11 @@ function FileForm({
                     size="xs"
                     value={f.language}
                     onChange={(v) => {
-                      const newLang = v ?? "plaintext";
+                      const newLang = v ?? 'plaintext'
                       updateFile(i, {
                         language: newLang,
-                        filename: adjustFilenameForLang(
-                          f.filename,
-                          f.language,
-                          newLang,
-                        ),
-                      });
+                        filename: adjustFilenameForLang(f.filename, f.language, newLang),
+                      })
                     }}
                     data={LANGUAGES}
                     searchable
@@ -501,7 +463,7 @@ function FileForm({
                   <SegmentedControl
                     size="xs"
                     value={preview}
-                    onChange={(v) => setPreview(v as "write" | "preview")}
+                    onChange={(v) => setPreview(v as 'write' | 'preview')}
                     data={[
                       {
                         label: (
@@ -510,7 +472,7 @@ function FileForm({
                             <span>Tulis</span>
                           </Group>
                         ),
-                        value: "write",
+                        value: 'write',
                       },
                       {
                         label: (
@@ -519,13 +481,13 @@ function FileForm({
                             <span>Preview</span>
                           </Group>
                         ),
-                        value: "preview",
+                        value: 'preview',
                       },
                     ]}
                   />
                 </Group>
 
-                {preview === "write" ? (
+                {preview === 'write' ? (
                   <Box>
                     <CodeEditor
                       value={f.content}
@@ -533,25 +495,21 @@ function FileForm({
                       language={f.language}
                       filename={f.filename}
                       placeholder={
-                        f.language === "markdown"
-                          ? "# Heading\n\nKonten markdown..."
+                        f.language === 'markdown'
+                          ? '# Heading\n\nKonten markdown...'
                           : `Isi konten ${f.language} di sini...`
                       }
                       height={400}
                     />
                     <Group justify="space-between" mt={4} px={4}>
                       <Group gap="xs">
-                        <Badge
-                          size="xs"
-                          variant="dot"
-                          color={getLangColor(f.language)}
-                        >
+                        <Badge size="xs" variant="dot" color={getLangColor(f.language)}>
                           {f.language}
                         </Badge>
                         <Text size="xs" c="dimmed">
                           {f.content
-                            ? `${f.content.split("\n").length} baris · ${f.content.length} karakter`
-                            : "Kosong"}
+                            ? `${f.content.split('\n').length} baris · ${f.content.length} karakter`
+                            : 'Kosong'}
                         </Text>
                       </Group>
                       <Text size="xs" c="dimmed">
@@ -564,15 +522,13 @@ function FileForm({
                     p="md"
                     mih={220}
                     style={{
-                      borderRadius: "var(--mantine-radius-md)",
-                      border: "1px solid var(--mantine-color-default-border)",
+                      borderRadius: 'var(--mantine-radius-md)',
+                      border: '1px solid var(--mantine-color-default-border)',
                     }}
                   >
                     {f.content ? (
                       <MarkdownRenderer fontSize={13}>
-                        {f.language === "markdown"
-                          ? f.content
-                          : `\`\`\`${f.language}\n${f.content}\n\`\`\``}
+                        {f.language === 'markdown' ? f.content : `\`\`\`${f.language}\n${f.content}\n\`\`\``}
                       </MarkdownRenderer>
                     ) : (
                       <Group justify="center" py="xl">
@@ -603,14 +559,14 @@ function FileForm({
           onChange={(e) => setTagInput(e.target.value)}
           leftSection={<TbTag size={13} />}
           onKeyDown={(e) => {
-            if ((e.key === "Enter" || e.key === ",") && tagInput.trim()) {
-              e.preventDefault();
+            if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+              e.preventDefault()
               const t = tagInput
                 .trim()
                 .toLowerCase()
-                .replace(/[^a-z0-9-]/g, "-");
-              if (t && !tags.includes(t)) setTags((prev) => [...prev, t]);
-              setTagInput("");
+                .replace(/[^a-z0-9-]/g, '-')
+              if (t && !tags.includes(t)) setTags((prev) => [...prev, t])
+              setTagInput('')
             }
           }}
         />
@@ -628,9 +584,7 @@ function FileForm({
                     size={12}
                     variant="transparent"
                     color="inherit"
-                    onClick={() =>
-                      setTags((prev) => prev.filter((x) => x !== t))
-                    }
+                    onClick={() => setTags((prev) => prev.filter((x) => x !== t))}
                   >
                     <TbX size={9} />
                   </ActionIcon>
@@ -661,12 +615,12 @@ function FileForm({
             disabled={!canSave}
             color="blue"
           >
-            {file ? "Simpan perubahan" : "Buat File"}
+            {file ? 'Simpan perubahan' : 'Buat File'}
           </Button>
         </Group>
       </Group>
     </Stack>
-  );
+  )
 }
 
 // ─── FileCard ─────────────────────────────────────────────────────────────────
@@ -680,15 +634,15 @@ function FileCard({
   onView,
   onTagClick,
 }: {
-  file: ProjectFile;
-  slug: string;
-  canManage: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-  onView: () => void;
-  onTagClick?: (tag: string) => void;
+  file: ProjectFile
+  slug: string
+  canManage: boolean
+  onEdit: () => void
+  onDelete: () => void
+  onView: () => void
+  onTagClick?: (tag: string) => void
 }) {
-  const firstFile = file.files[0];
+  const firstFile = file.files[0]
   return (
     <Box
       p="sm"
@@ -697,15 +651,15 @@ function FileCard({
       tabIndex={0}
       onClick={onView}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onView();
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onView()
         }
       }}
       style={{
-        borderRadius: "var(--mantine-radius-md)",
-        border: "1px solid var(--mantine-color-default-border)",
-        cursor: "pointer",
+        borderRadius: 'var(--mantine-radius-md)',
+        border: '1px solid var(--mantine-color-default-border)',
+        cursor: 'pointer',
       }}
     >
       <Group justify="space-between" wrap="nowrap" mb={4}>
@@ -718,9 +672,9 @@ function FileCard({
               fw={700}
               size="sm"
               style={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
               {file.title}
@@ -733,24 +687,16 @@ function FileCard({
           </Box>
         </Group>
         <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
-          <CopyButton
-            value={file.files
-              .map((f) => `// ${f.filename}\n${f.content}`)
-              .join("\n\n")}
-            timeout={2000}
-          >
+          <CopyButton value={file.files.map((f) => `// ${f.filename}\n${f.content}`).join('\n\n')} timeout={2000}>
             {({ copied, copy }) => (
-              <Tooltip
-                label={copied ? "Tersalin!" : "Salin semua file"}
-                position="left"
-              >
+              <Tooltip label={copied ? 'Tersalin!' : 'Salin semua file'} position="left">
                 <ActionIcon
                   size="sm"
                   variant="subtle"
-                  color={copied ? "teal" : "gray"}
+                  color={copied ? 'teal' : 'gray'}
                   onClick={(e) => {
-                    e.stopPropagation();
-                    copy();
+                    e.stopPropagation()
+                    copy()
                   }}
                 >
                   {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
@@ -766,8 +712,8 @@ function FileCard({
                   variant="subtle"
                   color="blue"
                   onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit();
+                    e.stopPropagation()
+                    onEdit()
                   }}
                 >
                   <TbEdit size={13} />
@@ -779,8 +725,8 @@ function FileCard({
                   variant="subtle"
                   color="red"
                   onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete();
+                    e.stopPropagation()
+                    onDelete()
                   }}
                 >
                   <TbTrash size={13} />
@@ -793,33 +739,25 @@ function FileCard({
 
       {/* Prefix + per-file copy path */}
       {file.prefix && (
-        <Group
-          gap={4}
-          mb={6}
-          wrap="wrap"
-          align="center"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <Group gap={4} mb={6} wrap="wrap" align="center" onClick={(e) => e.stopPropagation()}>
           <Code fz="xs" c="dimmed">
             {slug}:{file.prefix}/…
           </Code>
           {file.files.map((f) => {
-            const path = `${slug}:${file.prefix}/${f.filename}`;
+            const path = `${slug}:${file.prefix}/${f.filename}`
             return (
               <CopyButton key={f.filename} value={path} timeout={2000}>
                 {({ copied, copy }) => (
-                  <Tooltip label={copied ? "Disalin!" : path} withArrow>
+                  <Tooltip label={copied ? 'Disalin!' : path} withArrow>
                     <Badge
                       size="xs"
-                      variant={copied ? "filled" : "light"}
-                      color={copied ? "teal" : getLangColor(f.language)}
-                      style={{ cursor: "pointer" }}
-                      rightSection={
-                        copied ? <TbCheck size={9} /> : <TbCopy size={9} />
-                      }
+                      variant={copied ? 'filled' : 'light'}
+                      color={copied ? 'teal' : getLangColor(f.language)}
+                      style={{ cursor: 'pointer' }}
+                      rightSection={copied ? <TbCheck size={9} /> : <TbCopy size={9} />}
                       onClick={(e) => {
-                        e.stopPropagation();
-                        copy();
+                        e.stopPropagation()
+                        copy()
                       }}
                     >
                       {f.filename}
@@ -827,7 +765,7 @@ function FileCard({
                   </Tooltip>
                 )}
               </CopyButton>
-            );
+            )
           })}
         </Group>
       )}
@@ -838,21 +776,18 @@ function FileCard({
           style={{
             fontSize: 11,
             maxHeight: 80,
-            overflow: "hidden",
+            overflow: 'hidden',
             marginBottom: 6,
           }}
         >
-          {firstFile.content.split("\n").slice(0, 4).join("\n") || "(kosong)"}
+          {firstFile.content.split('\n').slice(0, 4).join('\n') || '(kosong)'}
         </Code>
       )}
 
       <Group gap={4} wrap="wrap" align="center">
         {!file.prefix &&
           file.files.slice(0, 3).map((f) => (
-            <Tooltip
-              key={f.filename}
-              label={`${f.language} · ${f.content.split("\n").length} baris`}
-            >
+            <Tooltip key={f.filename} label={`${f.language} · ${f.content.split('\n').length} baris`}>
               <Badge size="xs" variant="dot" color={getLangColor(f.language)}>
                 {f.filename}
               </Badge>
@@ -863,7 +798,7 @@ function FileCard({
             label={file.files
               .slice(3)
               .map((f) => f.filename)
-              .join(", ")}
+              .join(', ')}
           >
             <Badge size="xs" variant="default">
               +{file.files.length - 3}
@@ -876,12 +811,12 @@ function FileCard({
             size="xs"
             variant="outline"
             color="gray"
-            style={{ cursor: "pointer" }}
+            style={{ cursor: 'pointer' }}
             onClick={
               onTagClick
                 ? (e) => {
-                    e.stopPropagation();
-                    onTagClick(t);
+                    e.stopPropagation()
+                    onTagClick(t)
                   }
                 : undefined
             }
@@ -890,265 +825,174 @@ function FileCard({
           </Badge>
         ))}
         {file.tags.length > 3 && (
-          <Tooltip label={file.tags.slice(3).join(", ")}>
+          <Tooltip label={file.tags.slice(3).join(', ')}>
             <Text size="xs" c="dimmed">
               +{file.tags.length - 3}
             </Text>
           </Tooltip>
         )}
-        <Tooltip
-          label={`Diperbarui ${absoluteTime(file.updatedAt)} oleh ${file.author.name}`}
-        >
+        <Tooltip label={`Diperbarui ${absoluteTime(file.updatedAt)} oleh ${file.author.name}`}>
           <Text size="xs" c="dimmed" ml="auto">
             {file.author.name} · {relTime(file.updatedAt)}
           </Text>
         </Tooltip>
       </Group>
     </Box>
-  );
-}
-
-// ─── FileViewModal ────────────────────────────────────────────────────────────
-
-function FileViewModal({
-  file,
-  onClose,
-  canManage,
-  onEdit,
-}: {
-  file: ProjectFile | null;
-  onClose: () => void;
-  canManage: boolean;
-  onEdit: () => void;
-}) {
-  const [activeFile, setActiveFile] = useState(0);
-  const isMobile = useMediaQuery("(max-width: 48em)");
-  if (!file) return null;
-  const currentFile = file.files[activeFile] ?? file.files[0];
-
-  return (
-    <Modal
-      opened={file !== null}
-      onClose={onClose}
-      title={
-        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-          <TbFiles size={16} style={{ flexShrink: 0 }} />
-          <Text fw={700} lineClamp={1}>
-            {file.title}
-          </Text>
-        </Group>
-      }
-      size="xl"
-      fullScreen={isMobile}
-      zIndex={300}
-    >
-      <Stack gap="sm">
-        {file.description && (
-          <Text size="sm" c="dimmed">
-            {file.description}
-          </Text>
-        )}
-
-        <Tabs
-          value={String(activeFile)}
-          onChange={(v) => setActiveFile(Number(v))}
-          variant="outline"
-        >
-          <Tabs.List>
-            {file.files.map((f, i) => (
-              <Tabs.Tab
-                key={i}
-                value={String(i)}
-                leftSection={<TbFileCode size={12} />}
-              >
-                <Group gap={4}>
-                  <Text size="xs">{f.filename}</Text>
-                  <Badge
-                    size="xs"
-                    variant="dot"
-                    color={getLangColor(f.language)}
-                  >
-                    {f.language}
-                  </Badge>
-                </Group>
-              </Tabs.Tab>
-            ))}
-          </Tabs.List>
-          {file.files.map((f, i) => (
-            <Tabs.Panel key={i} value={String(i)} pt="xs">
-              <Box
-                p="md"
-                style={{
-                  borderRadius: "var(--mantine-radius-md)",
-                  border: "1px solid var(--mantine-color-default-border)",
-                  maxHeight: 400,
-                  overflowY: "auto",
-                }}
-              >
-                <MarkdownRenderer fontSize={13}>
-                  {f.language === "markdown"
-                    ? f.content || "_Kosong_"
-                    : `\`\`\`${f.language}\n${f.content || ""}\n\`\`\``}
-                </MarkdownRenderer>
-              </Box>
-            </Tabs.Panel>
-          ))}
-        </Tabs>
-
-        <Group gap={4} wrap="wrap">
-          {file.tags.map((t) => (
-            <Badge key={t} size="xs" variant="outline" color="gray">
-              {t}
-            </Badge>
-          ))}
-          <Text size="xs" c="dimmed" ml="auto">
-            oleh {file.author.name} · {relTime(file.updatedAt)}
-          </Text>
-        </Group>
-
-        <Divider />
-
-        <Group justify="space-between">
-          <CopyButton value={currentFile?.content ?? ""} timeout={2000}>
-            {({ copied, copy }) => (
-              <Button
-                type="button"
-                size="xs"
-                variant="subtle"
-                color={copied ? "teal" : "gray"}
-                leftSection={
-                  copied ? <TbCheck size={13} /> : <TbCopy size={13} />
-                }
-                onClick={copy}
-              >
-                {copied ? "Tersalin!" : `Copy ${currentFile?.filename ?? ""}`}
-              </Button>
-            )}
-          </CopyButton>
-          {canManage && (
-            <Button
-              type="button"
-              size="xs"
-              leftSection={<TbEdit size={13} />}
-              onClick={onEdit}
-            >
-              Edit
-            </Button>
-          )}
-        </Group>
-      </Stack>
-    </Modal>
-  );
+  )
 }
 
 // ─── FilesPanel ───────────────────────────────────────────────────────────────
 
-export function FilesPanel({
-  slug,
-  isOwner,
-  myUserId,
-  canEdit,
-}: FilesPanelProps) {
-  const qc = useQueryClient();
-  const isMobile = useMediaQuery("(max-width: 48em)");
-  const searchRef = useRef<HTMLInputElement>(null);
+export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps) {
+  const qc = useQueryClient()
+  const _isMobile = useMediaQuery('(max-width: 48em)')
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useLocalStorage<string[]>({
     key: `envman:files:${slug}:tagFilter`,
     defaultValue: [],
-  });
-  const [sort, setSort] = useLocalStorage<"updated" | "created">({
+  })
+  const [sort, setSort] = useLocalStorage<'updated' | 'created'>({
     key: `envman:files:${slug}:sort`,
-    defaultValue: "updated",
-  });
-  const [view, setView] = useLocalStorage<"list" | "grid">({
+    defaultValue: 'updated',
+  })
+  const [view, setView] = useLocalStorage<'list' | 'grid'>({
     key: `envman:files:${slug}:view`,
-    defaultValue: "list",
-  });
-  const [viewFile, setViewFile] = useState<ProjectFile | null>(null);
-  const [debouncedSearch] = useDebouncedValue(search, 150);
-  const navigate = useNavigate();
-  const { tab, fileId, fileNew } = useSearch({ from: "/envmanager/$slug/" });
+    defaultValue: 'list',
+  })
+  const [debouncedSearch] = useDebouncedValue(search, 150)
+  const navigate = useNavigate()
+  const { tab, fileId, fileNew, viewFileId } = useSearch({ from: '/envmanager/$slug/' })
 
-  const canManageFile = (authorId: string) => isOwner || authorId === myUserId;
+  const canManageFile = (authorId: string) => isOwner || authorId === myUserId
+
+  const openView = (id: string) =>
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: {
+        tab,
+        fileId: undefined,
+        fileNew: false,
+        viewFileId: id,
+        aliasId: undefined,
+        aliasNew: false,
+        noteId: undefined,
+        noteNew: false,
+        viewNoteId: undefined,
+      },
+    })
+  const closeView = () =>
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: {
+        tab,
+        fileId: undefined,
+        fileNew: false,
+        viewFileId: undefined,
+        aliasId: undefined,
+        aliasNew: false,
+        noteId: undefined,
+        noteNew: false,
+        viewNoteId: undefined,
+      },
+    })
 
   const { data, isLoading, isError } = useQuery<{ files: ProjectFile[] }>({
-    queryKey: ["envman", "files", slug],
+    queryKey: ['envman', 'files', slug],
     queryFn: () => apiFetch(`/api/envman/projects/${slug}/files`),
     staleTime: 60_000,
-  });
+  })
 
-  const files = data?.files ?? [];
-  const editingFile = fileId
-    ? (files.find((f) => f.id === fileId) ?? null)
-    : null;
-  const formOpen = fileNew || !!editingFile;
+  const files = data?.files ?? []
+  const editingFile = fileId ? (files.find((f) => f.id === fileId) ?? null) : null
+  const formOpen = fileNew || !!editingFile
   const closeForm = () =>
     navigate({
-      to: "/envmanager/$slug",
+      to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId: undefined, fileNew: false },
-    });
+      search: {
+        tab,
+        fileId: undefined,
+        fileNew: false,
+        viewFileId: undefined,
+        aliasId: undefined,
+        aliasNew: false,
+        noteId: undefined,
+        noteNew: false,
+        viewNoteId: undefined,
+      },
+    })
 
-  const allTags = useMemo(
-    () => [...new Set(files.flatMap((f) => f.tags))].sort(),
-    [files],
-  );
+  const allTags = useMemo(() => [...new Set(files.flatMap((f) => f.tags))].sort(), [files])
 
-  const addTagFilter = (tag: string) =>
-    setTagFilter((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
+  const addTagFilter = (tag: string) => setTagFilter((prev) => (prev.includes(tag) ? prev : [...prev, tag]))
 
   const filtered = useMemo(() => {
-    let list = [...files];
-    if (tagFilter.length > 0)
-      list = list.filter((f) => tagFilter.every((t) => f.tags.includes(t)));
+    let list = [...files]
+    if (tagFilter.length > 0) list = list.filter((f) => tagFilter.every((t) => f.tags.includes(t)))
     if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
+      const q = debouncedSearch.toLowerCase()
       list = list.filter(
         (f) =>
           f.title.toLowerCase().includes(q) ||
           f.description.toLowerCase().includes(q) ||
-          f.files.some(
-            (e) =>
-              e.filename.toLowerCase().includes(q) ||
-              e.content.toLowerCase().includes(q),
-          ) ||
+          f.files.some((e) => e.filename.toLowerCase().includes(q) || e.content.toLowerCase().includes(q)) ||
           f.tags.some((t) => t.includes(q)),
-      );
+      )
     }
     list.sort((a, b) =>
-      sort === "updated"
+      sort === 'updated'
         ? new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-    return list;
-  }, [files, tagFilter, debouncedSearch, sort]);
+    )
+    return list
+  }, [files, tagFilter, debouncedSearch, sort])
 
-  const FILES_PER_PAGE = 12;
-  const [page, setPage] = useState(1);
-  useEffect(() => setPage(1), [debouncedSearch, tagFilter, sort]);
-  const totalPages = Math.ceil(filtered.length / FILES_PER_PAGE);
-  const paginated = filtered.slice(
-    (page - 1) * FILES_PER_PAGE,
-    page * FILES_PER_PAGE,
-  );
+  const FILES_PER_PAGE = 12
+  const [page, setPage] = useState(1)
+  const [activeViewTab, setActiveViewTab] = useState(0)
+  useEffect(() => setPage(1), [])
+  const totalPages = Math.ceil(filtered.length / FILES_PER_PAGE)
+  const paginated = filtered.slice((page - 1) * FILES_PER_PAGE, page * FILES_PER_PAGE)
 
   const openEdit = (file: ProjectFile) =>
     navigate({
-      to: "/envmanager/$slug",
+      to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId: file.id, fileNew: false },
-    });
+      search: {
+        tab,
+        fileId: file.id,
+        fileNew: false,
+        viewFileId: undefined,
+        aliasId: undefined,
+        aliasNew: false,
+        noteId: undefined,
+        noteNew: false,
+        viewNoteId: undefined,
+      },
+    })
   const openCreate = () =>
     navigate({
-      to: "/envmanager/$slug",
+      to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileNew: true, fileId: undefined },
-    });
+      search: {
+        tab,
+        fileNew: true,
+        fileId: undefined,
+        viewFileId: undefined,
+        aliasId: undefined,
+        aliasNew: false,
+        noteId: undefined,
+        noteNew: false,
+        viewNoteId: undefined,
+      },
+    })
 
   const deleteFile = (f: ProjectFile) => {
-    const modalId = `delete-file-${f.id}`;
+    const modalId = `delete-file-${f.id}`
     modals.open({
       modalId,
       title: (
@@ -1169,19 +1013,14 @@ export function FilesPanel({
           <Box
             p="xs"
             style={{
-              borderRadius: "var(--mantine-radius-md)",
-              border: "1px solid var(--mantine-color-default-border)",
-              background: "var(--mantine-color-default-hover)",
+              borderRadius: 'var(--mantine-radius-md)',
+              border: '1px solid var(--mantine-color-default-border)',
+              background: 'var(--mantine-color-default-hover)',
             }}
           >
             <Group gap={4} mb={4}>
               {f.files.map((e) => (
-                <Badge
-                  key={e.filename}
-                  size="xs"
-                  variant="dot"
-                  color={getLangColor(e.language)}
-                >
+                <Badge key={e.filename} size="xs" variant="dot" color={getLangColor(e.language)}>
                   {e.filename}
                 </Badge>
               ))}
@@ -1194,11 +1033,7 @@ export function FilesPanel({
             Tindakan ini tidak dapat dibatalkan.
           </Text>
           <Group justify="flex-end" mt="xs">
-            <Button
-              variant="subtle"
-              color="gray"
-              onClick={() => modals.close(modalId)}
-            >
+            <Button variant="subtle" color="gray" onClick={() => modals.close(modalId)}>
               Batal
             </Button>
             <Button
@@ -1206,14 +1041,14 @@ export function FilesPanel({
               leftSection={<TbTrash size={13} />}
               onClick={() =>
                 apiFetch(`/api/envman/projects/${slug}/files/${f.id}`, {
-                  method: "DELETE",
+                  method: 'DELETE',
                 })
                   .then(() => {
                     qc.invalidateQueries({
-                      queryKey: ["envman", "files", slug],
-                    });
-                    notifyOk("File dihapus");
-                    modals.close(modalId);
+                      queryKey: ['envman', 'files', slug],
+                    })
+                    notifyOk('File dihapus')
+                    modals.close(modalId)
                   })
                   .catch(notifyErr)
               }
@@ -1223,49 +1058,174 @@ export function FilesPanel({
           </Group>
         </Stack>
       ),
-    });
-  };
+    })
+  }
 
-  const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0;
+  const _hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0
   const resetFilter = () => {
-    setSearch("");
-    setTagFilter([]);
-  };
+    setSearch('')
+    setTagFilter([])
+  }
+
+  if (viewFileId) {
+    const viewingFile = isLoading ? null : (files.find((f) => f.id === viewFileId) ?? null)
+    const currentViewFile = viewingFile?.files[activeViewTab] ?? viewingFile?.files[0]
+    return (
+      <Paper withBorder p="md" radius="md">
+        <Stack gap="lg">
+          {/* Breadcrumb */}
+          <Group gap={6} align="center">
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeView}>
+              <TbChevronLeft size={15} />
+            </ActionIcon>
+            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeView}>
+              Files
+            </Anchor>
+            <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
+            <Text size="sm" fw={600} lineClamp={1}>
+              {viewingFile?.title ?? '...'}
+            </Text>
+          </Group>
+          <Divider />
+
+          {isLoading && <Skeleton height={300} radius="md" />}
+          {!isLoading && !viewingFile && (
+            <Text size="sm" c="dimmed">
+              File tidak ditemukan.
+            </Text>
+          )}
+          {viewingFile && (
+            <Stack gap="sm">
+              {viewingFile.description && (
+                <Text size="sm" c="dimmed">
+                  {viewingFile.description}
+                </Text>
+              )}
+
+              <Tabs value={String(activeViewTab)} onChange={(v) => setActiveViewTab(Number(v))} variant="outline">
+                <Tabs.List>
+                  {viewingFile.files.map((f, i) => (
+                    <Tabs.Tab key={f.filename} value={String(i)} leftSection={<TbFileCode size={12} />}>
+                      <Group gap={4}>
+                        <Text size="xs">{f.filename}</Text>
+                        <Badge size="xs" variant="dot" color={getLangColor(f.language)}>
+                          {f.language}
+                        </Badge>
+                      </Group>
+                    </Tabs.Tab>
+                  ))}
+                </Tabs.List>
+                {viewingFile.files.map((f, i) => (
+                  <Tabs.Panel key={f.filename} value={String(i)} pt="xs">
+                    <Box
+                      p="md"
+                      style={{
+                        borderRadius: 'var(--mantine-radius-md)',
+                        border: '1px solid var(--mantine-color-default-border)',
+                        maxHeight: 500,
+                        overflowY: 'auto',
+                      }}
+                    >
+                      <MarkdownRenderer fontSize={13}>
+                        {f.language === 'markdown'
+                          ? f.content || '_Kosong_'
+                          : `\`\`\`${f.language}\n${f.content || ''}\n\`\`\``}
+                      </MarkdownRenderer>
+                    </Box>
+                  </Tabs.Panel>
+                ))}
+              </Tabs>
+
+              <Group gap={4} wrap="wrap">
+                {viewingFile.tags.map((t) => (
+                  <Badge key={t} size="xs" variant="outline" color="gray">
+                    {t}
+                  </Badge>
+                ))}
+                <Text size="xs" c="dimmed" ml="auto">
+                  oleh {viewingFile.author.name} · {relTime(viewingFile.updatedAt)}
+                </Text>
+              </Group>
+
+              <Divider />
+
+              <Group justify="space-between">
+                <CopyButton value={currentViewFile?.content ?? ''} timeout={2000}>
+                  {({ copied, copy }) => (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="subtle"
+                      color={copied ? 'teal' : 'gray'}
+                      leftSection={copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
+                      onClick={copy}
+                    >
+                      {copied ? 'Tersalin!' : `Copy ${currentViewFile?.filename ?? ''}`}
+                    </Button>
+                  )}
+                </CopyButton>
+                {canManageFile(viewingFile.author.id) && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    leftSection={<TbEdit size={13} />}
+                    onClick={() => {
+                      navigate({
+                        to: '/envmanager/$slug',
+                        params: { slug },
+                        search: {
+                          tab,
+                          fileId: viewingFile.id,
+                          fileNew: false,
+                          viewFileId: undefined,
+                          aliasId: undefined,
+                          aliasNew: false,
+                          noteId: undefined,
+                          noteNew: false,
+                          viewNoteId: undefined,
+                        },
+                      })
+                    }}
+                  >
+                    Edit
+                  </Button>
+                )}
+              </Group>
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
+    )
+  }
+
+  if (formOpen) {
+    return (
+      <Paper withBorder p="md" radius="md">
+        <Stack gap="lg">
+          {/* Breadcrumb */}
+          <Group gap={6} align="center">
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeForm}>
+              <TbChevronLeft size={15} />
+            </ActionIcon>
+            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeForm}>
+              Files
+            </Anchor>
+            <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
+            <Text size="sm" fw={600}>
+              {editingFile ? 'Edit File' : 'Buat File Baru'}
+            </Text>
+          </Group>
+          <Divider />
+          <FileForm slug={slug} file={editingFile ?? undefined} onClose={closeForm} />
+        </Stack>
+      </Paper>
+    )
+  }
 
   return (
     <Box>
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS */}
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
-
-      {/* Form modal */}
-      <Modal
-        opened={formOpen}
-        onClose={closeForm}
-        title={editingFile ? "Edit File" : "Buat File Baru"}
-        size={isMobile ? undefined : "90vw"}
-        fullScreen={isMobile}
-        zIndex={300}
-        styles={{ body: { paddingTop: 8 } }}
-      >
-        {formOpen && (
-          <FileForm
-            slug={slug}
-            file={editingFile ?? undefined}
-            onClose={closeForm}
-          />
-        )}
-      </Modal>
-
-      {/* View modal */}
-      <FileViewModal
-        file={viewFile}
-        onClose={() => setViewFile(null)}
-        canManage={viewFile ? canManageFile(viewFile.author.id) : false}
-        onEdit={() => {
-          openEdit(viewFile!);
-          setViewFile(null);
-        }}
-      />
 
       {/* Header */}
       <Group mb="md" justify="space-between" wrap="nowrap" align="flex-start">
@@ -1279,9 +1239,9 @@ export function FilesPanel({
             </Text>
             <Text size="xs" c="dimmed">
               {isLoading
-                ? "Memuat..."
+                ? 'Memuat...'
                 : files.length === 0
-                  ? "Snippets, config, dan script untuk project ini"
+                  ? 'Snippets, config, dan script untuk project ini'
                   : `${files.length} file`}
             </Text>
           </Box>
@@ -1308,21 +1268,20 @@ export function FilesPanel({
         p="xs"
         icon={<TbInfoCircle size={15} />}
         styles={{
-          message: { fontSize: "var(--mantine-font-size-xs)" },
+          message: { fontSize: 'var(--mantine-font-size-xs)' },
           body: { gap: 4 },
         }}
       >
-        Simpan scripts, snippets, dan config files per project. File dapat
-        dieksekusi langsung dari CLI tanpa download. Jalankan:{" "}
-        <Code fz="xs">envman -- bash {slug}:scripts/deploy.sh</Code>. Mendukung
-        multi-file per entry dan preview Markdown.
+        Simpan scripts, snippets, dan config files per project. File dapat dieksekusi langsung dari CLI tanpa download.
+        Jalankan: <Code fz="xs">envman -- bash {slug}:scripts/deploy.sh</Code>. Mendukung multi-file per entry dan
+        preview Markdown.
       </Alert>
 
       {/* Toolbar */}
       {!isLoading && files.length > 0 && (
         <Stack gap="xs" mb="md">
           <TextInput
-            maw={"540"}
+            maw={'540'}
             ref={searchRef}
             size="sm"
             placeholder="Cari judul, deskripsi, filename, isi, atau tag..."
@@ -1331,11 +1290,7 @@ export function FilesPanel({
             onChange={(e) => setSearch(e.target.value)}
             rightSection={
               search ? (
-                <ActionIcon
-                  size="xs"
-                  variant="subtle"
-                  onClick={() => setSearch("")}
-                >
+                <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}>
                   <TbX size={11} />
                 </ActionIcon>
               ) : undefined
@@ -1356,12 +1311,10 @@ export function FilesPanel({
               <Select
                 size="xs"
                 value={sort}
-                onChange={(v) =>
-                  setSort((v ?? "updated") as "updated" | "created")
-                }
+                onChange={(v) => setSort((v ?? 'updated') as 'updated' | 'created')}
                 data={[
-                  { value: "updated", label: "Terbaru diupdate" },
-                  { value: "created", label: "Terbaru dibuat" },
+                  { value: 'updated', label: 'Terbaru diupdate' },
+                  { value: 'created', label: 'Terbaru dibuat' },
                 ]}
                 leftSection={<TbSortAscending size={13} />}
                 allowDeselect={false}
@@ -1372,9 +1325,9 @@ export function FilesPanel({
               <Tooltip label="List view">
                 <ActionIcon
                   size="sm"
-                  variant={view === "list" ? "filled" : "subtle"}
+                  variant={view === 'list' ? 'filled' : 'subtle'}
                   color="blue"
-                  onClick={() => setView("list")}
+                  onClick={() => setView('list')}
                 >
                   <TbLayoutList size={14} />
                 </ActionIcon>
@@ -1382,24 +1335,22 @@ export function FilesPanel({
               <Tooltip label="Grid view">
                 <ActionIcon
                   size="sm"
-                  variant={view === "grid" ? "filled" : "subtle"}
+                  variant={view === 'grid' ? 'filled' : 'subtle'}
                   color="blue"
-                  onClick={() => setView("grid")}
+                  onClick={() => setView('grid')}
                 >
                   <TbLayoutGrid size={14} />
                 </ActionIcon>
               </Tooltip>
             </Group>
           </Group>
-          {tagFilter.length > 0 && (
-            <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />
-          )}
+          {tagFilter.length > 0 && <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />}
         </Stack>
       )}
 
       {/* Skeleton */}
       {isLoading &&
-        (view === "grid" ? (
+        (view === 'grid' ? (
           <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <Skeleton key={i} height={156} radius="md" />
@@ -1419,35 +1370,22 @@ export function FilesPanel({
           p="xl"
           ta="center"
           style={{
-            border: "1px dashed var(--mantine-color-default-border)",
-            borderRadius: "var(--mantine-radius-md)",
+            border: '1px dashed var(--mantine-color-default-border)',
+            borderRadius: 'var(--mantine-radius-md)',
           }}
         >
-          <ThemeIcon
-            size={48}
-            radius="xl"
-            variant="light"
-            color="blue"
-            mx="auto"
-            mb="sm"
-          >
+          <ThemeIcon size={48} radius="xl" variant="light" color="blue" mx="auto" mb="sm">
             <TbFiles size={24} />
           </ThemeIcon>
           <Text fw={600} mb={4}>
             Belum ada file
           </Text>
           <Text size="sm" c="dimmed" mb="md" maw={400} mx="auto">
-            Simpan snippets, config files, script, atau template untuk project
-            ini. Mendukung multi-file dan preview Markdown.
+            Simpan snippets, config files, script, atau template untuk project ini. Mendukung multi-file dan preview
+            Markdown.
           </Text>
           {canEdit && (
-            <Button
-              type="button"
-              size="xs"
-              color="blue"
-              leftSection={<TbPlus size={13} />}
-              onClick={openCreate}
-            >
+            <Button type="button" size="xs" color="blue" leftSection={<TbPlus size={13} />} onClick={openCreate}>
               Buat File Pertama
             </Button>
           )}
@@ -1460,18 +1398,11 @@ export function FilesPanel({
           p="xl"
           ta="center"
           style={{
-            border: "1px dashed var(--mantine-color-default-border)",
-            borderRadius: "var(--mantine-radius-md)",
+            border: '1px dashed var(--mantine-color-default-border)',
+            borderRadius: 'var(--mantine-radius-md)',
           }}
         >
-          <ThemeIcon
-            size={44}
-            radius="xl"
-            variant="light"
-            color="gray"
-            mx="auto"
-            mb="sm"
-          >
+          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
             <TbSearch size={22} />
           </ThemeIcon>
           <Text fw={500} size="sm" mb={4}>
@@ -1480,13 +1411,7 @@ export function FilesPanel({
           <Text size="xs" c="dimmed" mb="sm">
             Coba ubah filter atau kata kunci pencarian.
           </Text>
-          <Button
-            type="button"
-            size="xs"
-            variant="light"
-            leftSection={<TbX size={11} />}
-            onClick={resetFilter}
-          >
+          <Button type="button" size="xs" variant="light" leftSection={<TbX size={11} />} onClick={resetFilter}>
             Reset filter
           </Button>
         </Box>
@@ -1495,7 +1420,7 @@ export function FilesPanel({
       {/* List */}
       {!isLoading && !isError && filtered.length > 0 && (
         <>
-          {view === "grid" ? (
+          {view === 'grid' ? (
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
               {paginated.map((f) => (
                 <FileCard
@@ -1503,7 +1428,7 @@ export function FilesPanel({
                   file={f}
                   slug={slug}
                   canManage={canManageFile(f.author.id)}
-                  onView={() => setViewFile(f)}
+                  onView={() => openView(f.id)}
                   onEdit={() => openEdit(f)}
                   onDelete={() => deleteFile(f)}
                   onTagClick={addTagFilter}
@@ -1518,7 +1443,7 @@ export function FilesPanel({
                   file={f}
                   slug={slug}
                   canManage={canManageFile(f.author.id)}
-                  onView={() => setViewFile(f)}
+                  onView={() => openView(f.id)}
                   onEdit={() => openEdit(f)}
                   onDelete={() => deleteFile(f)}
                   onTagClick={addTagFilter}
@@ -1528,16 +1453,11 @@ export function FilesPanel({
           )}
           {totalPages > 1 && (
             <Group justify="center" mt="md">
-              <Pagination
-                value={page}
-                onChange={setPage}
-                total={totalPages}
-                size="sm"
-              />
+              <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
             </Group>
           )}
         </>
       )}
     </Box>
-  );
+  )
 }

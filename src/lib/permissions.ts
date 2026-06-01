@@ -17,17 +17,14 @@ export const CAPABILITIES = [
   'stack:prune',
 ] as const
 
-export type Capability = typeof CAPABILITIES[number]
+export type Capability = (typeof CAPABILITIES)[number]
 
 export function isValidCapability(value: unknown): value is Capability {
   return typeof value === 'string' && (CAPABILITIES as readonly string[]).includes(value)
 }
 
 // SUPER_ADMIN bypass. Lainnya cek permissions array.
-export function hasCapability(
-  user: { role: string; permissions: string[] },
-  cap: Capability,
-): boolean {
+export function hasCapability(user: { role: string; permissions: string[] }, cap: Capability): boolean {
   if (user.role === 'SUPER_ADMIN') return true
   return user.permissions.includes(cap)
 }

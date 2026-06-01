@@ -11,8 +11,18 @@ export interface ApiToken {
 }
 
 const TAG_COLORS = [
-  'red', 'pink', 'grape', 'violet', 'indigo', 'blue',
-  'cyan', 'teal', 'green', 'lime', 'yellow', 'orange',
+  'red',
+  'pink',
+  'grape',
+  'violet',
+  'indigo',
+  'blue',
+  'cyan',
+  'teal',
+  'green',
+  'lime',
+  'yellow',
+  'orange',
 ] as const
 
 export function tagColor(tag: string): string {
@@ -35,8 +45,11 @@ export function relativeTime(dateStr: string): string {
 
 export function absoluteTime(dateStr: string): string {
   return new Date(dateStr).toLocaleString('id-ID', {
-    day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 

@@ -9,9 +9,9 @@ import { useMantineColorScheme } from '@mantine/core'
 import Editor, { loader, type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
-import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { useEffect, useRef } from 'react'
 
@@ -35,33 +35,51 @@ function configureMonacoOnce() {
 // Map filename extension → Monaco language id. Monaco's known language list
 // covers most cases natively (typescript, yaml, shell, sql, dll).
 const EXT_LANGUAGE: Record<string, string> = {
-  ts: 'typescript', tsx: 'typescript',
-  js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
-  json: 'json', jsonc: 'json',
-  yaml: 'yaml', yml: 'yaml',
-  md: 'markdown', markdown: 'markdown',
-  sh: 'shell', bash: 'shell', zsh: 'shell',
+  ts: 'typescript',
+  tsx: 'typescript',
+  js: 'javascript',
+  jsx: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  json: 'json',
+  jsonc: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  md: 'markdown',
+  markdown: 'markdown',
+  sh: 'shell',
+  bash: 'shell',
+  zsh: 'shell',
   py: 'python',
   rb: 'ruby',
   go: 'go',
   rs: 'rust',
   java: 'java',
-  c: 'c', h: 'c',
-  cpp: 'cpp', cc: 'cpp', hpp: 'cpp',
+  c: 'c',
+  h: 'c',
+  cpp: 'cpp',
+  cc: 'cpp',
+  hpp: 'cpp',
   cs: 'csharp',
   php: 'php',
   sql: 'sql',
-  html: 'html', htm: 'html',
-  css: 'css', scss: 'scss', less: 'less',
+  html: 'html',
+  htm: 'html',
+  css: 'css',
+  scss: 'scss',
+  less: 'less',
   xml: 'xml',
   toml: 'ini',
-  ini: 'ini', env: 'ini',
+  ini: 'ini',
+  env: 'ini',
   dockerfile: 'dockerfile',
-  graphql: 'graphql', gql: 'graphql',
+  graphql: 'graphql',
+  gql: 'graphql',
   proto: 'proto',
   lua: 'lua',
   swift: 'swift',
-  kt: 'kotlin', kts: 'kotlin',
+  kt: 'kotlin',
+  kts: 'kotlin',
   prisma: 'sql', // closest mantra
 }
 
@@ -120,7 +138,8 @@ export default function MonacoCodeEditor({
   }, [])
 
   const lang = language ?? detectLanguage(filename)
-  const isDark = colorScheme === 'dark' || (colorScheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const isDark =
+    colorScheme === 'dark' || (colorScheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   const handleMount: OnMount = (editor) => {
     editorRef.current = editor
@@ -161,18 +180,20 @@ export default function MonacoCodeEditor({
         mouseWheelZoom: false,
       }}
       loading={
-        <div style={{
-          height: effectiveHeight,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--mantine-color-dimmed)',
-          fontSize: 13,
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
-          background: isDark ? '#1e1e1e' : '#fff',
-          border: '1px solid var(--mantine-color-default-border)',
-          borderRadius: 4,
-        }}>
+        <div
+          style={{
+            height: effectiveHeight,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--mantine-color-dimmed)',
+            fontSize: 13,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
+            background: isDark ? '#1e1e1e' : '#fff',
+            border: '1px solid var(--mantine-color-default-border)',
+            borderRadius: 4,
+          }}
+        >
           Loading editor…
         </div>
       }

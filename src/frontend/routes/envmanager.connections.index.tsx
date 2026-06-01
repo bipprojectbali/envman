@@ -28,6 +28,7 @@ import {
   TbAlertTriangle,
   TbCheck,
   TbClock,
+  TbDatabaseExport,
   TbExternalLink,
   TbLayoutGrid,
   TbLayoutList,
@@ -37,17 +38,16 @@ import {
   TbPlus,
   TbSearch,
   TbTrash,
-  TbDatabaseExport,
   TbX,
 } from 'react-icons/tb'
+import { BackupPanelContent } from '@/frontend/components/dev/PortainerBackupPanel'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
-import { BackupPanelContent } from '@/frontend/components/dev/PortainerBackupPanel'
 
 export const Route = createFileRoute('/envmanager/connections/')({
   validateSearch: (search: Record<string, unknown>) => ({
-    tab: (search.tab as string) === 'backup' ? 'backup' as const : 'connections' as const,
+    tab: (search.tab as string) === 'backup' ? ('backup' as const) : ('connections' as const),
   }),
   component: ConnectionsPage,
 })
@@ -112,10 +112,13 @@ function ConnectionsPage() {
   const searchRef = useRef<HTMLInputElement>(null)
 
   useHotkeys([
-    ['/', () => {
-      searchRef.current?.focus()
-      searchRef.current?.select()
-    }],
+    [
+      '/',
+      () => {
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      },
+    ],
   ])
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -125,7 +128,7 @@ function ConnectionsPage() {
   const connections: Connection[] = data?.connections ?? []
 
   const healthQueries = useQueries({
-    queries: connections.map(c => ({
+    queries: connections.map((c) => ({
       queryKey: ['portainer', 'connection-health', c.id],
       queryFn: () => apiFetch(`/api/envman/portainer/connections/${c.id}/health`),
       staleTime: 60_000,
@@ -133,16 +136,16 @@ function ConnectionsPage() {
     })),
   })
   const healthMap = Object.fromEntries(
-    connections.map((c, i) => [c.id, healthQueries[i]?.data as { totalStacks: number; activeStacks: number; inactiveStacks: number } | undefined]),
+    connections.map((c, i) => [
+      c.id,
+      healthQueries[i]?.data as { totalStacks: number; activeStacks: number; inactiveStacks: number } | undefined,
+    ]),
   )
 
   const filteredConnections = useMemo(() => {
     if (!debouncedSearch.trim()) return connections
     const q = debouncedSearch.toLowerCase()
-    return connections.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.portainerUrl.toLowerCase().includes(q),
-    )
+    return connections.filter((c) => c.name.toLowerCase().includes(q) || c.portainerUrl.toLowerCase().includes(q))
   }, [connections, debouncedSearch])
 
   const openCreate = () => {
@@ -170,7 +173,10 @@ function ConnectionsPage() {
     mutationFn: async () => {
       const body: Record<string, unknown> = { portainerUrl: form.portainerUrl }
       if (form.apiToken) body.apiToken = form.apiToken
-      else if (editTarget) { body.slug = '_test_'; body.envName = '_test_' }
+      else if (editTarget) {
+        body.slug = '_test_'
+        body.envName = '_test_'
+      }
       return apiFetch('/api/envman/portainer/probe', { method: 'POST', body: JSON.stringify(body) })
     },
     onSuccess: (data) => setTestResult({ ok: true, message: `Connected — ${data.stacks.length} stack(s) ditemukan` }),
@@ -182,7 +188,11 @@ function ConnectionsPage() {
       if (editTarget) {
         return apiFetch(`/api/envman/portainer/connections/${editTarget.id}`, {
           method: 'PATCH',
-          body: JSON.stringify({ name: form.name, portainerUrl: form.portainerUrl, ...(form.apiToken ? { apiToken: form.apiToken } : {}) }),
+          body: JSON.stringify({
+            name: form.name,
+            portainerUrl: form.portainerUrl,
+            ...(form.apiToken ? { apiToken: form.apiToken } : {}),
+          }),
         })
       }
       return apiFetch('/api/envman/portainer/connections', {
@@ -207,7 +217,9 @@ function ConnectionsPage() {
           <ThemeIcon size="sm" variant="light" color="red" radius="md">
             <TbTrash size={13} />
           </ThemeIcon>
-          <Text fw={600} size="sm">Hapus connection</Text>
+          <Text fw={600} size="sm">
+            Hapus connection
+          </Text>
         </Group>
       ),
       children: (
@@ -235,9 +247,12 @@ function ConnectionsPage() {
     return (
       <Box p="md">
         <Alert color="yellow" icon={<TbAlertTriangle size={16} />} variant="light">
-          <Text size="sm" fw={600} mb={4}>Tidak punya izin melihat Portainer connections</Text>
+          <Text size="sm" fw={600} mb={4}>
+            Tidak punya izin melihat Portainer connections
+          </Text>
           <Text size="xs">
-            Connection adalah infrastruktur global. Minta SUPER_ADMIN untuk grant capability <Code fz="xs">connection:view</Code>.
+            Connection adalah infrastruktur global. Minta SUPER_ADMIN untuk grant capability{' '}
+            <Code fz="xs">connection:view</Code>.
           </Text>
         </Alert>
       </Box>
@@ -251,272 +266,315 @@ function ConnectionsPage() {
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
-      <Tabs value={tab} onChange={(v) => navigate({ to: '/envmanager/connections', search: { tab: (v ?? 'connections') as 'connections' | 'backup' } })}>
+      <Tabs
+        value={tab}
+        onChange={(v) =>
+          navigate({ to: '/envmanager/connections', search: { tab: (v ?? 'connections') as 'connections' | 'backup' } })
+        }
+      >
         <Tabs.List mb="md">
-          <Tabs.Tab value="connections" leftSection={<TbPlugConnected size={14} />}>Connections</Tabs.Tab>
-          <Tabs.Tab value="backup" leftSection={<TbDatabaseExport size={14} />}>Backup</Tabs.Tab>
+          <Tabs.Tab value="connections" leftSection={<TbPlugConnected size={14} />}>
+            Connections
+          </Tabs.Tab>
+          <Tabs.Tab value="backup" leftSection={<TbDatabaseExport size={14} />}>
+            Backup
+          </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="connections">
           {/* ─── Header ─────────────────────────── */}
-      <Group justify="space-between" mb="md" wrap="nowrap" align="flex-start">
-        <Group gap="sm" style={{ minWidth: 0 }}>
-          <ThemeIcon size={38} radius="md" variant="light" color="primary">
-            <TbPlugConnected size={20} />
-          </ThemeIcon>
-          <Box style={{ minWidth: 0 }}>
-            <Text fw={700} size="lg" lh={1.2}>Portainer Connections</Text>
-            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-              {isLoading
-                ? 'Memuat...'
-                : connections.length === 0
-                  ? 'Belum ada connection'
-                  : `${connections.length} connection · ${totalEnvs} environment terhubung`}
-            </Text>
-          </Box>
-        </Group>
-        <Group gap="xs" wrap="nowrap">
-          {connections.length > 0 && (
-            <Tooltip label={view === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
-              <ActionIcon
-                size="lg" variant="default"
-                aria-label="Ganti tampilan"
-                onClick={() => setView(v => v === 'grid' ? 'list' : 'grid')}
-              >
-                {view === 'grid' ? <TbLayoutList size={16} /> : <TbLayoutGrid size={16} />}
-              </ActionIcon>
-            </Tooltip>
-          )}
-          {canManageConnections && (
-            <Button size="sm" leftSection={<TbPlus size={14} />} color="primary" onClick={openCreate}>
-              Add Connection
-            </Button>
-          )}
-        </Group>
-      </Group>
-
-      <Alert color="gray" p="xs" mb="md" icon={<TbPlugConnected size={14} />}>
-        <Text size="xs" c="dimmed">
-          Connections adalah konfigurasi Portainer yang dapat dipakai oleh semua project.
-          Set sekali, pakai berulang — tidak perlu input URL dan token di setiap environment.
-        </Text>
-      </Alert>
-
-      {/* ─── Toolbar ────────────────────────── */}
-      {!isError && connections.length > 0 && (
-        <Box p="xs" mb="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
-          <TextInput
-            ref={searchRef}
-            size="sm"
-            placeholder="Cari nama atau URL..."
-            leftSection={<TbSearch size={14} />}
-            rightSection={
-              search ? (
-                <ActionIcon size="sm" variant="subtle" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
-                  <TbX size={12} />
-                </ActionIcon>
-              ) : (
-                <Tooltip label="Tekan / untuk focus">
-                  <Kbd size="xs">/</Kbd>
+          <Group justify="space-between" mb="md" wrap="nowrap" align="flex-start">
+            <Group gap="sm" style={{ minWidth: 0 }}>
+              <ThemeIcon size={38} radius="md" variant="light" color="primary">
+                <TbPlugConnected size={20} />
+              </ThemeIcon>
+              <Box style={{ minWidth: 0 }}>
+                <Text fw={700} size="lg" lh={1.2}>
+                  Portainer Connections
+                </Text>
+                <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                  {isLoading
+                    ? 'Memuat...'
+                    : connections.length === 0
+                      ? 'Belum ada connection'
+                      : `${connections.length} connection · ${totalEnvs} environment terhubung`}
+                </Text>
+              </Box>
+            </Group>
+            <Group gap="xs" wrap="nowrap">
+              {connections.length > 0 && (
+                <Tooltip label={view === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
+                  <ActionIcon
+                    size="lg"
+                    variant="default"
+                    aria-label="Ganti tampilan"
+                    onClick={() => setView((v) => (v === 'grid' ? 'list' : 'grid'))}
+                  >
+                    {view === 'grid' ? <TbLayoutList size={16} /> : <TbLayoutGrid size={16} />}
+                  </ActionIcon>
                 </Tooltip>
-              )
-            }
-            rightSectionWidth={34}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {debouncedSearch.trim() && filteredConnections.length < connections.length && (
-            <Group justify="space-between" mt="xs" gap="xs">
-              <Text size="xs" c="dimmed">
-                {filteredConnections.length} dari {connections.length} connection
+              )}
+              {canManageConnections && (
+                <Button size="sm" leftSection={<TbPlus size={14} />} color="primary" onClick={openCreate}>
+                  Add Connection
+                </Button>
+              )}
+            </Group>
+          </Group>
+
+          <Alert color="gray" p="xs" mb="md" icon={<TbPlugConnected size={14} />}>
+            <Text size="xs" c="dimmed">
+              Connections adalah konfigurasi Portainer yang dapat dipakai oleh semua project. Set sekali, pakai berulang
+              — tidak perlu input URL dan token di setiap environment.
+            </Text>
+          </Alert>
+
+          {/* ─── Toolbar ────────────────────────── */}
+          {!isError && connections.length > 0 && (
+            <Box
+              p="xs"
+              mb="md"
+              style={{
+                border: '1px solid var(--mantine-color-default-border)',
+                borderRadius: 'var(--mantine-radius-md)',
+              }}
+            >
+              <TextInput
+                ref={searchRef}
+                size="sm"
+                placeholder="Cari nama atau URL..."
+                leftSection={<TbSearch size={14} />}
+                rightSection={
+                  search ? (
+                    <ActionIcon size="sm" variant="subtle" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
+                      <TbX size={12} />
+                    </ActionIcon>
+                  ) : (
+                    <Tooltip label="Tekan / untuk focus">
+                      <Kbd size="xs">/</Kbd>
+                    </Tooltip>
+                  )
+                }
+                rightSectionWidth={34}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {debouncedSearch.trim() && filteredConnections.length < connections.length && (
+                <Group justify="space-between" mt="xs" gap="xs">
+                  <Text size="xs" c="dimmed">
+                    {filteredConnections.length} dari {connections.length} connection
+                  </Text>
+                  <Button
+                    size="compact-xs"
+                    variant="subtle"
+                    color="gray"
+                    leftSection={<TbX size={11} />}
+                    onClick={() => setSearch('')}
+                  >
+                    Reset pencarian
+                  </Button>
+                </Group>
+              )}
+            </Box>
+          )}
+
+          {/* ─── Error state ────────────────────── */}
+          {isError && (
+            <Box p="xl" ta="center" style={{ border: '1px solid var(--mantine-color-red-5)' }}>
+              <ThemeIcon size={48} radius="xl" variant="light" color="red" mx="auto" mb="sm">
+                <TbAlertTriangle size={24} />
+              </ThemeIcon>
+              <Text fw={600} mb={4}>
+                Gagal memuat connections
               </Text>
-              <Button size="compact-xs" variant="subtle" color="gray" leftSection={<TbX size={11} />} onClick={() => setSearch('')}>
+              <Text size="sm" c="dimmed" mb="md">
+                {(error as Error)?.message ?? 'Terjadi kesalahan saat memuat daftar connection.'}
+              </Text>
+              <Button size="xs" variant="light" color="red" onClick={() => refetch()}>
+                Coba lagi
+              </Button>
+            </Box>
+          )}
+
+          {/* ─── List/grid ─────────────────────── */}
+          {!isError && isLoading ? (
+            view === 'grid' ? (
+              <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} height={148} radius="md" />
+                ))}
+              </SimpleGrid>
+            ) : (
+              <Stack gap="xs">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} height={72} radius="md" />
+                ))}
+              </Stack>
+            )
+          ) : !isError && connections.length === 0 ? (
+            <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
+              <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
+                <TbPlugConnectedX size={24} />
+              </ThemeIcon>
+              <Text fw={600} mb={4}>
+                Belum ada connection
+              </Text>
+              <Text size="sm" c="dimmed" mb="md" maw={420} mx="auto">
+                Tambah Portainer instance yang dapat dipakai semua project untuk auto-sync env vars ke container stack.
+              </Text>
+              {canManageConnections ? (
+                <Button size="sm" color="primary" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+                  Add Connection
+                </Button>
+              ) : (
+                <Text size="xs" c="dimmed">
+                  Connection adalah infrastruktur global — hanya SUPER_ADMIN yang boleh menambah.
+                </Text>
+              )}
+            </Box>
+          ) : !isError && filteredConnections.length === 0 ? (
+            <Box p="lg" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
+              <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
+                <TbSearch size={22} />
+              </ThemeIcon>
+              <Text fw={600} mb={4}>
+                Tidak ada hasil
+              </Text>
+              <Text size="sm" c="dimmed" mb="md">
+                Tidak ada connection yang cocok dengan "{debouncedSearch}".
+              </Text>
+              <Button size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={() => setSearch('')}>
                 Reset pencarian
               </Button>
-            </Group>
-          )}
-        </Box>
-      )}
+            </Box>
+          ) : !isError && view === 'grid' ? (
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
+              {filteredConnections.map((c) => (
+                <ConnectionGridCard
+                  key={c.id}
+                  connection={c}
+                  health={healthMap[c.id]}
+                  canManage={canManageConnections}
+                  onOpen={() => navigate({ to: '/envmanager/connections/$id', params: { id: c.id } })}
+                  onEdit={() => openEdit(c)}
+                  onDelete={() => deleteConnection(c.id, c.name, c._count.configs)}
+                />
+              ))}
+            </SimpleGrid>
+          ) : !isError ? (
+            <Stack gap="xs">
+              {filteredConnections.map((c) => (
+                <ConnectionListCard
+                  key={c.id}
+                  connection={c}
+                  health={healthMap[c.id]}
+                  canManage={canManageConnections}
+                  onOpen={() => navigate({ to: '/envmanager/connections/$id', params: { id: c.id } })}
+                  onEdit={() => openEdit(c)}
+                  onDelete={() => deleteConnection(c.id, c.name, c._count.configs)}
+                />
+              ))}
+            </Stack>
+          ) : null}
 
-      {/* ─── Error state ────────────────────── */}
-      {isError && (
-        <Box p="xl" ta="center" style={{ border: '1px solid var(--mantine-color-red-5)' }}>
-          <ThemeIcon size={48} radius="xl" variant="light" color="red" mx="auto" mb="sm">
-            <TbAlertTriangle size={24} />
-          </ThemeIcon>
-          <Text fw={600} mb={4}>Gagal memuat connections</Text>
-          <Text size="sm" c="dimmed" mb="md">
-            {(error as Error)?.message ?? 'Terjadi kesalahan saat memuat daftar connection.'}
-          </Text>
-          <Button size="xs" variant="light" color="red" onClick={() => refetch()}>
-            Coba lagi
-          </Button>
-        </Box>
-      )}
-
-      {/* ─── List/grid ─────────────────────── */}
-      {!isError && isLoading ? (
-        view === 'grid' ? (
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
-            {[0, 1, 2].map(i => <Skeleton key={i} height={148} radius="md" />)}
-          </SimpleGrid>
-        ) : (
-          <Stack gap="xs">
-            {[0, 1, 2].map(i => <Skeleton key={i} height={72} radius="md" />)}
-          </Stack>
-        )
-      ) : !isError && connections.length === 0 ? (
-        <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
-          <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
-            <TbPlugConnectedX size={24} />
-          </ThemeIcon>
-          <Text fw={600} mb={4}>Belum ada connection</Text>
-          <Text size="sm" c="dimmed" mb="md" maw={420} mx="auto">
-            Tambah Portainer instance yang dapat dipakai semua project untuk auto-sync env vars ke container stack.
-          </Text>
-          {canManageConnections ? (
-            <Button size="sm" color="primary" leftSection={<TbPlus size={14} />} onClick={openCreate}>
-              Add Connection
-            </Button>
-          ) : (
-            <Text size="xs" c="dimmed">Connection adalah infrastruktur global — hanya SUPER_ADMIN yang boleh menambah.</Text>
-          )}
-        </Box>
-      ) : !isError && filteredConnections.length === 0 ? (
-        <Box p="lg" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
-          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
-            <TbSearch size={22} />
-          </ThemeIcon>
-          <Text fw={600} mb={4}>Tidak ada hasil</Text>
-          <Text size="sm" c="dimmed" mb="md">Tidak ada connection yang cocok dengan "{debouncedSearch}".</Text>
-          <Button size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={() => setSearch('')}>
-            Reset pencarian
-          </Button>
-        </Box>
-      ) : !isError && view === 'grid' ? (
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
-          {filteredConnections.map(c => (
-            <ConnectionGridCard
-              key={c.id}
-              connection={c}
-              health={healthMap[c.id]}
-              canManage={canManageConnections}
-              onOpen={() => navigate({ to: '/envmanager/connections/$id', params: { id: c.id } })}
-              onEdit={() => openEdit(c)}
-              onDelete={() => deleteConnection(c.id, c.name, c._count.configs)}
-            />
-          ))}
-        </SimpleGrid>
-      ) : !isError ? (
-        <Stack gap="xs">
-          {filteredConnections.map(c => (
-            <ConnectionListCard
-              key={c.id}
-              connection={c}
-              health={healthMap[c.id]}
-              canManage={canManageConnections}
-              onOpen={() => navigate({ to: '/envmanager/connections/$id', params: { id: c.id } })}
-              onEdit={() => openEdit(c)}
-              onDelete={() => deleteConnection(c.id, c.name, c._count.configs)}
-            />
-          ))}
-        </Stack>
-      ) : null}
-
-      {/* ─── Create/Edit modal ─────────────── */}
-      <Modal
-        opened={modalOpen}
-        onClose={handleClose}
-        fullScreen={isMobile}
-        size="md"
-        centered
-        title={
-          <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="primary" radius="md">
-              <TbPlugConnected size={13} />
-            </ThemeIcon>
-            <Text fw={600} size="sm">{editTarget ? 'Edit Connection' : 'Tambah Connection'}</Text>
-          </Group>
-        }
-      >
-        <Stack gap="md">
-          <TextInput
-            label="Nama"
-            placeholder="Production Portainer, Dev Server, ..."
-            description="Nama untuk identifikasi — akan muncul di setiap environment setup"
-            value={form.name}
-            autoFocus
-            data-autofocus
-            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-          />
-          <TextInput
-            label="Portainer URL"
-            placeholder="https://portainer.example.com"
-            description="URL lengkap dengan protokol (https://) tanpa path"
-            value={form.portainerUrl}
-            onChange={e => setForm(f => ({ ...f, portainerUrl: e.target.value.trim() }))}
-            error={
-              form.portainerUrl && !/^https?:\/\//.test(form.portainerUrl)
-                ? 'URL harus diawali http:// atau https://'
-                : undefined
+          {/* ─── Create/Edit modal ─────────────── */}
+          <Modal
+            opened={modalOpen}
+            onClose={handleClose}
+            fullScreen={isMobile}
+            size="md"
+            centered
+            title={
+              <Group gap="xs">
+                <ThemeIcon size="sm" variant="light" color="primary" radius="md">
+                  <TbPlugConnected size={13} />
+                </ThemeIcon>
+                <Text fw={600} size="sm">
+                  {editTarget ? 'Edit Connection' : 'Tambah Connection'}
+                </Text>
+              </Group>
             }
-          />
-          <PasswordInput
-            label="API Token"
-            placeholder={editTarget ? '— kosongkan untuk pakai token lama —' : 'ptr_xxxxxxxxxxxx'}
-            description={
-              editTarget && !form.apiToken
-                ? 'Token tersimpan tetap digunakan jika dikosongkan'
-                : 'Buat di Portainer: Account → Access tokens → Add access token'
-            }
-            value={form.apiToken}
-            onChange={e => setForm(f => ({ ...f, apiToken: e.target.value }))}
-          />
+          >
+            <Stack gap="md">
+              <TextInput
+                label="Nama"
+                placeholder="Production Portainer, Dev Server, ..."
+                description="Nama untuk identifikasi — akan muncul di setiap environment setup"
+                value={form.name}
+                autoFocus
+                data-autofocus
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              />
+              <TextInput
+                label="Portainer URL"
+                placeholder="https://portainer.example.com"
+                description="URL lengkap dengan protokol (https://) tanpa path"
+                value={form.portainerUrl}
+                onChange={(e) => setForm((f) => ({ ...f, portainerUrl: e.target.value.trim() }))}
+                error={
+                  form.portainerUrl && !/^https?:\/\//.test(form.portainerUrl)
+                    ? 'URL harus diawali http:// atau https://'
+                    : undefined
+                }
+              />
+              <PasswordInput
+                label="API Token"
+                placeholder={editTarget ? '— kosongkan untuk pakai token lama —' : 'ptr_xxxxxxxxxxxx'}
+                description={
+                  editTarget && !form.apiToken
+                    ? 'Token tersimpan tetap digunakan jika dikosongkan'
+                    : 'Buat di Portainer: Account → Access tokens → Add access token'
+                }
+                value={form.apiToken}
+                onChange={(e) => setForm((f) => ({ ...f, apiToken: e.target.value }))}
+              />
 
-          {testResult && (
-            <Alert
-              color={testResult.ok ? 'teal' : 'red'}
-              icon={testResult.ok ? <TbCheck size={14} /> : <TbAlertTriangle size={14} />}
-              p="xs"
-              withCloseButton
-              onClose={() => setTestResult(null)}
-            >
-              <Text size="xs">{testResult.message}</Text>
-            </Alert>
-          )}
+              {testResult && (
+                <Alert
+                  color={testResult.ok ? 'teal' : 'red'}
+                  icon={testResult.ok ? <TbCheck size={14} /> : <TbAlertTriangle size={14} />}
+                  p="xs"
+                  withCloseButton
+                  onClose={() => setTestResult(null)}
+                >
+                  <Text size="xs">{testResult.message}</Text>
+                </Alert>
+              )}
 
-          <Group justify="space-between" gap="xs">
-            <Button
-              size="xs"
-              variant="default"
-              leftSection={<TbPlugConnected size={13} />}
-              loading={testConnection.isPending}
-              disabled={!form.portainerUrl || (!form.apiToken && !editTarget)}
-              onClick={() => testConnection.mutate()}
-            >
-              Test Connection
-            </Button>
-            <Text size="xs" c="dimmed">
-              {form.apiToken || editTarget ? '' : 'Test perlu URL + token'}
-            </Text>
-          </Group>
+              <Group justify="space-between" gap="xs">
+                <Button
+                  size="xs"
+                  variant="default"
+                  leftSection={<TbPlugConnected size={13} />}
+                  loading={testConnection.isPending}
+                  disabled={!form.portainerUrl || (!form.apiToken && !editTarget)}
+                  onClick={() => testConnection.mutate()}
+                >
+                  Test Connection
+                </Button>
+                <Text size="xs" c="dimmed">
+                  {form.apiToken || editTarget ? '' : 'Test perlu URL + token'}
+                </Text>
+              </Group>
 
-          <Divider />
+              <Divider />
 
-          <Group justify="flex-end" gap="xs">
-            <Button variant="subtle" color="gray" onClick={handleClose}>Batal</Button>
-            <Button
-              leftSection={editTarget ? <TbCheck size={14} /> : <TbPlus size={14} />}
-              color="primary"
-              loading={saveConnection.isPending}
-              disabled={!form.name || !form.portainerUrl || (!editTarget && !form.apiToken)}
-              onClick={() => saveConnection.mutate()}
-            >
-              {editTarget ? 'Update' : 'Simpan Connection'}
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
+              <Group justify="flex-end" gap="xs">
+                <Button variant="subtle" color="gray" onClick={handleClose}>
+                  Batal
+                </Button>
+                <Button
+                  leftSection={editTarget ? <TbCheck size={14} /> : <TbPlus size={14} />}
+                  color="primary"
+                  loading={saveConnection.isPending}
+                  disabled={!form.name || !form.portainerUrl || (!editTarget && !form.apiToken)}
+                  onClick={() => saveConnection.mutate()}
+                >
+                  {editTarget ? 'Update' : 'Simpan Connection'}
+                </Button>
+              </Group>
+            </Stack>
+          </Modal>
         </Tabs.Panel>
 
         <Tabs.Panel value="backup" pt="xs">
@@ -542,7 +600,9 @@ function HealthBadge({ health }: { health?: { totalStacks: number; activeStacks:
   if (!health) return null
   const color = health.inactiveStacks === 0 ? 'teal' : health.activeStacks === 0 ? 'red' : 'orange'
   return (
-    <Tooltip label={`${health.activeStacks} aktif, ${health.inactiveStacks} tidak aktif, dari ${health.totalStacks} total stack`}>
+    <Tooltip
+      label={`${health.activeStacks} aktif, ${health.inactiveStacks} tidak aktif, dari ${health.totalStacks} total stack`}
+    >
       <Badge size="xs" variant="light" color={color}>
         {health.activeStacks}/{health.totalStacks} active
       </Badge>
@@ -559,15 +619,20 @@ function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, 
       tabIndex={0}
       aria-label={`Buka connection ${c.name}`}
       onClick={onOpen}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
-      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column'}}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
+      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
     >
       <Group justify="space-between" mb="xs" wrap="nowrap">
         <ThemeIcon size={40} radius="md" variant="light" color="primary">
           <TbPlugConnected size={20} />
         </ThemeIcon>
         {canManage && (
-          <Group gap={4} onClick={e => e.stopPropagation()}>
+          <Group gap={4} onClick={(e) => e.stopPropagation()}>
             <Tooltip label="Edit">
               <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Edit connection" onClick={onEdit}>
                 <TbPencil size={13} />
@@ -582,37 +647,59 @@ function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, 
         )}
       </Group>
 
-      <Text fw={700} size="md" mb={2} lh={1.3} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <Text
+        fw={700}
+        size="md"
+        mb={2}
+        lh={1.3}
+        style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+      >
         {c.name}
       </Text>
       <Group gap={4} mb="xs" align="center">
-        <Code fz="xs" c="dimmed" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <Code
+          fz="xs"
+          c="dimmed"
+          style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
           {c.portainerUrl.replace(/^https?:\/\//, '')}
         </Code>
         <Tooltip label="Buka Portainer UI">
           <ActionIcon
-            size="xs" variant="subtle" color="gray"
+            size="xs"
+            variant="subtle"
+            color="gray"
             aria-label="Buka Portainer UI"
             component="a"
             href={c.portainerUrl}
             target="_blank"
             rel="noreferrer"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <TbExternalLink size={11} />
           </ActionIcon>
         </Tooltip>
       </Group>
 
-      <Group gap="xs" mt="auto" pt="xs" wrap="wrap" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
+      <Group
+        gap="xs"
+        mt="auto"
+        pt="xs"
+        wrap="wrap"
+        style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}
+      >
         <Tooltip label={`${c._count.configs} environment menggunakan connection ini`}>
-          <Badge size="xs" variant="default">{c._count.configs} env</Badge>
+          <Badge size="xs" variant="default">
+            {c._count.configs} env
+          </Badge>
         </Tooltip>
         <HealthBadge health={health} />
         <Tooltip label={`Dibuat ${new Date(c.createdAt).toLocaleString('id-ID')}`}>
           <Group gap={4} style={{ marginLeft: 'auto' }}>
             <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
-            <Text size="xs" c="dimmed">{relativeDate(c.createdAt)}</Text>
+            <Text size="xs" c="dimmed">
+              {relativeDate(c.createdAt)}
+            </Text>
           </Group>
         </Tooltip>
       </Group>
@@ -629,7 +716,12 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
       tabIndex={0}
       aria-label={`Buka connection ${c.name}`}
       onClick={onOpen}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
       style={{ cursor: 'pointer', borderBottom: '1px solid var(--mantine-color-default-border)' }}
     >
       <Group justify="space-between" wrap="nowrap">
@@ -643,23 +735,31 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
                 {c.name}
               </Text>
               <Tooltip label={`${c._count.configs} environment menggunakan connection ini`}>
-                <Badge size="xs" variant="default">{c._count.configs} env</Badge>
+                <Badge size="xs" variant="default">
+                  {c._count.configs} env
+                </Badge>
               </Tooltip>
               <HealthBadge health={health} />
             </Group>
             <Group gap="xs" wrap="nowrap">
-              <Code fz="xs" c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
+              <Code
+                fz="xs"
+                c="dimmed"
+                style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}
+              >
                 {c.portainerUrl.replace(/^https?:\/\//, '')}
               </Code>
               <Tooltip label="Buka Portainer UI">
                 <ActionIcon
-                  size="xs" variant="subtle" color="gray"
+                  size="xs"
+                  variant="subtle"
+                  color="gray"
                   aria-label="Buka Portainer UI"
                   component="a"
                   href={c.portainerUrl}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={e => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <TbExternalLink size={11} />
                 </ActionIcon>
@@ -667,14 +767,16 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
               <Tooltip label={`Dibuat ${new Date(c.createdAt).toLocaleString('id-ID')}`}>
                 <Group gap={4}>
                   <TbClock size={11} style={{ color: 'var(--mantine-color-dimmed)' }} />
-                  <Text size="xs" c="dimmed">{relativeDate(c.createdAt)}</Text>
+                  <Text size="xs" c="dimmed">
+                    {relativeDate(c.createdAt)}
+                  </Text>
                 </Group>
               </Tooltip>
             </Group>
           </Box>
         </Group>
         {canManage && (
-          <Group gap="xs" wrap="nowrap" onClick={e => e.stopPropagation()}>
+          <Group gap="xs" wrap="nowrap" onClick={(e) => e.stopPropagation()}>
             <Tooltip label="Edit">
               <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Edit connection" onClick={onEdit}>
                 <TbPencil size={13} />
@@ -695,7 +797,10 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
 // ─── Type-to-confirm delete ──────────────────────────────────────────────────
 
 function DeleteConnectionConfirm({
-  name, usedBy, onCancel, onConfirm,
+  name,
+  usedBy,
+  onCancel,
+  onConfirm,
 }: {
   name: string
   usedBy: number
@@ -724,8 +829,8 @@ function DeleteConnectionConfirm({
       {usedBy > 0 && (
         <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
           <Text size="xs">
-            <strong>{usedBy} environment</strong> masih menggunakan connection ini.
-            Setelah dihapus, environment tersebut perlu dikonfigurasi ulang sebelum bisa sync ke Portainer.
+            <strong>{usedBy} environment</strong> masih menggunakan connection ini. Setelah dihapus, environment
+            tersebut perlu dikonfigurasi ulang sebelum bisa sync ke Portainer.
           </Text>
         </Alert>
       )}
@@ -739,11 +844,15 @@ function DeleteConnectionConfirm({
         autoFocus
         data-autofocus
         spellCheck={false}
-        onChange={e => setTyped(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter' && canDelete) handleConfirm() }}
+        onChange={(e) => setTyped(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && canDelete) handleConfirm()
+        }}
       />
       <Group justify="flex-end" mt="xs">
-        <Button variant="subtle" color="gray" onClick={onCancel} disabled={loading}>Batal</Button>
+        <Button variant="subtle" color="gray" onClick={onCancel} disabled={loading}>
+          Batal
+        </Button>
         <Button
           color="red"
           leftSection={<TbTrash size={13} />}

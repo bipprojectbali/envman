@@ -16,7 +16,17 @@ function BlockedPage() {
       <Box style={{ position: 'absolute', top: 16, right: 16 }}>
         <ThemeToggle />
       </Box>
-      <Box p={{ base: 'lg', sm: 'xl' }} w="100%" maw={460} mx="md" style={{ boxShadow: 'var(--mantine-shadow-md)', border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+      <Box
+        p={{ base: 'lg', sm: 'xl' }}
+        w="100%"
+        maw={460}
+        mx="md"
+        style={{
+          boxShadow: 'var(--mantine-shadow-md)',
+          border: '1px solid var(--mantine-color-default-border)',
+          borderRadius: 'var(--mantine-radius-md)',
+        }}
+      >
         <Stack align="center" gap="lg">
           <ThemeIcon color="red" size={72} radius="xl" variant="light">
             <TbShieldOff size={40} />

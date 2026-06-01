@@ -3,20 +3,20 @@
 // Dipanggil dari src/cli.ts saat user (atau spawn dari `envman daemon start`)
 // menjalankan `envman daemon-internal`. Tidak boleh di-call langsung user.
 
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { paths } from '../shared/paths'
 import { ensureToken } from '../shared/token'
-import { PidFile, getProcessStartEpoch } from './pidfile'
-import { Router, okResponse, errorResponse } from './router'
-import { Server } from './server'
-import { log } from './logger'
-import { ProcessManager, ApiError as PmApiError } from './process-manager'
-import { tailFile } from './log-tailer'
-import { StateStore, StateStoreCorruptError } from './state-store'
-import { resurrectProcesses } from './resurrect'
-import { EnvmanServerClient, ServerNotConfiguredError, ServerAuthError } from './envman-client'
-import { syncContainers } from './env-syncer'
 import type { DaemonHealth } from '../shared/types'
+import { syncContainers } from './env-syncer'
+import { EnvmanServerClient, ServerAuthError, ServerNotConfiguredError } from './envman-client'
+import { tailFile } from './log-tailer'
+import { log } from './logger'
+import { getProcessStartEpoch, PidFile } from './pidfile'
+import { ApiError as PmApiError, ProcessManager } from './process-manager'
+import { resurrectProcesses } from './resurrect'
+import { errorResponse, okResponse, Router } from './router'
+import { Server } from './server'
+import { type PersistedState, StateStore, StateStoreCorruptError } from './state-store'
 
 // Bundled daemon version — separate dari CLI version supaya bisa track schema changes.
 export const DAEMON_VERSION = '0.1.0'
@@ -62,7 +62,7 @@ export async function runDaemon(): Promise<void> {
 
   // StateStore (Phase 4) — load BEFORE creating ProcessManager
   const stateStore = new StateStore(p.processesFile, p.processesBackup)
-  let initialState
+  let initialState: PersistedState
   try {
     initialState = stateStore.load()
     if (initialState.processes.length > 0) {
@@ -94,7 +94,7 @@ export async function runDaemon(): Promise<void> {
   }
   const onAudit = serverClient
     ? (ev: { action: string; detail?: string; processName?: string; processId?: string }) => {
-        serverClient!.postAudit(ev).catch(() => {})  // suppress in fire-and-forget
+        serverClient!.postAudit(ev).catch(() => {}) // suppress in fire-and-forget
       }
     : undefined
 
@@ -127,7 +127,7 @@ export async function runDaemon(): Promise<void> {
       uptimeMs: Date.now() - startedAt,
       startedAt,
       processCount: pm.count(),
-      diskFull: false,  // Phase 3+ akan update
+      diskFull: false, // Phase 3+ akan update
     }
     return okResponse(body, ctx.requestId)
   })
@@ -226,9 +226,7 @@ export async function runDaemon(): Promise<void> {
     try {
       if (!serverClient) throw new ServerNotConfiguredError()
       const filterName = ctx.body?.name as string | undefined
-      const containers = filterName
-        ? [pm.get(filterName)]
-        : [...pm.list()].map(s => pm.get(s.id))
+      const containers = filterName ? [pm.get(filterName)] : [...pm.list()].map((s) => pm.get(s.id))
       const result = await syncContainers({
         containers,
         client: serverClient,
@@ -236,10 +234,12 @@ export async function runDaemon(): Promise<void> {
       })
       // Audit
       if (!ctx.body?.dryRun) {
-        serverClient.postAudit({
-          action: 'PM_SYNC_TRIGGERED',
-          detail: `checked=${result.checked} updated=${result.updated.length} unchanged=${result.unchanged.length} failed=${result.failed.length}`,
-        }).catch(() => {})
+        serverClient
+          .postAudit({
+            action: 'PM_SYNC_TRIGGERED',
+            detail: `checked=${result.checked} updated=${result.updated.length} unchanged=${result.unchanged.length} failed=${result.failed.length}`,
+          })
+          .catch(() => {})
       }
       return okResponse(result, ctx.requestId)
     } catch (e: any) {
@@ -261,7 +261,7 @@ export async function runDaemon(): Promise<void> {
   //   ?stream=true              — SSE live stream
   router.add('GET', '/v1/process/:id/logs', async (ctx, params) => {
     try {
-      const c = pm.get(params.id)
+      const _c = pm.get(params.id)
       // ctx.body adalah null untuk GET — kita perlu URL parse dari raw request.
       // Workaround: simpan URL search di handler context. Untuk sekarang baca dari
       // process config — kalau SSE diminta, signal via custom path: /logs/stream

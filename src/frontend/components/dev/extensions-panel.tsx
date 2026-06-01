@@ -1,18 +1,17 @@
 import { Badge, Box, Container, Group, Stack, Switch, Text, ThemeIcon, Title } from '@mantine/core'
 import { TbPlugConnected, TbPlugOff } from 'react-icons/tb'
-import { notifyErr } from '@/frontend/lib/notify'
 import { useExtensions, useUpdateExtensions } from '@/frontend/hooks/useExtensions'
+import { notifyErr } from '@/frontend/lib/notify'
 
 const EXTENSIONS_META = [
   {
     key: 'portainer' as const,
     label: 'Portainer',
-    description: 'Integrasikan Portainer untuk sync env vars ke Docker stack dan exec container langsung dari dashboard.',
+    description:
+      'Integrasikan Portainer untuk sync env vars ke Docker stack dan exec container langsung dari dashboard.',
     icon: TbPlugConnected,
     color: 'cyan',
-    links: [
-      { label: 'Kelola connections', href: '/envmanager/connections' },
-    ],
+    links: [{ label: 'Kelola connections', href: '/envmanager/connections' }],
   },
 ]
 
@@ -21,17 +20,24 @@ export function ExtensionsPanel() {
   const update = useUpdateExtensions()
 
   const toggle = (key: 'portainer', value: boolean) => {
-    update.mutate({ [key]: value }, {
-      onError: () => notifyErr('Gagal menyimpan pengaturan extension'),
-    })
+    update.mutate(
+      { [key]: value },
+      {
+        onError: () => notifyErr('Gagal menyimpan pengaturan extension'),
+      },
+    )
   }
 
   return (
     <Container size="md">
       <Stack gap="lg">
         <Box>
-          <Title order={3} mb={4}>Extensions</Title>
-          <Text size="sm" c="dimmed">Aktifkan atau nonaktifkan fitur tambahan. Perubahan berlaku untuk semua pengguna.</Text>
+          <Title order={3} mb={4}>
+            Extensions
+          </Title>
+          <Text size="sm" c="dimmed">
+            Aktifkan atau nonaktifkan fitur tambahan. Perubahan berlaku untuk semua pengguna.
+          </Text>
         </Box>
 
         <Stack gap="sm">
@@ -43,7 +49,8 @@ export function ExtensionsPanel() {
                 <Group justify="space-between" wrap="nowrap" align="flex-start">
                   <Group gap="md" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
                     <ThemeIcon
-                      size={44} radius="md"
+                      size={44}
+                      radius="md"
                       variant={enabled ? 'light' : 'default'}
                       color={enabled ? ext_meta.color : 'gray'}
                     >
@@ -51,12 +58,10 @@ export function ExtensionsPanel() {
                     </ThemeIcon>
                     <Box style={{ minWidth: 0 }}>
                       <Group gap="xs" mb={4}>
-                        <Text fw={600} size="sm">{ext_meta.label}</Text>
-                        <Badge
-                          size="xs"
-                          variant="light"
-                          color={enabled ? 'teal' : 'gray'}
-                        >
+                        <Text fw={600} size="sm">
+                          {ext_meta.label}
+                        </Text>
+                        <Badge size="xs" variant="light" color={enabled ? 'teal' : 'gray'}>
                           {enabled ? 'Aktif' : 'Nonaktif'}
                         </Badge>
                       </Group>

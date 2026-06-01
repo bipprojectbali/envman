@@ -1,8 +1,8 @@
 import { Elysia } from 'elysia'
-import { prisma } from '../../lib/db'
-import { requireSuperAdmin } from '../../lib/auth-middleware'
-import { invalidateCache, invalidateProjectCaches, cacheKeys } from '../../lib/cache'
 import type { ProjectRole } from '../../lib/access'
+import { requireSuperAdmin } from '../../lib/auth-middleware'
+import { cacheKeys, invalidateCache, invalidateProjectCaches } from '../../lib/cache'
+import { prisma } from '../../lib/db'
 import { isValidCapability } from '../../lib/permissions'
 
 // Project-level role input: 'OWNER' | 'EDITOR' | 'VIEWER' | null (null = remove member)
@@ -27,17 +27,26 @@ export const adminUsersRouter = new Elysia()
   // ─── List all users with access summary ──────────────────────────────────────
   .get('/api/envman/admin/users', async ({ request, set }) => {
     const caller = await requireSuperAdmin(request)
-    if (!caller) { set.status = 403; return { error: 'SUPER_ADMIN required' } }
+    if (!caller) {
+      set.status = 403
+      return { error: 'SUPER_ADMIN required' }
+    }
     const users = await prisma.user.findMany({
       where: { deletedAt: null },
       select: {
-        id: true, name: true, email: true, role: true, blocked: true, permissions: true, createdAt: true,
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        blocked: true,
+        permissions: true,
+        createdAt: true,
         _count: { select: { projectMembers: true, envMemberships: true } },
       },
       orderBy: { createdAt: 'desc' },
     })
     return {
-      users: users.map(u => ({
+      users: users.map((u) => ({
         id: u.id,
         name: u.name,
         email: u.email,
@@ -54,17 +63,24 @@ export const adminUsersRouter = new Elysia()
   // ─── User access detail: full project × env matrix ───────────────────────────
   .get('/api/envman/admin/users/:userId/access', async ({ request, params, set }) => {
     const caller = await requireSuperAdmin(request)
-    if (!caller) { set.status = 403; return { error: 'SUPER_ADMIN required' } }
+    if (!caller) {
+      set.status = 403
+      return { error: 'SUPER_ADMIN required' }
+    }
     const user = await prisma.user.findUnique({
       where: { id: params.userId },
       select: { id: true, name: true, email: true, role: true, blocked: true, permissions: true },
     })
-    if (!user) { set.status = 404; return { error: 'User not found' } }
+    if (!user) {
+      set.status = 404
+      return { error: 'User not found' }
+    }
 
     const projects = await prisma.project.findMany({
       where: { deletedAt: null },
       select: {
-        slug: true, name: true,
+        slug: true,
+        name: true,
         members: { where: { userId: params.userId }, select: { role: true } },
         environments: {
           select: {
@@ -77,13 +93,13 @@ export const adminUsersRouter = new Elysia()
       orderBy: { name: 'asc' },
     })
 
-    const matrix = projects.map(p => {
+    const matrix = projects.map((p) => {
       const projectRole = (p.members[0]?.role ?? null) as ProjectRole | null
       return {
         slug: p.slug,
         name: p.name,
         projectRole,
-        environments: p.environments.map(e => {
+        environments: p.environments.map((e) => {
           const envMember = e.members[0]
           // envRole: 'inherit' (no record) | 'denied' (record, role=null) | role string
           let envRole: EnvRoleInput = 'inherit'
@@ -108,12 +124,21 @@ export const adminUsersRouter = new Elysia()
   // ─── Set project-level role (or remove membership) ───────────────────────────
   .put('/api/envman/admin/users/:userId/projects/:slug', async ({ request, params, set }) => {
     const caller = await requireSuperAdmin(request)
-    if (!caller) { set.status = 403; return { error: 'SUPER_ADMIN required' } }
-    const body = await request.json().catch(() => null) as { role?: unknown } | null
-    if (!body || !isValidProjectRole(body.role)) { set.status = 400; return { error: 'role must be OWNER, EDITOR, VIEWER, or null' } }
+    if (!caller) {
+      set.status = 403
+      return { error: 'SUPER_ADMIN required' }
+    }
+    const body = (await request.json().catch(() => null)) as { role?: unknown } | null
+    if (!body || !isValidProjectRole(body.role)) {
+      set.status = 400
+      return { error: 'role must be OWNER, EDITOR, VIEWER, or null' }
+    }
 
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
-    if (!project) { set.status = 404; return { error: 'Project not found' } }
+    if (!project) {
+      set.status = 404
+      return { error: 'Project not found' }
+    }
 
     const targetMember = await prisma.projectMember.findUnique({
       where: { userId_projectId: { userId: params.userId, projectId: project.id } },
@@ -150,19 +175,28 @@ export const adminUsersRouter = new Elysia()
   // ─── Set env-level override (inherit / denied / role) ────────────────────────
   .put('/api/envman/admin/users/:userId/projects/:slug/envs/:envName', async ({ request, params, set }) => {
     const caller = await requireSuperAdmin(request)
-    if (!caller) { set.status = 403; return { error: 'SUPER_ADMIN required' } }
-    const body = await request.json().catch(() => null) as { role?: unknown } | null
+    if (!caller) {
+      set.status = 403
+      return { error: 'SUPER_ADMIN required' }
+    }
+    const body = (await request.json().catch(() => null)) as { role?: unknown } | null
     if (!body || !isValidEnvRole(body.role)) {
       set.status = 400
       return { error: "role must be 'inherit', 'denied', 'OWNER', 'EDITOR', or 'VIEWER'" }
     }
 
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
-    if (!project) { set.status = 404; return { error: 'Project not found' } }
+    if (!project) {
+      set.status = 404
+      return { error: 'Project not found' }
+    }
     const env = await prisma.environment.findUnique({
       where: { projectId_name: { projectId: project.id, name: params.envName } },
     })
-    if (!env) { set.status = 404; return { error: 'Environment not found' } }
+    if (!env) {
+      set.status = 404
+      return { error: 'Environment not found' }
+    }
 
     const existing = await prisma.environmentMember.findUnique({
       where: { userId_environmentId: { userId: params.userId, environmentId: env.id } },
@@ -189,21 +223,27 @@ export const adminUsersRouter = new Elysia()
       })
     }
 
-    await invalidateCache(
-      cacheKeys.projectAccess(params.userId, params.slug),
-      cacheKeys.projectDetail(params.slug),
-    )
+    await invalidateCache(cacheKeys.projectAccess(params.userId, params.slug), cacheKeys.projectDetail(params.slug))
     return { ok: true, role: body.role }
   })
 
   // ─── Set user capability list (SUPER_ADMIN grants) ───────────────────────────
   .put('/api/envman/admin/users/:userId/permissions', async ({ request, params, set }) => {
     const caller = await requireSuperAdmin(request)
-    if (!caller) { set.status = 403; return { error: 'SUPER_ADMIN required' } }
-    const body = await request.json().catch(() => null) as { permissions?: unknown } | null
-    if (!body || !Array.isArray(body.permissions)) { set.status = 400; return { error: 'permissions array required' } }
-    const invalid = body.permissions.filter(p => !isValidCapability(p))
-    if (invalid.length > 0) { set.status = 400; return { error: `Invalid capability: ${invalid.join(', ')}` } }
+    if (!caller) {
+      set.status = 403
+      return { error: 'SUPER_ADMIN required' }
+    }
+    const body = (await request.json().catch(() => null)) as { permissions?: unknown } | null
+    if (!body || !Array.isArray(body.permissions)) {
+      set.status = 400
+      return { error: 'permissions array required' }
+    }
+    const invalid = body.permissions.filter((p) => !isValidCapability(p))
+    if (invalid.length > 0) {
+      set.status = 400
+      return { error: `Invalid capability: ${invalid.join(', ')}` }
+    }
     const permissions = [...new Set(body.permissions as string[])]
     const user = await prisma.user.update({
       where: { id: params.userId },

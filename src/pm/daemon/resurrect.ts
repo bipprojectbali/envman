@@ -6,7 +6,7 @@
 //        Decision: tidak adopt orphan (kehilangan stdout/stderr fd), KILL + respawn.
 
 import { log } from './logger'
-import { isPidAlive, getProcessStartEpoch } from './pidfile'
+import { getProcessStartEpoch, isPidAlive } from './pidfile'
 import type { ProcessManager } from './process-manager'
 import type { PersistedProcess } from './state-store'
 
@@ -44,7 +44,7 @@ export async function resurrectProcesses(
             // Tunggu kernel reap, maksimal 2s
             const deadline = Date.now() + 2000
             while (isPidAlive(proc.lastPid) && Date.now() < deadline) {
-              await new Promise(r => setTimeout(r, 100))
+              await new Promise((r) => setTimeout(r, 100))
             }
             if (isPidAlive(proc.lastPid)) {
               process.kill(proc.lastPid, 'SIGKILL')

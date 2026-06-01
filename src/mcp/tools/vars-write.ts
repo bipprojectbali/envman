@@ -3,19 +3,23 @@
 
 import { z } from 'zod'
 import { apiCall } from '../api-client'
-import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
-import { toErrorResponse } from '../errors'
 import { emitAudit } from '../audit'
-import { SlugRef, EnvName, VarKey } from '../schemas/common'
+import { toErrorResponse } from '../errors'
+import { EnvName, SlugRef, VarKey } from '../schemas/common'
+import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 
-const VarSetInputSchema = z.object({
-  slug: SlugRef,
-  env: EnvName,
-  key: VarKey,
-  value: z.string().describe('Variable value. Plaintext — if isSecret=true, server will encrypt before storage.'),
-  isSecret: z.boolean().default(false)
-    .describe('If true, value is encrypted at rest and masked in lists for VIEWER role.'),
-}).strict()
+const VarSetInputSchema = z
+  .object({
+    slug: SlugRef,
+    env: EnvName,
+    key: VarKey,
+    value: z.string().describe('Variable value. Plaintext — if isSecret=true, server will encrypt before storage.'),
+    isSecret: z
+      .boolean()
+      .default(false)
+      .describe('If true, value is encrypted at rest and masked in lists for VIEWER role.'),
+  })
+  .strict()
 
 const VarSetOutputSchema = z.object({
   ok: z.boolean(),
@@ -24,11 +28,13 @@ const VarSetOutputSchema = z.object({
   created: z.boolean().describe('True if newly created, false if updated existing'),
 })
 
-const VarDeleteInputSchema = z.object({
-  slug: SlugRef,
-  env: EnvName,
-  key: VarKey,
-}).strict()
+const VarDeleteInputSchema = z
+  .object({
+    slug: SlugRef,
+    env: EnvName,
+    key: VarKey,
+  })
+  .strict()
 
 const VarDeleteOutputSchema = z.object({
   ok: z.boolean(),
@@ -109,7 +115,8 @@ export const varsWriteModule: ToolModule = {
             resource: `Var ${parsed.slug}:${parsed.env}:${parsed.key}`,
           })
           emitAudit(ctx.cfg, 'MCP_VAR_SET', {
-            slug: parsed.slug, env: parsed.env,
+            slug: parsed.slug,
+            env: parsed.env,
             detail: `key=${parsed.key} isSecret=${parsed.isSecret}`,
           })
           // Server doesn't distinguish create vs update — assume update if API returns 200.
@@ -118,7 +125,7 @@ export const varsWriteModule: ToolModule = {
             ok: true,
             key: res.var.key,
             isSecret: res.var.isSecret,
-            created: false,  // unknown from current server response
+            created: false, // unknown from current server response
           })
         } catch (e) {
           return toErrorResponse(e)
@@ -144,7 +151,9 @@ export const varsWriteModule: ToolModule = {
             resource: `Var ${parsed.slug}:${parsed.env}:${parsed.key}`,
           })
           emitAudit(ctx.cfg, 'MCP_VAR_DELETED', {
-            slug: parsed.slug, env: parsed.env, detail: `key=${parsed.key}`,
+            slug: parsed.slug,
+            env: parsed.env,
+            detail: `key=${parsed.key}`,
           })
           return jsonResponse({ ok: true, key: parsed.key })
         } catch (e) {

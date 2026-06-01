@@ -66,7 +66,7 @@ export class LogTailer {
     const id = crypto.randomUUID()
     const encoder = new TextEncoder()
 
-    let pushFn: (line: LogLine) => void = () => {}
+    let _pushFn: (line: LogLine) => void = () => {}
     let close: () => void = () => {}
 
     const stream = new ReadableStream<Uint8Array>({
@@ -82,10 +82,12 @@ export class LogTailer {
           truncated: false,
         }
         this.subscribers.set(id, sub)
-        pushFn = sub.push
+        _pushFn = sub.push
         close = () => {
           this.subscribers.delete(id)
-          try { controller.close() } catch {}
+          try {
+            controller.close()
+          } catch {}
         }
 
         // Keep-alive ping setiap 15s (proxy may drop idle conn at 30-60s)
@@ -142,7 +144,7 @@ export async function tailFile(path: string, lines: number = 100): Promise<strin
   let pos = totalSize
   let collected = ''
   let lineCount = 0
-  const targetCount = lines + 1  // butuh extra untuk handle trailing line
+  const targetCount = lines + 1 // butuh extra untuk handle trailing line
 
   while (pos > 0 && lineCount < targetCount) {
     const readSize = Math.min(CHUNK, pos)

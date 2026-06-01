@@ -1,48 +1,65 @@
 // PM daemon write tools: pm_start, pm_stop, pm_restart, pm_delete, pm_sync,
 // pm_reset, pm_daemon_start, pm_daemon_stop.
 
+import { spawnSync } from 'node:child_process'
 import { z } from 'zod'
-import { spawnSync } from 'child_process'
 import { DaemonClient, DaemonNotRunningError } from '../../pm/cli/client'
-import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
-import { toErrorResponse, McpToolError } from '../errors'
 import { emitAudit } from '../audit'
+import { McpToolError, toErrorResponse } from '../errors'
+import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
-const ProcessNameSchema = z.string()
-  .min(1).max(64)
+const ProcessNameSchema = z
+  .string()
+  .min(1)
+  .max(64)
   .regex(/^[a-zA-Z0-9_-]+$/, 'Process name must be alphanumeric with -/_ only')
   .describe('Process name (unique within daemon).')
 
-const EnvSourceSchema = z.object({
-  type: z.enum(['envman', 'file']),
-  ref: z.string().describe('"slug:env" for envman, or file path for file'),
-}).strict()
+const EnvSourceSchema = z
+  .object({
+    type: z.enum(['envman', 'file']),
+    ref: z.string().describe('"slug:env" for envman, or file path for file'),
+  })
+  .strict()
 
-const PmStartInputSchema = z.object({
-  name: ProcessNameSchema,
-  command: z.array(z.string()).min(1).describe('Argv to spawn — first element is the binary.'),
-  cwd: z.string().optional().describe('Working directory (default: current daemon CWD).'),
-  staticEnv: z.record(z.string(), z.string()).optional()
-    .describe('Static env vars as KEY=value object. NOT secrets — visible in pm describe.'),
-  envSources: z.array(EnvSourceSchema).optional()
-    .describe('Sources to fetch env from. envman type: "slug:env". file type: path.'),
-}).strict()
+const PmStartInputSchema = z
+  .object({
+    name: ProcessNameSchema,
+    command: z.array(z.string()).min(1).describe('Argv to spawn — first element is the binary.'),
+    cwd: z.string().optional().describe('Working directory (default: current daemon CWD).'),
+    staticEnv: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe('Static env vars as KEY=value object. NOT secrets — visible in pm describe.'),
+    envSources: z
+      .array(EnvSourceSchema)
+      .optional()
+      .describe('Sources to fetch env from. envman type: "slug:env". file type: path.'),
+  })
+  .strict()
 
-const ProcessSnapshotSchema = z.object({
-  id: z.string(), name: z.string(), command: z.array(z.string()),
-  pid: z.number().nullable(), status: z.string(),
-}).passthrough()
+const ProcessSnapshotSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    command: z.array(z.string()),
+    pid: z.number().nullable(),
+    status: z.string(),
+  })
+  .passthrough()
 
 const PmStartOutputSchema = z.object({ process: ProcessSnapshotSchema })
 
 const PmByNameSchema = z.object({ name: ProcessNameSchema }).strict()
 
-const PmSyncInputSchema = z.object({
-  name: z.string().optional().describe('Sync only one process by name; omit to sync all.'),
-  dryRun: z.boolean().default(false).describe('Compute diff but do not restart.'),
-}).strict()
+const PmSyncInputSchema = z
+  .object({
+    name: z.string().optional().describe('Sync only one process by name; omit to sync all.'),
+    dryRun: z.boolean().default(false).describe('Compute diff but do not restart.'),
+  })
+  .strict()
 
 const PmSyncOutputSchema = z.object({
   checked: z.number(),
@@ -194,7 +211,12 @@ function daemonNotRunningError(): ToolResponse {
   }
 }
 
-async function callDaemon<T>(c: DaemonClient, method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {
+async function callDaemon<T>(
+  c: DaemonClient,
+  method: 'GET' | 'POST' | 'DELETE',
+  path: string,
+  body?: unknown,
+): Promise<T> {
   try {
     if (method === 'GET') return await c.get<T>(path)
     if (method === 'POST') return await c.post<T>(path, body ?? {})
@@ -209,8 +231,15 @@ async function callDaemon<T>(c: DaemonClient, method: 'GET' | 'POST' | 'DELETE',
 
 // ─── Module ───────────────────────────────────────────────────────────────────
 
-interface OneResponse { process: Record<string, unknown> }
-interface SyncResponse { checked: number; updated: string[]; unchanged: string[]; failed: { name: string; error: string }[] }
+interface OneResponse {
+  process: Record<string, unknown>
+}
+interface SyncResponse {
+  checked: number
+  updated: string[]
+  unchanged: string[]
+  failed: { name: string; error: string }[]
+}
 
 export const pmWriteModule: ToolModule = {
   register(server, ctx) {

@@ -18,17 +18,9 @@ import { modals } from '@mantine/modals'
 import { useMutation } from '@tanstack/react-query'
 import { createLazyFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { TbAlertTriangle, TbCheck, TbCloudDownload, TbCopy, TbDatabase, TbKey, TbRefresh } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
-import {
-  TbAlertTriangle,
-  TbCheck,
-  TbCloudDownload,
-  TbCopy,
-  TbDatabase,
-  TbKey,
-  TbRefresh,
-} from 'react-icons/tb'
 
 export const Route = createLazyFileRoute('/envmanager/database')({
   component: DatabasePage,
@@ -45,15 +37,19 @@ function DatabasePage() {
           <TbDatabase size={20} />
         </ThemeIcon>
         <div>
-          <Text fw={700} size="lg">Database Sync</Text>
-          <Text size="sm" c="dimmed">Kloning data dari instance remote (staging) ke local dev.</Text>
+          <Text fw={700} size="lg">
+            Database Sync
+          </Text>
+          <Text size="sm" c="dimmed">
+            Kloning data dari instance remote (staging) ke local dev.
+          </Text>
         </div>
       </Group>
 
       <Alert icon={<TbAlertTriangle size={18} />} color="yellow" variant="light">
         <Text size="sm">
-          Operasi ini <b>destructive</b>: data local akan ditimpa total oleh data dari remote.
-          Pakai hanya untuk debugging dengan real data. Setelah sync, kamu perlu login ulang.
+          Operasi ini <b>destructive</b>: data local akan ditimpa total oleh data dari remote. Pakai hanya untuk
+          debugging dengan real data. Setelah sync, kamu perlu login ulang.
         </Text>
       </Alert>
 
@@ -83,7 +79,7 @@ function GenerateTokenSection() {
   useEffect(() => {
     if (!tokenResp) return
     const id = setInterval(() => {
-      setRemaining(r => {
+      setRemaining((r) => {
         if (r <= 1) {
           setTokenResp(null)
           return 0
@@ -95,21 +91,30 @@ function GenerateTokenSection() {
   }, [tokenResp])
 
   return (
-    <Box p="md" >
+    <Box p="md">
       <Stack gap="sm">
         <Group gap="xs">
           <ThemeIcon size={28} variant="light" color="primary" radius="md">
             <TbKey size={14} />
           </ThemeIcon>
           <Text fw={600}>Generate Sync Token</Text>
-          <Badge size="xs" color="gray" variant="light">jalankan di STAGING</Badge>
+          <Badge size="xs" color="gray" variant="light">
+            jalankan di STAGING
+          </Badge>
         </Group>
         <Text size="xs" c="dimmed">
-          Token berlaku 5 menit dan hanya bisa dipakai sekali. Setelah generate, copy
-          dan paste di section "Sync From Remote" pada local dev.
+          Token berlaku 5 menit dan hanya bisa dipakai sekali. Setelah generate, copy dan paste di section "Sync From
+          Remote" pada local dev.
         </Text>
         {tokenResp ? (
-          <Box p="sm" bg="var(--mantine-color-default-hover)" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+          <Box
+            p="sm"
+            bg="var(--mantine-color-default-hover)"
+            style={{
+              border: '1px solid var(--mantine-color-default-border)',
+              borderRadius: 'var(--mantine-radius-md)',
+            }}
+          >
             <Stack gap="xs">
               <Group justify="space-between" wrap="nowrap">
                 <Code style={{ flex: 1, wordBreak: 'break-all' }}>{tokenResp.token}</Code>
@@ -195,14 +200,16 @@ function SyncFromSection() {
   }
 
   return (
-    <Box p="md" >
+    <Box p="md">
       <Stack gap="sm">
         <Group gap="xs">
           <ThemeIcon size={28} variant="light" color="teal" radius="md">
             <TbCloudDownload size={14} />
           </ThemeIcon>
           <Text fw={600}>Sync From Remote</Text>
-          <Badge size="xs" color="gray" variant="light">jalankan di LOCAL DEV</Badge>
+          <Badge size="xs" color="gray" variant="light">
+            jalankan di LOCAL DEV
+          </Badge>
         </Group>
         <Text size="xs" c="dimmed">
           Paste URL server staging dan token yang sudah di-generate di section atas (di instance staging).
@@ -233,13 +240,22 @@ function SyncFromSection() {
         </Button>
 
         {result && (
-          <Box p="sm" mt="xs" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+          <Box
+            p="sm"
+            mt="xs"
+            style={{
+              border: '1px solid var(--mantine-color-default-border)',
+              borderRadius: 'var(--mantine-radius-md)',
+            }}
+          >
             <Stack gap="xs">
               <Group gap="xs">
                 <ThemeIcon size={20} color="teal" variant="light" radius="xl">
                   <TbCheck size={12} />
                 </ThemeIcon>
-                <Text size="sm" fw={600}>Sync berhasil dalam {result.durationMs}ms</Text>
+                <Text size="sm" fw={600}>
+                  Sync berhasil dalam {result.durationMs}ms
+                </Text>
               </Group>
               <Table withTableBorder withColumnBorders fz="xs" striped>
                 <Table.Thead>
@@ -251,7 +267,9 @@ function SyncFromSection() {
                 <Table.Tbody>
                   {Object.entries(result.tables).map(([t, n]) => (
                     <Table.Tr key={t}>
-                      <Table.Td><Code>{t}</Code></Table.Td>
+                      <Table.Td>
+                        <Code>{t}</Code>
+                      </Table.Td>
                       <Table.Td ta="right">{n}</Table.Td>
                     </Table.Tr>
                   ))}

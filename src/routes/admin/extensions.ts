@@ -1,6 +1,6 @@
 import { Elysia } from 'elysia'
+import { forbidden, requireAuth, requireSuperAdmin, unauthorized } from '../../lib/auth-middleware'
 import { redis } from '../../lib/redis'
-import { requireAuth, requireSuperAdmin, unauthorized, forbidden } from '../../lib/auth-middleware'
 
 const REDIS_KEY = 'app:extensions'
 

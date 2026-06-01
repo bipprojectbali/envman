@@ -6,12 +6,12 @@
 //       5 crash dalam 60s = quarantined, exit dari quarantine = manual reset
 
 export interface BackoffConfig {
-  baseDelayMs: number          // default 1000
-  capDelayMs: number           // default 60_000
-  minUptimeMs: number          // 1000 = process harus bertahan 1s untuk dianggap stable
-  resetThresholdMs: number     // 10_000 = setelah uptime > 10s, reset counter
-  windowDurationMs: number     // 60_000 = sliding window untuk crash-loop detection
-  maxRestartsInWindow: number  // 5 = max restart dalam window sebelum quarantine
+  baseDelayMs: number // default 1000
+  capDelayMs: number // default 60_000
+  minUptimeMs: number // 1000 = process harus bertahan 1s untuk dianggap stable
+  resetThresholdMs: number // 10_000 = setelah uptime > 10s, reset counter
+  windowDurationMs: number // 60_000 = sliding window untuk crash-loop detection
+  maxRestartsInWindow: number // 5 = max restart dalam window sebelum quarantine
 }
 
 export const DEFAULT_BACKOFF: BackoffConfig = {
@@ -24,8 +24,8 @@ export const DEFAULT_BACKOFF: BackoffConfig = {
 }
 
 export interface BackoffState {
-  restartCount: number       // total restart sejak last reset (atau sejak start)
-  restartWindow: number[]    // timestamps (epoch ms) dalam window
+  restartCount: number // total restart sejak last reset (atau sejak start)
+  restartWindow: number[] // timestamps (epoch ms) dalam window
 }
 
 export function newBackoffState(): BackoffState {
@@ -38,7 +38,7 @@ export function newBackoffState(): BackoffState {
  */
 export function computeDelayMs(restartCount: number, cfg: BackoffConfig = DEFAULT_BACKOFF): number {
   if (restartCount <= 0) return 0
-  const exp = Math.pow(2, restartCount - 1)
+  const exp = 2 ** (restartCount - 1)
   return Math.min(cfg.capDelayMs, cfg.baseDelayMs * exp)
 }
 
@@ -66,7 +66,7 @@ export function recordExit(
 
   // Trim window — buang timestamp lama di luar windowDurationMs
   const cutoff = now - cfg.windowDurationMs
-  state.restartWindow = state.restartWindow.filter(t => t >= cutoff)
+  state.restartWindow = state.restartWindow.filter((t) => t >= cutoff)
 
   if (state.restartWindow.length >= cfg.maxRestartsInWindow) {
     return 'quarantine'

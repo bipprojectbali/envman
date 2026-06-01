@@ -4,13 +4,13 @@
 //   R1 ✓ Per-name lock untuk prevent concurrent start dengan nama sama
 //   R2 ✓ State machine container handles stop-during-start
 
-import { randomUUID } from 'crypto'
-import { join } from 'path'
-import { mkdirSync, existsSync } from 'fs'
-import { log } from './logger'
-import { ProcessContainer, type ProcessConfig, type ProcessSnapshot } from './process-container'
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { LogRotator } from './log-rotator'
 import type { LogWriter } from './log-writer'
+import { log } from './logger'
+import { type ProcessConfig, ProcessContainer, type ProcessSnapshot } from './process-container'
 import type { PersistedProcess, PersistedState, StateStore } from './state-store'
 import { STATE_SCHEMA_VERSION } from './state-store'
 
@@ -25,9 +25,9 @@ export interface ProcessManagerOptions {
 
 export class ProcessManager {
   private byId = new Map<string, ProcessContainer>()
-  private byName = new Map<string, string>()  // name → id
+  private byName = new Map<string, string>() // name → id
   private logRotator: LogRotator | null = null
-  private logWriters = new Map<string, LogWriter>()  // shared dengan LogRotator
+  private logWriters = new Map<string, LogWriter>() // shared dengan LogRotator
 
   constructor(private readonly opts: ProcessManagerOptions) {
     if (!existsSync(opts.logsDir)) {
@@ -55,7 +55,7 @@ export class ProcessManager {
    * Serialize current state untuk persistence.
    */
   getPersistedState(): PersistedState {
-    const processes: PersistedProcess[] = [...this.byId.values()].map(c => {
+    const processes: PersistedProcess[] = [...this.byId.values()].map((c) => {
       const snap = c.snapshot()
       return {
         id: c.config.id,
@@ -108,10 +108,7 @@ export class ProcessManager {
       throw new ApiError('BAD_REQUEST', 'command is empty')
     }
     if (!/^[a-zA-Z0-9_-]+$/.test(input.name)) {
-      throw new ApiError(
-        'BAD_REQUEST',
-        'name must be alphanumeric with - and _ only',
-      )
+      throw new ApiError('BAD_REQUEST', 'name must be alphanumeric with - and _ only')
     }
 
     const id = randomUUID()
@@ -142,7 +139,9 @@ export class ProcessManager {
 
   private emitAudit(action: string, info: { processId?: string; processName?: string; detail?: string }): void {
     if (!this.opts.onAudit) return
-    try { this.opts.onAudit({ action, ...info }) } catch {}
+    try {
+      this.opts.onAudit({ action, ...info })
+    } catch {}
   }
 
   /**
@@ -203,7 +202,7 @@ export class ProcessManager {
   }
 
   list(): ProcessSnapshot[] {
-    return [...this.byId.values()].map(c => c.snapshot())
+    return [...this.byId.values()].map((c) => c.snapshot())
   }
 
   count(): number {
@@ -217,7 +216,7 @@ export class ProcessManager {
     this.stopRotator()
     const containers = [...this.byId.values()]
     log.info('shutting down all processes', { count: containers.length })
-    await Promise.allSettled(containers.map(c => c.destroy()))
+    await Promise.allSettled(containers.map((c) => c.destroy()))
     this.byId.clear()
     this.byName.clear()
     this.logWriters.clear()
@@ -228,7 +227,10 @@ export class ProcessManager {
  * API-friendly error dengan kode + message.
  */
 export class ApiError extends Error {
-  constructor(public code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST' | 'INTERNAL', message: string) {
+  constructor(
+    public code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST' | 'INTERNAL',
+    message: string,
+  ) {
     super(message)
   }
 }

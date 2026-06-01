@@ -4,56 +4,70 @@
 
 import { z } from 'zod'
 import { DaemonClient, DaemonNotRunningError } from '../../pm/cli/client'
+import { McpToolError, toErrorResponse } from '../errors'
 import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
-import { toErrorResponse, McpToolError } from '../errors'
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const PmDaemonStatusInputSchema = z.object({}).strict()
-const PmDaemonStatusOutputSchema = z.object({
-  uptimeMs: z.number(),
-  pid: z.number(),
-  version: z.string(),
-  processCount: z.number(),
-  startedAt: z.number(),
-  diskFull: z.boolean(),
-}).passthrough()
+const PmDaemonStatusOutputSchema = z
+  .object({
+    uptimeMs: z.number(),
+    pid: z.number(),
+    version: z.string(),
+    processCount: z.number(),
+    startedAt: z.number(),
+    diskFull: z.boolean(),
+  })
+  .passthrough()
 
 const PmListInputSchema = z.object({}).strict()
 
-const ProcessSnapshotSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  command: z.array(z.string()),
-  cwd: z.string(),
-  pid: z.number().nullable(),
-  status: z.string(),
-  startedAt: z.number().nullable(),
-  uptimeMs: z.number(),
-  restartCount: z.number(),
-  lastExitCode: z.number().nullable(),
-  lastError: z.string().nullable(),
-}).passthrough()
+const ProcessSnapshotSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    command: z.array(z.string()),
+    cwd: z.string(),
+    pid: z.number().nullable(),
+    status: z.string(),
+    startedAt: z.number().nullable(),
+    uptimeMs: z.number(),
+    restartCount: z.number(),
+    lastExitCode: z.number().nullable(),
+    lastError: z.string().nullable(),
+  })
+  .passthrough()
 
 const PmListOutputSchema = z.object({
   processes: z.array(ProcessSnapshotSchema),
   count: z.number().int(),
 })
 
-const PmDescribeInputSchema = z.object({
-  name: z.string().min(1).max(64)
-    .describe('Process name as shown in pm_list'),
-}).strict()
+const PmDescribeInputSchema = z
+  .object({
+    name: z.string().min(1).max(64).describe('Process name as shown in pm_list'),
+  })
+  .strict()
 
 const PmDescribeOutputSchema = z.object({ process: ProcessSnapshotSchema })
 
-const PmLogsInputSchema = z.object({
-  name: z.string().min(1).max(64).describe('Process name'),
-  lines: z.number().int().min(1).max(1000).default(100)
-    .describe('Number of recent lines to return (default 100, max 1000)'),
-  stream: z.enum(['out', 'err', 'both']).default('both')
-    .describe('Which stream(s) to include: stdout, stderr, or both'),
-}).strict()
+const PmLogsInputSchema = z
+  .object({
+    name: z.string().min(1).max(64).describe('Process name'),
+    lines: z
+      .number()
+      .int()
+      .min(1)
+      .max(1000)
+      .default(100)
+      .describe('Number of recent lines to return (default 100, max 1000)'),
+    stream: z
+      .enum(['out', 'err', 'both'])
+      .default('both')
+      .describe('Which stream(s) to include: stdout, stderr, or both'),
+  })
+  .strict()
 
 const PmLogsOutputSchema = z.object({
   out: z.array(z.string()),
@@ -157,7 +171,12 @@ function buildDaemonClient(): DaemonClient | null {
 function daemonNotRunningError(): ToolResponse {
   return {
     isError: true,
-    content: [{ type: 'text', text: 'Error: pm daemon is not running. Start it with `envman pm daemon start`, or use pm_daemon_start tool (--write mode).' }],
+    content: [
+      {
+        type: 'text',
+        text: 'Error: pm daemon is not running. Start it with `envman pm daemon start`, or use pm_daemon_start tool (--write mode).',
+      },
+    ],
   }
 }
 
@@ -176,10 +195,24 @@ async function callDaemon<T>(client: DaemonClient, method: 'GET' | 'POST' | 'DEL
 
 // ─── Module ───────────────────────────────────────────────────────────────────
 
-interface DaemonHealth { uptimeMs: number; pid: number; version: string; processCount: number; startedAt: number; diskFull: boolean }
-interface ListResponse { processes: Array<Record<string, unknown>> }
-interface OneResponse { process: Record<string, unknown> }
-interface LogsResponse { out: string[]; err: string[] }
+interface DaemonHealth {
+  uptimeMs: number
+  pid: number
+  version: string
+  processCount: number
+  startedAt: number
+  diskFull: boolean
+}
+interface ListResponse {
+  processes: Array<Record<string, unknown>>
+}
+interface OneResponse {
+  process: Record<string, unknown>
+}
+interface LogsResponse {
+  out: string[]
+  err: string[]
+}
 
 export const pmReadonlyModule: ToolModule = {
   register(server) {
@@ -261,7 +294,11 @@ export const pmReadonlyModule: ToolModule = {
         const client = buildDaemonClient()
         if (!client) return daemonNotRunningError()
         try {
-          const res = await callDaemon<LogsResponse>(client, 'GET', `/v1/process/${encodeURIComponent(parsed.name)}/logs/tail`)
+          const res = await callDaemon<LogsResponse>(
+            client,
+            'GET',
+            `/v1/process/${encodeURIComponent(parsed.name)}/logs/tail`,
+          )
           let out = res.out
           let err = res.err
           if (parsed.stream === 'out') err = []

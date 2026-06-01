@@ -1,4 +1,4 @@
-import { Box, Container, Stack, Text, ThemeIcon, Title } from '@mantine/core'
+import { Container, Stack, Text, ThemeIcon, Title } from '@mantine/core'
 import type { ComponentType } from 'react'
 
 export function PlaceholderPanel({

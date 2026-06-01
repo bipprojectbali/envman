@@ -2,40 +2,54 @@
 
 import { z } from 'zod'
 import { apiCall } from '../api-client'
-import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
-import { toErrorResponse } from '../errors'
 import { emitAudit } from '../audit'
-import { SlugRef, AliasName } from '../schemas/common'
+import { toErrorResponse } from '../errors'
+import { AliasName, SlugRef } from '../schemas/common'
+import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 
-const AliasCreateInputSchema = z.object({
-  slug: SlugRef,
-  name: AliasName.describe('Alias name — will be slugified server-side.'),
-  args: z.string().min(1, 'args must not be empty')
-    .describe('CLI args this alias expands to (e.g., "-e myapp:prod -- bash myapp:scripts/deploy.sh"). Use canonical "slug:prefix/file.ext" syntax for file refs — legacy "files:" prefix is deprecated.'),
-  description: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-}).strict()
+const AliasCreateInputSchema = z
+  .object({
+    slug: SlugRef,
+    name: AliasName.describe('Alias name — will be slugified server-side.'),
+    args: z
+      .string()
+      .min(1, 'args must not be empty')
+      .describe(
+        'CLI args this alias expands to (e.g., "-e myapp:prod -- bash myapp:scripts/deploy.sh"). Use canonical "slug:prefix/file.ext" syntax for file refs — legacy "files:" prefix is deprecated.',
+      ),
+    description: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+  })
+  .strict()
 
 const AliasOutputSchema = z.object({
-  alias: z.object({
-    id: z.string(), name: z.string(), args: z.string(),
-    description: z.string().nullable().optional(),
-    tags: z.array(z.string()),
-  }).passthrough(),
+  alias: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      args: z.string(),
+      description: z.string().nullable().optional(),
+      tags: z.array(z.string()),
+    })
+    .passthrough(),
 })
 
-const AliasUpdateInputSchema = z.object({
-  slug: SlugRef,
-  name: AliasName,
-  args: z.string().min(1).optional(),
-  description: z.string().nullable().optional(),
-  tags: z.array(z.string()).optional(),
-}).strict()
+const AliasUpdateInputSchema = z
+  .object({
+    slug: SlugRef,
+    name: AliasName,
+    args: z.string().min(1).optional(),
+    description: z.string().nullable().optional(),
+    tags: z.array(z.string()).optional(),
+  })
+  .strict()
 
-const AliasDeleteInputSchema = z.object({
-  slug: SlugRef,
-  name: AliasName,
-}).strict()
+const AliasDeleteInputSchema = z
+  .object({
+    slug: SlugRef,
+    name: AliasName,
+  })
+  .strict()
 
 const AliasDeleteOutputSchema = z.object({ ok: z.boolean(), name: z.string() })
 
@@ -119,11 +133,15 @@ export const aliasesWriteModule: ToolModule = {
       async (args): Promise<ToolResponse> => {
         try {
           const p = AliasCreateInputSchema.parse(args)
-          const res = await apiCall<AliasResponse>(ctx.cfg, `/api/envman/projects/${encodeURIComponent(p.slug)}/aliases`, {
-            method: 'POST',
-            body: { name: p.name, args: p.args, description: p.description, tags: p.tags ?? [] },
-            resource: `Alias ${p.slug}:${p.name}`,
-          })
+          const res = await apiCall<AliasResponse>(
+            ctx.cfg,
+            `/api/envman/projects/${encodeURIComponent(p.slug)}/aliases`,
+            {
+              method: 'POST',
+              body: { name: p.name, args: p.args, description: p.description, tags: p.tags ?? [] },
+              resource: `Alias ${p.slug}:${p.name}`,
+            },
+          )
           emitAudit(ctx.cfg, 'MCP_ALIAS_CREATED', { slug: p.slug, detail: `name=${p.name}` })
           return jsonResponse({ alias: res.alias as unknown as Record<string, unknown> })
         } catch (e) {
@@ -173,10 +191,14 @@ export const aliasesWriteModule: ToolModule = {
       async (args): Promise<ToolResponse> => {
         try {
           const p = AliasDeleteInputSchema.parse(args)
-          await apiCall(ctx.cfg, `/api/envman/projects/${encodeURIComponent(p.slug)}/aliases/${encodeURIComponent(p.name)}`, {
-            method: 'DELETE',
-            resource: `Alias ${p.slug}:${p.name}`,
-          })
+          await apiCall(
+            ctx.cfg,
+            `/api/envman/projects/${encodeURIComponent(p.slug)}/aliases/${encodeURIComponent(p.name)}`,
+            {
+              method: 'DELETE',
+              resource: `Alias ${p.slug}:${p.name}`,
+            },
+          )
           emitAudit(ctx.cfg, 'MCP_ALIAS_DELETED', { slug: p.slug, detail: `name=${p.name}` })
           return jsonResponse({ ok: true, name: p.name })
         } catch (e) {

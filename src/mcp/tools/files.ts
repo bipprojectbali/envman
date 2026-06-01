@@ -2,38 +2,49 @@
 
 import { z } from 'zod'
 import { apiCall } from '../api-client'
-import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 import { toErrorResponse } from '../errors'
 import { SlugRef } from '../schemas/common'
+import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 
-const FilesListInputSchema = z.object({
-  slug: SlugRef,
-}).strict()
+const FilesListInputSchema = z
+  .object({
+    slug: SlugRef,
+  })
+  .strict()
 
-const FileSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  description: z.string().nullable().optional(),
-  prefix: z.string().nullable().optional(),
-  tags: z.array(z.string()),
-  files: z.array(z.object({
-    filename: z.string(),
-    language: z.string().optional(),
-  }).passthrough()),
-}).passthrough()
+const FileSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().nullable().optional(),
+    prefix: z.string().nullable().optional(),
+    tags: z.array(z.string()),
+    files: z.array(
+      z
+        .object({
+          filename: z.string(),
+          language: z.string().optional(),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough()
 
 const FilesListOutputSchema = z.object({
   files: z.array(FileSchema),
   count: z.number().int(),
 })
 
-const FileResolveInputSchema = z.object({
-  slug: SlugRef,
-  prefix: z.string().min(1).max(128)
-    .describe('Prefix slug of the file entry (e.g., "deploy", "migrate")'),
-  filename: z.string().optional()
-    .describe('Specific filename if entry has multiple files (e.g., "main.sh"). Omit if entry has exactly one file.'),
-}).strict()
+const FileResolveInputSchema = z
+  .object({
+    slug: SlugRef,
+    prefix: z.string().min(1).max(128).describe('Prefix slug of the file entry (e.g., "deploy", "migrate")'),
+    filename: z
+      .string()
+      .optional()
+      .describe('Specific filename if entry has multiple files (e.g., "main.sh"). Omit if entry has exactly one file.'),
+  })
+  .strict()
 
 const FileResolveOutputSchema = z.object({
   content: z.string(),
@@ -86,7 +97,9 @@ ERRORS:
 NOTES:
   - Returned content may be large — use vars_export pattern of restraint when previewing.`
 
-interface FilesListResponse { files: Array<Record<string, unknown>> }
+interface FilesListResponse {
+  files: Array<Record<string, unknown>>
+}
 interface FileResolveResponse {
   content: string
   filename: string
@@ -137,7 +150,10 @@ export const filesReadModule: ToolModule = {
           const res = await apiCall<FileResolveResponse>(
             ctx.cfg,
             `/api/envman/projects/${encodeURIComponent(parsed.slug)}/files/resolve?${qs}`,
-            { resource: `File ${parsed.slug}:${parsed.prefix}${parsed.filename ? '/' + parsed.filename : ''}`, notFoundHint: 'Use files_list to see prefixes.' },
+            {
+              resource: `File ${parsed.slug}:${parsed.prefix}${parsed.filename ? `/${parsed.filename}` : ''}`,
+              notFoundHint: 'Use files_list to see prefixes.',
+            },
           )
           return jsonResponse({
             content: res.content,

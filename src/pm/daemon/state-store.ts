@@ -6,13 +6,7 @@
 //   S3 ✓ Corrupt file → fallback ke .bak; both corrupt → REFUSE start
 //   S4 ✓ Schema version field, migration chain
 
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  renameSync,
-  unlinkSync,
-} from 'fs'
+import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { log } from './logger'
 
 // Current schema version. Bump kalau struct ProcessRecord berubah breaking.
@@ -48,13 +42,16 @@ const EMPTY_STATE: PersistedState = {
 }
 
 export class StateStoreCorruptError extends Error {
-  constructor(public readonly mainError: string, public readonly backupError: string) {
+  constructor(
+    public readonly mainError: string,
+    public readonly backupError: string,
+  ) {
     super(
       `State files corrupt. Daemon REFUSING to start with empty state ` +
-      `(would silently lose all processes).\n` +
-      `  Main: ${mainError}\n` +
-      `  Backup: ${backupError}\n` +
-      `Fix: edit ~/.config/envman/run/processes.json manually atau delete jika OK kehilangan list.`,
+        `(would silently lose all processes).\n` +
+        `  Main: ${mainError}\n` +
+        `  Backup: ${backupError}\n` +
+        `Fix: edit ~/.config/envman/run/processes.json manually atau delete jika OK kehilangan list.`,
     )
   }
 }
@@ -76,9 +73,7 @@ function migrate(raw: any): PersistedState {
 
   // Future: if (version < 2) raw = migrateV1ToV2(raw)
   if (version > STATE_SCHEMA_VERSION) {
-    throw new Error(
-      `state version ${version} > supported ${STATE_SCHEMA_VERSION} — please upgrade daemon`,
-    )
+    throw new Error(`state version ${version} > supported ${STATE_SCHEMA_VERSION} — please upgrade daemon`)
   }
 
   return {
@@ -105,8 +100,7 @@ function validateProcess(raw: any): PersistedProcess {
     logErrPath: raw.logErrPath,
     options: raw.options,
     lastPid: typeof raw.lastPid === 'number' ? raw.lastPid : null,
-    lastStartEpochMs:
-      typeof raw.lastStartEpochMs === 'number' ? raw.lastStartEpochMs : null,
+    lastStartEpochMs: typeof raw.lastStartEpochMs === 'number' ? raw.lastStartEpochMs : null,
   }
 }
 
@@ -200,7 +194,9 @@ export class StateStore {
       renameSync(tmpPath, this.path)
     } catch (e: any) {
       // Cleanup tmp jika gagal
-      try { unlinkSync(tmpPath) } catch {}
+      try {
+        unlinkSync(tmpPath)
+      } catch {}
       log.error('state rename failed', { error: e.message })
       throw e
     }

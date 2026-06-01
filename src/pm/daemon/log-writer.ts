@@ -8,15 +8,15 @@
 //   L7 ✓ Mode 0640 saat create (owner rw, group r).
 //   L6 ✓ ENOSPC detection — set disk full flag, hentikan write.
 
-import { openSync, closeSync, writeSync, statSync, existsSync } from 'fs'
+import { closeSync, existsSync, openSync, statSync, writeSync } from 'node:fs'
 import { log } from './logger'
 
 /** Callback dipanggil setiap line BARU di-write ke disk (untuk tailer). */
 export type LineHook = (line: string) => void
 
 export interface LogWriterOptions {
-  outPath: string                // ~/.config/envman/run/logs/<name>-<id>.out.log
-  errPath: string                // dan .err.log
+  outPath: string // ~/.config/envman/run/logs/<name>-<id>.out.log
+  errPath: string // dan .err.log
   /** Callback per-line untuk subscribe (tailer); optional */
   onOutLine?: LineHook
   onErrLine?: LineHook
@@ -76,7 +76,7 @@ export class LogWriter {
     // Append to remainder, split by \n
     const combined = (stream === 'out' ? this.outRemainder : this.errRemainder) + chunk
     const parts = combined.split('\n')
-    const newRemainder = parts.pop() ?? ''  // last element = partial atau ''
+    const newRemainder = parts.pop() ?? '' // last element = partial atau ''
     if (stream === 'out') this.outRemainder = newRemainder
     else this.errRemainder = newRemainder
 
@@ -86,7 +86,7 @@ export class LogWriter {
     const hook = stream === 'out' ? this.opts.onOutLine : this.opts.onErrLine
     for (const line of parts) {
       try {
-        writeSync(fd, line + '\n')
+        writeSync(fd, `${line}\n`)
         if (hook) hook(line)
       } catch (e: any) {
         if (e.code === 'ENOSPC') {
@@ -110,14 +110,14 @@ export class LogWriter {
     if (this.closed) return
     if (this.outRemainder.length > 0 && this.outFd !== null) {
       try {
-        writeSync(this.outFd, this.outRemainder + '\n')
+        writeSync(this.outFd, `${this.outRemainder}\n`)
         if (this.opts.onOutLine) this.opts.onOutLine(this.outRemainder)
       } catch {}
       this.outRemainder = ''
     }
     if (this.errRemainder.length > 0 && this.errFd !== null) {
       try {
-        writeSync(this.errFd, this.errRemainder + '\n')
+        writeSync(this.errFd, `${this.errRemainder}\n`)
         if (this.opts.onErrLine) this.opts.onErrLine(this.errRemainder)
       } catch {}
       this.errRemainder = ''
@@ -133,11 +133,15 @@ export class LogWriter {
     this.flushRemainder()
     this.closed = true
     if (this.outFd !== null) {
-      try { closeSync(this.outFd) } catch {}
+      try {
+        closeSync(this.outFd)
+      } catch {}
       this.outFd = null
     }
     if (this.errFd !== null) {
-      try { closeSync(this.errFd) } catch {}
+      try {
+        closeSync(this.errFd)
+      } catch {}
       this.errFd = null
     }
   }
@@ -147,8 +151,18 @@ export class LogWriter {
    */
   closeFdsForRotation(): void {
     this.flushRemainder()
-    if (this.outFd !== null) { try { closeSync(this.outFd) } catch {}; this.outFd = null }
-    if (this.errFd !== null) { try { closeSync(this.errFd) } catch {}; this.errFd = null }
+    if (this.outFd !== null) {
+      try {
+        closeSync(this.outFd)
+      } catch {}
+      this.outFd = null
+    }
+    if (this.errFd !== null) {
+      try {
+        closeSync(this.errFd)
+      } catch {}
+      this.errFd = null
+    }
   }
 
   /**
@@ -175,9 +189,14 @@ export class LogWriter {
    * Ukuran file out + err saat ini. Untuk rotator size check.
    */
   getSizes(): { out: number; err: number } {
-    let outSize = 0, errSize = 0
-    try { if (existsSync(this.opts.outPath)) outSize = statSync(this.opts.outPath).size } catch {}
-    try { if (existsSync(this.opts.errPath)) errSize = statSync(this.opts.errPath).size } catch {}
+    let outSize = 0,
+      errSize = 0
+    try {
+      if (existsSync(this.opts.outPath)) outSize = statSync(this.opts.outPath).size
+    } catch {}
+    try {
+      if (existsSync(this.opts.errPath)) errSize = statSync(this.opts.errPath).size
+    } catch {}
     return { out: outSize, err: errSize }
   }
 }

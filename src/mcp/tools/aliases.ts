@@ -2,30 +2,35 @@
 
 import { z } from 'zod'
 import { apiCall } from '../api-client'
-import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 import { toErrorResponse } from '../errors'
-import { SlugRef, AliasName } from '../schemas/common'
+import { AliasName, SlugRef } from '../schemas/common'
+import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 
 const AliasesListInputSchema = z.object({ slug: SlugRef }).strict()
 
-const AliasSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  args: z.string(),
-  description: z.string().nullable().optional(),
-  tags: z.array(z.string()),
-}).passthrough()
+const AliasSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    args: z.string(),
+    description: z.string().nullable().optional(),
+    tags: z.array(z.string()),
+  })
+  .passthrough()
 
 const AliasesListOutputSchema = z.object({
   aliases: z.array(AliasSchema),
   count: z.number().int(),
 })
 
-const AliasResolveInputSchema = z.object({
-  ref: z.string()
-    .regex(/^[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$/i, 'ref must be "slug:aliasName"')
-    .describe('Reference in "slug:aliasName" format (e.g., "myapp:deploy").'),
-}).strict()
+const AliasResolveInputSchema = z
+  .object({
+    ref: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$/i, 'ref must be "slug:aliasName"')
+      .describe('Reference in "slug:aliasName" format (e.g., "myapp:deploy").'),
+  })
+  .strict()
 
 const AliasResolveOutputSchema = z.object({
   args: z.string(),
@@ -75,8 +80,14 @@ ERRORS:
 NOTES:
   - Use aliases_list first to see available alias names for a project.`
 
-interface AliasesListResponse { aliases: Array<Record<string, unknown>> }
-interface AliasResolveResponse { args: string; project: string; alias: string }
+interface AliasesListResponse {
+  aliases: Array<Record<string, unknown>>
+}
+interface AliasResolveResponse {
+  args: string
+  project: string
+  alias: string
+}
 
 export const aliasesReadModule: ToolModule = {
   register(server, ctx) {

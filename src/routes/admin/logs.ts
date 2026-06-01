@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia'
 import { appLog, clearAppLogs, getAppLogs } from '../../lib/applog'
+import { forbidden, requireSuperAdmin } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
-import { requireSuperAdmin, forbidden } from '../../lib/auth-middleware'
 
 export const adminLogsRouter = new Elysia()
 

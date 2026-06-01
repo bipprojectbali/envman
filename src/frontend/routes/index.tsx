@@ -41,7 +41,7 @@ import {
   TbVariable,
 } from 'react-icons/tb'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
-import { useSession, getDefaultRoute } from '@/frontend/hooks/useAuth'
+import { getDefaultRoute, useSession } from '@/frontend/hooks/useAuth'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -80,8 +80,7 @@ const features = [
     icon: TbNote,
     color: 'grape',
     title: 'Notes & Docs',
-    description:
-      'Dokumentasi runbook, deployment guide, atau apapun per project. Markdown support, tag, dan search.',
+    description: 'Dokumentasi runbook, deployment guide, atau apapun per project. Markdown support, tag, dan search.',
   },
   {
     icon: TbUsers,
@@ -94,15 +93,13 @@ const features = [
     icon: TbBrandDocker,
     color: 'cyan',
     title: 'Portainer Integration',
-    description:
-      'Push semua vars ke Docker stack dalam satu klik. Sync otomatis menginject via env_file ke container.',
+    description: 'Push semua vars ke Docker stack dalam satu klik. Sync otomatis menginject via env_file ke container.',
   },
   {
     icon: TbKey,
     color: 'orange',
     title: 'API Tokens',
-    description:
-      'Token ter-scope per project:env atau global. Pilih read-only atau read-write, tambahkan expiry date.',
+    description: 'Token ter-scope per project:env atau global. Pilih read-only atau read-write, tambahkan expiry date.',
   },
   {
     icon: TbRefresh,
@@ -129,15 +126,18 @@ const features = [
     icon: TbServer,
     color: 'pink',
     title: 'Self-Hosted',
-    description:
-      'Data sepenuhnya ada di server kamu sendiri. Tidak ada pihak ketiga yang menyentuh secrets-mu.',
+    description: 'Data sepenuhnya ada di server kamu sendiri. Tidak ada pihak ketiga yang menyentuh secrets-mu.',
   },
 ]
 
 function CodeBlock({ code, label }: { code: string; label?: string }) {
   return (
     <Box>
-      {label && <Text size="xs" c="dimmed" mb={4}>{label}</Text>}
+      {label && (
+        <Text size="xs" c="dimmed" mb={4}>
+          {label}
+        </Text>
+      )}
       <Group gap={6} align="flex-start">
         <Box
           style={{
@@ -159,14 +159,7 @@ function CodeBlock({ code, label }: { code: string; label?: string }) {
         <CopyButton value={code}>
           {({ copied, copy }) => (
             <Tooltip label={copied ? 'Copied!' : 'Copy'}>
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                color={copied ? 'teal' : 'gray'}
-                onClick={copy}
-                mt={6}
-                px={6}
-              >
+              <Button size="compact-xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy} mt={6} px={6}>
                 {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
               </Button>
             </Tooltip>
@@ -182,7 +175,7 @@ function HomePage() {
   const { data: sessionData } = useSession()
   const { data: versionData } = useQuery({
     queryKey: ['cli-version'],
-    queryFn: () => fetch('/download/cli/version').then(r => r.json()) as Promise<{ version: string }>,
+    queryFn: () => fetch('/download/cli/version').then((r) => r.json()) as Promise<{ version: string }>,
     staleTime: 5 * 60_000,
   })
   const user = sessionData?.user
@@ -229,17 +222,13 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
               <ThemeIcon size={32} variant="gradient" radius="md">
                 <TbVariable size={16} />
               </ThemeIcon>
-              <Text fw={700} size="sm" lh={1}>Env Manager</Text>
+              <Text fw={700} size="sm" lh={1}>
+                Env Manager
+              </Text>
             </Group>
             <Group gap="xs">
               <ThemeToggle />
-              <Button
-                component={Link}
-                to="/docs"
-                size="sm"
-                variant="subtle"
-                color="gray"
-              >
+              <Button component={Link} to="/docs" size="sm" variant="subtle" color="gray">
                 Docs
               </Button>
               {user ? (
@@ -248,20 +237,12 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
                   to={getDefaultRoute(user.role)}
                   size="sm"
                   variant="gradient"
-                 
                   leftSection={<TbLayoutDashboard size={14} />}
                 >
                   Dashboard
                 </Button>
               ) : (
-                <Button
-                  component={Link}
-                  to="/login"
-                  size="sm"
-                  variant="gradient"
-                 
-                  leftSection={<TbLogin size={14} />}
-                >
+                <Button component={Link} to="/login" size="sm" variant="gradient" leftSection={<TbLogin size={14} />}>
                   Login
                 </Button>
               )}
@@ -284,39 +265,21 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
             style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', lineHeight: 1.1, letterSpacing: '-0.02em' }}
           >
             Environment variables,{' '}
-            <Text
-              component="span"
-              variant="gradient"
-             
-              inherit
-            >
+            <Text component="span" variant="gradient" inherit>
               terkelola dengan baik.
             </Text>
           </Title>
 
           <Text size="lg" c="dimmed" ta="center" maw={540} lh={1.7}>
-            Ganti .env files yang berserakan dengan satu sumber kebenaran yang terenkripsi.
-            Inject ke runtime tanpa mengubah kode aplikasi.
+            Ganti .env files yang berserakan dengan satu sumber kebenaran yang terenkripsi. Inject ke runtime tanpa
+            mengubah kode aplikasi.
           </Text>
 
           <Group gap="sm">
-            <Button
-              component={Link}
-              to="/login"
-              size="md"
-              variant="gradient"
-             
-              leftSection={<TbLogin size={17} />}
-            >
+            <Button component={Link} to="/login" size="md" variant="gradient" leftSection={<TbLogin size={17} />}>
               Masuk ke Dashboard
             </Button>
-            <Button
-              component="a"
-              href="#install"
-              size="md"
-              variant="default"
-              leftSection={<TbDownload size={17} />}
-            >
+            <Button component="a" href="#install" size="md" variant="default" leftSection={<TbDownload size={17} />}>
               Install CLI
             </Button>
           </Group>
@@ -326,10 +289,14 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
               { label: 'AES-256-GCM', sub: 'enkripsi secret' },
               { label: 'Multi-env', sub: 'per project' },
               { label: versionData?.version ? `v${versionData.version}` : '—', sub: 'CLI terbaru' },
-            ].map(stat => (
+            ].map((stat) => (
               <Stack key={stat.label} align="center" gap={2}>
-                <Text fw={700} size="md">{stat.label}</Text>
-                <Text size="xs" c="dimmed">{stat.sub}</Text>
+                <Text fw={700} size="md">
+                  {stat.label}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {stat.sub}
+                </Text>
               </Stack>
             ))}
           </Group>
@@ -339,7 +306,10 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
       {/* ─── Install ─────────────────────────────────────────────────── */}
       <Box
         id="install"
-        style={{ borderTop: '1px solid var(--mantine-color-default-border)', borderBottom: '1px solid var(--mantine-color-default-border)' }}
+        style={{
+          borderTop: '1px solid var(--mantine-color-default-border)',
+          borderBottom: '1px solid var(--mantine-color-default-border)',
+        }}
         py={{ base: 48, md: 64 }}
       >
         <Container size="md">
@@ -348,7 +318,9 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
               <ThemeIcon size={44} variant="gradient" radius="md">
                 <TbDownload size={22} />
               </ThemeIcon>
-              <Title order={2} ta="center" fw={700}>Install CLI</Title>
+              <Title order={2} ta="center" fw={700}>
+                Install CLI
+              </Title>
               {versionData?.version && (
                 <Group justify="center" gap="xs">
                   <Badge variant="light" color="primary" size="sm">
@@ -360,18 +332,20 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
                 </Group>
               )}
               <Text c="dimmed" ta="center" maw={480}>
-                Binary standalone — tidak perlu Node.js, npm, atau runtime apapun.
-                Satu file, langsung jalan.
+                Binary standalone — tidak perlu Node.js, npm, atau runtime apapun. Satu file, langsung jalan.
               </Text>
             </Stack>
 
             {/* One-liner */}
             <Stack gap="xs">
-              <Text size="sm" fw={600}>Linux &amp; macOS — satu command, auto-detect platform:</Text>
+              <Text size="sm" fw={600}>
+                Linux &amp; macOS — satu command, auto-detect platform:
+              </Text>
               <CodeBlock code={`curl -fsSL ${origin}/install | bash`} />
               <Text size="xs" c="dimmed">
-                Script otomatis deteksi OS dan arsitektur, download binary yang tepat, install ke <Code fz="xs">/usr/local/bin/envman</Code>.
-                Butuh <Code fz="xs">sudo</Code>? Script akan memintanya otomatis jika diperlukan.
+                Script otomatis deteksi OS dan arsitektur, download binary yang tepat, install ke{' '}
+                <Code fz="xs">/usr/local/bin/envman</Code>. Butuh <Code fz="xs">sudo</Code>? Script akan memintanya
+                otomatis jika diperlukan.
               </Text>
             </Stack>
 
@@ -379,11 +353,21 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
 
             <Tabs defaultValue="linux-x64" variant="pills" radius="md">
               <Tabs.List mb="md">
-                <Tabs.Tab value="linux-x64" leftSection={<TbTerminal size={13} />}>Linux x64</Tabs.Tab>
-                <Tabs.Tab value="linux-arm64" leftSection={<TbTerminal size={13} />}>Linux ARM64</Tabs.Tab>
-                <Tabs.Tab value="darwin-arm64" leftSection={<TbTerminal size={13} />}>macOS Apple Silicon</Tabs.Tab>
-                <Tabs.Tab value="darwin-x64" leftSection={<TbTerminal size={13} />}>macOS Intel</Tabs.Tab>
-                <Tabs.Tab value="windows-x64" leftSection={<TbBrandWindows size={13} />}>Windows</Tabs.Tab>
+                <Tabs.Tab value="linux-x64" leftSection={<TbTerminal size={13} />}>
+                  Linux x64
+                </Tabs.Tab>
+                <Tabs.Tab value="linux-arm64" leftSection={<TbTerminal size={13} />}>
+                  Linux ARM64
+                </Tabs.Tab>
+                <Tabs.Tab value="darwin-arm64" leftSection={<TbTerminal size={13} />}>
+                  macOS Apple Silicon
+                </Tabs.Tab>
+                <Tabs.Tab value="darwin-x64" leftSection={<TbTerminal size={13} />}>
+                  macOS Intel
+                </Tabs.Tab>
+                <Tabs.Tab value="windows-x64" leftSection={<TbBrandWindows size={13} />}>
+                  Windows
+                </Tabs.Tab>
               </Tabs.List>
 
               {(Object.entries(installCmds) as [string, string][]).map(([platform, cmd]) => (
@@ -418,7 +402,9 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
             <ThemeIcon size={44} variant="gradient" radius="md">
               <TbPlayerPlay size={22} />
             </ThemeIcon>
-            <Title order={2} ta="center" fw={700}>Panduan Penggunaan</Title>
+            <Title order={2} ta="center" fw={700}>
+              Panduan Penggunaan
+            </Title>
             <Text c="dimmed" ta="center" maw={480}>
               Dari install sampai inject ke production — semua ada di sini.
             </Text>
@@ -427,12 +413,20 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
           <Timeline active={-1} bulletSize={32} lineWidth={2} color="primary">
             {/* Step 1 */}
             <Timeline.Item
-              bullet={<Text fw={800} size="sm" c="white">1</Text>}
-              title={<Text fw={700} size="sm">Login ke server</Text>}
+              bullet={
+                <Text fw={800} size="sm" c="white">
+                  1
+                </Text>
+              }
+              title={
+                <Text fw={700} size="sm">
+                  Login ke server
+                </Text>
+              }
             >
               <Text size="sm" c="dimmed" mb="sm" mt={4}>
-                Setelah install CLI, login sekali untuk menyimpan credentials ke config lokal.
-                Token bisa dibuat di dashboard → Tokens.
+                Setelah install CLI, login sekali untuk menyimpan credentials ke config lokal. Token bisa dibuat di
+                dashboard → Tokens.
               </Text>
               <Stack gap="xs">
                 <CodeBlock
@@ -449,18 +443,23 @@ curl -L ${origin}/download/cli/windows-x64 -o envman.exe`,
 
             {/* Step 2 */}
             <Timeline.Item
-              bullet={<Text fw={800} size="sm" c="white">2</Text>}
-              title={<Text fw={700} size="sm">Inject vars ke command</Text>}
+              bullet={
+                <Text fw={800} size="sm" c="white">
+                  2
+                </Text>
+              }
+              title={
+                <Text fw={700} size="sm">
+                  Inject vars ke command
+                </Text>
+              }
             >
               <Text size="sm" c="dimmed" mb="sm" mt={4}>
-                Gunakan flag <Code fz="xs">-e project:environment</Code> untuk fetch vars dari server,
-                lalu jalankan command apapun. Vars hanya ada di memori process — tidak ditulis ke file.
+                Gunakan flag <Code fz="xs">-e project:environment</Code> untuk fetch vars dari server, lalu jalankan
+                command apapun. Vars hanya ada di memori process — tidak ditulis ke file.
               </Text>
               <Stack gap="xs">
-                <CodeBlock
-                  label="Inject ke satu environment"
-                  code={`envman -e myapp:production -- bun start`}
-                />
+                <CodeBlock label="Inject ke satu environment" code={`envman -e myapp:production -- bun start`} />
                 <CodeBlock
                   label="Gabungkan beberapa env (later overrides earlier)"
                   code={`envman -e myapp:base -e myapp:production -- bun dev`}
@@ -482,8 +481,16 @@ envman --server-wins -e myapp:production -- bun start
 
             {/* Step 3 */}
             <Timeline.Item
-              bullet={<Text fw={800} size="sm" c="white">3</Text>}
-              title={<Text fw={700} size="sm">CI/CD tanpa login interaktif</Text>}
+              bullet={
+                <Text fw={800} size="sm" c="white">
+                  3
+                </Text>
+              }
+              title={
+                <Text fw={700} size="sm">
+                  CI/CD tanpa login interaktif
+                </Text>
+              }
             >
               <Text size="sm" c="dimmed" mb="sm" mt={4}>
                 Di CI/CD, set <Code fz="xs">ENVMAN_SERVER</Code> dan <Code fz="xs">ENVMAN_TOKEN</Code> sebagai
@@ -509,13 +516,21 @@ ENVMAN_TOKEN=<TOKEN> \\
 
             {/* Step 4 */}
             <Timeline.Item
-              bullet={<Text fw={800} size="sm" c="white">4</Text>}
-              title={<Text fw={700} size="sm">Auth dari local file</Text>}
+              bullet={
+                <Text fw={800} size="sm" c="white">
+                  4
+                </Text>
+              }
+              title={
+                <Text fw={700} size="sm">
+                  Auth dari local file
+                </Text>
+              }
             >
               <Text size="sm" c="dimmed" mb="sm" mt={4}>
                 Jika kamu punya file <Code fz="xs">-e</Code> yang juga berisi <Code fz="xs">ENVMAN_SERVER</Code> dan{' '}
-                <Code fz="xs">ENVMAN_TOKEN</Code>, tidak perlu login sama sekali. Berguna untuk monorepo dengan
-                auth berbeda per direktori.
+                <Code fz="xs">ENVMAN_TOKEN</Code>, tidak perlu login sama sekali. Berguna untuk monorepo dengan auth
+                berbeda per direktori.
               </Text>
               <Stack gap="xs">
                 <CodeBlock
@@ -534,18 +549,23 @@ DEBUG=true`}
 
             {/* Step 5 */}
             <Timeline.Item
-              bullet={<Text fw={800} size="sm" c="white">5</Text>}
-              title={<Text fw={700} size="sm">Aliases — simpan perintah panjang</Text>}
+              bullet={
+                <Text fw={800} size="sm" c="white">
+                  5
+                </Text>
+              }
+              title={
+                <Text fw={700} size="sm">
+                  Aliases — simpan perintah panjang
+                </Text>
+              }
             >
               <Text size="sm" c="dimmed" mb="sm" mt={4}>
-                Buat alias di dashboard → project → tab <Code fz="xs">Aliases</Code>.
-                Jalankan dengan <Code fz="xs">envman run project:alias</Code>. Bisa tambah extra source dan passthrough args.
+                Buat alias di dashboard → project → tab <Code fz="xs">Aliases</Code>. Jalankan dengan{' '}
+                <Code fz="xs">envman run project:alias</Code>. Bisa tambah extra source dan passthrough args.
               </Text>
               <Stack gap="xs">
-                <CodeBlock
-                  label="Jalankan alias"
-                  code={`envman run myapp:deploy`}
-                />
+                <CodeBlock label="Jalankan alias" code={`envman run myapp:deploy`} />
                 <CodeBlock
                   label="Alias + extra source + passthrough args"
                   code={`envman run -e .env.local myapp:deploy --dry-run`}
@@ -561,8 +581,16 @@ envman -e myapp:production -- bash myapp:scripts/deploy.sh`}
 
             {/* Step 6 */}
             <Timeline.Item
-              bullet={<Text fw={800} size="sm" c="white">6</Text>}
-              title={<Text fw={700} size="sm">Logout</Text>}
+              bullet={
+                <Text fw={800} size="sm" c="white">
+                  6
+                </Text>
+              }
+              title={
+                <Text fw={700} size="sm">
+                  Logout
+                </Text>
+              }
             >
               <Text size="sm" c="dimmed" mb="sm" mt={4}>
                 Menghapus config tersimpan di <Code fz="xs">~/.config/envman/config.json</Code>.
@@ -589,7 +617,9 @@ envman -e myapp:production -- bash myapp:scripts/deploy.sh`}
               <ThemeIcon size={22} variant="light" color="primary" radius="sm">
                 <TbCode size={12} />
               </ThemeIcon>
-              <Text fw={600} size="sm" c="gray.3">CLI Cheatsheet</Text>
+              <Text fw={600} size="sm" c="gray.3">
+                CLI Cheatsheet
+              </Text>
             </Group>
             <pre
               style={{
@@ -661,15 +691,26 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
           </Stack>
 
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-            {features.map(f => (
-              <Box key={f.title} p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+            {features.map((f) => (
+              <Box
+                key={f.title}
+                p="md"
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 'var(--mantine-radius-md)',
+                }}
+              >
                 <Group gap="sm" mb="xs">
                   <ThemeIcon size={36} variant="light" color={f.color} radius="md">
                     <f.icon size={18} />
                   </ThemeIcon>
-                  <Text fw={600} size="sm">{f.title}</Text>
+                  <Text fw={600} size="sm">
+                    {f.title}
+                  </Text>
                 </Group>
-                <Text size="sm" c="dimmed" lh={1.65}>{f.description}</Text>
+                <Text size="sm" c="dimmed" lh={1.65}>
+                  {f.description}
+                </Text>
               </Box>
             ))}
           </SimpleGrid>
@@ -682,7 +723,8 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
           p={{ base: 'xl', md: 48 }}
           ta="center"
           style={{
-            background: 'linear-gradient(135deg, var(--mantine-color-violet-light) 0%, var(--mantine-color-grape-light) 100%)',
+            background:
+              'linear-gradient(135deg, var(--mantine-color-violet-light) 0%, var(--mantine-color-grape-light) 100%)',
             border: '1px solid var(--mantine-color-violet-light-hover)',
             borderRadius: 'var(--mantine-radius-xl)',
           }}
@@ -691,34 +733,22 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
             <ThemeIcon
               size={60}
               variant="gradient"
-             
               radius="xl"
               style={{ boxShadow: '0 8px 32px rgba(121, 80, 242, 0.35)' }}
             >
               <TbVariable size={30} />
             </ThemeIcon>
-            <Title order={2} fw={700}>Siap mulai?</Title>
+            <Title order={2} fw={700}>
+              Siap mulai?
+            </Title>
             <Text c="dimmed" maw={360}>
               Login dan mulai kelola environment variables-mu dengan aman sekarang juga.
             </Text>
             <Group gap="sm" mt="xs">
-              <Button
-                component={Link}
-                to="/login"
-                size="md"
-                variant="gradient"
-               
-                leftSection={<TbLogin size={17} />}
-              >
+              <Button component={Link} to="/login" size="md" variant="gradient" leftSection={<TbLogin size={17} />}>
                 Masuk ke Dashboard
               </Button>
-              <Button
-                component="a"
-                href="#install"
-                size="md"
-                variant="default"
-                leftSection={<TbDownload size={17} />}
-              >
+              <Button component="a" href="#install" size="md" variant="default" leftSection={<TbDownload size={17} />}>
                 Install CLI
               </Button>
             </Group>
@@ -734,13 +764,17 @@ envman mcp --write                   # + write tools (var_set, pm_start, dll)
               <ThemeIcon size={22} variant="gradient" radius="sm">
                 <TbVariable size={11} />
               </ThemeIcon>
-              <Text size="xs" fw={600}>Env Manager</Text>
+              <Text size="xs" fw={600}>
+                Env Manager
+              </Text>
             </Group>
             <Group gap="md">
               <Button component={Link} to="/docs" size="compact-xs" variant="subtle" color="gray">
                 Docs
               </Button>
-              <Text size="xs" c="dimmed">Self-hosted. Data tetap milikmu.</Text>
+              <Text size="xs" c="dimmed">
+                Self-hosted. Data tetap milikmu.
+              </Text>
             </Group>
           </Group>
         </Container>

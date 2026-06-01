@@ -5,10 +5,10 @@
 //   D6: chmod 0600 segera setelah bind (default 0755 di Bun.serve)
 //   I1: header token validation untuk semua request
 
-import { existsSync, unlinkSync, chmodSync } from 'fs'
-import { log } from './logger'
-import { Router, errorResponse } from './router'
+import { chmodSync, existsSync, unlinkSync } from 'node:fs'
 import { AUTH_HEADER, safeEqual } from '../shared/token'
+import { log } from './logger'
+import { errorResponse, type Router } from './router'
 
 export interface ServerOptions {
   socketPath: string
@@ -56,11 +56,7 @@ export class Server {
     const token = req.headers.get(AUTH_HEADER) ?? ''
     if (!safeEqual(token, this.opts.token)) {
       log.warn('auth failed', { remoteAddr: 'unix-socket', path: new URL(req.url).pathname })
-      return errorResponse(
-        'INVALID_AUTH',
-        'Missing or invalid auth token',
-        req.headers.get('x-request-id') ?? '',
-      )
+      return errorResponse('INVALID_AUTH', 'Missing or invalid auth token', req.headers.get('x-request-id') ?? '')
     }
 
     this.inflightRequests++
@@ -81,7 +77,7 @@ export class Server {
 
     const deadline = Date.now() + timeoutMs
     while (this.inflightRequests > 0 && Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 50))
+      await new Promise((r) => setTimeout(r, 50))
     }
     if (this.inflightRequests > 0) {
       log.warn('shutdown timeout, forcing close', { inflight: this.inflightRequests })

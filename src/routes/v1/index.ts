@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { requireEnvAuth, requireAuth, unauthorized, forbidden } from '../../lib/auth-middleware'
+import { forbidden, requireAuth, requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 
 // /api/v1/ — versioned API gateway
@@ -23,9 +23,7 @@ export const v1Router = new Elysia({ prefix: '/api/v1' })
     const isSuperAdmin = caller.role === 'SUPER_ADMIN'
     const limit = Math.min(Number(query.limit) || 50, 200)
     const offset = Number(query.offset) || 0
-    const where = isSuperAdmin
-      ? { deletedAt: null }
-      : { deletedAt: null, members: { some: { userId: caller.userId } } }
+    const where = isSuperAdmin ? { deletedAt: null } : { deletedAt: null, members: { some: { userId: caller.userId } } }
     const [projects, total] = await Promise.all([
       prisma.project.findMany({
         where,
@@ -43,7 +41,7 @@ export const v1Router = new Elysia({ prefix: '/api/v1' })
     return {
       projects: projects.map((p: any) => ({
         ...p,
-        myRole: isSuperAdmin ? 'OWNER' : p.members.find((m: any) => m.userId === caller.userId)?.role ?? 'VIEWER',
+        myRole: isSuperAdmin ? 'OWNER' : (p.members.find((m: any) => m.userId === caller.userId)?.role ?? 'VIEWER'),
       })),
       total,
       limit,

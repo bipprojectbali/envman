@@ -25,11 +25,11 @@ function SessionGuard() {
 
   useEffect(() => {
     if (isLoading) return
-    const isPublic = PUBLIC_ROUTES.includes(pathname) || PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
+    const isPublic = PUBLIC_ROUTES.includes(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
     if (data?.user === null && !isPublic) {
       navigate({ to: '/login' })
     }
-  }, [data?.user, isLoading, pathname])
+  }, [data?.user, isLoading, pathname, navigate])
 
   return null
 }

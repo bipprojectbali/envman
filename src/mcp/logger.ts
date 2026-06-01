@@ -1,7 +1,7 @@
 // Stderr-only logger. WAJIB di MCP stdio context — stdout dipakai JSON-RPC protocol.
 // Bug B1 mitigation: tidak boleh console.log di MCP path.
 
-import type { Writable } from 'stream'
+import type { Writable } from 'node:stream'
 
 const REDACT_PATTERNS: Array<[RegExp, string]> = [
   [/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer ***'],
@@ -28,7 +28,7 @@ class StderrLogger {
 
   private write(level: string, msg: string, detail?: unknown): void {
     const ts = new Date().toISOString()
-    const detailStr = detail !== undefined ? ' ' + redact(JSON.stringify(detail)) : ''
+    const detailStr = detail !== undefined ? ` ${redact(JSON.stringify(detail))}` : ''
     this.out.write(`${ts} ${level} mcp ${redact(msg)}${detailStr}\n`)
   }
 

@@ -1,7 +1,7 @@
 // CLI: `envman pm <subcommand>` — process management.
 
+import type { EnvSource, ProcessSnapshot } from '../daemon/process-container'
 import { DaemonClient, DaemonNotRunningError } from './client'
-import type { ProcessSnapshot, EnvSource } from '../daemon/process-container'
 
 interface ListResponse {
   ok: true
@@ -28,12 +28,12 @@ function formatUptime(ms: number): string {
 function statusColor(status: string): string {
   // ANSI color codes — minimal, no dependency
   const colors: Record<string, string> = {
-    online: '\x1b[32m',       // green
-    starting: '\x1b[33m',     // yellow
+    online: '\x1b[32m', // green
+    starting: '\x1b[33m', // yellow
     stopping: '\x1b[33m',
-    stopped: '\x1b[90m',      // gray
-    errored: '\x1b[31m',      // red
-    quarantined: '\x1b[35m',  // magenta
+    stopped: '\x1b[90m', // gray
+    errored: '\x1b[31m', // red
+    quarantined: '\x1b[35m', // magenta
   }
   const reset = '\x1b[0m'
   return `${colors[status] ?? ''}${status}${reset}`
@@ -51,7 +51,7 @@ function printTable(processes: ProcessSnapshot[]): void {
   }
 
   const headers = ['NAME', 'PID', 'STATUS', 'UPTIME', 'RESTARTS', 'COMMAND']
-  const rows = processes.map(p => [
+  const rows = processes.map((p) => [
     p.name,
     p.pid?.toString() ?? '-',
     p.status,
@@ -61,13 +61,11 @@ function printTable(processes: ProcessSnapshot[]): void {
   ])
 
   // Hitung lebar kolom (ignore ANSI codes saat measuring)
-  const widths = headers.map((h, i) =>
-    Math.max(h.length, ...rows.map(r => r[i].length)),
-  )
+  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)))
 
   const sep = '  '
   console.log(headers.map((h, i) => h.padEnd(widths[i])).join(sep))
-  console.log(widths.map(w => '─'.repeat(w)).join(sep))
+  console.log(widths.map((w) => '─'.repeat(w)).join(sep))
   for (const row of rows) {
     const cells = row.map((cell, i) => {
       // Wrap status dengan warna setelah padding
@@ -133,7 +131,8 @@ export async function cmdPmStart(args: string[]): Promise<void> {
     while (j < args.length) {
       const a = args[j]
       if (a.startsWith('-')) {
-        if (FLAGS_WITH_VALUE.has(a)) j += 2  // skip flag + value
+        if (FLAGS_WITH_VALUE.has(a))
+          j += 2 // skip flag + value
         else j++
       } else {
         positionalIdx = j
@@ -174,7 +173,10 @@ export async function cmdPmStart(args: string[]): Promise<void> {
       i += 2
     } else if (flag === '-s' || flag === '--source') {
       const src = flagArgs[i + 1] ?? ''
-      if (!src) { console.error('-s requires a value'); process.exit(1) }
+      if (!src) {
+        console.error('-s requires a value')
+        process.exit(1)
+      }
       // Format: "project:env" → envman, atau path file
       if (src.includes(':') && !src.startsWith('/') && !src.startsWith('.')) {
         envSources.push({ type: 'envman', ref: src })
@@ -221,7 +223,7 @@ export async function cmdPmStart(args: string[]): Promise<void> {
   const p = res.process
   console.log(`Started "${p.name}" (PID ${p.pid}, status=${p.status})`)
   if (envSources.length > 0) {
-    console.log(`  Env sources: ${envSources.map(s => s.ref).join(', ')}`)
+    console.log(`  Env sources: ${envSources.map((s) => s.ref).join(', ')}`)
     console.log(`  Use 'envman pm sync ${name}' to re-fetch env from server`)
   }
 }
@@ -232,7 +234,7 @@ export async function cmdPmStart(args: string[]): Promise<void> {
  */
 async function resolveSourcesCli(sources: EnvSource[]): Promise<Record<string, string>> {
   const { paths } = await import('../shared/paths')
-  const { readFileSync, existsSync } = await import('fs')
+  const { readFileSync, existsSync } = await import('node:fs')
   const p = paths()
   if (!existsSync(p.config)) {
     throw new Error('envman server not configured (run `envman login`)')
@@ -251,7 +253,7 @@ async function resolveSourcesCli(sources: EnvSource[]): Promise<Record<string, s
         signal: AbortSignal.timeout(10_000),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${src.ref}`)
-      const data = await res.json() as { vars: Record<string, string> }
+      const data = (await res.json()) as { vars: Record<string, string> }
       Object.assign(merged, data.vars)
     } else {
       const text = readFileSync(src.ref, 'utf8')
@@ -278,7 +280,7 @@ async function resolveSourcesCli(sources: EnvSource[]): Promise<Record<string, s
 export async function cmdPmStop(args: string[]): Promise<void> {
   const idOrName = args[0]
   if (!idOrName) {
-    console.error("Usage: envman pm stop <name>")
+    console.error('Usage: envman pm stop <name>')
     process.exit(1)
   }
   const client = new DaemonClient()
@@ -289,7 +291,7 @@ export async function cmdPmStop(args: string[]): Promise<void> {
 export async function cmdPmRestart(args: string[]): Promise<void> {
   const idOrName = args[0]
   if (!idOrName) {
-    console.error("Usage: envman pm restart <name>")
+    console.error('Usage: envman pm restart <name>')
     process.exit(1)
   }
   const client = new DaemonClient()
@@ -301,7 +303,7 @@ export async function cmdPmRestart(args: string[]): Promise<void> {
 export async function cmdPmReset(args: string[]): Promise<void> {
   const idOrName = args[0]
   if (!idOrName) {
-    console.error("Usage: envman pm reset <name>")
+    console.error('Usage: envman pm reset <name>')
     process.exit(1)
   }
   const client = new DaemonClient()
@@ -312,7 +314,7 @@ export async function cmdPmReset(args: string[]): Promise<void> {
 export async function cmdPmDelete(args: string[]): Promise<void> {
   const idOrName = args[0]
   if (!idOrName) {
-    console.error("Usage: envman pm delete <name>")
+    console.error('Usage: envman pm delete <name>')
     process.exit(1)
   }
   const client = new DaemonClient()
@@ -327,9 +329,9 @@ export async function cmdPmList(): Promise<void> {
 }
 
 export async function cmdPmSync(args: string[]): Promise<void> {
-  const name = args.find(a => !a.startsWith('-'))
+  const name = args.find((a) => !a.startsWith('-'))
   const dryRun = args.includes('--dry-run')
-  const client = new DaemonClient({ timeoutMs: 30_000 })  // sync bisa lambat
+  const client = new DaemonClient({ timeoutMs: 30_000 }) // sync bisa lambat
   const res = await client.post<{
     ok: true
     checked: number
@@ -366,19 +368,32 @@ export async function cmdPmLogs(args: string[]): Promise<void> {
   let i = 0
   while (i < args.length) {
     const a = args[i]
-    if (a === '-f' || a === '--follow') { follow = true; i++ }
-    else if (a === '-n' || a === '--lines') {
+    if (a === '-f' || a === '--follow') {
+      follow = true
+      i++
+    } else if (a === '-n' || a === '--lines') {
       lines = parseInt(args[i + 1] ?? '100', 10)
-      if (!Number.isFinite(lines) || lines < 0) { console.error('Invalid --lines'); process.exit(1) }
+      if (!Number.isFinite(lines) || lines < 0) {
+        console.error('Invalid --lines')
+        process.exit(1)
+      }
       i += 2
+    } else if (a === '--out') {
+      streamFilter = 'out'
+      i++
+    } else if (a === '--err') {
+      streamFilter = 'err'
+      i++
+    } else if (a.startsWith('-')) {
+      console.error(`Unknown flag: ${a}`)
+      process.exit(1)
+    } else {
+      target = a
+      i++
     }
-    else if (a === '--out') { streamFilter = 'out'; i++ }
-    else if (a === '--err') { streamFilter = 'err'; i++ }
-    else if (a.startsWith('-')) { console.error(`Unknown flag: ${a}`); process.exit(1) }
-    else { target = a; i++ }
   }
   if (!target) {
-    console.error("Usage: envman pm logs <name> [-f] [-n 100] [--out|--err]")
+    console.error('Usage: envman pm logs <name> [-f] [-n 100] [--out|--err]')
     process.exit(1)
   }
 
@@ -405,14 +420,17 @@ export async function cmdPmLogs(args: string[]): Promise<void> {
 
 async function streamLogs(target: string, streamFilter: 'out' | 'err' | 'both'): Promise<void> {
   const { paths } = await import('../shared/paths')
-  const { readFileSync } = await import('fs')
+  const { readFileSync } = await import('node:fs')
   const { AUTH_HEADER } = await import('../shared/token')
   const p = paths()
   const token = readFileSync(p.token, 'utf8').trim()
 
   // Setup abort untuk Ctrl+C
   const abort = new AbortController()
-  const onSig = () => { abort.abort(); process.exit(0) }
+  const onSig = () => {
+    abort.abort()
+    process.exit(0)
+  }
   process.on('SIGINT', onSig)
   process.on('SIGTERM', onSig)
 
@@ -437,12 +455,13 @@ async function streamLogs(target: string, streamFilter: 'out' | 'err' | 'both'):
       if (done) break
       buf += decoder.decode(value, { stream: true })
       // Parse SSE — events terpisah dengan \n\n
-      let idx
-      while ((idx = buf.indexOf('\n\n')) !== -1) {
+      let idx: number = buf.indexOf('\n\n')
+      while (idx !== -1) {
         const ev = buf.slice(0, idx)
         buf = buf.slice(idx + 2)
+        idx = buf.indexOf('\n\n')
         for (const line of ev.split('\n')) {
-          if (line.startsWith(': ')) continue  // keep-alive ping
+          if (line.startsWith(': ')) continue // keep-alive ping
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6))
@@ -466,7 +485,7 @@ async function streamLogs(target: string, streamFilter: 'out' | 'err' | 'both'):
 export async function cmdPmDescribe(args: string[]): Promise<void> {
   const idOrName = args[0]
   if (!idOrName) {
-    console.error("Usage: envman pm describe <name>")
+    console.error('Usage: envman pm describe <name>')
     process.exit(1)
   }
   const client = new DaemonClient()
@@ -491,21 +510,42 @@ export async function cmdPm(args: string[]): Promise<void> {
     switch (sub) {
       case 'daemon': {
         const { cmdDaemon } = await import('./daemon-control')
-        await cmdDaemon(args.slice(1)); return
+        await cmdDaemon(args.slice(1))
+        return
       }
-      case 'start':    await cmdPmStart(args.slice(1)); return
-      case 'stop':     await cmdPmStop(args.slice(1)); return
-      case 'restart':  await cmdPmRestart(args.slice(1)); return
-      case 'reset':    await cmdPmReset(args.slice(1)); return
+      case 'start':
+        await cmdPmStart(args.slice(1))
+        return
+      case 'stop':
+        await cmdPmStop(args.slice(1))
+        return
+      case 'restart':
+        await cmdPmRestart(args.slice(1))
+        return
+      case 'reset':
+        await cmdPmReset(args.slice(1))
+        return
       case 'delete':
-      case 'rm':       await cmdPmDelete(args.slice(1)); return
+      case 'rm':
+        await cmdPmDelete(args.slice(1))
+        return
       case 'ls':
-      case 'list':     await cmdPmList(); return
+      case 'list':
+        await cmdPmList()
+        return
       case 'describe':
-      case 'show':     await cmdPmDescribe(args.slice(1)); return
-      case 'logs':     await cmdPmLogs(args.slice(1)); return
-      case 'save':     await cmdPmSave(); return
-      case 'sync':     await cmdPmSync(args.slice(1)); return
+      case 'show':
+        await cmdPmDescribe(args.slice(1))
+        return
+      case 'logs':
+        await cmdPmLogs(args.slice(1))
+        return
+      case 'save':
+        await cmdPmSave()
+        return
+      case 'sync':
+        await cmdPmSync(args.slice(1))
+        return
       case undefined:
       case '--help':
       case '-h':

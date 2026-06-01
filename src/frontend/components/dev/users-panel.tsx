@@ -1,16 +1,35 @@
-import React, { useMemo, useState } from 'react'
 import {
-  ActionIcon, Avatar, Badge, Box, Container, Group,
-  Menu, SegmentedControl, Stack, Table, Text, TextInput, Title,
+  ActionIcon,
+  Avatar,
+  Badge,
+  Box,
+  Container,
+  Group,
+  Menu,
+  SegmentedControl,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Title,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type React from 'react'
+import { useMemo, useState } from 'react'
 import {
-  TbCircleFilled, TbDots, TbLock, TbLockOpen,
-  TbSearch, TbShieldCheck, TbShieldOff, TbBug, TbX,
+  TbBug,
+  TbCircleFilled,
+  TbDots,
+  TbLock,
+  TbLockOpen,
+  TbSearch,
+  TbShieldCheck,
+  TbShieldOff,
+  TbX,
 } from 'react-icons/tb'
-import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { useSession } from '@/frontend/hooks/useAuth'
 import { usePresence } from '@/frontend/hooks/usePresence'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import type { AdminUser } from './types'
 
 const roleBadge: Record<string, { color: string; label: string }> = {
@@ -40,7 +59,10 @@ export function UsersPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role }),
       }).then((r) => r.json()),
-    onSuccess: (_: unknown, { role }: { id: string; role: string }) => { queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }); notifyOk(`Role diubah ke ${role}`) },
+    onSuccess: (_: unknown, { role }: { id: string; role: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      notifyOk(`Role diubah ke ${role}`)
+    },
     onError: (e) => notifyErr(e),
   })
 
@@ -52,7 +74,10 @@ export function UsersPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blocked }),
       }).then((r) => r.json()),
-    onSuccess: (_: unknown, { blocked }: { id: string; blocked: boolean }) => { queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }); notifyOk(blocked ? 'User diblokir' : 'Blokir user dicabut') },
+    onSuccess: (_: unknown, { blocked }: { id: string; blocked: boolean }) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      notifyOk(blocked ? 'User diblokir' : 'Blokir user dicabut')
+    },
     onError: (e) => notifyErr(e),
   })
 
@@ -64,11 +89,11 @@ export function UsersPanel() {
     let list = [...users]
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+      list = list.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
     }
-    if (filterStatus === 'online') list = list.filter(u => !u.blocked && onlineUserIds.includes(u.id))
-    if (filterStatus === 'offline') list = list.filter(u => !u.blocked && !onlineUserIds.includes(u.id))
-    if (filterStatus === 'blocked') list = list.filter(u => u.blocked)
+    if (filterStatus === 'online') list = list.filter((u) => !u.blocked && onlineUserIds.includes(u.id))
+    if (filterStatus === 'offline') list = list.filter((u) => !u.blocked && !onlineUserIds.includes(u.id))
+    if (filterStatus === 'blocked') list = list.filter((u) => u.blocked)
     return list
   }, [users, search, filterStatus, onlineUserIds])
 
@@ -78,7 +103,8 @@ export function UsersPanel() {
         <Group justify="space-between">
           <Title order={3}>User Management</Title>
           <Badge variant="light" size="lg">
-            {filteredUsers.length}{filteredUsers.length !== users.length ? `/${users.length}` : ''} users
+            {filteredUsers.length}
+            {filteredUsers.length !== users.length ? `/${users.length}` : ''} users
           </Badge>
         </Group>
 
@@ -89,13 +115,19 @@ export function UsersPanel() {
             leftSection={<TbSearch size={13} />}
             value={search}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-            rightSection={search ? <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}><TbX size={11} /></ActionIcon> : undefined}
+            rightSection={
+              search ? (
+                <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}>
+                  <TbX size={11} />
+                </ActionIcon>
+              ) : undefined
+            }
             style={{ flex: 1 }}
           />
           <SegmentedControl
             size="xs"
             value={filterStatus}
-            onChange={v => setFilterStatus(v as typeof filterStatus)}
+            onChange={(v) => setFilterStatus(v as typeof filterStatus)}
             data={[
               { label: 'Semua', value: 'all' },
               { label: 'Online', value: 'online' },
@@ -128,7 +160,9 @@ export function UsersPanel() {
               {filteredUsers.length === 0 && !isLoading && (
                 <Table.Tr>
                   <Table.Td colSpan={4}>
-                    <Text ta="center" c="dimmed" py="md" size="sm">Tidak ada user yang cocok.</Text>
+                    <Text ta="center" c="dimmed" py="md" size="sm">
+                      Tidak ada user yang cocok.
+                    </Text>
                   </Table.Td>
                 </Table.Tr>
               )}

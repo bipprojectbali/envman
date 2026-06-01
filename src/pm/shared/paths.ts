@@ -1,8 +1,8 @@
 // File paths untuk envman pm — single source of truth.
 // Bisa di-override via env var ENVMAN_PM_HOME untuk testing.
 
-import { homedir } from 'os'
-import { join } from 'path'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 export function pmHome(): string {
   return process.env.ENVMAN_PM_HOME ?? join(homedir(), '.config', 'envman')

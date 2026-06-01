@@ -7,11 +7,11 @@
 //   E5 ✓ Restart via ProcessContainer state machine — locked per container
 //   E6 ✓ Hash canonical (lihat env-resolver.ts hashEnv) avoid key-order false diff
 
-import { existsSync, readFileSync } from 'fs'
-import { log } from './logger'
+import { existsSync, readFileSync } from 'node:fs'
 import type { EnvmanServerClient } from './envman-client'
-import { ServerUnreachableError, ServerAuthError } from './envman-client'
-import type { ProcessContainer, EnvSource } from './process-container'
+import { ServerAuthError, ServerUnreachableError } from './envman-client'
+import { log } from './logger'
+import type { EnvSource, ProcessContainer } from './process-container'
 
 export type { EnvSource }
 
@@ -61,10 +61,7 @@ function parseEnvFile(filePath: string): Record<string, string> {
     // Strip optional `export ` prefix
     if (key.startsWith('export ')) key = key.slice(7).trim()
     // Strip matching quotes
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1)
     }
     result[key] = value
@@ -82,7 +79,7 @@ export interface SyncOptions {
 
 export interface SyncResult {
   checked: number
-  updated: string[]   // names of restarted processes
+  updated: string[] // names of restarted processes
   unchanged: string[]
   failed: { name: string; error: string }[]
 }

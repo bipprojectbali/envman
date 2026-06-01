@@ -1,8 +1,8 @@
 import { Elysia } from 'elysia'
 import { appLog } from '../../lib/applog'
-import { prisma } from '../../lib/db'
-import { requireSuperAdmin, unauthorized, forbidden } from '../../lib/auth-middleware'
 import { audit } from '../../lib/audit'
+import { forbidden, requireSuperAdmin, unauthorized } from '../../lib/auth-middleware'
+import { prisma } from '../../lib/db'
 import { getIp } from '../../lib/request'
 
 export const adminUsersRouter = new Elysia()
@@ -20,13 +20,22 @@ export const adminUsersRouter = new Elysia()
   .put('/api/admin/users/:id/role', async ({ request, params, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
-    if (caller.userId === params.id) { set.status = 400; return { error: 'Tidak bisa mengubah role sendiri' } }
+    if (caller.userId === params.id) {
+      set.status = 400
+      return { error: 'Tidak bisa mengubah role sendiri' }
+    }
 
     const { role } = (await request.json()) as { role: string }
-    if (!['USER', 'QC', 'ADMIN'].includes(role)) { set.status = 400; return { error: 'Role tidak valid (USER, QC, atau ADMIN)' } }
+    if (!['USER', 'QC', 'ADMIN'].includes(role)) {
+      set.status = 400
+      return { error: 'Role tidak valid (USER, QC, atau ADMIN)' }
+    }
 
     const target = await prisma.user.findUnique({ where: { id: params.id }, select: { email: true, role: true } })
-    if (target?.role === 'SUPER_ADMIN') { set.status = 400; return { error: 'Tidak bisa mengubah role SUPER_ADMIN' } }
+    if (target?.role === 'SUPER_ADMIN') {
+      set.status = 400
+      return { error: 'Tidak bisa mengubah role SUPER_ADMIN' }
+    }
 
     const user = await prisma.user.update({
       where: { id: params.id },
@@ -41,7 +50,10 @@ export const adminUsersRouter = new Elysia()
   .put('/api/admin/users/:id/block', async ({ request, params, set }) => {
     const caller = await requireSuperAdmin(request)
     if (!caller) return forbidden(set)
-    if (caller.userId === params.id) { set.status = 400; return { error: 'Tidak bisa memblokir diri sendiri' } }
+    if (caller.userId === params.id) {
+      set.status = 400
+      return { error: 'Tidak bisa memblokir diri sendiri' }
+    }
 
     const { blocked } = (await request.json()) as { blocked: boolean }
     const user = await prisma.user.update({

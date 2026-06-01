@@ -2,7 +2,14 @@ import { auth } from './auth'
 import { prisma } from './db'
 
 export type AuthCaller = { userId: string; role: string; email: string; permissions: string[] }
-export type EnvAuthCaller = { userId: string; role: string; tokenName?: string; canWrite: boolean; scopes: string[]; permissions: string[] }
+export type EnvAuthCaller = {
+  userId: string
+  role: string
+  tokenName?: string
+  canWrite: boolean
+  scopes: string[]
+  permissions: string[]
+}
 
 export async function requireAuth(request: Request): Promise<AuthCaller | null> {
   try {
@@ -34,7 +41,12 @@ export async function requireAuth(request: Request): Promise<AuthCaller | null> 
     return null
   }
   if (session.user.blocked) return null
-  return { userId: session.user.id, role: session.user.role, email: session.user.email, permissions: session.user.permissions }
+  return {
+    userId: session.user.id,
+    role: session.user.role,
+    email: session.user.email,
+    permissions: session.user.permissions,
+  }
 }
 
 export async function requireSuperAdmin(request: Request): Promise<AuthCaller | null> {

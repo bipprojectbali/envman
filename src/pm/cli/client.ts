@@ -5,7 +5,7 @@
 //   I3: structured error mapping dari daemon JSON
 //   D6: pakai token dari ~/.config/envman/daemon.token
 
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { paths } from '../shared/paths'
 import { AUTH_HEADER } from '../shared/token'
 import type { ApiError } from '../shared/types'
@@ -23,16 +23,20 @@ export class DaemonAuthError extends Error {
 }
 
 export class DaemonApiError extends Error {
-  constructor(public code: string, public httpStatus: number, message: string) {
+  constructor(
+    public code: string,
+    public httpStatus: number,
+    message: string,
+  ) {
     super(message)
   }
 }
 
 export interface ClientOptions {
-  timeoutMs?: number       // default 5000
-  socketPath?: string      // override untuk testing
-  tokenPath?: string       // override path untuk read token (untuk testing isolation)
-  tokenOverride?: string   // langsung kasih token (untuk testing invalid auth)
+  timeoutMs?: number // default 5000
+  socketPath?: string // override untuk testing
+  tokenPath?: string // override path untuk read token (untuk testing isolation)
+  tokenOverride?: string // langsung kasih token (untuk testing invalid auth)
 }
 
 export class DaemonClient {
@@ -65,11 +69,7 @@ export class DaemonClient {
     return existsSync(this.socketPath)
   }
 
-  async request<T = any>(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<T> {
+  async request<T = any>(method: string, path: string, body?: unknown): Promise<T> {
     if (!this.isAvailable()) {
       throw new DaemonNotRunningError()
     }

@@ -1,28 +1,49 @@
 import {
-  ActionIcon, AppShell, Avatar, Box, Burger, Group,
-  NavLink, Stack, Text, ThemeIcon, Title, Tooltip,
+  ActionIcon,
+  AppShell,
+  Avatar,
+  Box,
+  Burger,
+  Group,
+  NavLink,
+  Stack,
+  Text,
+  ThemeIcon,
+  Tooltip,
 } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { createLazyFileRoute, Outlet, useMatchRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import {
-  TbBook, TbBug, TbChevronRight, TbCode,
-  TbDatabase, TbLayoutDashboard, TbLayoutSidebarLeftCollapse,
-  TbLayoutSidebarLeftExpand, TbLogout, TbPuzzle, TbServer,
-  TbSettings, TbSitemap, TbUserSearch, TbUsers, TbVariable,
+  TbBook,
+  TbBug,
+  TbChevronRight,
+  TbCode,
+  TbDatabase,
+  TbLayoutDashboard,
+  TbLayoutSidebarLeftCollapse,
+  TbLayoutSidebarLeftExpand,
+  TbLogout,
+  TbPuzzle,
+  TbServer,
+  TbSettings,
+  TbSitemap,
+  TbUserSearch,
+  TbUsers,
+  TbVariable,
 } from 'react-icons/tb'
+import { AppLogsPanel } from '@/frontend/components/dev/app-logs-panel'
+import { DatabasePanel } from '@/frontend/components/dev/dev-database'
+import { ProjectPanel } from '@/frontend/components/dev/dev-project'
+import { ExtensionsPanel } from '@/frontend/components/dev/extensions-panel'
+import { OverviewPanel } from '@/frontend/components/dev/overview-panel'
+import { PlaceholderPanel } from '@/frontend/components/dev/placeholder-panel'
+import { UserLogsPanel } from '@/frontend/components/dev/user-logs-panel'
+import { UsersPanel } from '@/frontend/components/dev/users-panel'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { TicketsPanel } from '@/frontend/components/TicketsPanel'
 import { useLogout, useSession } from '@/frontend/hooks/useAuth'
-import { OverviewPanel } from '@/frontend/components/dev/overview-panel'
-import { UsersPanel } from '@/frontend/components/dev/users-panel'
-import { AppLogsPanel } from '@/frontend/components/dev/app-logs-panel'
-import { UserLogsPanel } from '@/frontend/components/dev/user-logs-panel'
-import { ExtensionsPanel } from '@/frontend/components/dev/extensions-panel'
-import { PlaceholderPanel } from '@/frontend/components/dev/placeholder-panel'
-import { DatabasePanel } from '@/frontend/components/dev/dev-database'
-import { ProjectPanel } from '@/frontend/components/dev/dev-project'
 
 export const Route = createLazyFileRoute('/dev')({ component: DevPage })
 
@@ -157,24 +178,49 @@ function DevPage() {
           {collapsed ? (
             <>
               <Tooltip label="Dashboard" position="right">
-                <ActionIcon variant="subtle" color="gray" size="lg" component="a" href="/dashboard" mt={4} style={{ width: '100%' }}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  component="a"
+                  href="/dashboard"
+                  mt={4}
+                  style={{ width: '100%' }}
+                >
                   <TbLayoutDashboard size={18} />
                 </ActionIcon>
               </Tooltip>
               <Tooltip label="Env Manager" position="right">
-                <ActionIcon variant="subtle" color="gray" size="lg" component="a" href="/envmanager" mt={4} style={{ width: '100%' }}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  component="a"
+                  href="/envmanager"
+                  mt={4}
+                  style={{ width: '100%' }}
+                >
                   <TbVariable size={18} />
                 </ActionIcon>
               </Tooltip>
               <Tooltip label="Docs" position="right">
-                <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => navigate({ to: '/dev/docs', search: { tab: 'overview' } })} mt={4} style={{ width: '100%' }}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  onClick={() => navigate({ to: '/dev/docs', search: { tab: 'overview' } })}
+                  mt={4}
+                  style={{ width: '100%' }}
+                >
                   <TbBook size={18} />
                 </ActionIcon>
               </Tooltip>
             </>
           ) : (
             <>
-              <Text size="xs" c="dimmed" fw={500} mt="md" mb={4} ml="sm">Tools</Text>
+              <Text size="xs" c="dimmed" fw={500} mt="md" mb={4} ml="sm">
+                Tools
+              </Text>
               <NavLink
                 label="Dashboard"
                 leftSection={<TbLayoutDashboard size={18} />}
@@ -262,7 +308,11 @@ function DevPage() {
             {active === 'project' && <ProjectPanel />}
             {active === 'extensions' && <ExtensionsPanel />}
             {active === 'settings' && (
-              <PlaceholderPanel title="Settings" desc="System configuration akan ditampilkan di sini." icon={TbSettings} />
+              <PlaceholderPanel
+                title="Settings"
+                desc="System configuration akan ditampilkan di sini."
+                icon={TbSettings}
+              />
             )}
           </>
         ) : (

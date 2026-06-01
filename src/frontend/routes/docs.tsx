@@ -1,17 +1,9 @@
-import {
-  Anchor,
-  Box,
-  Button,
-  Container,
-  Group,
-  Text,
-  ThemeIcon,
-} from '@mantine/core'
+import { Anchor, Box, Button, Container, Group, Text, ThemeIcon } from '@mantine/core'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { TbBook, TbLogin, TbLayoutDashboard, TbVariable } from 'react-icons/tb'
-import { ThemeToggle } from '@/frontend/components/ThemeToggle'
+import { TbBook, TbLayoutDashboard, TbLogin, TbVariable } from 'react-icons/tb'
 import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
-import { useSession, getDefaultRoute } from '@/frontend/hooks/useAuth'
+import { ThemeToggle } from '@/frontend/components/ThemeToggle'
+import { getDefaultRoute, useSession } from '@/frontend/hooks/useAuth'
 import 'github-markdown-css/github-markdown.css'
 
 export const Route = createFileRoute('/docs')({
@@ -203,7 +195,7 @@ ENVMAN_TOKEN=<TOKEN> \\
 # GitHub Actions
 # env:
 #   ENVMAN_SERVER: ${origin}
-#   ENVMAN_TOKEN: \$\{{ secrets.ENVMAN_TOKEN }}
+#   ENVMAN_TOKEN: $\{{ secrets.ENVMAN_TOKEN }}
 # run: envman -e myapp:production -- bun start
 
 # System env menang (PORT=8080 system beats server PORT=3000)
@@ -1052,12 +1044,18 @@ function DocsPage() {
                   <TbVariable size={14} />
                 </ThemeIcon>
                 <Anchor component={Link} to="/" underline="never">
-                  <Text fw={700} size="sm">Env Manager</Text>
+                  <Text fw={700} size="sm">
+                    Env Manager
+                  </Text>
                 </Anchor>
-                <Text c="dimmed" size="sm">/</Text>
+                <Text c="dimmed" size="sm">
+                  /
+                </Text>
                 <Group gap={4}>
                   <TbBook size={14} />
-                  <Text size="sm" fw={500}>Docs</Text>
+                  <Text size="sm" fw={500}>
+                    Docs
+                  </Text>
                 </Group>
               </Group>
               <Group gap="xs">
@@ -1068,20 +1066,12 @@ function DocsPage() {
                     to={getDefaultRoute(user.role)}
                     size="xs"
                     variant="gradient"
-                   
                     leftSection={<TbLayoutDashboard size={13} />}
                   >
                     Dashboard
                   </Button>
                 ) : (
-                  <Button
-                    component={Link}
-                    to="/login"
-                    size="xs"
-                    variant="gradient"
-                   
-                    leftSection={<TbLogin size={13} />}
-                  >
+                  <Button component={Link} to="/login" size="xs" variant="gradient" leftSection={<TbLogin size={13} />}>
                     Login
                   </Button>
                 )}
@@ -1108,7 +1098,9 @@ function DocsPage() {
               <ThemeIcon size={20} variant="gradient" radius="sm">
                 <TbVariable size={10} />
               </ThemeIcon>
-              <Text size="xs" fw={600}>Env Manager</Text>
+              <Text size="xs" fw={600}>
+                Env Manager
+              </Text>
             </Group>
             <Group gap="md">
               <Anchor href="/api/docs.md" size="xs" c="dimmed" target="_blank">
@@ -1117,7 +1109,9 @@ function DocsPage() {
               <Anchor component={Link} to="/" size="xs" c="dimmed">
                 Landing Page
               </Anchor>
-              <Text size="xs" c="dimmed">Self-hosted. Data tetap milikmu.</Text>
+              <Text size="xs" c="dimmed">
+                Self-hosted. Data tetap milikmu.
+              </Text>
             </Group>
           </Group>
         </Container>

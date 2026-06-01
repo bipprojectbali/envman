@@ -1,34 +1,20 @@
-import {
-  Alert,
-  Box,
-  Code,
-  Group,
-  SegmentedControl,
-  Stack,
-  Switch,
-  Text,
-  ThemeIcon,
-} from '@mantine/core'
+import { Alert, Box, Code, Group, SegmentedControl, Stack, Switch, Text, ThemeIcon } from '@mantine/core'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  TbAlertTriangle,
-  TbBan,
-  TbCheck,
-  TbInfoCircle,
-  TbLock,
-  TbShieldCheck,
-  TbUser,
-} from 'react-icons/tb'
+import { TbAlertTriangle, TbBan, TbCheck, TbInfoCircle, TbLock, TbShieldCheck, TbUser } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
-import { GLOBAL_ROLE_COLOR } from './types'
 import type { GlobalRole, UserDetail } from './types'
+import { GLOBAL_ROLE_COLOR } from './types'
 
 const ROLE_DESCRIPTIONS: Record<GlobalRole, { label: string; description: string; icon: typeof TbUser }> = {
   USER: { label: 'USER', description: 'Default. Tidak punya hak istimewa. Lihat profile saja.', icon: TbUser },
   QC: { label: 'QC', description: 'Akses dashboard ticket (QC workflow). Tidak ke envmanager.', icon: TbShieldCheck },
   ADMIN: { label: 'ADMIN', description: 'Akses envmanager. Hak harus di-grant via capability.', icon: TbShieldCheck },
-  SUPER_ADMIN: { label: 'SUPER_ADMIN', description: 'Bypass semua. Akses penuh ke /dev, /envmanager, /dashboard.', icon: TbLock },
+  SUPER_ADMIN: {
+    label: 'SUPER_ADMIN',
+    description: 'Bypass semua. Akses penuh ke /dev, /envmanager, /dashboard.',
+    icon: TbLock,
+  },
 }
 
 export function ProfileTab({ user }: { user: UserDetail }) {
@@ -60,21 +46,31 @@ export function ProfileTab({ user }: { user: UserDetail }) {
   return (
     <Stack gap="md">
       {/* Global Role */}
-      <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+      <Box
+        p="md"
+        style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+      >
         <Group gap="xs" mb="xs">
           <ThemeIcon size={22} radius="md" variant="light" color="violet">
             <TbShieldCheck size={13} />
           </ThemeIcon>
-          <Text size="sm" fw={600}>Global Role</Text>
+          <Text size="sm" fw={600}>
+            Global Role
+          </Text>
         </Group>
         <Text size="xs" c="dimmed" mb="sm">
-          Identity user di sistem. ADMIN tidak punya hak default — semua akses harus di-grant via capability/access matrix.
+          Identity user di sistem. ADMIN tidak punya hak default — semua akses harus di-grant via capability/access
+          matrix.
         </Text>
 
         {isSuperAdmin ? (
           <Alert color="violet" variant="light" icon={<TbLock size={14} />} p="sm">
-            <Text size="xs" fw={500}>SUPER_ADMIN tidak dapat diubah dari sini.</Text>
-            <Text size="xs" c="dimmed">Promote/demote SUPER_ADMIN hanya via Prisma Studio atau database langsung.</Text>
+            <Text size="xs" fw={500}>
+              SUPER_ADMIN tidak dapat diubah dari sini.
+            </Text>
+            <Text size="xs" c="dimmed">
+              Promote/demote SUPER_ADMIN hanya via Prisma Studio atau database langsung.
+            </Text>
           </Alert>
         ) : (
           <SegmentedControl
@@ -82,7 +78,7 @@ export function ProfileTab({ user }: { user: UserDetail }) {
             onChange={(v) => roleMutation.mutate(v as GlobalRole)}
             disabled={roleMutation.isPending}
             color={GLOBAL_ROLE_COLOR[user.role]}
-            data={(['USER', 'QC', 'ADMIN'] as const).map(r => ({
+            data={(['USER', 'QC', 'ADMIN'] as const).map((r) => ({
               value: r,
               label: (
                 <Group gap={5} justify="center" wrap="nowrap">
@@ -95,7 +91,9 @@ export function ProfileTab({ user }: { user: UserDetail }) {
                       flexShrink: 0,
                     }}
                   />
-                  <Text size="xs" fw={500}>{r}</Text>
+                  <Text size="xs" fw={500}>
+                    {r}
+                  </Text>
                 </Group>
               ),
             }))}
@@ -103,13 +101,7 @@ export function ProfileTab({ user }: { user: UserDetail }) {
         )}
 
         {!isSuperAdmin && (
-          <Alert
-            color={GLOBAL_ROLE_COLOR[user.role]}
-            variant="light"
-            mt="sm"
-            p="xs"
-            icon={<TbInfoCircle size={13} />}
-          >
+          <Alert color={GLOBAL_ROLE_COLOR[user.role]} variant="light" mt="sm" p="xs" icon={<TbInfoCircle size={13} />}>
             <Text size="xs">
               <b>{ROLE_DESCRIPTIONS[user.role].label}:</b> {ROLE_DESCRIPTIONS[user.role].description}
             </Text>
@@ -118,17 +110,24 @@ export function ProfileTab({ user }: { user: UserDetail }) {
       </Box>
 
       {/* Account Status */}
-      <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+      <Box
+        p="md"
+        style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+      >
         <Group gap="xs" mb="xs">
           <ThemeIcon size={22} radius="md" variant="light" color={user.blocked ? 'red' : 'teal'}>
             {user.blocked ? <TbBan size={13} /> : <TbCheck size={13} />}
           </ThemeIcon>
-          <Text size="sm" fw={600}>Account Status</Text>
+          <Text size="sm" fw={600}>
+            Account Status
+          </Text>
         </Group>
 
         <Group justify="space-between" align="flex-start" wrap="nowrap">
           <Box style={{ flex: 1 }}>
-            <Text size="sm" fw={500}>{user.blocked ? 'Akun di-block' : 'Akun aktif'}</Text>
+            <Text size="sm" fw={500}>
+              {user.blocked ? 'Akun di-block' : 'Akun aktif'}
+            </Text>
             <Text size="xs" c="dimmed">
               {user.blocked
                 ? 'User tidak bisa login. Semua session aktif dihapus saat di-block.'
@@ -148,7 +147,9 @@ export function ProfileTab({ user }: { user: UserDetail }) {
 
         {isSuperAdmin && (
           <Alert color="gray" variant="light" mt="sm" p="xs" icon={<TbLock size={12} />}>
-            <Text size="xs" c="dimmed">SUPER_ADMIN tidak bisa di-block.</Text>
+            <Text size="xs" c="dimmed">
+              SUPER_ADMIN tidak bisa di-block.
+            </Text>
           </Alert>
         )}
 
@@ -164,9 +165,9 @@ export function ProfileTab({ user }: { user: UserDetail }) {
       {/* Catatan */}
       <Alert color="gray" variant="light" icon={<TbInfoCircle size={14} />} p="sm">
         <Text size="xs" c="dimmed" lh={1.6}>
-          • Akses per <b>project</b> dan <b>environment</b> → tab <Code fz={10}>Access Matrix</Code>.<br />
-          • Grant <b>capability</b> (create project, view connection, dll) → tab <Code fz={10}>Permissions</Code>.<br />
-          • Perubahan block/role berlaku <b>seketika</b> tanpa perlu refresh.
+          • Akses per <b>project</b> dan <b>environment</b> → tab <Code fz={10}>Access Matrix</Code>.<br />• Grant{' '}
+          <b>capability</b> (create project, view connection, dll) → tab <Code fz={10}>Permissions</Code>.<br />•
+          Perubahan block/role berlaku <b>seketika</b> tanpa perlu refresh.
         </Text>
       </Alert>
     </Stack>

@@ -9,20 +9,12 @@
 //        → kalau PID file ada tapi proses mati, cleanup PID file + socket
 //          sebelum bind baru.
 
-import {
-  openSync,
-  closeSync,
-  writeSync,
-  readFileSync,
-  existsSync,
-  unlinkSync,
-  constants as fsConstants,
-} from 'fs'
-import { spawnSync } from 'child_process'
+import { spawnSync } from 'node:child_process'
+import { closeSync, existsSync, constants as fsConstants, openSync, readFileSync, unlinkSync, writeSync } from 'node:fs'
 
 export interface PidFileContent {
   pid: number
-  startEpochMs: number    // process start time, untuk PID-hijack guard
+  startEpochMs: number // process start time, untuk PID-hijack guard
   socketPath: string
 }
 
@@ -76,10 +68,12 @@ export function parseEtime(etime: string): number | null {
     days = parseInt(dayMatch[1], 10)
     rest = dayMatch[2]
   }
-  const parts = rest.split(':').map(s => parseInt(s, 10))
-  if (parts.some(p => !Number.isFinite(p))) return null
+  const parts = rest.split(':').map((s) => parseInt(s, 10))
+  if (parts.some((p) => !Number.isFinite(p))) return null
 
-  let hh = 0, mm = 0, ss = 0
+  let hh = 0,
+    mm = 0,
+    ss = 0
   if (parts.length === 1) {
     ss = parts[0]
   } else if (parts.length === 2) {
@@ -108,7 +102,7 @@ export function isPidAlive(pid: number): boolean {
     return true
   } catch (e: any) {
     if (e.code === 'EPERM') return true
-    return false  // ESRCH atau errno lain
+    return false // ESRCH atau errno lain
   }
 }
 
@@ -122,11 +116,7 @@ export class PidFile {
    *   - 'EACCES'/'ENOENT' dll: filesystem error
    */
   tryAcquire(content: PidFileContent): void {
-    const fd = openSync(
-      this.path,
-      fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY,
-      0o600,
-    )
+    const fd = openSync(this.path, fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY, 0o600)
     try {
       const data = `${content.pid}\n${content.startEpochMs}\n${content.socketPath}\n`
       writeSync(fd, data)

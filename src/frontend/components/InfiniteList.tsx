@@ -1,5 +1,5 @@
-import { Button, Center, Loader, Stack, Text } from '@mantine/core'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { Button, Center, Loader, Stack } from '@mantine/core'
+import { type ReactNode, useEffect, useRef } from 'react'
 
 interface InfiniteListProps {
   children: ReactNode
@@ -25,7 +25,9 @@ export function InfiniteList({
     const el = sentinelRef.current
     if (!el) return
     const observer = new IntersectionObserver(
-      (entries) => { if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage() },
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage()
+      },
       { rootMargin: '200px' },
     )
     observer.observe(el)
@@ -33,17 +35,23 @@ export function InfiniteList({
   }, [autoLoad, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   if (isLoading) {
-    return <Center py="xl"><Loader size="sm" /></Center>
+    return (
+      <Center py="xl">
+        <Loader size="sm" />
+      </Center>
+    )
   }
 
   return (
     <Stack gap={0}>
       {children}
       <div ref={sentinelRef} />
-      {isFetchingNextPage && <Center py="md"><Loader size="xs" /></Center>}
-      {!hasNextPage && !isLoading && (
-        <div />
+      {isFetchingNextPage && (
+        <Center py="md">
+          <Loader size="xs" />
+        </Center>
       )}
+      {!hasNextPage && !isLoading && <div />}
       {hasNextPage && !autoLoad && (
         <Center mt="sm">
           <Button size="xs" variant="subtle" onClick={fetchNextPage} loading={isFetchingNextPage}>

@@ -1,18 +1,18 @@
 // Build McpServer + register modules based on mode (readonly vs write).
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { log } from './logger'
 import type { ToolContext, ToolModule } from './shared'
+import { aliasesReadModule } from './tools/aliases'
+import { aliasesWriteModule } from './tools/aliases-write'
+import { filesReadModule } from './tools/files'
+import { filesWriteModule } from './tools/files-write'
 import { metaModule } from './tools/meta'
+import { pmReadonlyModule } from './tools/pm-readonly'
+import { pmWriteModule } from './tools/pm-write'
 import { projectsModule } from './tools/projects'
 import { varsReadModule } from './tools/vars'
-import { aliasesReadModule } from './tools/aliases'
-import { filesReadModule } from './tools/files'
-import { pmReadonlyModule } from './tools/pm-readonly'
 import { varsWriteModule } from './tools/vars-write'
-import { aliasesWriteModule } from './tools/aliases-write'
-import { filesWriteModule } from './tools/files-write'
-import { pmWriteModule } from './tools/pm-write'
-import { log } from './logger'
 
 export interface ServerOpts {
   /** Server name as advertised to client. */

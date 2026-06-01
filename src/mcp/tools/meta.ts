@@ -4,8 +4,8 @@
 import { z } from 'zod'
 import { apiCall } from '../api-client'
 import { fetchWhoami } from '../auth'
-import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 import { toErrorResponse } from '../errors'
+import { jsonResponse, type ToolModule, type ToolResponse } from '../shared'
 
 const WhoamiInputSchema = z.object({}).strict()
 

@@ -2,7 +2,10 @@
 // Bug E1, E2 mitigation: tidak pernah throw raw — selalu return { isError: true, content }.
 
 export class McpToolError extends Error {
-  constructor(public userMessage: string, public httpStatus?: number) {
+  constructor(
+    public userMessage: string,
+    public httpStatus?: number,
+  ) {
     super(userMessage)
   }
 }
@@ -46,7 +49,7 @@ function safeBody(body: string): string {
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer ***')
     .replace(/"token"\s*:\s*"[^"]+"/gi, '"token":"***"')
     .replace(/"password"\s*:\s*"[^"]+"/gi, '"password":"***"')
-  return cleaned.length > REDACT_LIMIT ? cleaned.slice(0, REDACT_LIMIT) + '...' : cleaned
+  return cleaned.length > REDACT_LIMIT ? `${cleaned.slice(0, REDACT_LIMIT)}...` : cleaned
 }
 
 /**
@@ -83,7 +86,11 @@ export function mapHttpError(status: number, body: string, resource = 'Resource'
  * Convert any error → MCP tool error response (isError: true).
  * NEVER let an exception escape the handler — Claude Code stdio has no auto-reconnect.
  */
-export function toErrorResponse(e: unknown): { isError: true; content: Array<{ type: 'text'; text: string }>; [k: string]: unknown } {
+export function toErrorResponse(e: unknown): {
+  isError: true
+  content: Array<{ type: 'text'; text: string }>
+  [k: string]: unknown
+} {
   let text: string
   if (e instanceof McpToolError) {
     text = `Error: ${e.userMessage}`

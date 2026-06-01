@@ -2,9 +2,9 @@
 // Reuses CLI's resolveAuth chain (local env → process.env → config.json)
 // but does NOT call process.exit on missing — throws instead.
 
-import { existsSync, readFileSync } from 'fs'
-import { homedir } from 'os'
-import { join } from 'path'
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { apiCall, type Config } from './api-client'
 import { WHOAMI_CACHE_TTL_MS } from './constants'
 import { AuthError } from './errors'
@@ -22,8 +22,8 @@ export class MissingAuthError extends Error {
   constructor() {
     super(
       'No envman credentials found. Either:\n' +
-      '  1. Run `envman login <server-url> --token <token>`, or\n' +
-      '  2. Set ENVMAN_SERVER + ENVMAN_TOKEN environment variables.',
+        '  1. Run `envman login <server-url> --token <token>`, or\n' +
+        '  2. Set ENVMAN_SERVER + ENVMAN_TOKEN environment variables.',
     )
   }
 }

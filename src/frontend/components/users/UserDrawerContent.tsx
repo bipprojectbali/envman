@@ -14,20 +14,13 @@ import {
   Tooltip,
 } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
-import {
-  TbBan,
-  TbCheck,
-  TbCopy,
-  TbKey,
-  TbShieldCheck,
-  TbUser,
-} from 'react-icons/tb'
+import { TbBan, TbCheck, TbCopy, TbKey, TbShieldCheck, TbUser } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
-import { GLOBAL_ROLE_COLOR } from './types'
-import type { UserAccess } from './types'
 import { AccessMatrixTab } from './AccessMatrixTab'
 import { PermissionsTab } from './PermissionsTab'
 import { ProfileTab } from './ProfileTab'
+import type { UserAccess } from './types'
+import { GLOBAL_ROLE_COLOR } from './types'
 
 export function UserDrawerContent({ userId }: { userId: string }) {
   const { data, isLoading } = useQuery<UserAccess>({
@@ -52,7 +45,7 @@ export function UserDrawerContent({ userId }: { userId: string }) {
           </Box>
           <Divider />
           <SimpleGrid cols={3} p="sm">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3].map((i) => (
               <Stack key={i} gap={4} align="center" py="xs">
                 <Skeleton circle height={28} width={28} />
                 <Skeleton height={18} width={32} radius="sm" />
@@ -73,9 +66,9 @@ export function UserDrawerContent({ userId }: { userId: string }) {
   }
 
   const { user, projects } = data
-  const accessibleProjects = projects.filter(p => p.projectRole !== null).length
+  const accessibleProjects = projects.filter((p) => p.projectRole !== null).length
   const envOverrides = projects.reduce(
-    (sum, p) => sum + p.environments.filter(e => e.envRole !== 'inherit').length,
+    (sum, p) => sum + p.environments.filter((e) => e.envRole !== 'inherit').length,
     0,
   )
   const permissionCount = user.permissions.length
@@ -120,9 +113,13 @@ export function UserDrawerContent({ userId }: { userId: string }) {
               )}
             </Box>
             <Box style={{ minWidth: 0, flex: 1 }}>
-              <Text fw={700} size="md" truncate mb={2}>{user.name}</Text>
+              <Text fw={700} size="md" truncate mb={2}>
+                {user.name}
+              </Text>
               <Group gap={4} mb={8}>
-                <Text size="xs" c="dimmed" truncate style={{ maxWidth: 240 }}>{user.email}</Text>
+                <Text size="xs" c="dimmed" truncate style={{ maxWidth: 240 }}>
+                  {user.email}
+                </Text>
                 <CopyButton value={user.email}>
                   {({ copied, copy }) => (
                     <Tooltip label={copied ? 'Disalin' : 'Copy email'} withArrow>
@@ -134,12 +131,18 @@ export function UserDrawerContent({ userId }: { userId: string }) {
                 </CopyButton>
               </Group>
               <Group gap={6}>
-                <Badge size="sm" color={roleColor} variant="filled">{user.role}</Badge>
+                <Badge size="sm" color={roleColor} variant="filled">
+                  {user.role}
+                </Badge>
                 {user.blocked && (
-                  <Badge size="xs" color="red" variant="light" leftSection={<TbBan size={9} />}>Blocked</Badge>
+                  <Badge size="xs" color="red" variant="light" leftSection={<TbBan size={9} />}>
+                    Blocked
+                  </Badge>
                 )}
                 {isSuperAdmin && (
-                  <Badge size="xs" color="violet" variant="dot">bypass all</Badge>
+                  <Badge size="xs" color="violet" variant="dot">
+                    bypass all
+                  </Badge>
                 )}
               </Group>
             </Box>
@@ -151,11 +154,19 @@ export function UserDrawerContent({ userId }: { userId: string }) {
           {[
             { value: accessibleProjects, label: 'Projects', color: accessibleProjects > 0 ? 'violet' : 'gray' },
             { value: envOverrides, label: 'Overrides', color: envOverrides > 0 ? 'orange' : 'gray' },
-            { value: isSuperAdmin ? '∞' : permissionCount, label: 'Capabilities', color: isSuperAdmin ? 'violet' : permissionCount > 0 ? 'teal' : 'gray' },
-          ].map(s => (
+            {
+              value: isSuperAdmin ? '∞' : permissionCount,
+              label: 'Capabilities',
+              color: isSuperAdmin ? 'violet' : permissionCount > 0 ? 'teal' : 'gray',
+            },
+          ].map((s) => (
             <Stack key={s.label} gap={2} align="center">
-              <Text size="xl" fw={800} lh={1} c={s.color}>{s.value}</Text>
-              <Text size="xs" c="dimmed">{s.label}</Text>
+              <Text size="xl" fw={800} lh={1} c={s.color}>
+                {s.value}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {s.label}
+              </Text>
             </Stack>
           ))}
         </Group>
@@ -164,13 +175,17 @@ export function UserDrawerContent({ userId }: { userId: string }) {
       {/* Tabs */}
       <Tabs defaultValue="profile" variant="pills" color={roleColor}>
         <Tabs.List>
-          <Tabs.Tab value="profile" leftSection={<TbUser size={14} />}>Profile</Tabs.Tab>
+          <Tabs.Tab value="profile" leftSection={<TbUser size={14} />}>
+            Profile
+          </Tabs.Tab>
           {!isUserOnly && (
             <Tabs.Tab value="access" leftSection={<TbShieldCheck size={14} />}>
               <Group gap={4} wrap="nowrap">
                 Access Matrix
                 {accessibleProjects > 0 && (
-                  <Badge size="xs" color="violet" variant="filled" circle>{accessibleProjects}</Badge>
+                  <Badge size="xs" color="violet" variant="filled" circle>
+                    {accessibleProjects}
+                  </Badge>
                 )}
               </Group>
             </Tabs.Tab>
@@ -180,7 +195,9 @@ export function UserDrawerContent({ userId }: { userId: string }) {
               <Group gap={4} wrap="nowrap">
                 Permissions
                 {!isSuperAdmin && permissionCount > 0 && (
-                  <Badge size="xs" color="teal" variant="filled" circle>{permissionCount}</Badge>
+                  <Badge size="xs" color="teal" variant="filled" circle>
+                    {permissionCount}
+                  </Badge>
                 )}
               </Group>
             </Tabs.Tab>

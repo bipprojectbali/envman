@@ -11,7 +11,7 @@
 // Mengubah brand color = ubah di satu tempat (file ini), semua komponen
 // auto-pick. Ini yang dimaksud "single source of truth".
 
-import { createTheme, rem, type MantineGradient } from '@mantine/core'
+import { createTheme, type MantineGradient, rem } from '@mantine/core'
 
 // Brand gradient dipakai di hero, ThemeIcon, CTA button, dll.
 // Mantine auto-pakai di komponen dengan `variant="gradient"` tanpa

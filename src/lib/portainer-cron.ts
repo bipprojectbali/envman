@@ -1,5 +1,5 @@
-import { prisma } from './db'
 import { appLog } from './applog'
+import { prisma } from './db'
 
 type ActiveCron = { stop(): void }
 
@@ -68,7 +68,9 @@ export async function runBackup(
               const d = (await r.json()) as { StackFileContent: string }
               composeFiles[`${stack.Name}.yml`] = d.StackFileContent
             }
-          } catch { /* skip individual stack errors */ }
+          } catch {
+            /* skip individual stack errors */
+          }
         }),
       )
 
@@ -123,14 +125,19 @@ export async function syncBackupCrons() {
         } catch {
           ok_flag.ok = false
         }
-        await prisma.portainerBackupSchedule.update({
-          where: { id: schedule.id },
-          data: { lastRunAt: new Date(), lastRunOk: ok_flag.ok },
-        }).catch(() => {})
+        await prisma.portainerBackupSchedule
+          .update({
+            where: { id: schedule.id },
+            data: { lastRunAt: new Date(), lastRunOk: ok_flag.ok },
+          })
+          .catch(() => {})
       })
       activeCrons.set(schedule.connectionId, job)
     } catch (err) {
-      appLog('warn', `Invalid backup cron for connection ${schedule.connectionId}: ${err instanceof Error ? err.message : String(err)}`)
+      appLog(
+        'warn',
+        `Invalid backup cron for connection ${schedule.connectionId}: ${err instanceof Error ? err.message : String(err)}`,
+      )
     }
   }
 

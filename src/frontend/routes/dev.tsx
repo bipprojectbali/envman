@@ -1,6 +1,16 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-const validTabs = ['overview', 'users', 'tickets', 'app-logs', 'user-logs', 'database', 'project', 'extensions', 'settings'] as const
+const validTabs = [
+  'overview',
+  'users',
+  'tickets',
+  'app-logs',
+  'user-logs',
+  'database',
+  'project',
+  'extensions',
+  'settings',
+] as const
 
 export const Route = createFileRoute('/dev')({
   validateSearch: (search: Record<string, unknown>) => ({

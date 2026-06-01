@@ -2,29 +2,32 @@
 
 import { z } from 'zod'
 import { apiCall } from '../api-client'
-import { jsonResponse, markdownResponse, type ToolModule, type ToolResponse } from '../shared'
-import { toErrorResponse } from '../errors'
 import { emitAudit } from '../audit'
-import { SlugRef, EnvName, Pagination } from '../schemas/common'
+import { toErrorResponse } from '../errors'
+import { EnvName, Pagination, SlugRef } from '../schemas/common'
+import { jsonResponse, markdownResponse, type ToolModule, type ToolResponse } from '../shared'
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
-const VarsListInputSchema = z.object({
-  slug: SlugRef,
-  env: EnvName,
-  search: z.string().optional()
-    .describe('Substring match on KEY (case-insensitive). Omit to list all.'),
-  ...Pagination.shape,
-}).strict()
+const VarsListInputSchema = z
+  .object({
+    slug: SlugRef,
+    env: EnvName,
+    search: z.string().optional().describe('Substring match on KEY (case-insensitive). Omit to list all.'),
+    ...Pagination.shape,
+  })
+  .strict()
 
-const VarRecordSchema = z.object({
-  id: z.string(),
-  key: z.string(),
-  value: z.string().describe('Actual value, or "***" for secrets when token is VIEWER role'),
-  isSecret: z.boolean(),
-  isDisabled: z.boolean(),
-  updatedAt: z.string(),
-}).passthrough()
+const VarRecordSchema = z
+  .object({
+    id: z.string(),
+    key: z.string(),
+    value: z.string().describe('Actual value, or "***" for secrets when token is VIEWER role'),
+    isSecret: z.boolean(),
+    isDisabled: z.boolean(),
+    updatedAt: z.string(),
+  })
+  .passthrough()
 
 const VarsListOutputSchema = z.object({
   vars: z.array(VarRecordSchema),
@@ -34,12 +37,18 @@ const VarsListOutputSchema = z.object({
   hasMore: z.boolean(),
 })
 
-const VarsExportInputSchema = z.object({
-  slug: SlugRef,
-  env: EnvName,
-  revealSecrets: z.boolean().default(false)
-    .describe('If true, return decrypted secret values (requires EDITOR/OWNER role). DEFAULT FALSE — secrets shown as "***".'),
-}).strict()
+const VarsExportInputSchema = z
+  .object({
+    slug: SlugRef,
+    env: EnvName,
+    revealSecrets: z
+      .boolean()
+      .default(false)
+      .describe(
+        'If true, return decrypted secret values (requires EDITOR/OWNER role). DEFAULT FALSE — secrets shown as "***".',
+      ),
+  })
+  .strict()
 
 const VarsExportOutputSchema = z.object({
   vars: z.record(z.string(), z.string()),
@@ -47,24 +56,30 @@ const VarsExportOutputSchema = z.object({
   secretsRevealed: z.boolean(),
 })
 
-const VarsDiffInputSchema = z.object({
-  slug: SlugRef,
-  env1: EnvName.describe('First environment to compare (e.g., "dev")'),
-  env2: EnvName.describe('Second environment to compare (e.g., "production")'),
-}).strict()
+const VarsDiffInputSchema = z
+  .object({
+    slug: SlugRef,
+    env1: EnvName.describe('First environment to compare (e.g., "dev")'),
+    env2: EnvName.describe('Second environment to compare (e.g., "production")'),
+  })
+  .strict()
 
-const DiffEntrySchema = z.object({
-  key: z.string(),
-  value1: z.string().nullable(),
-  value2: z.string().nullable(),
-}).passthrough()
+const DiffEntrySchema = z
+  .object({
+    key: z.string(),
+    value1: z.string().nullable(),
+    value2: z.string().nullable(),
+  })
+  .passthrough()
 
-const VarsDiffOutputSchema = z.object({
-  same: z.array(DiffEntrySchema),
-  different: z.array(DiffEntrySchema),
-  only_env1: z.array(DiffEntrySchema),
-  only_env2: z.array(DiffEntrySchema),
-}).passthrough()
+const VarsDiffOutputSchema = z
+  .object({
+    same: z.array(DiffEntrySchema),
+    different: z.array(DiffEntrySchema),
+    only_env1: z.array(DiffEntrySchema),
+    only_env2: z.array(DiffEntrySchema),
+  })
+  .passthrough()
 
 // ─── Descriptions ─────────────────────────────────────────────────────────────
 

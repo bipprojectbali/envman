@@ -4,16 +4,16 @@
 //   I5: body size limit 1MB (cegah OOM dari corrupt JSON)
 //   I3: error responses selalu structured JSON (CLI tidak hang on undefined)
 
+import { type ApiError, ERROR_CODES, type ErrorCode } from '../shared/types'
 import { log } from './logger'
-import { ERROR_CODES, type ApiError, type ErrorCode } from '../shared/types'
 
-const MAX_BODY_SIZE = 1_000_000  // 1MB
+const MAX_BODY_SIZE = 1_000_000 // 1MB
 
 export type HandlerCtx = {
   requestId: string
-  body: any                       // parsed JSON, atau null kalau GET/DELETE
-  signal?: AbortSignal            // request abort signal (untuk SSE cleanup)
-  url: URL                        // parsed URL (untuk query params)
+  body: any // parsed JSON, atau null kalau GET/DELETE
+  signal?: AbortSignal // request abort signal (untuk SSE cleanup)
+  url: URL // parsed URL (untuk query params)
 }
 
 export type Handler = (ctx: HandlerCtx) => Promise<Response> | Response
@@ -37,7 +37,7 @@ export class Router {
     const paramNames: string[] = []
     const regexSrc = pattern
       .split('/')
-      .map(seg => {
+      .map((seg) => {
         if (seg.startsWith(':')) {
           paramNames.push(seg.slice(1))
           return '([^/]+)'
@@ -58,9 +58,7 @@ export class Router {
     const url = new URL(req.url)
     const path = url.pathname
 
-    const route = this.routes.find(
-      r => r.method === req.method.toUpperCase() && r.pattern.test(path),
-    )
+    const route = this.routes.find((r) => r.method === req.method.toUpperCase() && r.pattern.test(path))
     if (!route) {
       return errorResponse('NOT_FOUND', `No route for ${req.method} ${path}`, requestId)
     }
@@ -75,20 +73,12 @@ export class Router {
     if (req.method !== 'GET' && req.method !== 'DELETE') {
       const contentLength = Number(req.headers.get('content-length') ?? '0')
       if (contentLength > MAX_BODY_SIZE) {
-        return errorResponse(
-          'PAYLOAD_TOO_LARGE',
-          `Request body exceeds ${MAX_BODY_SIZE} bytes`,
-          requestId,
-        )
+        return errorResponse('PAYLOAD_TOO_LARGE', `Request body exceeds ${MAX_BODY_SIZE} bytes`, requestId)
       }
       try {
         const text = await req.text()
         if (text.length > MAX_BODY_SIZE) {
-          return errorResponse(
-            'PAYLOAD_TOO_LARGE',
-            `Request body exceeds ${MAX_BODY_SIZE} bytes`,
-            requestId,
-          )
+          return errorResponse('PAYLOAD_TOO_LARGE', `Request body exceeds ${MAX_BODY_SIZE} bytes`, requestId)
         }
         body = text ? JSON.parse(text) : null
       } catch (e: any) {
@@ -106,10 +96,7 @@ export class Router {
 }
 
 export function okResponse(data: object, requestId: string): Response {
-  return Response.json(
-    { ok: true, requestId, ...data },
-    { headers: { 'x-request-id': requestId } },
-  )
+  return Response.json({ ok: true, requestId, ...data }, { headers: { 'x-request-id': requestId } })
 }
 
 export function errorResponse(code: ErrorCode, message: string, requestId: string): Response {

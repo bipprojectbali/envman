@@ -1,9 +1,19 @@
-import { useEffect, useState } from 'react'
 import {
-  ActionIcon, Badge, Box, Container, Group,
-  Pagination, SegmentedControl, Stack, Table, Text, Title, Tooltip,
+  ActionIcon,
+  Badge,
+  Box,
+  Container,
+  Group,
+  Pagination,
+  SegmentedControl,
+  Stack,
+  Table,
+  Text,
+  Title,
+  Tooltip,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { TbRefresh, TbTrash } from 'react-icons/tb'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import type { AppLogEntry } from './types'
@@ -35,7 +45,10 @@ export function AppLogsPanel() {
 
   const clearLogs = useMutation({
     mutationFn: () => fetch('/api/admin/logs/app', { method: 'DELETE', credentials: 'include' }).then((r) => r.json()),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'logs', 'app'] }); notifyOk('App logs dihapus') },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'logs', 'app'] })
+      notifyOk('App logs dihapus')
+    },
     onError: (e) => notifyErr(e),
   })
 
