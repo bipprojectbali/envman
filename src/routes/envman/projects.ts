@@ -256,6 +256,47 @@ export const projectsRouter = new Elysia()
     return { ok: true }
   })
 
+  // ─── Available users for member add (OWNER only) ──────
+  .get('/api/envman/projects/:slug/available-users', async ({ request, params, set, query }) => {
+    const auth = await requireEnvAuth(request)
+    if (!auth) {
+      set.status = 401
+      return { error: 'Unauthorized' }
+    }
+    const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+    if (!access || access !== 'OWNER') {
+      set.status = 403
+      return { error: 'Owner required' }
+    }
+    const search = ((query as Record<string, unknown>).search as string | undefined)?.trim() ?? ''
+    const project = await prisma.project.findUnique({ where: { slug: params.slug }, select: { id: true } })
+    if (!project) {
+      set.status = 404
+      return { error: 'Not found' }
+    }
+    const existingIds = (
+      await prisma.projectMember.findMany({ where: { projectId: project.id }, select: { userId: true } })
+    ).map((m) => m.userId)
+    const users = await prisma.user.findMany({
+      where: {
+        id: { notIn: existingIds },
+        blocked: false,
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { email: { contains: search, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+      select: { id: true, name: true, email: true },
+      take: 200,
+      orderBy: { name: 'asc' },
+    })
+    return { users }
+  })
+
   // ─── Environments ─────────────────────────────────────
   .post('/api/envman/projects/:slug/environments', async ({ request, params, set }) => {
     const auth = await requireEnvAuth(request)

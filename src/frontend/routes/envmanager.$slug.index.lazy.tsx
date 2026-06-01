@@ -50,6 +50,7 @@ import {
 } from 'react-icons/tb'
 import { AliasesPanel } from '@/frontend/components/slug/AliasesPanel'
 import { FilesPanel } from '@/frontend/components/slug/FilesPanel'
+import { MembersPanel } from '@/frontend/components/slug/MembersPanel'
 import { NotesPanel } from '@/frontend/components/slug/NotesPanel'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/api'
@@ -569,6 +570,19 @@ function ProjectDetailPage() {
             >
               Files
             </Tabs.Tab>
+            <Tabs.Tab
+              value="members"
+              leftSection={<TbUsers size={13} />}
+              rightSection={
+                memberCount > 0 ? (
+                  <Badge size="xs" variant="light" color="primary" circle>
+                    {memberCount}
+                  </Badge>
+                ) : undefined
+              }
+            >
+              Members
+            </Tabs.Tab>
           </Tabs.List>
 
           {/* ── Environments tab ── */}
@@ -969,6 +983,19 @@ function ProjectDetailPage() {
           <Tabs.Panel value="files">
             <Paper withBorder p="md" radius="md">
               <FilesPanel slug={slug} isOwner={isOwner} myUserId={myUserId ?? ''} canEdit={canEdit} />
+            </Paper>
+          </Tabs.Panel>
+
+          {/* ── Members tab ── */}
+          <Tabs.Panel value="members">
+            <Paper withBorder p="md" radius="md">
+              <MembersPanel
+                slug={slug}
+                members={project?.members ?? []}
+                isOwner={isOwner}
+                myUserId={myUserId ?? ''}
+                onRefresh={refetch}
+              />
             </Paper>
           </Tabs.Panel>
         </Tabs>

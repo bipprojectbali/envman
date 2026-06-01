@@ -97,6 +97,22 @@ function tagColor(tag: string): string {
   return TAG_COLORS[h % TAG_COLORS.length]
 }
 
+function groupByPrimaryTag<T extends { tags?: string[] | null }>(items: T[]): { tag: string | null; items: T[] }[] {
+  const map = new Map<string, T[]>()
+  const noTag: T[] = []
+  for (const item of items) {
+    const tag = item.tags?.[0] ?? null
+    if (tag === null) noTag.push(item)
+    else {
+      if (!map.has(tag)) map.set(tag, [])
+      map.get(tag)!.push(item)
+    }
+  }
+  const result: { tag: string | null; items: T[] }[] = [...map.entries()].map(([tag, items]) => ({ tag, items }))
+  if (noTag.length > 0) result.push({ tag: null, items: noTag })
+  return result
+}
+
 function relativeDate(iso?: string): string {
   if (!iso) return ''
   const ms = Date.now() - new Date(iso).getTime()
@@ -820,39 +836,75 @@ function ProjectListPage() {
                     <Box style={{ flex: 1, height: 1, background: 'var(--mantine-color-default-border)' }} />
                   </Group>
                 )}
-                {view === 'list' ? (
-                  <Stack gap="xs">
-                    {group.items.map((p) => (
-                      <ProjectListCard
-                        key={p.slug}
-                        project={p}
-                        isPinned={pinned.includes(p.slug)}
-                        onPin={() => togglePin(p.slug)}
-                        onEdit={() => openEditPage(p.slug)}
-                        onDelete={() => deleteProject(p.slug, p.name)}
-                        onToggleActive={() => confirmToggleActive(p.slug, p.name, p.isActive)}
-                        onTagClick={addTagFilter}
-                        onClick={() => openProject(p.slug)}
-                      />
-                    ))}
-                  </Stack>
-                ) : (
-                  <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
-                    {group.items.map((p) => (
-                      <ProjectGridCard
-                        key={p.slug}
-                        project={p}
-                        isPinned={pinned.includes(p.slug)}
-                        onPin={() => togglePin(p.slug)}
-                        onEdit={() => openEditPage(p.slug)}
-                        onDelete={() => deleteProject(p.slug, p.name)}
-                        onToggleActive={() => confirmToggleActive(p.slug, p.name, p.isActive)}
-                        onTagClick={addTagFilter}
-                        onClick={() => openProject(p.slug)}
-                      />
-                    ))}
-                  </SimpleGrid>
-                )}
+                {(() => {
+                  const tagGroups = groupByPrimaryTag(group.items)
+                  const hasSubGroups = tagGroups.length > 1
+                  return (
+                    <Stack gap={hasSubGroups ? 'sm' : 'xs'}>
+                      {tagGroups.map((tg) => (
+                        <Box key={tg.tag ?? '__no_tag__'}>
+                          {hasSubGroups && (
+                            <Group gap="xs" mb="xs" align="center">
+                              {tg.tag ? (
+                                <Badge size="xs" variant="dot" color={tagColor(tg.tag)}>
+                                  {tg.tag}
+                                </Badge>
+                              ) : (
+                                <Text size="xs" c="dimmed" fs="italic">
+                                  no tag
+                                </Text>
+                              )}
+                              <Badge size="xs" variant="outline" radius="sm" color="gray">
+                                {tg.items.length}
+                              </Badge>
+                              <Box
+                                style={{
+                                  flex: 1,
+                                  height: 1,
+                                  background: 'var(--mantine-color-default-border)',
+                                  opacity: 0.5,
+                                }}
+                              />
+                            </Group>
+                          )}
+                          {view === 'list' ? (
+                            <Stack gap="xs">
+                              {tg.items.map((p) => (
+                                <ProjectListCard
+                                  key={p.slug}
+                                  project={p}
+                                  isPinned={pinned.includes(p.slug)}
+                                  onPin={() => togglePin(p.slug)}
+                                  onEdit={() => openEditPage(p.slug)}
+                                  onDelete={() => deleteProject(p.slug, p.name)}
+                                  onToggleActive={() => confirmToggleActive(p.slug, p.name, p.isActive)}
+                                  onTagClick={addTagFilter}
+                                  onClick={() => openProject(p.slug)}
+                                />
+                              ))}
+                            </Stack>
+                          ) : (
+                            <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
+                              {tg.items.map((p) => (
+                                <ProjectGridCard
+                                  key={p.slug}
+                                  project={p}
+                                  isPinned={pinned.includes(p.slug)}
+                                  onPin={() => togglePin(p.slug)}
+                                  onEdit={() => openEditPage(p.slug)}
+                                  onDelete={() => deleteProject(p.slug, p.name)}
+                                  onToggleActive={() => confirmToggleActive(p.slug, p.name, p.isActive)}
+                                  onTagClick={addTagFilter}
+                                  onClick={() => openProject(p.slug)}
+                                />
+                              ))}
+                            </SimpleGrid>
+                          )}
+                        </Box>
+                      ))}
+                    </Stack>
+                  )
+                })()}
               </Box>
             ))}
           </Stack>
