@@ -68,9 +68,11 @@ Session-based (HttpOnly cookie + DB). `POST /api/auth/login` → bcrypt verify �
 | Role | Default | Can Access |
 |------|---------|------------|
 | SUPER_ADMIN | `/dev` | `/dev`, `/dashboard`, `/envmanager`, `/profile` |
-| ADMIN | `/dashboard` | `/dashboard`, `/envmanager`, `/profile` |
+| ADMIN | `/envmanager` | `/dashboard`, `/envmanager`, `/profile` |
 | QC | `/dashboard` | `/dashboard` (QC tickets only), `/profile` |
-| USER | `/profile` | `/profile` |
+| USER | `/envmanager` | `/envmanager` (hanya project yang dia di-assign sebagai member), `/profile` |
+
+Model akses project: **membership-based**, bukan role-based. Global role hanya menentukan akses ke `/dev` dan `/dashboard`. Akses ke project ditentukan oleh `ProjectMember` — siapapun (termasuk `USER`) bisa di-assign ke project dengan role OWNER/EDITOR/VIEWER dan akan melihat project tersebut di `/envmanager`. User tanpa membership tidak melihat project apapun.
 
 `getDefaultRoute(role)` in `src/frontend/hooks/useAuth.ts`. Blocked → `/blocked`.
 

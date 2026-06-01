@@ -47,7 +47,7 @@ function ProfilePage() {
                 Dev
               </Button>
             )}
-            {user?.role === 'ADMIN' && (
+            {(user?.role === 'ADMIN' || user?.role === 'USER') && (
               <Button component={Link} to="/envmanager" variant="light" size="sm">
                 Env Manager
               </Button>

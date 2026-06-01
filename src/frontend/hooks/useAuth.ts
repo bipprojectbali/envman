@@ -27,8 +27,9 @@ export function getDefaultRoute(role: Role): string {
     case 'QC':
       return '/dashboard'
     case 'ADMIN':
-      // ADMIN landing di envmanager (collaboration tool main view).
-      // Dashboard (/dashboard) khusus QC ticket workflow.
+    case 'USER':
+      // ADMIN dan USER landing di envmanager.
+      // USER hanya melihat project yang dia di-assign sebagai member.
       return '/envmanager'
     default:
       return '/profile'
