@@ -1042,6 +1042,7 @@ function GistsPage() {
   const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: 'envman:gists:tagFilter', defaultValue: [] })
   const [sort, setSort] = useLocalStorage<'updated' | 'created'>({ key: 'envman:gists:sort', defaultValue: 'updated' })
   const [view, setView] = useLocalStorage<'list' | 'grid'>({ key: 'envman:gists:view', defaultValue: 'list' })
+  const [groupByTag, setGroupByTag] = useLocalStorage<boolean>({ key: 'envman:gists:groupByTag', defaultValue: true })
   const [debouncedSearch] = useDebouncedValue(search, 150)
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -1434,6 +1435,18 @@ function GistsPage() {
                   <TbLayoutGrid size={14} />
                 </ActionIcon>
               </Tooltip>
+              {allTags.length > 0 && (
+                <Tooltip label={groupByTag ? 'Nonaktifkan group by tag' : 'Group by tag'} withArrow>
+                  <ActionIcon
+                    size="sm"
+                    variant={groupByTag ? 'filled' : 'subtle'}
+                    color={groupByTag ? 'grape' : 'gray'}
+                    onClick={() => setGroupByTag((v) => !v)}
+                  >
+                    <TbTag size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
             </Group>
           </Group>
 
@@ -1518,27 +1531,6 @@ function GistsPage() {
             Reset filter
           </Button>
         </Box>
-      ) : view === 'list' ? (
-        <InfiniteList
-          fetchNextPage={fetchNextPage}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          isLoading={isLoading}
-        >
-          <Stack gap="xs">
-            {filtered.map((g) => (
-              <GistCard
-                key={g.id}
-                gist={g}
-                isOwner={canManageGist(g.user.id)}
-                onView={() => goToView(g.id)}
-                onEdit={() => goToEdit(g.id)}
-                onDelete={() => deleteGist(g)}
-                onTagClick={addTagFilter}
-              />
-            ))}
-          </Stack>
-        </InfiniteList>
       ) : (
         <InfiniteList
           fetchNextPage={fetchNextPage}
@@ -1546,19 +1538,60 @@ function GistsPage() {
           isFetchingNextPage={isFetchingNextPage}
           isLoading={isLoading}
         >
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
-            {filtered.map((g) => (
-              <GistCard
-                key={g.id}
-                gist={g}
-                isOwner={canManageGist(g.user.id)}
-                onView={() => goToView(g.id)}
-                onEdit={() => goToEdit(g.id)}
-                onDelete={() => deleteGist(g)}
-                onTagClick={addTagFilter}
-              />
-            ))}
-          </SimpleGrid>
+          {(() => {
+            const renderCards = (list: typeof filtered) =>
+              view === 'list' ? (
+                <Stack gap="xs">
+                  {list.map((g) => (
+                    <GistCard key={g.id} gist={g} isOwner={canManageGist(g.user.id)}
+                      onView={() => goToView(g.id)} onEdit={() => goToEdit(g.id)}
+                      onDelete={() => deleteGist(g)} onTagClick={addTagFilter} />
+                  ))}
+                </Stack>
+              ) : (
+                <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
+                  {list.map((g) => (
+                    <GistCard key={g.id} gist={g} isOwner={canManageGist(g.user.id)}
+                      onView={() => goToView(g.id)} onEdit={() => goToEdit(g.id)}
+                      onDelete={() => deleteGist(g)} onTagClick={addTagFilter} />
+                  ))}
+                </SimpleGrid>
+              )
+
+            if (!groupByTag || allTags.length === 0) return renderCards(filtered)
+
+            const grouped = new Map<string, typeof filtered>()
+            const untagged: typeof filtered = []
+            for (const g of filtered) {
+              if (g.tags.length === 0) { untagged.push(g); continue }
+              const tag = g.tags[0]
+              if (!grouped.has(tag)) grouped.set(tag, [])
+              grouped.get(tag)!.push(g)
+            }
+            const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
+            return (
+              <Stack gap="md">
+                {groups.map(([tag, items]) => (
+                  <Stack key={tag} gap="xs">
+                    <Group gap={6} align="center">
+                      <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                      <Divider style={{ flex: 1 }} />
+                    </Group>
+                    {renderCards(items)}
+                  </Stack>
+                ))}
+                {untagged.length > 0 && (
+                  <Stack gap="xs">
+                    <Group gap={6} align="center">
+                      <Text size="xs" c="dimmed" fw={500}>Tanpa tag</Text>
+                      <Divider style={{ flex: 1 }} />
+                    </Group>
+                    {renderCards(untagged)}
+                  </Stack>
+                )}
+              </Stack>
+            )
+          })()}
         </InfiniteList>
       )}
     </Box>
