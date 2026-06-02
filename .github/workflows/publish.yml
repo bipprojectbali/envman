@@ -84,12 +84,16 @@ jobs:
 
       # ── Upload CLI ke app via HTTP (tanpa SSH, cukup secret) ────────────────────
       # File di-overwrite setiap deploy → hanya 1 versi (latest) di volume
+      # Skip otomatis jika CLI_UPLOAD_SECRET atau APP_URL tidak di-set
       - name: Upload CLI binaries ke server
-        if: ${{ secrets.CLI_UPLOAD_SECRET != '' && secrets.APP_URL != '' }}
         env:
           CLI_UPLOAD_SECRET: ${{ secrets.CLI_UPLOAD_SECRET }}
           APP_URL: ${{ secrets.APP_URL }}
         run: |
+          if [ -z "$CLI_UPLOAD_SECRET" ] || [ -z "$APP_URL" ]; then
+            echo "CLI_UPLOAD_SECRET atau APP_URL belum di-set, skip upload"
+            exit 0
+          fi
           for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
             if [ "$platform" = "windows-x64" ]; then
               gz="dist/cli/envman-windows-x64.exe.gz"
