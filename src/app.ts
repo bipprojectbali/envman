@@ -153,16 +153,16 @@ Auth dua metode: **Session** (browser, cookie HttpOnly) dan **API Token** (\`Aut
 curl -fsSL ${origin}/install | bash
 
 # Linux x64
-curl -sL ${origin}/download/cli/linux-x64 -o envman && chmod +x envman && sudo mv envman /usr/local/bin/
+curl -sL --compressed ${origin}/download/cli/linux-x64 -o envman && chmod +x envman && sudo mv envman /usr/local/bin/
 
 # Linux ARM64
-curl -sL ${origin}/download/cli/linux-arm64 -o envman && chmod +x envman && sudo mv envman /usr/local/bin/
+curl -sL --compressed ${origin}/download/cli/linux-arm64 -o envman && chmod +x envman && sudo mv envman /usr/local/bin/
 
 # macOS Apple Silicon
-curl -sL ${origin}/download/cli/darwin-arm64 -o envman && chmod +x envman && sudo mv envman /usr/local/bin/
+curl -sL --compressed ${origin}/download/cli/darwin-arm64 -o envman && chmod +x envman && sudo mv envman /usr/local/bin/
 
 # macOS Intel
-curl -sL ${origin}/download/cli/darwin-x64 -o envman && chmod +x envman && sudo mv envman /usr/local/bin/
+curl -sL --compressed ${origin}/download/cli/darwin-x64 -o envman && chmod +x envman && sudo mv envman /usr/local/bin/
 
 # Windows (PowerShell)
 Invoke-WebRequest -Uri "${origin}/download/cli/windows-x64" -OutFile "envman.exe"
@@ -738,7 +738,7 @@ echo "Run: envman login ${origin} --token <your-token>"
         return { version: pkg.version as string }
       })
 
-      .get('/download/cli/:platform', ({ params, set }) => {
+      .get('/download/cli/:platform', async ({ params, set }) => {
         const platforms: Record<string, string> = {
           'linux-x64': 'envman-linux-x64',
           'linux-arm64': 'envman-linux-arm64',
@@ -752,9 +752,18 @@ echo "Run: envman login ${origin} --token <your-token>"
           return 'Unknown platform'
         }
 
+        // Serve dari volume lokal jika tersedia (lebih cepat dari GitHub CDN)
+        const localFile = Bun.file(`/data/cli/${filename}.gz`)
+        if (await localFile.exists()) {
+          set.headers['Content-Type'] = 'application/octet-stream'
+          set.headers['Content-Encoding'] = 'gzip'
+          set.headers['Content-Disposition'] = `attachment; filename="${filename}"`
+          return localFile
+        }
+
+        // Fallback ke GitHub Releases
         const repo = process.env.GITHUB_REPO ?? 'bipprojectbali/envman'
         const url = `https://github.com/${repo}/releases/latest/download/${filename}`
-
         set.status = 302
         set.headers.Location = url
         return null

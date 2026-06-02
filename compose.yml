@@ -31,6 +31,8 @@ services:
       # Use DIRECT_URL for migrations to bypass pooler (advisory lock requires direct connection)
       - MIGRATE_DATABASE_URL=${DIRECT_URL}
       # MIGRATE_DB_RETRIES defaults to 5 (2s delay each)
+    volumes:
+      - ./cli-dist:/data/cli:ro
     networks:
       - public-net
       - postgres-net-stg

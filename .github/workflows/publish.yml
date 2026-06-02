@@ -82,6 +82,30 @@ jobs:
           done
           echo "✓ CLI binaries uploaded to $TAG"
 
+      # ── Deploy CLI binaries ke server (serve lokal, lebih cepat dari GitHub CDN) ──
+      - name: Deploy CLI binaries ke server
+        if: ${{ secrets.CLI_DEPLOY_HOST != '' }}
+        env:
+          CLI_DEPLOY_HOST: ${{ secrets.CLI_DEPLOY_HOST }}
+          CLI_DEPLOY_USER: ${{ secrets.CLI_DEPLOY_USER }}
+          CLI_DEPLOY_KEY: ${{ secrets.CLI_DEPLOY_KEY }}
+          CLI_DEPLOY_PATH: ${{ secrets.CLI_DEPLOY_PATH || '/opt/envman/cli-dist' }}
+          STACK_ENV: ${{ github.event.inputs.stack_env }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$CLI_DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$CLI_DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Buat direktori di server jika belum ada
+          ssh -i ~/.ssh/deploy_key "$CLI_DEPLOY_USER@$CLI_DEPLOY_HOST" \
+            "mkdir -p $CLI_DEPLOY_PATH"
+          # Upload hanya .gz (lebih kecil, ~60% dari raw)
+          for f in dist/cli/*.gz; do
+            [ -f "$f" ] && scp -i ~/.ssh/deploy_key "$f" \
+              "$CLI_DEPLOY_USER@$CLI_DEPLOY_HOST:$CLI_DEPLOY_PATH/"
+          done
+          echo "✓ CLI .gz binaries deployed to $CLI_DEPLOY_HOST:$CLI_DEPLOY_PATH"
+
       # ── Docker build ──────────────────────────────────────────────────────────
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
