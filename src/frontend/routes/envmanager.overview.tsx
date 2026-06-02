@@ -7,6 +7,7 @@ import {
   Code,
   Divider,
   Group,
+  Paper,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -129,7 +130,7 @@ function StatCard({
 }) {
   const clickable = !!onClick
   return (
-    <Box
+    <Paper
       p={{ base: 'sm', sm: 'md' }}
       className={`envman-stat-card ${clickable ? 'is-clickable' : ''}`}
       role={clickable ? 'link' : undefined}
@@ -173,7 +174,7 @@ function StatCard({
           {sub}
         </Text>
       )}
-    </Box>
+    </Paper>
   )
 }
 
@@ -352,7 +353,7 @@ function OverviewPage() {
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: 'sm', md: 'md' }}>
         {/* ─── Projects list ──────────────── */}
-        <Box
+        <Paper
           p="md"
           style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}
         >
@@ -446,7 +447,6 @@ function OverviewPage() {
                     }}
                     style={{
                       borderRadius: 8,
-                      border: '1px solid var(--mantine-color-default-border)',
                       cursor: 'pointer',
                     }}
                   >
@@ -496,12 +496,12 @@ function OverviewPage() {
               )}
             </Stack>
           )}
-        </Box>
+        </Paper>
 
         {/* ─── Right column ──────────────── */}
         <Stack gap="md">
           {/* Gists */}
-          <Box
+          <Paper
             p="md"
             style={{
               borderRadius: 'var(--mantine-radius-md)',
@@ -558,13 +558,12 @@ function OverviewPage() {
                     }}
                     style={{
                       borderRadius: 8,
-                      border: '1px solid var(--mantine-color-default-border)',
                       cursor: 'pointer',
                     }}
                   >
                     <Group gap="xs" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
                       <TbFileCode size={14} style={{ color: 'var(--mantine-color-grape-5)', flexShrink: 0 }} />
-                      <Box style={{ flex: 1, minWidth: 0 }}>
+                      <Paper style={{ flex: 1, minWidth: 0 }}>
                         <Text
                           size="xs"
                           fw={600}
@@ -588,7 +587,7 @@ function OverviewPage() {
                             {relativeTime(g.updatedAt)}
                           </Text>
                         </Group>
-                      </Box>
+                      </Paper>
                     </Group>
                     <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
                   </Group>
@@ -600,10 +599,10 @@ function OverviewPage() {
                 )}
               </Stack>
             )}
-          </Box>
+          </Paper>
 
           {/* Tokens */}
-          <Box
+          <Paper
             p="md"
             style={{
               borderRadius: 'var(--mantine-radius-md)',
@@ -715,10 +714,10 @@ function OverviewPage() {
                 )}
               </Stack>
             )}
-          </Box>
+          </Paper>
 
           {/* Connections */}
-          <Box
+          <Paper
             p="md"
             style={{
               borderRadius: 'var(--mantine-radius-md)',
@@ -776,7 +775,7 @@ function OverviewPage() {
                 ))}
               </Stack>
             )}
-          </Box>
+          </Paper>
         </Stack>
       </SimpleGrid>
     </Box>

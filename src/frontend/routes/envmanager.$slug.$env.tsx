@@ -647,7 +647,7 @@ function VarsPage() {
       <Paper withBorder p="md" radius="md">
         <Box>
           {/* Breadcrumb */}
-          <Group gap={6} align="center">
+          <Group gap={6} align="center" p={"md"}>
             <ActionIcon
               variant="subtle"
               color="gray"
@@ -689,7 +689,7 @@ function VarsPage() {
           <Divider />
 
           {/* Portainer section */}
-          <Stack gap="xs">
+          <Stack gap="md" p={"md"}>
             <Group justify="space-between" align="center" wrap="nowrap">
               <Group gap="xs" wrap="nowrap">
                 <TbBrandDocker

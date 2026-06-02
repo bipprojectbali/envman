@@ -9,11 +9,16 @@ import {
   Text,
   ThemeIcon,
   Tooltip,
-} from '@mantine/core'
-import { useDisclosure, useMediaQuery } from '@mantine/hooks'
-import { modals } from '@mantine/modals'
-import { createLazyFileRoute, Outlet, useMatchRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+} from "@mantine/core";
+import { useDisclosure, useMediaQuery } from "@mantine/hooks";
+import { modals } from "@mantine/modals";
+import {
+  createLazyFileRoute,
+  Outlet,
+  useMatchRoute,
+  useNavigate,
+} from "@tanstack/react-router";
+import { useState } from "react";
 import {
   TbBook,
   TbBug,
@@ -31,71 +36,77 @@ import {
   TbUserSearch,
   TbUsers,
   TbVariable,
-} from 'react-icons/tb'
-import { AppLogsPanel } from '@/frontend/components/dev/app-logs-panel'
-import { DatabasePanel } from '@/frontend/components/dev/dev-database'
-import { ProjectPanel } from '@/frontend/components/dev/dev-project'
-import { ExtensionsPanel } from '@/frontend/components/dev/extensions-panel'
-import { OverviewPanel } from '@/frontend/components/dev/overview-panel'
-import { PlaceholderPanel } from '@/frontend/components/dev/placeholder-panel'
-import { UserLogsPanel } from '@/frontend/components/dev/user-logs-panel'
-import { UsersPanel } from '@/frontend/components/dev/users-panel'
-import { ThemeToggle } from '@/frontend/components/ThemeToggle'
-import { TicketsPanel } from '@/frontend/components/TicketsPanel'
-import { UserAvatar } from '@/frontend/components/UserAvatar'
-import { useLogout, useSession } from '@/frontend/hooks/useAuth'
+} from "react-icons/tb";
+import { AppLogsPanel } from "@/frontend/components/dev/app-logs-panel";
+import { DatabasePanel } from "@/frontend/components/dev/dev-database";
+import { ProjectPanel } from "@/frontend/components/dev/dev-project";
+import { ExtensionsPanel } from "@/frontend/components/dev/extensions-panel";
+import { OverviewPanel } from "@/frontend/components/dev/overview-panel";
+import { PlaceholderPanel } from "@/frontend/components/dev/placeholder-panel";
+import { UserLogsPanel } from "@/frontend/components/dev/user-logs-panel";
+import { UsersPanel } from "@/frontend/components/dev/users-panel";
+import { ThemeToggle } from "@/frontend/components/ThemeToggle";
+import { TicketsPanel } from "@/frontend/components/TicketsPanel";
+import { UserAvatar } from "@/frontend/components/UserAvatar";
+import { useLogout, useSession } from "@/frontend/hooks/useAuth";
 
-export const Route = createLazyFileRoute('/dev')({ component: DevPage })
+export const Route = createLazyFileRoute("/dev")({ component: DevPage });
 
 const navItems = [
-  { label: 'Overview', icon: TbLayoutDashboard, key: 'overview' },
-  { label: 'Users', icon: TbUsers, key: 'users' },
-  { label: 'Tickets', icon: TbBug, key: 'tickets' },
-  { label: 'App Logs', icon: TbServer, key: 'app-logs' },
-  { label: 'User Logs', icon: TbUserSearch, key: 'user-logs' },
-  { label: 'Database', icon: TbDatabase, key: 'database' },
-  { label: 'Project', icon: TbSitemap, key: 'project' },
-  { label: 'Extensions', icon: TbPuzzle, key: 'extensions' },
-  { label: 'Settings', icon: TbSettings, key: 'settings' },
-]
+  { label: "Overview", icon: TbLayoutDashboard, key: "overview" },
+  { label: "Users", icon: TbUsers, key: "users" },
+  { label: "Tickets", icon: TbBug, key: "tickets" },
+  { label: "App Logs", icon: TbServer, key: "app-logs" },
+  { label: "User Logs", icon: TbUserSearch, key: "user-logs" },
+  { label: "Database", icon: TbDatabase, key: "database" },
+  { label: "Project", icon: TbSitemap, key: "project" },
+  { label: "Extensions", icon: TbPuzzle, key: "extensions" },
+  { label: "Settings", icon: TbSettings, key: "settings" },
+];
 
 function DevPage() {
-  const { data } = useSession()
-  const logout = useLogout()
-  const user = data?.user
-  const { tab: active } = Route.useSearch()
-  const matchRoute = useMatchRoute()
-  const isChildRoute = !!matchRoute({ to: '/dev/docs', search: { tab: 'overview' } })
-  const navigate = useNavigate()
-  const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false)
-  const isMobile = useMediaQuery('(max-width: 48em)')
+  const { data } = useSession();
+  const logout = useLogout();
+  const user = data?.user;
+  const { tab: active } = Route.useSearch();
+  const matchRoute = useMatchRoute();
+  const isChildRoute = !!matchRoute({
+    to: "/dev/docs",
+    search: { tab: "overview" },
+  });
+  const navigate = useNavigate();
+  const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] =
+    useDisclosure(false);
+  const isMobile = useMediaQuery("(max-width: 48em)");
   const setActive = (key: string) => {
-    navigate({ to: '/dev', search: { tab: key } })
-    closeMobile()
-  }
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('dev:sidebar') === 'collapsed')
+    navigate({ to: "/dev", search: { tab: key } });
+    closeMobile();
+  };
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("dev:sidebar") === "collapsed",
+  );
   const toggleSidebar = () => {
     setCollapsed((prev) => {
-      const next = !prev
-      localStorage.setItem('dev:sidebar', next ? 'collapsed' : 'open')
-      return next
-    })
-  }
+      const next = !prev;
+      localStorage.setItem("dev:sidebar", next ? "collapsed" : "open");
+      return next;
+    });
+  };
   const confirmLogout = () =>
     modals.openConfirmModal({
-      title: 'Logout',
+      title: "Logout",
       children: <Text size="sm">Are you sure you want to logout?</Text>,
-      labels: { confirm: 'Logout', cancel: 'Cancel' },
-      confirmProps: { color: 'red' },
+      labels: { confirm: "Logout", cancel: "Cancel" },
+      confirmProps: { color: "red" },
       onConfirm: () => logout.mutate(),
-    })
+    });
 
   return (
     <AppShell
       header={{ height: 56, collapsed: !isMobile }}
       navbar={{
         width: collapsed ? 60 : 260,
-        breakpoint: 'sm',
+        breakpoint: "sm",
         collapsed: { mobile: !mobileOpened },
       }}
       padding="md"
@@ -104,7 +115,11 @@ function DevPage() {
         <Group h="100%" justify="space-between">
           <Group gap="xs">
             <Burger opened={mobileOpened} onClick={toggleMobile} size="sm" />
-            <ThemeIcon size="md" variant="gradient" gradient={{ from: 'red', to: 'orange' }}>
+            <ThemeIcon
+              size="md"
+              variant="gradient"
+              gradient={{ from: "red", to: "orange" }}
+            >
               <TbCode size={16} />
             </ThemeIcon>
             <Text fw={700} size="sm">
@@ -113,19 +128,32 @@ function DevPage() {
           </Group>
         </Group>
       </AppShell.Header>
-      <AppShell.Navbar p={collapsed ? 'xs' : 'md'}>
+      <AppShell.Navbar p={collapsed ? "xs" : "md"}>
         <AppShell.Section>
-          <Group gap="xs" mb="md" justify={collapsed ? 'center' : 'space-between'}>
+          <Group
+            gap="xs"
+            mb="md"
+            justify={collapsed ? "center" : "space-between"}
+          >
             {collapsed ? (
               <Tooltip label="Expand sidebar" position="right">
-                <ActionIcon variant="subtle" color="gray" size="lg" onClick={toggleSidebar}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  onClick={toggleSidebar}
+                >
                   <TbLayoutSidebarLeftExpand size={18} />
                 </ActionIcon>
               </Tooltip>
             ) : (
               <>
                 <Group gap="xs">
-                  <ThemeIcon size="lg" variant="gradient" gradient={{ from: 'red', to: 'orange' }}>
+                  <ThemeIcon
+                    size="lg"
+                    variant="gradient"
+                    gradient={{ from: "red", to: "orange" }}
+                  >
                     <TbCode size={18} />
                   </ThemeIcon>
                   <div>
@@ -138,7 +166,12 @@ function DevPage() {
                   </div>
                 </Group>
                 <Tooltip label="Minimize sidebar">
-                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={toggleSidebar}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    onClick={toggleSidebar}
+                  >
                     <TbLayoutSidebarLeftCollapse size={18} />
                   </ActionIcon>
                 </Tooltip>
@@ -152,12 +185,12 @@ function DevPage() {
             collapsed ? (
               <Tooltip key={item.key} label={item.label} position="right">
                 <ActionIcon
-                  variant={active === item.key ? 'light' : 'subtle'}
-                  color={active === item.key ? 'blue' : 'gray'}
+                  variant={active === item.key ? "light" : "subtle"}
+                  color={active === item.key ? "blue" : "gray"}
                   size="lg"
                   onClick={() => setActive(item.key)}
                   mb={4}
-                  style={{ width: '100%' }}
+                  style={{ width: "100%" }}
                 >
                   <item.icon size={18} />
                 </ActionIcon>
@@ -185,7 +218,7 @@ function DevPage() {
                   component="a"
                   href="/dashboard"
                   mt={4}
-                  style={{ width: '100%' }}
+                  style={{ width: "100%" }}
                 >
                   <TbLayoutDashboard size={18} />
                 </ActionIcon>
@@ -198,7 +231,7 @@ function DevPage() {
                   component="a"
                   href="/envmanager"
                   mt={4}
-                  style={{ width: '100%' }}
+                  style={{ width: "100%" }}
                 >
                   <TbVariable size={18} />
                 </ActionIcon>
@@ -208,9 +241,11 @@ function DevPage() {
                   variant="subtle"
                   color="gray"
                   size="lg"
-                  onClick={() => navigate({ to: '/dev/docs', search: { tab: 'overview' } })}
+                  onClick={() =>
+                    navigate({ to: "/dev/docs", search: { tab: "overview" } })
+                  }
                   mt={4}
-                  style={{ width: '100%' }}
+                  style={{ width: "100%" }}
                 >
                   <TbBook size={18} />
                 </ActionIcon>
@@ -243,7 +278,9 @@ function DevPage() {
                 label="Docs"
                 leftSection={<TbBook size={18} />}
                 rightSection={<TbChevronRight size={14} />}
-                onClick={() => navigate({ to: '/dev/docs', search: { tab: 'overview' } })}
+                onClick={() =>
+                  navigate({ to: "/dev/docs", search: { tab: "overview" } })
+                }
                 variant="light"
                 mb={4}
               />
@@ -252,15 +289,34 @@ function DevPage() {
         </AppShell.Section>
 
         <AppShell.Section>
-          <Box p={collapsed ? 'xs' : 'sm'} style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
+          <Box
+            p={collapsed ? "xs" : "sm"}
+            style={{
+              borderTop: "1px solid var(--mantine-color-default-border)",
+            }}
+          >
             {collapsed ? (
               <Stack align="center" gap={4}>
                 <Tooltip label={user?.name} position="right">
-                  <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="sm" color="red" />
+                  <UserAvatar
+                    user={{
+                      id: user?.id ?? "",
+                      name: user?.name ?? "",
+                      image: user?.image,
+                    }}
+                    size="sm"
+                    color="red"
+                  />
                 </Tooltip>
                 <ThemeToggle size="sm" />
                 <Tooltip label="Logout" position="right">
-                  <ActionIcon variant="subtle" color="red" size="sm" onClick={confirmLogout} loading={logout.isPending}>
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    size="sm"
+                    onClick={confirmLogout}
+                    loading={logout.isPending}
+                  >
                     <TbLogout size={14} />
                   </ActionIcon>
                 </Tooltip>
@@ -268,7 +324,15 @@ function DevPage() {
             ) : (
               <Group justify="space-between">
                 <Group gap="xs">
-                  <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="sm" color="red" />
+                  <UserAvatar
+                    user={{
+                      id: user?.id ?? "",
+                      name: user?.name ?? "",
+                      image: user?.image,
+                    }}
+                    size="sm"
+                    color="red"
+                  />
                   <div>
                     <Text size="xs" fw={500}>
                       {user?.name}
@@ -281,7 +345,12 @@ function DevPage() {
                 <Group gap={4}>
                   <ThemeToggle size="sm" />
                   <Tooltip label="Logout">
-                    <ActionIcon variant="subtle" color="red" onClick={confirmLogout} loading={logout.isPending}>
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      onClick={confirmLogout}
+                      loading={logout.isPending}
+                    >
                       <TbLogout size={16} />
                     </ActionIcon>
                   </Tooltip>
@@ -295,15 +364,15 @@ function DevPage() {
       <AppShell.Main>
         {!isChildRoute ? (
           <>
-            {active === 'overview' && <OverviewPanel />}
-            {active === 'users' && <UsersPanel />}
-            {active === 'tickets' && <TicketsPanel />}
-            {active === 'app-logs' && <AppLogsPanel />}
-            {active === 'user-logs' && <UserLogsPanel />}
-            {active === 'database' && <DatabasePanel />}
-            {active === 'project' && <ProjectPanel />}
-            {active === 'extensions' && <ExtensionsPanel />}
-            {active === 'settings' && (
+            {active === "overview" && <OverviewPanel />}
+            {active === "users" && <UsersPanel />}
+            {active === "tickets" && <TicketsPanel />}
+            {active === "app-logs" && <AppLogsPanel />}
+            {active === "user-logs" && <UserLogsPanel />}
+            {active === "database" && <DatabasePanel />}
+            {active === "project" && <ProjectPanel />}
+            {active === "extensions" && <ExtensionsPanel />}
+            {active === "settings" && (
               <PlaceholderPanel
                 title="Settings"
                 desc="System configuration akan ditampilkan di sini."
@@ -316,5 +385,5 @@ function DevPage() {
         )}
       </AppShell.Main>
     </AppShell>
-  )
+  );
 }

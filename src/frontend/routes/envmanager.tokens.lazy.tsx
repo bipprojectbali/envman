@@ -11,7 +11,6 @@ import {
   Divider,
   Group,
   Kbd,
-  Modal,
   Pagination,
   Paper,
   SegmentedControl,
@@ -26,7 +25,7 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDebouncedValue, useDisclosure, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { useDebouncedValue, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
@@ -421,7 +420,6 @@ function TokensPage() {
   const { data: sessionData } = useSession()
   const canCreateToken = hasCapability(sessionData?.user, 'token:create')
   const isMobile = useMediaQuery('(max-width: 48em)')
-  const [editOpen, { open: openEdit, close: closeEdit }] = useDisclosure(false)
   const [editingToken, setEditingToken] = useState<ApiToken | null>(null)
   const [newToken, setNewToken] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -550,28 +548,11 @@ function TokensPage() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['envman', 'tokens'] })
-      if (selectedTokenId) {
-        navigate({ to: '/envmanager/tokens', search: { token: editingToken!.id, edit: undefined } })
-      } else {
-        closeEdit()
-        setEditingToken(null)
-      }
+      navigate({ to: '/envmanager/tokens', search: { token: editingToken!.id, edit: undefined } })
       notifyOk('Token diperbarui')
     },
     onError: (e) => notifyErr(e),
   })
-
-  const openEditModal = (t: ApiToken) => {
-    setEditingToken(t)
-    setEditForm({
-      name: t.name,
-      canWrite: t.canWrite,
-      expiresAt: t.expiresAt ? new Date(t.expiresAt).toISOString().split('T')[0] : '',
-      scopes: t.scopes,
-      tags: t.tags ?? [],
-    })
-    openEdit()
-  }
 
   const toggleToken = useMutation({
     mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/toggle`, { method: 'PATCH' }),
@@ -1496,7 +1477,7 @@ function TokensPage() {
                     copyPending={copyToken.isPending && copyToken.variables === t.id}
                     rotatePending={rotateToken.isPending && rotateToken.variables === t.id}
                     onToggle={() => toggleToken.mutate(t.id)} onCopy={() => copyToken.mutate(t.id)}
-                    onRotate={() => confirmRotate(t.id, t.name)} onEdit={() => openEditModal(t)}
+                    onRotate={() => confirmRotate(t.id, t.name)} onEdit={() => goToEdit(t.id)}
                     onRevoke={() => revokeToken(t.id, t.name)}
                     onUsageToggle={() => setExpandedUsage((prev) => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}
                     onCardClick={() => goToDetail(t.id)} />
@@ -1510,7 +1491,7 @@ function TokensPage() {
                     copyPending={copyToken.isPending && copyToken.variables === t.id}
                     rotatePending={rotateToken.isPending && rotateToken.variables === t.id}
                     onToggle={() => toggleToken.mutate(t.id)} onCopy={() => copyToken.mutate(t.id)}
-                    onRotate={() => confirmRotate(t.id, t.name)} onEdit={() => openEditModal(t)}
+                    onRotate={() => confirmRotate(t.id, t.name)} onEdit={() => goToEdit(t.id)}
                     onRevoke={() => revokeToken(t.id, t.name)}
                     onUsageToggle={() => setExpandedUsage((prev) => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}
                     onCardClick={() => goToDetail(t.id)} />
@@ -1555,7 +1536,7 @@ function TokensPage() {
                 onToggle={() => toggleToken.mutate(t.id)}
                 onCopy={() => copyToken.mutate(t.id)}
                 onRotate={() => confirmRotate(t.id, t.name)}
-                onEdit={() => openEditModal(t)}
+                onEdit={() => goToEdit(t.id)}
                 onRevoke={() => revokeToken(t.id, t.name)}
                 onUsageToggle={() =>
                   setExpandedUsage((prev) => {
@@ -1590,7 +1571,7 @@ function TokensPage() {
                 onToggle={() => toggleToken.mutate(t.id)}
                 onCopy={() => copyToken.mutate(t.id)}
                 onRotate={() => confirmRotate(t.id, t.name)}
-                onEdit={() => openEditModal(t)}
+                onEdit={() => goToEdit(t.id)}
                 onRevoke={() => revokeToken(t.id, t.name)}
                 onUsageToggle={() =>
                   setExpandedUsage((prev) => {
@@ -1611,85 +1592,6 @@ function TokensPage() {
         </>
       ) : null}
 
-      {/* ─── Edit modal ─────────────────────── */}
-      <Modal
-        opened={editOpen}
-        onClose={() => {
-          closeEdit()
-          setEditingToken(null)
-        }}
-        size="lg"
-        fullScreen={isMobile}
-        title={
-          <Group gap="xs">
-            <ThemeIcon size={28} variant="light" color="primary" radius="md">
-              <TbPencil size={15} />
-            </ThemeIcon>
-            <Box>
-              <Text fw={700} size="sm">
-                Edit Token
-              </Text>
-              <Text size="xs" c="dimmed">
-                {editingToken?.name}
-              </Text>
-            </Box>
-          </Group>
-        }
-      >
-        <Stack gap="md">
-          {tokenForm(editForm, setEditForm)}
-          <Divider />
-          <Box
-            p="xs"
-            style={{
-              borderRadius: 'var(--mantine-radius-md)',
-              border: '1px solid var(--mantine-color-default-border)',
-              background: 'var(--mantine-color-default-hover)',
-            }}
-          >
-            <Text size="xs" fw={600} mb={4}>
-              Ringkasan token:
-            </Text>
-            <Group gap="xs" wrap="wrap">
-              <Badge
-                size="xs"
-                color={editForm.canWrite ? 'orange' : 'blue'}
-                variant="light"
-                leftSection={editForm.canWrite ? <TbLockOpen size={9} /> : <TbLock size={9} />}
-              >
-                {editForm.canWrite ? 'read-write' : 'read-only'}
-              </Badge>
-              <Badge size="xs" color="primary" variant="light">
-                {editForm.scopes.length === 0 ? 'semua project' : `${editForm.scopes.length} scope`}
-              </Badge>
-              <Badge
-                size="xs"
-                color={editForm.expiresAt ? 'teal' : 'gray'}
-                variant="light"
-                leftSection={<TbCalendar size={9} />}
-              >
-                {editForm.expiresAt
-                  ? `exp: ${new Date(editForm.expiresAt).toLocaleDateString('id-ID')}`
-                  : 'tidak ada expiry'}
-              </Badge>
-            </Group>
-          </Box>
-          <Button
-            
-            leftSection={<TbCheck size={14} />}
-            onClick={() => editToken.mutate(editForm)}
-            loading={editToken.isPending}
-            disabled={!editForm.name}
-          >
-            Simpan Perubahan
-          </Button>
-          {editToken.isError && (
-            <Text size="xs" c="red">
-              {(editToken.error as Error).message}
-            </Text>
-          )}
-        </Stack>
-      </Modal>
     </Box>
   )
 }

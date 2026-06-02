@@ -215,10 +215,10 @@ function UsersPage() {
           ).map(({ value, label }) => ({
             value,
             label: (
-              <Group gap={4} wrap="nowrap" justify="center">
+              <Group miw={72} gap={4} wrap="nowrap" justify="center">
                 <span>{label}</span>
                 {roleCounts[value] > 0 && (
-                  <Badge size="xs" variant="light" color={GLOBAL_ROLE_COLOR[value === 'ALL' ? 'USER' : value]} circle>
+                  <Badge size="md" variant="light" color={GLOBAL_ROLE_COLOR[value === 'ALL' ? 'USER' : value]} circle>
                     {roleCounts[value]}
                   </Badge>
                 )}

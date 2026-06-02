@@ -9,6 +9,7 @@ import {
   Group,
   Kbd,
   Modal,
+  Paper,
   PasswordInput,
   SimpleGrid,
   Skeleton,
@@ -612,7 +613,7 @@ function HealthBadge({ health }: { health?: { totalStacks: number; activeStacks:
 
 function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, onDelete }: CardProps) {
   return (
-    <Box
+    <Paper
       p="md"
       className="envman-conn-card"
       role="link"
@@ -703,7 +704,7 @@ function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, 
           </Group>
         </Tooltip>
       </Group>
-    </Box>
+    </Paper>
   )
 }
 

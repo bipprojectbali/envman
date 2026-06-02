@@ -13,49 +13,53 @@ import {
   Text,
   TextInput,
   Tooltip,
-} from '@mantine/core'
-import { modals } from '@mantine/modals'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { TbPlus, TbSearch, TbTrash } from 'react-icons/tb'
-import { UserAvatar } from '@/frontend/components/UserAvatar'
-import { apiFetch } from '@/frontend/lib/api'
-import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+} from "@mantine/core";
+import { modals } from "@mantine/modals";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { TbPlus, TbSearch, TbTrash } from "react-icons/tb";
+import { UserAvatar } from "@/frontend/components/UserAvatar";
+import { apiFetch } from "@/frontend/lib/api";
+import { notifyErr, notifyOk } from "@/frontend/lib/notify";
 
-type ProjectRole = 'OWNER' | 'EDITOR' | 'VIEWER'
+type ProjectRole = "OWNER" | "EDITOR" | "VIEWER";
 
 interface Member {
-  id: string
-  role: ProjectRole
-  user: { id: string; name: string; email: string }
+  id: string;
+  role: ProjectRole;
+  user: { id: string; name: string; email: string };
 }
 
 interface AvailableUser {
-  id: string
-  name: string
-  email: string
+  id: string;
+  name: string;
+  email: string;
 }
 
-const roleColor: Record<ProjectRole, string> = { OWNER: 'blue', EDITOR: 'teal', VIEWER: 'gray' }
+const roleColor: Record<ProjectRole, string> = {
+  OWNER: "blue",
+  EDITOR: "teal",
+  VIEWER: "gray",
+};
 const roleOptions = [
-  { value: 'OWNER', label: 'Owner' },
-  { value: 'EDITOR', label: 'Editor' },
-  { value: 'VIEWER', label: 'Viewer' },
-]
+  { value: "OWNER", label: "Owner" },
+  { value: "EDITOR", label: "Editor" },
+  { value: "VIEWER", label: "Viewer" },
+];
 
 function initials(name: string) {
   return name
-    .split(' ')
+    .split(" ")
     .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('')
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 function toggle(set: Set<string>, id: string): Set<string> {
-  const next = new Set(set)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  return next
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
 }
 
 export function MembersPanel({
@@ -65,129 +69,163 @@ export function MembersPanel({
   myUserId,
   onRefresh,
 }: {
-  slug: string
-  members: Member[]
-  isOwner: boolean
-  myUserId: string
-  onRefresh: () => void
+  slug: string;
+  members: Member[];
+  isOwner: boolean;
+  myUserId: string;
+  onRefresh: () => void;
 }) {
-  const qc = useQueryClient()
+  const qc = useQueryClient();
 
-  const [filter, setFilter] = useState('')
-  const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set())
-  const [addRole, setAddRole] = useState<ProjectRole>('VIEWER')
-  const [selectedToDelete, setSelectedToDelete] = useState<Set<string>>(new Set())
+  const [filter, setFilter] = useState("");
+  const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set());
+  const [addRole, setAddRole] = useState<ProjectRole>("VIEWER");
+  const [selectedToDelete, setSelectedToDelete] = useState<Set<string>>(
+    new Set(),
+  );
 
   const { data: availableData, isLoading: loadingAvailable } = useQuery({
-    queryKey: ['envman', 'available-users', slug],
-    queryFn: () => apiFetch<{ users: AvailableUser[] }>(`/api/envman/projects/${slug}/available-users`),
+    queryKey: ["envman", "available-users", slug],
+    queryFn: () =>
+      apiFetch<{ users: AvailableUser[] }>(
+        `/api/envman/projects/${slug}/available-users`,
+      ),
     enabled: isOwner,
     staleTime: 30_000,
-  })
+  });
 
-  const allAvailable = availableData?.users ?? []
-  const q = filter.trim().toLowerCase()
+  const allAvailable = availableData?.users ?? [];
+  const q = filter.trim().toLowerCase();
   const available = q
-    ? allAvailable.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
-    : allAvailable
+    ? allAvailable.filter(
+        (u) =>
+          u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
+      )
+    : allAvailable;
 
-  const allAddSelected = available.length > 0 && available.every((u) => selectedToAdd.has(u.id))
-  const someAddSelected = available.some((u) => selectedToAdd.has(u.id)) && !allAddSelected
+  const allAddSelected =
+    available.length > 0 && available.every((u) => selectedToAdd.has(u.id));
+  const someAddSelected =
+    available.some((u) => selectedToAdd.has(u.id)) && !allAddSelected;
 
-  const toggleAllAdd = () => setSelectedToAdd(allAddSelected ? new Set() : new Set(available.map((u) => u.id)))
+  const toggleAllAdd = () =>
+    setSelectedToAdd(
+      allAddSelected ? new Set() : new Set(available.map((u) => u.id)),
+    );
 
-  const ownerCount = members.filter((m) => m.role === 'OWNER').length
-  const deletable = members.filter((m) => !(m.role === 'OWNER' && ownerCount === 1))
-  const allDeleteSelected = deletable.length > 0 && deletable.every((m) => selectedToDelete.has(m.user.id))
-  const someDeleteSelected = deletable.some((m) => selectedToDelete.has(m.user.id)) && !allDeleteSelected
+  const ownerCount = members.filter((m) => m.role === "OWNER").length;
+  const deletable = members.filter(
+    (m) => !(m.role === "OWNER" && ownerCount === 1),
+  );
+  const allDeleteSelected =
+    deletable.length > 0 &&
+    deletable.every((m) => selectedToDelete.has(m.user.id));
+  const someDeleteSelected =
+    deletable.some((m) => selectedToDelete.has(m.user.id)) &&
+    !allDeleteSelected;
 
   const toggleAllDelete = () =>
-    setSelectedToDelete(allDeleteSelected ? new Set() : new Set(deletable.map((m) => m.user.id)))
+    setSelectedToDelete(
+      allDeleteSelected ? new Set() : new Set(deletable.map((m) => m.user.id)),
+    );
 
   const addMutation = useMutation({
     mutationFn: async () => {
       await Promise.all(
         [...selectedToAdd].map((userId) =>
           apiFetch(`/api/envman/projects/${slug}/members`, {
-            method: 'POST',
+            method: "POST",
             body: JSON.stringify({ userId, role: addRole }),
           }),
         ),
-      )
+      );
     },
     onSuccess: () => {
-      notifyOk(`${selectedToAdd.size} anggota berhasil ditambahkan`)
-      setSelectedToAdd(new Set())
-      qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
-      qc.invalidateQueries({ queryKey: ['envman', 'available-users', slug] })
-      onRefresh()
+      notifyOk(`${selectedToAdd.size} anggota berhasil ditambahkan`);
+      setSelectedToAdd(new Set());
+      qc.invalidateQueries({ queryKey: ["envman", "project", slug] });
+      qc.invalidateQueries({ queryKey: ["envman", "available-users", slug] });
+      onRefresh();
     },
     onError: (e) => notifyErr(e),
-  })
+  });
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (userIds: string[]) => {
       await Promise.all(
-        userIds.map((userId) => apiFetch(`/api/envman/projects/${slug}/members/${userId}`, { method: 'DELETE' })),
-      )
+        userIds.map((userId) =>
+          apiFetch(`/api/envman/projects/${slug}/members/${userId}`, {
+            method: "DELETE",
+          }),
+        ),
+      );
     },
     onSuccess: (_d, userIds) => {
-      notifyOk(`${userIds.length} anggota berhasil dihapus`)
-      setSelectedToDelete(new Set())
-      qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
-      onRefresh()
+      notifyOk(`${userIds.length} anggota berhasil dihapus`);
+      setSelectedToDelete(new Set());
+      qc.invalidateQueries({ queryKey: ["envman", "project", slug] });
+      onRefresh();
     },
     onError: (e) => notifyErr(e),
-  })
+  });
 
   const changeRoleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: ProjectRole }) =>
       apiFetch(`/api/envman/projects/${slug}/members/${userId}`, {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({ role }),
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
-      onRefresh()
+      qc.invalidateQueries({ queryKey: ["envman", "project", slug] });
+      onRefresh();
     },
     onError: (e) => notifyErr(e),
-  })
+  });
 
   const confirmBulkDelete = () => {
-    const ids = [...selectedToDelete]
-    const names = members.filter((m) => ids.includes(m.user.id)).map((m) => m.user.name)
+    const ids = [...selectedToDelete];
+    const names = members
+      .filter((m) => ids.includes(m.user.id))
+      .map((m) => m.user.name);
     modals.openConfirmModal({
       title: `Hapus ${ids.length} Anggota`,
       children: (
         <Text size="sm">
-          Hapus <strong>{names.join(', ')}</strong> dari project ini?
+          Hapus <strong>{names.join(", ")}</strong> dari project ini?
         </Text>
       ),
-      labels: { confirm: 'Hapus', cancel: 'Batal' },
-      confirmProps: { color: 'red' },
+      labels: { confirm: "Hapus", cancel: "Batal" },
+      confirmProps: { color: "red" },
       onConfirm: () => bulkDeleteMutation.mutate(ids),
-    })
-  }
+    });
+  };
 
   const confirmSingleDelete = (m: Member) =>
     modals.openConfirmModal({
-      title: 'Hapus Anggota',
+      title: "Hapus Anggota",
       children: (
         <Text size="sm">
           Hapus <strong>{m.user.name}</strong> dari project ini?
         </Text>
       ),
-      labels: { confirm: 'Hapus', cancel: 'Batal' },
-      confirmProps: { color: 'red' },
+      labels: { confirm: "Hapus", cancel: "Batal" },
+      confirmProps: { color: "red" },
       onConfirm: () => bulkDeleteMutation.mutate([m.user.id]),
-    })
+    });
 
   return (
     <Stack gap="md">
       {/* ── Add section ── */}
       {isOwner && (
         <Paper withBorder p="sm" radius="md">
-          <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="sm" style={{ letterSpacing: '0.06em' }}>
+          <Text
+            size="xs"
+            fw={600}
+            c="dimmed"
+            tt="uppercase"
+            mb="sm"
+            style={{ letterSpacing: "0.06em" }}
+          >
             Tambah Anggota
           </Text>
 
@@ -215,7 +253,9 @@ export function MembersPanel({
                   size="xs"
                   label={
                     <Text size="xs" fw={600}>
-                      {allAddSelected ? 'Batal semua' : `Pilih semua (${available.length})`}
+                      {allAddSelected
+                        ? "Batal semua"
+                        : `Pilih semua (${available.length})`}
                     </Text>
                   }
                   checked={allAddSelected}
@@ -254,13 +294,20 @@ export function MembersPanel({
                         align="center"
                         px={4}
                         py={4}
-                        style={{ cursor: 'pointer', borderRadius: 'var(--mantine-radius-xs)' }}
-                        onClick={() => setSelectedToAdd((prev) => toggle(prev, u.id))}
+                        style={{
+                          cursor: "pointer",
+                          borderRadius: "var(--mantine-radius-xs)",
+                        }}
+                        onClick={() =>
+                          setSelectedToAdd((prev) => toggle(prev, u.id))
+                        }
                       >
                         <Checkbox
                           size="xs"
                           checked={selectedToAdd.has(u.id)}
-                          onChange={() => setSelectedToAdd((prev) => toggle(prev, u.id))}
+                          onChange={() =>
+                            setSelectedToAdd((prev) => toggle(prev, u.id))
+                          }
                           onClick={(e) => e.stopPropagation()}
                         />
                         <UserAvatar user={u} size={22} color="blue" />
@@ -332,8 +379,8 @@ export function MembersPanel({
           </Text>
         ) : (
           members.map((m) => {
-            const isSelf = m.user.id === myUserId
-            const isLastOwner = m.role === 'OWNER' && ownerCount === 1
+            const isSelf = m.user.id === myUserId;
+            const isLastOwner = m.role === "OWNER" && ownerCount === 1;
             return (
               <Group
                 key={m.id}
@@ -342,8 +389,8 @@ export function MembersPanel({
                 align="center"
                 p="xs"
                 style={{
-                  border: '1px solid var(--mantine-color-default-border)',
-                  borderRadius: 'var(--mantine-radius-sm)',
+                  border: "1px solid var(--mantine-color-default-border)",
+                  borderRadius: "var(--mantine-radius-sm)",
                 }}
               >
                 {isOwner && (
@@ -351,7 +398,10 @@ export function MembersPanel({
                     size="xs"
                     checked={selectedToDelete.has(m.user.id)}
                     disabled={isLastOwner}
-                    onChange={() => !isLastOwner && setSelectedToDelete((prev) => toggle(prev, m.user.id))}
+                    onChange={() =>
+                      !isLastOwner &&
+                      setSelectedToDelete((prev) => toggle(prev, m.user.id))
+                    }
                   />
                 )}
                 <UserAvatar user={m.user} size={32} color={roleColor[m.role]} />
@@ -376,7 +426,11 @@ export function MembersPanel({
                     data={roleOptions}
                     value={m.role}
                     onChange={(v) => {
-                      if (v && v !== m.role) changeRoleMutation.mutate({ userId: m.user.id, role: v as ProjectRole })
+                      if (v && v !== m.role)
+                        changeRoleMutation.mutate({
+                          userId: m.user.id,
+                          role: v as ProjectRole,
+                        });
                     }}
                     w={100}
                     allowDeselect={false}
@@ -388,7 +442,14 @@ export function MembersPanel({
                   </Badge>
                 )}
                 {isOwner && (
-                  <Tooltip label={isLastOwner ? 'Owner terakhir tidak bisa dihapus' : 'Hapus anggota'} withArrow>
+                  <Tooltip
+                    label={
+                      isLastOwner
+                        ? "Owner terakhir tidak bisa dihapus"
+                        : "Hapus anggota"
+                    }
+                    withArrow
+                  >
                     <ActionIcon
                       size="sm"
                       variant="subtle"
@@ -401,10 +462,10 @@ export function MembersPanel({
                   </Tooltip>
                 )}
               </Group>
-            )
+            );
           })
         )}
       </Stack>
     </Stack>
-  )
+  );
 }
