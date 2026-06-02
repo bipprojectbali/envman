@@ -5,6 +5,7 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   Checkbox,
   Code,
   Divider,
@@ -32,6 +33,7 @@ import {
   TbAlertTriangle,
   TbBookmark,
   TbCheck,
+  TbChevronLeft,
   TbChevronRight,
   TbClipboard,
   TbCloud,
@@ -622,24 +624,182 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
   const displayUrl = config?.portainerUrl ?? ''
   const diff: DiffResult | undefined = diffData?.diff
 
+  // ─── Inline setup form (menggantikan modal) ──────────────────────────────
+  if (setupOpen) {
+    return (
+      <Stack gap="sm">
+        <Group gap={6} align="center">
+          <ActionIcon variant="subtle" color="gray" size="sm" onClick={handleClose}>
+            <TbChevronLeft size={15} />
+          </ActionIcon>
+          <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={handleClose}>
+            Portainer
+          </Text>
+          <Text size="sm" c="dimmed">/</Text>
+          <Text size="sm" fw={600}>
+            {isEditing ? 'Edit Konfigurasi' : 'Hubungkan ke Portainer'}
+          </Text>
+        </Group>
+        <Divider />
+
+        <Stepper active={step} size="xs" mb="xs" onStepClick={(s) => { if (s < step) setStep(s) }}>
+          <Stepper.Step label="Connection" />
+          <Stepper.Step label="Stack" />
+        </Stepper>
+
+        {step === 0 && (
+          <Stack gap="sm">
+            {connections.length === 0 ? (
+              <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
+                <Text size="xs">
+                  Belum ada Portainer connection.{' '}
+                  <Anchor size="xs" href="/envmanager/connections">Tambah connection</Anchor>{' '}
+                  terlebih dahulu.
+                </Text>
+              </Alert>
+            ) : (
+              <>
+                <Text size="xs" c="dimmed">
+                  Pilih Portainer instance untuk environment{' '}
+                  <strong>{slug}:{env}</strong>.
+                </Text>
+                <Select
+                  label="Portainer Connection"
+                  placeholder="Pilih connection..."
+                  data={connections.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                    description: c.portainerUrl.replace(/^https?:\/\//, ''),
+                  }))}
+                  value={selectedConnectionId}
+                  onChange={setSelectedConnectionId}
+                  searchable
+                />
+                {probeError && (
+                  <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
+                    <Text size="xs">{probeError}</Text>
+                  </Alert>
+                )}
+              </>
+            )}
+            <Group justify="space-between" mt="xs">
+              <Button size="sm" variant="subtle" color="gray" component="a" href="/envmanager/connections" leftSection={<TbPlus size={13} />}>
+                Kelola Connections
+              </Button>
+              <Group gap="xs">
+                <Button variant="subtle" size="sm" color="gray" onClick={handleClose}>Batal</Button>
+                <Button
+                  size="sm"
+                  disabled={!selectedConnectionId || connections.length === 0}
+                  loading={probe.isPending}
+                  leftSection={<TbPlugConnected size={14} />}
+                  onClick={() => selectedConnectionId && probe.mutate(selectedConnectionId)}
+                >
+                  Load Stacks
+                </Button>
+              </Group>
+            </Group>
+          </Stack>
+        )}
+
+        {step === 1 && (
+          <Stack gap="sm">
+            <Alert color="teal" p="xs" icon={<TbCheck size={14} />}>
+              <Text size="xs" fw={500}>
+                {connections.find((c) => c.id === selectedConnectionId)?.name} — {stacks.length} stack ditemukan
+              </Text>
+            </Alert>
+            <Select
+              label="Stack target"
+              placeholder="Pilih stack..."
+              data={stacks.map((s) => ({ value: String(s.id), label: s.name, description: `Endpoint ${s.endpointId}` }))}
+              value={selectedStack ? String(selectedStack.id) : null}
+              onChange={(v) => setSelectedStack(stacks.find((s) => String(s.id) === v) ?? null)}
+              searchable
+              nothingFoundMessage="Stack tidak ditemukan"
+            />
+            {selectedStack && (
+              <Box p="sm">
+                <Text size="xs" c="dimmed" mb={6}>Ringkasan</Text>
+                <Stack gap={4}>
+                  {[
+                    ['Connection', connections.find((c) => c.id === selectedConnectionId)?.name ?? '—'],
+                    ['Project:Env', `${slug}:${env}`],
+                    ['Stack (primary)', selectedStack.name],
+                    ['Endpoint', `#${selectedStack.endpointId}`],
+                  ].map(([label, value]) => (
+                    <Group key={label} justify="space-between">
+                      <Text size="xs" c="dimmed">{label}</Text>
+                      <Code fz="xs">{value}</Code>
+                    </Group>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+            {stacks.length > 1 && selectedStack && (
+              <Box>
+                <Text size="xs" c="dimmed" mb={6}>Stack tambahan (opsional)</Text>
+                <Select
+                  placeholder="Tambah stack lain..."
+                  data={stacks
+                    .filter((s) => s.id !== selectedStack.id && !additionalSelectedStacks.find((a) => a.id === s.id))
+                    .map((s) => ({ value: String(s.id), label: s.name }))}
+                  value={null}
+                  onChange={(v) => {
+                    const s = stacks.find((st) => String(st.id) === v)
+                    if (s) setAdditionalSelectedStacks((prev) => [...prev, s])
+                  }}
+                  searchable
+                  nothingFoundMessage="Tidak ada stack lain"
+                  size="xs"
+                />
+                {additionalSelectedStacks.length > 0 && (
+                  <Stack gap={4} mt="xs">
+                    {additionalSelectedStacks.map((s) => (
+                      <Group key={s.id} justify="space-between" p="xs" style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 6 }}>
+                        <Group gap="xs">
+                          <Badge size="xs" variant="outline" color="gray">ep#{s.endpointId}</Badge>
+                          <Text size="xs" ff="monospace">{s.name}</Text>
+                        </Group>
+                        <ActionIcon size="xs" variant="subtle" color="red"
+                          onClick={() => setAdditionalSelectedStacks((prev) => prev.filter((a) => a.id !== s.id))}>
+                          <TbX size={11} />
+                        </ActionIcon>
+                      </Group>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            )}
+            <Group justify="space-between" mt="xs">
+              <Button variant="subtle" size="sm" color="gray" onClick={() => setStep(0)}>← Kembali</Button>
+              <Button
+                size="sm"
+                color="primary"
+                disabled={!selectedStack}
+                loading={saveConfig.isPending}
+                leftSection={<TbCheck size={14} />}
+                onClick={() => saveConfig.mutate()}
+              >
+                {isEditing ? 'Update' : 'Simpan & Hubungkan'}
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Stack>
+    )
+  }
+
   return (
     <>
       {/* ─── Not configured ─────────────────────────────── */}
       {!config ? (
-        <Box
-          style={{
-            border: '1px solid var(--mantine-color-default-border)',
-            borderRadius: 'var(--mantine-radius-md)',
-            overflow: 'hidden',
-          }}
+        <Card
+          
         >
           {/* Header strip */}
           <Box
             p="md"
-            style={{
-              borderBottom: '1px solid var(--mantine-color-default-border)',
-              background: 'var(--mantine-color-default-hover)',
-            }}
           >
             <Group gap="sm">
               <ThemeIcon size={40} radius="md" variant="light" color="gray">
@@ -732,7 +892,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               )}
             </Stack>
           </Box>
-        </Box>
+        </Card>
       ) : (
         /* ─── Configured ────────────────────────────────── */
         <Box
@@ -1246,219 +1406,6 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
           </Stack>
         </Box>
       )}
-
-      {/* ─── Setup Modal ────────────────────────────────── */}
-      <Modal
-        opened={setupOpen}
-        onClose={handleClose}
-        title={
-          <Group gap="xs">
-            <ThemeIcon size="sm" variant="light" color="primary" radius="md">
-              <TbCloud size={13} />
-            </ThemeIcon>
-            <Text fw={600} size="sm">
-              {isEditing ? 'Edit Portainer' : 'Hubungkan ke Portainer'}
-            </Text>
-          </Group>
-        }
-        size="md"
-      >
-        <Stepper
-          active={step}
-          size="xs"
-          mb="md"
-          onStepClick={(s) => {
-            if (s < step) setStep(s)
-          }}
-        >
-          <Stepper.Step label="Connection" />
-          <Stepper.Step label="Stack" />
-        </Stepper>
-
-        {step === 0 && (
-          <Stack gap="sm">
-            {connections.length === 0 ? (
-              <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-                <Text size="xs">
-                  Belum ada Portainer connection.{' '}
-                  <Anchor size="xs" href="/envmanager/connections">
-                    Tambah connection
-                  </Anchor>{' '}
-                  terlebih dahulu.
-                </Text>
-              </Alert>
-            ) : (
-              <>
-                <Text size="xs" c="dimmed">
-                  Pilih Portainer instance untuk environment{' '}
-                  <strong>
-                    {slug}:{env}
-                  </strong>
-                  .
-                </Text>
-                <Select
-                  label="Portainer Connection"
-                  placeholder="Pilih connection..."
-                  data={connections.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                    description: c.portainerUrl.replace(/^https?:\/\//, ''),
-                  }))}
-                  value={selectedConnectionId}
-                  onChange={setSelectedConnectionId}
-                  searchable
-                />
-                {probeError && (
-                  <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
-                    <Text size="xs">{probeError}</Text>
-                  </Alert>
-                )}
-              </>
-            )}
-            <Group justify="space-between" mt="xs">
-              <Button
-                size="sm"
-                variant="subtle"
-                color="gray"
-                component="a"
-                href="/envmanager/connections"
-                leftSection={<TbPlus size={13} />}
-              >
-                Kelola Connections
-              </Button>
-              <Group gap="xs">
-                <Button variant="subtle" size="sm" color="gray" onClick={handleClose}>
-                  Batal
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={!selectedConnectionId || connections.length === 0}
-                  loading={probe.isPending}
-                  leftSection={<TbPlugConnected size={14} />}
-                  onClick={() => selectedConnectionId && probe.mutate(selectedConnectionId)}
-                >
-                  Load Stacks
-                </Button>
-              </Group>
-            </Group>
-          </Stack>
-        )}
-
-        {step === 1 && (
-          <Stack gap="sm">
-            <Alert color="teal" p="xs" icon={<TbCheck size={14} />}>
-              <Text size="xs" fw={500}>
-                {connections.find((c) => c.id === selectedConnectionId)?.name} — {stacks.length} stack ditemukan
-              </Text>
-            </Alert>
-            <Select
-              label="Stack target"
-              placeholder="Pilih stack..."
-              data={stacks.map((s) => ({
-                value: String(s.id),
-                label: s.name,
-                description: `Endpoint ${s.endpointId}`,
-              }))}
-              value={selectedStack ? String(selectedStack.id) : null}
-              onChange={(v) => setSelectedStack(stacks.find((s) => String(s.id) === v) ?? null)}
-              searchable
-              nothingFoundMessage="Stack tidak ditemukan"
-            />
-            {selectedStack && (
-              <Box
-                p="sm"
-                style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-primary)' }}
-              >
-                <Text size="xs" c="dimmed" mb={6}>
-                  Ringkasan
-                </Text>
-                <Stack gap={4}>
-                  {[
-                    ['Connection', connections.find((c) => c.id === selectedConnectionId)?.name ?? '—'],
-                    ['Project:Env', `${slug}:${env}`],
-                    ['Stack (primary)', selectedStack.name],
-                    ['Endpoint', `#${selectedStack.endpointId}`],
-                  ].map(([label, value]) => (
-                    <Group key={label} justify="space-between">
-                      <Text size="xs" c="dimmed">
-                        {label}
-                      </Text>
-                      <Code fz="xs">{value}</Code>
-                    </Group>
-                  ))}
-                </Stack>
-              </Box>
-            )}
-
-            {/* Additional stacks (multi-stack sync) */}
-            {stacks.length > 1 && selectedStack && (
-              <Box>
-                <Text size="xs" c="dimmed" mb={6}>
-                  Stack tambahan (opsional)
-                </Text>
-                <Select
-                  placeholder="Tambah stack lain..."
-                  data={stacks
-                    .filter((s) => s.id !== selectedStack.id && !additionalSelectedStacks.find((a) => a.id === s.id))
-                    .map((s) => ({ value: String(s.id), label: s.name }))}
-                  value={null}
-                  onChange={(v) => {
-                    const s = stacks.find((st) => String(st.id) === v)
-                    if (s) setAdditionalSelectedStacks((prev) => [...prev, s])
-                  }}
-                  searchable
-                  nothingFoundMessage="Tidak ada stack lain"
-                  size="xs"
-                />
-                {additionalSelectedStacks.length > 0 && (
-                  <Stack gap={4} mt="xs">
-                    {additionalSelectedStacks.map((s) => (
-                      <Group
-                        key={s.id}
-                        justify="space-between"
-                        p="xs"
-                        style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 6 }}
-                      >
-                        <Group gap="xs">
-                          <Badge size="xs" variant="outline" color="gray">
-                            ep#{s.endpointId}
-                          </Badge>
-                          <Text size="xs" ff="monospace">
-                            {s.name}
-                          </Text>
-                        </Group>
-                        <ActionIcon
-                          size="xs"
-                          variant="subtle"
-                          color="red"
-                          onClick={() => setAdditionalSelectedStacks((prev) => prev.filter((a) => a.id !== s.id))}
-                        >
-                          <TbX size={11} />
-                        </ActionIcon>
-                      </Group>
-                    ))}
-                  </Stack>
-                )}
-              </Box>
-            )}
-            <Group justify="space-between" mt="xs">
-              <Button variant="subtle" size="sm" color="gray" onClick={() => setStep(0)}>
-                ← Kembali
-              </Button>
-              <Button
-                size="sm"
-                color="primary"
-                disabled={!selectedStack}
-                loading={saveConfig.isPending}
-                leftSection={<TbCheck size={14} />}
-                onClick={() => saveConfig.mutate()}
-              >
-                {isEditing ? 'Update' : 'Simpan & Hubungkan'}
-              </Button>
-            </Group>
-          </Stack>
-        )}
-      </Modal>
 
       {/* ─── Diff Modal ─────────────────────────────────── */}
       <Modal

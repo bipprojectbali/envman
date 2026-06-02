@@ -716,7 +716,6 @@ function VarsPage() {
                 {portainerData?.config ? "Tersambung" : "Belum tersambung"}
               </Badge>
             </Group>
-            <Divider />
             <PortainerSync
               slug={slug}
               env={env}
