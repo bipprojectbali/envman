@@ -436,6 +436,7 @@ function TokensPage() {
   const [filterTags, setFilterTags] = useLocalStorage<string[]>({ key: 'envman:tokens:filterTags', defaultValue: [] })
   const [sort, setSort] = useLocalStorage({ key: 'envman:tokens:sort', defaultValue: 'terbaru' })
   const [view, setView] = useLocalStorage<'grid' | 'list'>({ key: 'envman:tokens:view', defaultValue: 'list' })
+  const [groupByTag, setGroupByTag] = useLocalStorage<boolean>({ key: 'envman:tokens:groupByTag', defaultValue: false })
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['envman', 'tokens'],
@@ -522,6 +523,7 @@ function TokensPage() {
           canWrite: body.canWrite,
           expiresAt: body.expiresAt || undefined,
           scopes: body.scopes,
+          tags: body.tags,
         }),
       }),
     onSuccess: (data) => {
@@ -543,6 +545,7 @@ function TokensPage() {
           canWrite: body.canWrite,
           expiresAt: body.expiresAt || null,
           scopes: body.scopes,
+          tags: body.tags,
         }),
       }),
     onSuccess: () => {
@@ -1185,6 +1188,19 @@ function TokensPage() {
                 {view === 'list' ? <TbLayoutGrid size={15} /> : <TbLayoutList size={15} />}
               </ActionIcon>
             </Tooltip>
+            {allTags.length > 0 && (
+              <Tooltip label={groupByTag ? 'Nonaktifkan group by tag' : 'Group by tag'}>
+                <ActionIcon
+                  size="md"
+                  variant={groupByTag ? 'filled' : 'default'}
+                  radius="md"
+                  color={groupByTag ? 'grape' : undefined}
+                  onClick={() => setGroupByTag((v) => !v)}
+                >
+                  <TbTag size={15} />
+                </ActionIcon>
+              </Tooltip>
+            )}
             <SegmentedControl
               size="xs"
               value={filterStatus}
@@ -1459,6 +1475,71 @@ function TokensPage() {
             Reset filter
           </Button>
         </Box>
+      ) : !isError && groupByTag && allTags.length > 0 ? (
+        (() => {
+          const grouped = new Map<string, typeof filteredTokens>()
+          const untagged: typeof filteredTokens = []
+          for (const t of filteredTokens) {
+            if ((t.tags ?? []).length === 0) { untagged.push(t); continue }
+            for (const tag of t.tags ?? []) {
+              if (!grouped.has(tag)) grouped.set(tag, [])
+              grouped.get(tag)!.push(t)
+            }
+          }
+          const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
+          const renderTokens = (list: typeof filteredTokens) =>
+            view === 'grid' ? (
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                {list.map((t) => (
+                  <TokenCard key={t.id} token={t} isUsageOpen={expandedUsage.has(t.id)} isCopied={copiedId === t.id}
+                    togglePending={toggleToken.isPending && toggleToken.variables === t.id}
+                    copyPending={copyToken.isPending && copyToken.variables === t.id}
+                    rotatePending={rotateToken.isPending && rotateToken.variables === t.id}
+                    onToggle={() => toggleToken.mutate(t.id)} onCopy={() => copyToken.mutate(t.id)}
+                    onRotate={() => confirmRotate(t.id, t.name)} onEdit={() => openEditModal(t)}
+                    onRevoke={() => revokeToken(t.id, t.name)}
+                    onUsageToggle={() => setExpandedUsage((prev) => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}
+                    onCardClick={() => goToDetail(t.id)} />
+                ))}
+              </SimpleGrid>
+            ) : (
+              <Stack gap="xs">
+                {list.map((t) => (
+                  <TokenCard key={t.id} token={t} compact isUsageOpen={expandedUsage.has(t.id)} isCopied={copiedId === t.id}
+                    togglePending={toggleToken.isPending && toggleToken.variables === t.id}
+                    copyPending={copyToken.isPending && copyToken.variables === t.id}
+                    rotatePending={rotateToken.isPending && rotateToken.variables === t.id}
+                    onToggle={() => toggleToken.mutate(t.id)} onCopy={() => copyToken.mutate(t.id)}
+                    onRotate={() => confirmRotate(t.id, t.name)} onEdit={() => openEditModal(t)}
+                    onRevoke={() => revokeToken(t.id, t.name)}
+                    onUsageToggle={() => setExpandedUsage((prev) => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}
+                    onCardClick={() => goToDetail(t.id)} />
+                ))}
+              </Stack>
+            )
+          return (
+            <Stack gap="md">
+              {groups.map(([tag, tagTokens]) => (
+                <Stack key={tag} gap="xs">
+                  <Group gap={6} align="center">
+                    <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                    <Divider style={{ flex: 1 }} />
+                  </Group>
+                  {renderTokens(tagTokens)}
+                </Stack>
+              ))}
+              {untagged.length > 0 && (
+                <Stack gap="xs">
+                  <Group gap={6} align="center">
+                    <Text size="xs" c="dimmed" fw={500}>Tanpa tag</Text>
+                    <Divider style={{ flex: 1 }} />
+                  </Group>
+                  {renderTokens(untagged)}
+                </Stack>
+              )}
+            </Stack>
+          )
+        })()
       ) : !isError && view === 'grid' ? (
         <>
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
