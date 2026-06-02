@@ -591,10 +591,15 @@ export function createApp() {
           return
         }
         const userId = (sessionData.user as { id: string }).id
-        const dbUser = await prisma.user.findUnique({
+        // Selalu update image dari Google — better-auth tidak update otomatis saat re-login
+        const googleImage = (sessionData.user as { image?: string | null }).image
+        const dbUser = await prisma.user.update({
           where: { id: userId },
+          data: { ...(googleImage ? { image: googleImage } : {}) },
           select: { role: true, email: true },
         })
+        // Invalidate avatar cache agar proxy serve foto terbaru
+        redis.del(`avatar:${userId}`).catch(() => {})
         appLog('info', `Login (Google): ${dbUser?.email} (${dbUser?.role})`, getIp(request))
         const defaultRoute =
           dbUser?.role === 'SUPER_ADMIN'

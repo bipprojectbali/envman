@@ -1,7 +1,6 @@
 import {
   ActionIcon,
   AppShell,
-  Avatar,
   Box,
   Burger,
   Group,
@@ -43,6 +42,7 @@ import { UserLogsPanel } from '@/frontend/components/dev/user-logs-panel'
 import { UsersPanel } from '@/frontend/components/dev/users-panel'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { TicketsPanel } from '@/frontend/components/TicketsPanel'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { useLogout, useSession } from '@/frontend/hooks/useAuth'
 
 export const Route = createLazyFileRoute('/dev')({ component: DevPage })
@@ -256,9 +256,7 @@ function DevPage() {
             {collapsed ? (
               <Stack align="center" gap={4}>
                 <Tooltip label={user?.name} position="right">
-                  <Avatar color="red" radius="xl" size="sm">
-                    {user?.name?.charAt(0).toUpperCase()}
-                  </Avatar>
+                  <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="sm" color="red" />
                 </Tooltip>
                 <ThemeToggle size="sm" />
                 <Tooltip label="Logout" position="right">
@@ -270,9 +268,7 @@ function DevPage() {
             ) : (
               <Group justify="space-between">
                 <Group gap="xs">
-                  <Avatar color="red" radius="xl" size="sm">
-                    {user?.name?.charAt(0).toUpperCase()}
-                  </Avatar>
+                  <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="sm" color="red" />
                   <div>
                     <Text size="xs" fw={500}>
                       {user?.name}

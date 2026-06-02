@@ -11,7 +11,7 @@ export const adminUsersRouter = new Elysia()
     const caller = await requireSuperAdmin(request)
     if (!caller) return caller === null ? forbidden(set) : unauthorized(set)
     const users = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, role: true, blocked: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, blocked: true, createdAt: true, image: true },
       orderBy: { createdAt: 'asc' },
     })
     return { users }
@@ -40,7 +40,7 @@ export const adminUsersRouter = new Elysia()
     const user = await prisma.user.update({
       where: { id: params.id },
       data: { role: role as 'USER' | 'QC' | 'ADMIN' },
-      select: { id: true, name: true, email: true, role: true, blocked: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, blocked: true, createdAt: true, image: true },
     })
     audit(params.id, 'ROLE_CHANGED', `${target?.role} → ${role} by ${caller.userId}`, getIp(request))
     appLog('info', `Role changed: ${user.email} ${target?.role} → ${role}`)
@@ -59,7 +59,7 @@ export const adminUsersRouter = new Elysia()
     const user = await prisma.user.update({
       where: { id: params.id },
       data: { blocked },
-      select: { id: true, name: true, email: true, role: true, blocked: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, blocked: true, createdAt: true, image: true },
     })
     // Atomic: block user + hapus semua sessions sekaligus
     if (blocked) {
