@@ -202,6 +202,10 @@ function ProjectListPage() {
   const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: 'envman:projects:tagFilter', defaultValue: [] })
   const [sort, setSort] = useLocalStorage<SortKey>({ key: 'envman:projects:sort', defaultValue: 'recent' })
   const [pinned, setPinned] = useLocalStorage<string[]>({ key: 'envman:projects:pinned', defaultValue: [] })
+  const [groupByTag, setGroupByTag] = useLocalStorage<boolean>({
+    key: 'envman:projects:groupByTag',
+    defaultValue: true,
+  })
   const [statusFilter, setStatusFilter] = useLocalStorage<'all' | 'active' | 'inactive'>({
     key: 'envman:projects:statusFilter',
     defaultValue: 'all',
@@ -651,6 +655,19 @@ function ProjectListPage() {
               </ActionIcon>
             </Tooltip>
             {allTags.length > 0 && (
+              <Tooltip label={groupByTag ? 'Nonaktifkan group by tag' : 'Group by tag'}>
+                <ActionIcon
+                  size="md"
+                  variant={groupByTag ? 'filled' : 'default'}
+                  radius="md"
+                  color={groupByTag ? 'grape' : undefined}
+                  onClick={() => setGroupByTag((v) => !v)}
+                >
+                  <TbTag size={15} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+            {allTags.length > 0 && (
               <MultiSelectChips
                 size="sm"
                 label="Tag"
@@ -837,8 +854,8 @@ function ProjectListPage() {
                   </Group>
                 )}
                 {(() => {
-                  const tagGroups = groupByPrimaryTag(group.items)
-                  const hasSubGroups = tagGroups.length > 1
+                  const tagGroups = groupByTag ? groupByPrimaryTag(group.items) : [{ tag: null, items: group.items }]
+                  const hasSubGroups = groupByTag && tagGroups.length > 1
                   return (
                     <Stack gap={hasSubGroups ? 'sm' : 'xs'}>
                       {tagGroups.map((tg) => (
