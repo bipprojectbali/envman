@@ -1594,7 +1594,7 @@ function TokensPage() {
             </Group>
           </Box>
           <Button
-            fullWidth
+            
             leftSection={<TbCheck size={14} />}
             onClick={() => editToken.mutate(editForm)}
             loading={editToken.isPending}

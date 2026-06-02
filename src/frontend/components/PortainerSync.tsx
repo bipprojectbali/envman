@@ -1602,7 +1602,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
 
             {(diff.added.length > 0 || diff.changed.length > 0) && (
               <Button
-                fullWidth
+                
                 color="primary"
                 leftSection={<TbCloudUpload size={14} />}
                 onClick={() => {
