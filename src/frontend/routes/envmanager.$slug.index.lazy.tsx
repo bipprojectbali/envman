@@ -8,6 +8,7 @@ import {
   CopyButton,
   Group,
   Kbd,
+  Menu,
   Paper,
   Select,
   SimpleGrid,
@@ -31,6 +32,7 @@ import {
   TbChevronRight,
   TbClock,
   TbCopy,
+  TbDots,
   TbFiles,
   TbFolders,
   TbInfoCircle,
@@ -782,42 +784,40 @@ function ProjectDetailPage() {
                                       {varCount} vars
                                     </Badge>
                                   </Group>
-                                  <Group gap={6} wrap="nowrap" align="center">
-                                    <Group gap={4} wrap="nowrap" align="center" onClick={(ev) => ev.stopPropagation()}>
-                                      <Code
-                                        fz="xs"
-                                        style={{
-                                          display: 'block',
-                                          overflow: 'hidden',
-                                          textOverflow: 'ellipsis',
-                                          whiteSpace: 'nowrap',
-                                        }}
-                                      >
-                                        {slug}:{e.name}
-                                      </Code>
-                                      <CopyButton value={`${slug}:${e.name}`} timeout={2000}>
-                                        {({ copied, copy }) => (
-                                          <Tooltip label={copied ? 'Tersalin!' : 'Copy'} withArrow>
-                                            <ActionIcon
-                                              size="xs"
-                                              variant="subtle"
-                                              color={copied ? 'teal' : 'gray'}
-                                              style={{ flexShrink: 0 }}
-                                              onClick={copy}
-                                            >
-                                              {copied ? <TbCheck size={10} /> : <TbCopy size={10} />}
-                                            </ActionIcon>
-                                          </Tooltip>
-                                        )}
-                                      </CopyButton>
-                                    </Group>
+                                  <Group gap={4} wrap="nowrap" align="center" onClick={(ev) => ev.stopPropagation()}>
+                                    <Code
+                                      fz="xs"
+                                      style={{
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: 160,
+                                      }}
+                                    >
+                                      {slug}:{e.name}
+                                    </Code>
+                                    <CopyButton value={`${slug}:${e.name}`} timeout={2000}>
+                                      {({ copied, copy }) => (
+                                        <Tooltip label={copied ? 'Tersalin!' : 'Copy'} withArrow>
+                                          <ActionIcon
+                                            size="xs"
+                                            variant="subtle"
+                                            color={copied ? 'teal' : 'gray'}
+                                            style={{ flexShrink: 0 }}
+                                            onClick={copy}
+                                          >
+                                            {copied ? <TbCheck size={10} /> : <TbCopy size={10} />}
+                                          </ActionIcon>
+                                        </Tooltip>
+                                      )}
+                                    </CopyButton>
                                     {e.createdAt && (
                                       <Tooltip
                                         label={`Dibuat ${new Date(e.createdAt).toLocaleString('id-ID')}`}
                                         withArrow
                                       >
                                         <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-                                          {relativeDate(e.createdAt)}
+                                          <TbClock size={10} style={{ verticalAlign: 'middle' }} />
                                         </Text>
                                       </Tooltip>
                                     )}
@@ -833,49 +833,41 @@ function ProjectDetailPage() {
                                 onClick={(ev) => ev.stopPropagation()}
                               >
                                 {isOwner && (
-                                  <>
-                                    <Tooltip label="Rename" position="left" withArrow>
+                                  <Menu position="bottom-end" withArrow shadow="md" width={160}>
+                                    <Menu.Target>
                                       <ActionIcon
                                         size="sm"
                                         variant="subtle"
                                         color="gray"
-                                        aria-label="Rename environment"
+                                        aria-label="Aksi environment"
+                                        onClick={(ev) => ev.stopPropagation()}
+                                      >
+                                        <TbDots size={14} />
+                                      </ActionIcon>
+                                    </Menu.Target>
+                                    <Menu.Dropdown>
+                                      <Menu.Item
+                                        leftSection={<TbPencil size={13} />}
                                         onClick={(ev) => {
                                           ev.stopPropagation()
                                           renameEnv(e.name, varCount)
                                         }}
                                       >
-                                        <TbPencil size={13} />
-                                      </ActionIcon>
-                                    </Tooltip>
-                                    <Tooltip label="Hapus" position="left" withArrow>
-                                      <ActionIcon
-                                        size="sm"
-                                        variant="subtle"
+                                        Rename
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        leftSection={<TbTrash size={13} />}
                                         color="red"
-                                        aria-label="Hapus environment"
                                         onClick={(ev) => {
                                           ev.stopPropagation()
                                           deleteEnv(e.name, varCount)
                                         }}
                                       >
-                                        <TbTrash size={13} />
-                                      </ActionIcon>
-                                    </Tooltip>
-                                  </>
+                                        Hapus
+                                      </Menu.Item>
+                                    </Menu.Dropdown>
+                                  </Menu>
                                 )}
-                                <Button
-                                  size="xs"
-                                  variant="light"
-                                  color={color}
-                                  rightSection={<TbChevronRight size={12} />}
-                                  onClick={(ev) => {
-                                    ev.stopPropagation()
-                                    goTo()
-                                  }}
-                                >
-                                  Open
-                                </Button>
                               </Group>
                             </Group>
                           </Box>
