@@ -20,7 +20,7 @@ export const projectsRouter = new Elysia()
     }
     const isSuperAdmin = caller.role === 'SUPER_ADMIN'
     const include = {
-      members: { include: { user: { select: { id: true, name: true, email: true } } } },
+      members: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
       environments: { select: { name: true }, orderBy: { name: 'asc' as const } },
       _count: { select: { environments: true } },
     }
@@ -84,7 +84,7 @@ export const projectsRouter = new Elysia()
     const project = await prisma.project.findFirst({
       where: { slug: params.slug, ...notDeleted },
       include: {
-        members: { include: { user: { select: { id: true, name: true, email: true } } } },
+        members: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
         environments: { include: { _count: { select: { vars: true } } } },
       },
     })

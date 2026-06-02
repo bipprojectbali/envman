@@ -11,6 +11,7 @@ export interface User {
   role: Role
   blocked: boolean
   permissions: string[]
+  image?: string | null
 }
 
 // SUPER_ADMIN bypass semua capability. Lainnya cek permissions array.

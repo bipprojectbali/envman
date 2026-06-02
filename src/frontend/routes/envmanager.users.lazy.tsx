@@ -1,6 +1,5 @@
 import {
   ActionIcon,
-  Avatar,
   Badge,
   Box,
   Button,
@@ -22,6 +21,7 @@ import { TbBan, TbCheck, TbChevronLeft, TbSearch, TbShieldCheck, TbUsers, TbX } 
 import type { GlobalRole, UserSummary } from '@/frontend/components/users/types'
 import { GLOBAL_ROLE_COLOR } from '@/frontend/components/users/types'
 import { UserDrawerContent } from '@/frontend/components/users/UserDrawerContent'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 
 export const Route = createLazyFileRoute('/envmanager/users')({
@@ -99,15 +99,13 @@ function UsersPage() {
           </Text>
           {selectedUser ? (
             <Group gap="xs" wrap="nowrap">
-              <Avatar
+              <UserAvatar
+                user={selectedUser}
                 size={22}
-                radius="xl"
                 color={GLOBAL_ROLE_COLOR[selectedUser.role]}
                 variant="gradient"
                 gradient={{ from: GLOBAL_ROLE_COLOR[selectedUser.role], to: 'grape' }}
-              >
-                {selectedUser.name.charAt(0).toUpperCase()}
-              </Avatar>
+              />
               <Text size="sm" fw={600}>
                 {selectedUser.name}
               </Text>
@@ -300,15 +298,13 @@ function UsersPage() {
                 >
                   <Table.Td>
                     <Group gap="xs" wrap="nowrap">
-                      <Avatar
+                      <UserAvatar
+                        user={u}
                         size={32}
-                        radius="xl"
                         color={GLOBAL_ROLE_COLOR[u.role]}
                         variant="gradient"
                         gradient={{ from: GLOBAL_ROLE_COLOR[u.role], to: 'grape' }}
-                      >
-                        {u.name.charAt(0).toUpperCase()}
-                      </Avatar>
+                      />
                       <div>
                         <Text size="sm" fw={500}>
                           {u.name}

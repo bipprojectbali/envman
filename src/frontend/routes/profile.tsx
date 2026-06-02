@@ -1,4 +1,5 @@
-import { Avatar, Badge, Box, Button, Container, Divider, Group, Stack, Text, Title } from '@mantine/core'
+import { Badge, Box, Button, Container, Divider, Group, Stack, Text, Title } from '@mantine/core'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { modals } from '@mantine/modals'
 import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { TbLogout, TbUser } from 'react-icons/tb'
@@ -84,9 +85,7 @@ function ProfilePage() {
           style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
         >
           <Stack align="center" gap="sm">
-            <Avatar color="blue" radius="xl" size={72} variant="gradient" gradient={{ from: 'blue', to: 'violet' }}>
-              {user?.name?.charAt(0).toUpperCase()}
-            </Avatar>
+            <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size={72} color="blue" variant="gradient" gradient={{ from: 'blue', to: 'violet' }} />
             <Box ta="center">
               <Text fw={600} size="md">
                 {user?.name}

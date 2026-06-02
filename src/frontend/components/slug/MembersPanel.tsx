@@ -1,6 +1,5 @@
 import {
   ActionIcon,
-  Avatar,
   Badge,
   Box,
   Button,
@@ -19,6 +18,7 @@ import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { TbPlus, TbSearch, TbTrash } from 'react-icons/tb'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 
@@ -263,9 +263,7 @@ export function MembersPanel({
                           onChange={() => setSelectedToAdd((prev) => toggle(prev, u.id))}
                           onClick={(e) => e.stopPropagation()}
                         />
-                        <Avatar size={22} radius="xl" color="blue">
-                          {initials(u.name)}
-                        </Avatar>
+                        <UserAvatar user={u} size={22} color="blue" />
                         <Box style={{ flex: 1, minWidth: 0 }}>
                           <Text size="xs" fw={600} truncate>
                             {u.name}
@@ -356,9 +354,7 @@ export function MembersPanel({
                     onChange={() => !isLastOwner && setSelectedToDelete((prev) => toggle(prev, m.user.id))}
                   />
                 )}
-                <Avatar size={32} radius="xl" color={roleColor[m.role]}>
-                  {initials(m.user.name)}
-                </Avatar>
+                <UserAvatar user={m.user} size={32} color={roleColor[m.role]} />
                 <Box style={{ flex: 1, minWidth: 0 }}>
                   <Group gap={6} wrap="nowrap" align="center">
                     <Text size="sm" fw={600} truncate>

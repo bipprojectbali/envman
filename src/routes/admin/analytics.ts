@@ -879,7 +879,7 @@ export const adminAnalyticsRouter = new Elysia()
 
     const onlineIds = new Set(getOnlineUserIds())
     const sessions = await prisma.session.findMany({
-      include: { user: { select: { id: true, name: true, email: true, role: true, blocked: true } } },
+      include: { user: { select: { id: true, name: true, email: true, role: true, blocked: true, image: true } } },
       orderBy: { createdAt: 'desc' },
     })
 

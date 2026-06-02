@@ -9,6 +9,7 @@ import { audit } from './lib/audit'
 import { auth } from './lib/auth'
 import { requireAuth } from './lib/auth-middleware'
 import { prisma } from './lib/db'
+import { redis } from './lib/redis'
 import { env } from './lib/env'
 import { addConnection, broadcastToAdmins, removeConnection } from './lib/presence'
 import { getIp, getPublicOrigin } from './lib/request'
@@ -487,13 +488,51 @@ export function createApp() {
         }
         const dbUser = await prisma.user.findUnique({
           where: { id: authResult.userId },
-          select: { id: true, name: true, email: true, role: true, blocked: true, permissions: true },
+          select: { id: true, name: true, email: true, role: true, blocked: true, permissions: true, image: true },
         })
         if (!dbUser || dbUser.blocked) {
           set.status = 401
           return { user: null }
         }
         return { user: dbUser }
+      })
+
+      // ─── Avatar proxy — hindari CORS Google + cache Redis ──
+      .get('/api/user/avatar/:userId', async ({ params, set }) => {
+        const user = await prisma.user.findUnique({
+          where: { id: params.userId },
+          select: { image: true },
+        })
+        if (!user?.image) { set.status = 404; return null }
+
+        const cacheKey = `avatar:${params.userId}`
+        try {
+          const cached = await redis.get(cacheKey)
+          if (cached) {
+            const sep = (cached as string).indexOf('|')
+            const ct = (cached as string).slice(0, sep)
+            const bytes = Buffer.from((cached as string).slice(sep + 1), 'base64')
+            return new Response(bytes, {
+              headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=3600' },
+            })
+          }
+        } catch { /* Redis miss — continue to fetch */ }
+
+        try {
+          const res = await fetch(user.image, { signal: AbortSignal.timeout(5000) })
+          if (!res.ok) { set.status = 404; return null }
+          const ct = res.headers.get('content-type') ?? 'image/jpeg'
+          const bytes = await res.arrayBuffer()
+          const b64 = Buffer.from(bytes).toString('base64')
+          // Cache 1 jam — best-effort, jangan block response jika Redis gagal
+          redis.set(cacheKey, `${ct}|${b64}`, 'EX', 3600).catch(() => {})
+          return new Response(bytes, {
+            headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=3600' },
+          })
+        } catch {
+          set.status = 404
+          return null
+        }
       })
 
       // ─── Backward-compat: POST /api/auth/logout ──────────

@@ -1,6 +1,5 @@
 import {
   ActionIcon,
-  Avatar,
   Badge,
   Box,
   CopyButton,
@@ -15,6 +14,7 @@ import {
 } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { TbBan, TbCheck, TbCopy, TbKey, TbShieldCheck, TbUser } from 'react-icons/tb'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { AccessMatrixTab } from './AccessMatrixTab'
 import { PermissionsTab } from './PermissionsTab'
@@ -83,15 +83,13 @@ export function UserDrawerContent({ userId }: { userId: string }) {
         <Box p="md">
           <Group gap="md" wrap="nowrap">
             <Box style={{ position: 'relative', flexShrink: 0 }}>
-              <Avatar
-                color={roleColor}
-                radius="xl"
+              <UserAvatar
+                user={user}
                 size={56}
+                color={roleColor}
                 variant="gradient"
                 gradient={{ from: roleColor, to: 'grape' }}
-              >
-                {user.name.charAt(0).toUpperCase()}
-              </Avatar>
+              />
               {user.blocked && (
                 <Box
                   style={{

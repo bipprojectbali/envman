@@ -28,7 +28,7 @@ export const v1Router = new Elysia({ prefix: '/api/v1' })
       prisma.project.findMany({
         where,
         include: {
-          members: { include: { user: { select: { id: true, name: true, email: true } } } },
+          members: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
           environments: { select: { name: true }, orderBy: { name: 'asc' as const } },
           _count: { select: { environments: true } },
         },

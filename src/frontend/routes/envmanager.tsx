@@ -1,7 +1,6 @@
 import {
   ActionIcon,
   AppShell,
-  Avatar,
   Badge,
   Box,
   Burger,
@@ -15,6 +14,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from '@tanstack/react-router'
@@ -246,9 +246,7 @@ function EnvManagerLayout() {
             <Menu position="bottom-end" withArrow shadow="md" width={200}>
               <Menu.Target>
                 <Box style={{ position: 'relative', cursor: 'pointer' }}>
-                  <Avatar color="primary" radius="xl" size="sm" variant="gradient">
-                    {user?.name?.charAt(0).toUpperCase()}
-                  </Avatar>
+                  <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="sm" color="primary" variant="gradient" />
                   <Box
                     style={{
                       position: 'absolute',
@@ -635,9 +633,7 @@ function EnvManagerLayout() {
               <Menu position="right-end" withArrow shadow="md" width={220}>
                 <Menu.Target>
                   <Box style={{ position: 'relative', cursor: 'pointer' }}>
-                    <Avatar color="primary" radius="xl" size="md" variant="gradient">
-                      {user?.name?.charAt(0).toUpperCase()}
-                    </Avatar>
+                    <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="md" color="primary" variant="gradient" />
                     <Box
                       style={{
                         position: 'absolute',
@@ -693,9 +689,7 @@ function EnvManagerLayout() {
                   >
                     <Group gap="xs" wrap="nowrap">
                       <Box style={{ position: 'relative', flexShrink: 0 }}>
-                        <Avatar color="primary" radius="xl" size="md" variant="gradient">
-                          {user?.name?.charAt(0).toUpperCase()}
-                        </Avatar>
+                        <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="md" color="primary" variant="gradient" />
                         <Box
                           style={{
                             position: 'absolute',
