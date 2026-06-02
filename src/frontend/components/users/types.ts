@@ -11,6 +11,7 @@ export interface UserSummary {
   createdAt: string
   projectCount: number
   envOverrideCount: number
+  image?: string | null
 }
 
 export interface UserDetail {
@@ -20,6 +21,7 @@ export interface UserDetail {
   role: GlobalRole
   blocked: boolean
   permissions: string[]
+  image?: string | null
 }
 
 export interface UserAccess {

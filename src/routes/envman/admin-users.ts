@@ -41,6 +41,7 @@ export const adminUsersRouter = new Elysia()
         blocked: true,
         permissions: true,
         createdAt: true,
+        image: true,
         _count: { select: { projectMembers: true, envMemberships: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -54,6 +55,7 @@ export const adminUsersRouter = new Elysia()
         blocked: u.blocked,
         permissions: u.permissions,
         createdAt: u.createdAt,
+        image: u.image,
         projectCount: u._count.projectMembers,
         envOverrideCount: u._count.envMemberships,
       })),
@@ -69,7 +71,7 @@ export const adminUsersRouter = new Elysia()
     }
     const user = await prisma.user.findUnique({
       where: { id: params.userId },
-      select: { id: true, name: true, email: true, role: true, blocked: true, permissions: true },
+      select: { id: true, name: true, email: true, role: true, blocked: true, permissions: true, image: true },
     })
     if (!user) {
       set.status = 404

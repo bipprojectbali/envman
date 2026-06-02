@@ -7,6 +7,7 @@ export interface AdminUser {
   role: Role
   blocked: boolean
   createdAt: string
+  image?: string | null
 }
 
 export interface AppLogEntry {
