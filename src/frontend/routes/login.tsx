@@ -234,6 +234,7 @@ function LoginPage() {
             <Divider label="atau lanjut dengan" labelPosition="center" my="lg" />
 
             <Button
+              fullWidth
               component="a"
               href="/api/auth/google"
               
