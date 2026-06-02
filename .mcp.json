@@ -11,24 +11,6 @@
         "GH_REPO": "bipprojectbali/envman"
       },
       "description": "Deploy pipeline ke staging"
-    },
-    "playwright": {
-      "command": "bunx",
-      "args": ["@playwright/mcp@latest", "--output-dir", ".playwright-screenshots"]
-    },
-    "debug-dev": {
-      "command": "bun",
-      "args": ["run", "scripts/mcp/debug-dev.ts"],
-      "description": "Debug runtime local (dev): inspect logs, DB, Redis, presence, tickets + run test/lint/typecheck"
-    },
-    "debug-stg": {
-      "command": "bun",
-      "args": ["run", "scripts/mcp/debug-stg.ts"],
-      "env": {
-        "BASE_URL": "${STG_BASE_URL}",
-        "MCP_SECRET": "${STG_MCP_SECRET}"
-      },
-      "description": "Debug runtime staging: inspect logs, DB state, Redis, presence, tickets — compare dengan local"
     }
   }
 }

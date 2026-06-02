@@ -1703,7 +1703,7 @@ function VarsPage() {
 
           {/* Write actions */}
           {canEdit && (
-            <Group gap={4} wrap="nowrap">
+            <Group gap={4} wrap="nowrap" w="fit-content">
               {/* .env menu (utility) */}
               <Menu shadow="md" width={220} position="bottom-end">
                 <Menu.Target>

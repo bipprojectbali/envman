@@ -254,28 +254,26 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
   if (formOpen) {
     const editingAlias = aliasId ? (aliases.find((a) => a.id === aliasId) ?? null) : null
     return (
-      <Paper withBorder p="md" radius="md">
-        <Stack gap="lg">
-          <Group gap={6} align="center">
-            <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeForm}>
-              <TbChevronLeft size={15} />
-            </ActionIcon>
-            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeForm}>
-              Aliases
-            </Anchor>
-            <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
-            <Text size="sm" fw={600}>
-              {aliasId ? (editingAlias ? `Edit: ${editingAlias.name}` : '...') : 'Tambah Alias Baru'}
-            </Text>
-          </Group>
-          <Divider />
-          {isLoading && aliasId ? (
-            <Skeleton height={200} radius="md" />
-          ) : (
-            <AliasForm slug={slug} editing={editingAlias} onClose={closeForm} />
-          )}
-        </Stack>
-      </Paper>
+      <Stack gap="lg">
+        <Group gap={6} align="center">
+          <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeForm}>
+            <TbChevronLeft size={15} />
+          </ActionIcon>
+          <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeForm}>
+            Aliases
+          </Anchor>
+          <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
+          <Text size="sm" fw={600}>
+            {aliasId ? (editingAlias ? `Edit: ${editingAlias.name}` : '...') : 'Tambah Alias Baru'}
+          </Text>
+        </Group>
+        <Divider />
+        {isLoading && aliasId ? (
+          <Skeleton height={200} radius="md" />
+        ) : (
+          <AliasForm slug={slug} editing={editingAlias} onClose={closeForm} />
+        )}
+      </Stack>
     )
   }
 

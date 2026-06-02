@@ -400,7 +400,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
           </Tabs.List>
 
           {files.map((f, i) => (
-            <Tabs.Panel key={f.filename || i} value={String(i)} pt="sm">
+            <Tabs.Panel key={i} value={String(i)} pt="sm">
               <Stack gap="xs">
                 {/* Toolbar: filename + language + write/preview */}
                 <Group gap="xs" align="flex-end" wrap="nowrap">
@@ -664,7 +664,7 @@ function GistCard({
 }) {
   const firstFile = gist.files[0]
   return (
-    <Box
+    <Paper
       p="sm"
       className="envman-gist-card"
       role="article"
@@ -842,7 +842,7 @@ function GistCard({
           </Text>
         </Tooltip>
       </Group>
-    </Box>
+    </Paper>
   )
 }
 
