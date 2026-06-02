@@ -769,6 +769,34 @@ echo "Run: envman login ${origin} --token <your-token>"
         return null
       })
 
+      // Upload CLI binary dari CI — overwrite latest, tidak perlu SSH ke server
+      .post('/api/admin/cli/upload/:platform', async ({ params, request, set }) => {
+        const secret = request.headers.get('x-cli-upload-secret')
+        if (!secret || secret !== process.env.CLI_UPLOAD_SECRET) {
+          set.status = 401
+          return { error: 'Unauthorized' }
+        }
+        const platforms: Record<string, string> = {
+          'linux-x64': 'envman-linux-x64',
+          'linux-arm64': 'envman-linux-arm64',
+          'darwin-x64': 'envman-darwin-x64',
+          'darwin-arm64': 'envman-darwin-arm64',
+          'windows-x64': 'envman-windows-x64.exe',
+        }
+        const filename = platforms[params.platform]
+        if (!filename) {
+          set.status = 404
+          return { error: 'Unknown platform' }
+        }
+        const body = await request.arrayBuffer()
+        if (body.byteLength === 0) {
+          set.status = 400
+          return { error: 'Empty body' }
+        }
+        await Bun.write(`/data/cli/${filename}.gz`, body)
+        return { ok: true, platform: params.platform, size: body.byteLength }
+      })
+
       // ─── Public Docs (raw markdown for AI / crawlers) ─────
       .get('/api/docs.md', ({ request }) => {
         const origin = getPublicOrigin(request)

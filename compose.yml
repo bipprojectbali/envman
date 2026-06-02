@@ -22,6 +22,8 @@ services:
       # MCP
       - MCP_SECRET=${MCP_SECRET}
       - MCP_SECRET_ADMIN=${MCP_SECRET_ADMIN}
+      # CLI upload secret (dipakai CI untuk POST /api/admin/cli/upload/:platform)
+      - CLI_UPLOAD_SECRET=${CLI_UPLOAD_SECRET}
       # Telegram
       - TELEGRAM_NOTIFY_TOKEN=${TELEGRAM_NOTIFY_TOKEN}
       - TELEGRAM_NOTIFY_CHAT_ID=${TELEGRAM_NOTIFY_CHAT_ID}
@@ -32,7 +34,7 @@ services:
       - MIGRATE_DATABASE_URL=${DIRECT_URL}
       # MIGRATE_DB_RETRIES defaults to 5 (2s delay each)
     volumes:
-      - ./cli-dist:/data/cli:ro
+      - cli-dist:/data/cli
     networks:
       - public-net
       - postgres-net-stg
@@ -52,6 +54,9 @@ services:
       - "traefik.http.routers.envman.tls=true"
       - "traefik.http.routers.envman.tls.certresolver=letsencrypt"
       - "traefik.http.services.envman.loadbalancer.server.port=3000"
+
+volumes:
+  cli-dist:
 
 networks:
   public-net:

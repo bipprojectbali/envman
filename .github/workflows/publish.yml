@@ -82,29 +82,29 @@ jobs:
           done
           echo "✓ CLI binaries uploaded to $TAG"
 
-      # ── Deploy CLI binaries ke server (serve lokal, lebih cepat dari GitHub CDN) ──
-      - name: Deploy CLI binaries ke server
-        if: ${{ secrets.CLI_DEPLOY_HOST != '' }}
+      # ── Upload CLI ke app via HTTP (tanpa SSH, cukup secret) ────────────────────
+      # File di-overwrite setiap deploy → hanya 1 versi (latest) di volume
+      - name: Upload CLI binaries ke server
+        if: ${{ secrets.CLI_UPLOAD_SECRET != '' && secrets.APP_URL != '' }}
         env:
-          CLI_DEPLOY_HOST: ${{ secrets.CLI_DEPLOY_HOST }}
-          CLI_DEPLOY_USER: ${{ secrets.CLI_DEPLOY_USER }}
-          CLI_DEPLOY_KEY: ${{ secrets.CLI_DEPLOY_KEY }}
-          CLI_DEPLOY_PATH: ${{ secrets.CLI_DEPLOY_PATH || '/opt/envman/cli-dist' }}
-          STACK_ENV: ${{ github.event.inputs.stack_env }}
+          CLI_UPLOAD_SECRET: ${{ secrets.CLI_UPLOAD_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$CLI_DEPLOY_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$CLI_DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          # Buat direktori di server jika belum ada
-          ssh -i ~/.ssh/deploy_key "$CLI_DEPLOY_USER@$CLI_DEPLOY_HOST" \
-            "mkdir -p $CLI_DEPLOY_PATH"
-          # Upload hanya .gz (lebih kecil, ~60% dari raw)
-          for f in dist/cli/*.gz; do
-            [ -f "$f" ] && scp -i ~/.ssh/deploy_key "$f" \
-              "$CLI_DEPLOY_USER@$CLI_DEPLOY_HOST:$CLI_DEPLOY_PATH/"
+          for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
+            if [ "$platform" = "windows-x64" ]; then
+              gz="dist/cli/envman-windows-x64.exe.gz"
+            else
+              gz="dist/cli/envman-${platform}.gz"
+            fi
+            [ -f "$gz" ] || continue
+            echo "Uploading $platform..."
+            curl -fsSL -X POST \
+              -H "x-cli-upload-secret: $CLI_UPLOAD_SECRET" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$gz" \
+              "$APP_URL/api/admin/cli/upload/$platform"
           done
-          echo "✓ CLI .gz binaries deployed to $CLI_DEPLOY_HOST:$CLI_DEPLOY_PATH"
+          echo "✓ CLI binaries uploaded"
 
       # ── Docker build ──────────────────────────────────────────────────────────
       - name: Set up QEMU
