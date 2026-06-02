@@ -6,21 +6,24 @@ import {
   Button,
   Code,
   CopyButton,
+  Divider,
   Group,
   Kbd,
   Menu,
+  Modal,
   Paper,
   Select,
   SimpleGrid,
   Skeleton,
   Stack,
   Tabs,
+  TagsInput,
   Text,
   TextInput,
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDebouncedValue, useHotkeys, useLocalStorage } from '@mantine/hooks'
+import { useDebouncedValue, useDisclosure, useHotkeys, useLocalStorage } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute, Link, useNavigate } from '@tanstack/react-router'
@@ -63,6 +66,7 @@ export const Route = createLazyFileRoute('/envmanager/$slug/')({ component: Proj
 interface Environment {
   id: string
   name: string
+  tags: string[]
   createdAt?: string
   _count: { vars: number }
 }
@@ -149,12 +153,22 @@ function ProjectDetailPage() {
   const canCreateNote = hasCapability(sessionData?.user, 'note:create')
 
   const [newEnvName, setNewEnvName] = useState('')
+  const [newEnvTags, setNewEnvTags] = useState<string[]>([])
   const [envSearch, setEnvSearch] = useState('')
   const [envSort, setEnvSort] = useState<'name' | 'vars' | 'recent'>('name')
+  const [envTagFilter, setEnvTagFilter] = useState<string>('')
+  const [envGroupByTag, setEnvGroupByTag] = useLocalStorage<boolean>({
+    key: 'envman:environments:groupByTag',
+    defaultValue: false,
+  })
   const [envView, setEnvView] = useLocalStorage<'list' | 'grid'>({
     key: 'envman:environments:view',
     defaultValue: 'list',
   })
+  const [createOpen, { open: openCreate, close: closeCreate }] = useDisclosure(false)
+  const [editEnv, setEditEnv] = useState<Environment | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editTags, setEditTags] = useState<string[]>([])
   const searchRef = useRef<HTMLInputElement>(null)
   const [debouncedSearch] = useDebouncedValue(envSearch, 120)
 
@@ -206,12 +220,19 @@ function ProjectDetailPage() {
   const aliasesCount = aliasesData?.aliases?.length ?? 0
   const filesCount = filesData?.files?.length ?? 0
 
+  const allEnvTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of envs) for (const t of (e.tags ?? [])) set.add(t)
+    return [...set].sort()
+  }, [envs])
+
   const filteredEnvs = useMemo(() => {
     let list = [...envs]
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase()
       list = list.filter((e) => e.name.toLowerCase().includes(q))
     }
+    if (envTagFilter) list = list.filter((e) => (e.tags ?? []).includes(envTagFilter))
     if (envSort === 'name') list.sort((a, b) => a.name.localeCompare(b.name))
     else if (envSort === 'vars') list.sort((a, b) => (b._count?.vars ?? 0) - (a._count?.vars ?? 0))
     else if (envSort === 'recent') {
@@ -222,7 +243,7 @@ function ProjectDetailPage() {
       })
     }
     return list
-  }, [envs, debouncedSearch, envSort])
+  }, [envs, debouncedSearch, envSort, envTagFilter])
 
   useHotkeys([
     [
@@ -254,13 +275,29 @@ function ProjectDetailPage() {
       : null
 
   const addEnv = useMutation({
-    mutationFn: (name: string) =>
-      apiFetch(`/api/envman/projects/${slug}/environments`, { method: 'POST', body: JSON.stringify({ name }) }),
-    onSuccess: (_, name) => {
+    mutationFn: ({ name, tags }: { name: string; tags: string[] }) =>
+      apiFetch(`/api/envman/projects/${slug}/environments`, { method: 'POST', body: JSON.stringify({ name, tags }) }),
+    onSuccess: (_, { name }) => {
       qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
       setNewEnvName('')
+      setNewEnvTags([])
+      closeCreate()
       notifyOk(`Environment "${name}" ditambahkan`)
       navigate({ to: '/envmanager/$slug/$env', params: { slug, env: name } })
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  const updateEnv = useMutation({
+    mutationFn: ({ oldName, name, tags }: { oldName: string; name: string; tags: string[] }) =>
+      apiFetch(`/api/envman/projects/${slug}/environments/${oldName}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: name !== oldName ? name : undefined, tags }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
+      setEditEnv(null)
+      notifyOk('Environment diperbarui')
     },
     onError: (e) => notifyErr(e),
   })
@@ -631,16 +668,16 @@ function ProjectDetailPage() {
                             variant="light"
                             color={getEnvColor(preset)}
                             leftSection={<TbPlus size={12} />}
-                            onClick={() => addEnv.mutate(preset)}
-                            loading={addEnv.isPending && addEnv.variables === preset}
+                            onClick={() => addEnv.mutate({ name: preset, tags: [] })}
+                            loading={addEnv.isPending && addEnv.variables?.name === preset}
                           >
                             {preset}
                           </Button>
                         ))}
                       </Group>
-                      <Text size="xs" c="dimmed">
-                        atau buat nama custom di bawah
-                      </Text>
+                      <Button size="xs" variant="subtle" leftSection={<TbPlus size={12} />} onClick={openCreate}>
+                        Buat nama custom
+                      </Button>
                     </>
                   )}
                 </Box>
@@ -678,47 +715,84 @@ function ProjectDetailPage() {
                         radius="md"
                       />
                     )}
-                    {/* Sort + view toggle */}
-                    <Group gap="xs" wrap="wrap" justify={envs.length > 2 ? undefined : 'flex-end'}>
-                      {envs.length > 2 && (
-                        <Select
-                          size="sm"
-                          w={155}
-                          radius="md"
-                          leftSection={<TbSortAscending size={14} />}
-                          value={envSort}
-                          onChange={(v) => setEnvSort((v ?? 'name') as typeof envSort)}
-                          data={[
-                            { label: 'Nama A→Z', value: 'name' },
-                            { label: 'Terbanyak vars', value: 'vars' },
-                            { label: 'Terbaru', value: 'recent' },
-                          ]}
-                          allowDeselect={false}
-                        />
-                      )}
-                      <Group gap={4} wrap="nowrap">
-                        <Tooltip label="List view" withArrow>
-                          <ActionIcon
+                    {/* Sort + view toggle + Create */}
+                    <Group gap="xs" wrap="wrap" justify="space-between">
+                      <Group gap="xs" wrap="wrap">
+                        {envs.length > 2 && (
+                          <Select
                             size="sm"
-                            variant={envView === 'list' ? 'filled' : 'subtle'}
-                            color="blue"
-                            onClick={() => setEnvView('list')}
-                          >
-                            <TbLayoutList size={14} />
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label="Grid view" withArrow>
-                          <ActionIcon
-                            size="sm"
-                            variant={envView === 'grid' ? 'filled' : 'subtle'}
-                            color="blue"
-                            onClick={() => setEnvView('grid')}
-                          >
-                            <TbLayoutGrid size={14} />
-                          </ActionIcon>
-                        </Tooltip>
+                            w={155}
+                            radius="md"
+                            leftSection={<TbSortAscending size={14} />}
+                            value={envSort}
+                            onChange={(v) => setEnvSort((v ?? 'name') as typeof envSort)}
+                            data={[
+                              { label: 'Nama A→Z', value: 'name' },
+                              { label: 'Terbanyak vars', value: 'vars' },
+                              { label: 'Terbaru', value: 'recent' },
+                            ]}
+                            allowDeselect={false}
+                          />
+                        )}
+                        <Group gap={4} wrap="nowrap">
+                          <Tooltip label="List view" withArrow>
+                            <ActionIcon
+                              size="sm"
+                              variant={envView === 'list' ? 'filled' : 'subtle'}
+                              color="blue"
+                              onClick={() => setEnvView('list')}
+                            >
+                              <TbLayoutList size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                          <Tooltip label="Grid view" withArrow>
+                            <ActionIcon
+                              size="sm"
+                              variant={envView === 'grid' ? 'filled' : 'subtle'}
+                              color="blue"
+                              onClick={() => setEnvView('grid')}
+                            >
+                              <TbLayoutGrid size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                          {allEnvTags.length > 0 && (
+                            <Tooltip label={envGroupByTag ? 'Nonaktifkan grouping' : 'Group by tag'} withArrow>
+                              <ActionIcon
+                                size="sm"
+                                variant={envGroupByTag ? 'filled' : 'subtle'}
+                                color="grape"
+                                onClick={() => setEnvGroupByTag((v) => !v)}
+                              >
+                                <TbTag size={14} />
+                              </ActionIcon>
+                            </Tooltip>
+                          )}
+                        </Group>
                       </Group>
+                      {canEdit && (
+                        <Button size="xs" leftSection={<TbPlus size={13} />} onClick={openCreate}>
+                          Buat environment
+                        </Button>
+                      )}
                     </Group>
+                    {/* Tag filter chips */}
+                    {allEnvTags.length > 0 && (
+                      <Group gap={6} wrap="wrap">
+                        {allEnvTags.map((t) => (
+                          <Badge
+                            key={t}
+                            size="sm"
+                            variant={envTagFilter === t ? 'filled' : 'outline'}
+                            color="grape"
+                            leftSection={<TbTag size={9} />}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => setEnvTagFilter((f) => (f === t ? '' : t))}
+                          >
+                            {t}
+                          </Badge>
+                        ))}
+                      </Group>
+                    )}
                   </Stack>
 
                   {/* Environment list/grid */}
@@ -784,6 +858,15 @@ function ProjectDetailPage() {
                                       {varCount} vars
                                     </Badge>
                                   </Group>
+                                  {(e.tags ?? []).length > 0 && (
+                                    <Group gap={4} mb={2} wrap="wrap">
+                                      {(e.tags ?? []).map((t) => (
+                                        <Badge key={t} size="xs" variant="dot" color="grape">
+                                          {t}
+                                        </Badge>
+                                      ))}
+                                    </Group>
+                                  )}
                                   <Group gap={4} wrap="nowrap" align="center" onClick={(ev) => ev.stopPropagation()}>
                                     <Code
                                       fz="xs"
@@ -832,8 +915,8 @@ function ProjectDetailPage() {
                                 style={{ flexShrink: 0 }}
                                 onClick={(ev) => ev.stopPropagation()}
                               >
-                                {isOwner && (
-                                  <Menu position="bottom-end" withArrow shadow="md" width={160}>
+                                {canEdit && (
+                                  <Menu position="bottom-end" withArrow shadow="md" width={180}>
                                     <Menu.Target>
                                       <ActionIcon
                                         size="sm"
@@ -850,21 +933,28 @@ function ProjectDetailPage() {
                                         leftSection={<TbPencil size={13} />}
                                         onClick={(ev) => {
                                           ev.stopPropagation()
-                                          renameEnv(e.name, varCount)
+                                          setEditEnv(e)
+                                          setEditName(e.name)
+                                          setEditTags(e.tags ?? [])
                                         }}
                                       >
-                                        Rename
+                                        Edit
                                       </Menu.Item>
-                                      <Menu.Item
-                                        leftSection={<TbTrash size={13} />}
-                                        color="red"
-                                        onClick={(ev) => {
-                                          ev.stopPropagation()
-                                          deleteEnv(e.name, varCount)
-                                        }}
-                                      >
-                                        Hapus
-                                      </Menu.Item>
+                                      {isOwner && (
+                                        <>
+                                          <Menu.Divider />
+                                          <Menu.Item
+                                            leftSection={<TbTrash size={13} />}
+                                            color="red"
+                                            onClick={(ev) => {
+                                              ev.stopPropagation()
+                                              deleteEnv(e.name, varCount)
+                                            }}
+                                          >
+                                            Hapus
+                                          </Menu.Item>
+                                        </>
+                                      )}
                                     </Menu.Dropdown>
                                   </Menu>
                                 )}
@@ -873,6 +963,58 @@ function ProjectDetailPage() {
                           </Box>
                         )
                       })
+                      if (envGroupByTag && allEnvTags.length > 0) {
+                        const grouped = new Map<string, typeof filteredEnvs>()
+                        const untagged: typeof filteredEnvs = []
+                        for (const env of filteredEnvs) {
+                          if ((env.tags ?? []).length === 0) { untagged.push(env); continue }
+                          for (const t of env.tags ?? []) {
+                            if (!grouped.has(t)) grouped.set(t, [])
+                            grouped.get(t)!.push(env)
+                          }
+                        }
+                        const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
+                        const renderGroup = (groupCards: typeof filteredEnvs) => {
+                          const gc = groupCards.map((ge) => {
+                            const gc2 = getEnvColor(ge.name)
+                            const vc = ge._count?.vars ?? 0
+                            const gt = () => navigate({ to: '/envmanager/$slug/$env', params: { slug, env: ge.name } })
+                            return cards[filteredEnvs.indexOf(ge)]
+                          })
+                          return envView === 'grid'
+                            ? <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{gc}</SimpleGrid>
+                            : <Stack gap="xs">{gc}</Stack>
+                        }
+                        const cardsByEnv = new Map(filteredEnvs.map((e, i) => [e.name, cards[i]]))
+                        return (
+                          <Stack gap="md">
+                            {groups.map(([tag, tagEnvs]) => (
+                              <Stack key={tag} gap="xs">
+                                <Group gap={6} align="center">
+                                  <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                                  <Divider style={{ flex: 1 }} />
+                                </Group>
+                                {envView === 'grid'
+                                  ? <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{tagEnvs.map((e) => cardsByEnv.get(e.name))}</SimpleGrid>
+                                  : <Stack gap="xs">{tagEnvs.map((e) => cardsByEnv.get(e.name))}</Stack>
+                                }
+                              </Stack>
+                            ))}
+                            {untagged.length > 0 && (
+                              <Stack gap="xs">
+                                <Group gap={6} align="center">
+                                  <Text size="xs" c="dimmed" fw={500}>Lainnya</Text>
+                                  <Divider style={{ flex: 1 }} />
+                                </Group>
+                                {envView === 'grid'
+                                  ? <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{untagged.map((e) => cardsByEnv.get(e.name))}</SimpleGrid>
+                                  : <Stack gap="xs">{untagged.map((e) => cardsByEnv.get(e.name))}</Stack>
+                                }
+                              </Stack>
+                            )}
+                          </Stack>
+                        )
+                      }
                       return envView === 'grid' ? (
                         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">
                           {cards}
@@ -885,69 +1027,90 @@ function ProjectDetailPage() {
                 </>
               )}
 
-              {/* Add environment */}
-              {canEdit && (
-                <Box
-                  p="sm"
-                  mt="md"
-                  style={{
-                    border: '1px solid var(--mantine-color-default-border)',
-                    borderRadius: 'var(--mantine-radius-md)',
-                    width: 'fit-content',
-                  }}
-                >
-                  <Stack gap="xs">
-                    <Text size="xs" fw={500} c="dimmed">
-                      Tambah environment
-                    </Text>
-                    <Group gap="xs" align="flex-start" wrap="nowrap">
-                      <Box style={{ minWidth: 220 }}>
-                        <TextInput
-                          size="sm"
-                          placeholder="production, staging-eu, dev-alice..."
-                          value={newEnvName}
-                          onChange={(ev) => setNewEnvName(ev.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                          onKeyDown={(ev) => {
-                            if (ev.key === 'Enter' && newEnvValid && !newEnvDuplicate) addEnv.mutate(newEnvName)
-                          }}
-                          leftSection={<TbVariable size={14} />}
-                          error={newEnvError ?? undefined}
-                          styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
-                        />
-                        {envs.length > 0 && envs.length < ENV_PRESETS.length && (
-                          <Group gap={6} mt={6}>
-                            <Text size="xs" c="dimmed">
-                              Preset:
-                            </Text>
-                            {ENV_PRESETS.filter((p) => !envs.some((e) => e.name === p)).map((preset) => (
-                              <Badge
-                                key={preset}
-                                size="sm"
-                                variant="outline"
-                                color={getEnvColor(preset)}
-                                style={{ cursor: 'pointer' }}
-                                onClick={() => addEnv.mutate(preset)}
-                              >
-                                + {preset}
-                              </Badge>
-                            ))}
-                          </Group>
-                        )}
-                      </Box>
+              {/* Create + Edit modals */}
+              <Modal
+                opened={createOpen}
+                onClose={() => { closeCreate(); setNewEnvName(''); setNewEnvTags([]) }}
+                title={<Group gap="xs"><ThemeIcon size="sm" variant="light" color="blue" radius="md"><TbPlus size={13} /></ThemeIcon><Text fw={600} size="sm">Buat Environment</Text></Group>}
+                size="sm"
+              >
+                <Stack gap="sm">
+                  <TextInput
+                    label="Nama"
+                    placeholder="production, staging-eu, dev-alice..."
+                    value={newEnvName}
+                    onChange={(ev) => setNewEnvName(ev.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    onKeyDown={(ev) => { if (ev.key === 'Enter' && newEnvValid && !newEnvDuplicate) addEnv.mutate({ name: newEnvName, tags: newEnvTags }) }}
+                    leftSection={<TbVariable size={14} />}
+                    error={newEnvError ?? undefined}
+                    styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
+                    autoFocus
+                  />
+                  {envs.length < ENV_PRESETS.length && (
+                    <Group gap={6}>
+                      <Text size="xs" c="dimmed">Preset:</Text>
+                      {ENV_PRESETS.filter((p) => !envs.some((e) => e.name === p)).map((preset) => (
+                        <Badge key={preset} size="sm" variant="outline" color={getEnvColor(preset)} style={{ cursor: 'pointer' }} onClick={() => setNewEnvName(preset)}>
+                          {preset}
+                        </Badge>
+                      ))}
+                    </Group>
+                  )}
+                  <TagsInput
+                    label="Tags"
+                    description="Opsional — untuk filter dan grouping"
+                    placeholder="backend, frontend, internal..."
+                    value={newEnvTags}
+                    onChange={setNewEnvTags}
+                  />
+                  <Group justify="flex-end" mt="xs">
+                    <Button variant="default" onClick={() => { closeCreate(); setNewEnvName(''); setNewEnvTags([]) }}>Batal</Button>
+                    <Button leftSection={<TbPlus size={14} />} onClick={() => addEnv.mutate({ name: newEnvName, tags: newEnvTags })} loading={addEnv.isPending} disabled={!newEnvValid || newEnvDuplicate}>
+                      Buat
+                    </Button>
+                  </Group>
+                </Stack>
+              </Modal>
+
+              <Modal
+                opened={!!editEnv}
+                onClose={() => setEditEnv(null)}
+                title={<Group gap="xs"><ThemeIcon size="sm" variant="light" color="blue" radius="md"><TbPencil size={13} /></ThemeIcon><Text fw={600} size="sm">Edit Environment</Text></Group>}
+                size="sm"
+              >
+                {editEnv && (
+                  <Stack gap="sm">
+                    {isOwner && (
+                      <TextInput
+                        label="Nama"
+                        value={editName}
+                        onChange={(ev) => setEditName(ev.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                        leftSection={<TbVariable size={14} />}
+                        styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
+                        error={editName.length > 0 && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(editName) ? 'Format tidak valid' : undefined}
+                      />
+                    )}
+                    <TagsInput
+                      label="Tags"
+                      description="Untuk filter dan grouping"
+                      placeholder="backend, frontend, internal..."
+                      value={editTags}
+                      onChange={setEditTags}
+                    />
+                    <Divider />
+                    <Group justify="flex-end">
+                      <Button variant="default" onClick={() => setEditEnv(null)}>Batal</Button>
                       <Button
-                        size="sm"
-                        style={{ flexShrink: 0 }}
-                        leftSection={<TbPlus size={14} />}
-                        onClick={() => addEnv.mutate(newEnvName)}
-                        loading={addEnv.isPending}
-                        disabled={!newEnvValid || newEnvDuplicate}
+                        onClick={() => updateEnv.mutate({ oldName: editEnv.name, name: editName, tags: editTags })}
+                        loading={updateEnv.isPending}
+                        disabled={isOwner && editName.length > 0 && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(editName)}
                       >
-                        Add
+                        Simpan
                       </Button>
                     </Group>
                   </Stack>
-                </Box>
-              )}
+                )}
+              </Modal>
             </Paper>
           </Tabs.Panel>
 
