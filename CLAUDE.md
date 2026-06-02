@@ -36,7 +36,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`
 - `TicketComment` (id, ticketId, authorId, authorTag, body, createdAt)
 - `TicketEvidence` (id, ticketId, kind, url, note, createdAt)
 - `Project` (id, slug, name, description, tags[], timestamps)
-- `Environment` (id, name, projectId, createdAt) — unique(projectId, name)
+- `Environment` (id, name, tags[], projectId, createdAt) — unique(projectId, name)
 - `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
 - `ApiToken` (id, userId, name, token, scopes[], canWrite, lastUsedAt?, expiresAt?, createdAt)
@@ -61,6 +61,63 @@ bun run db:generate   # bunx prisma generate
 bun run db:studio     # bunx prisma studio
 bun run db:push       # bunx prisma db push
 ```
+
+### Aturan Migrasi Database (KETETAPAN MUTLAK)
+
+**Setiap perubahan `prisma/schema.prisma` WAJIB diikuti langkah berikut — tanpa terkecuali:**
+
+#### 1. Buat migration SQL manual
+
+Buat folder baru di `prisma/migrations/` dengan format `YYYYMMDDHHMMSS_deskripsi_singkat/migration.sql`.
+
+**Aturan penulisan SQL:**
+- Nama tabel pakai **lowercase** — semua tabel di project ini lowercase (contoh: `"environment"`, bukan `"Environment"`)
+- Selalu pakai `IF NOT EXISTS` / `IF EXISTS` agar idempotent (aman di-rerun di env yang sudah `db push` manual)
+- Kolom NOT NULL di tabel berisi data: wajib kasih `DEFAULT` atau `UPDATE` backfill dulu
+- Sertakan comment singkat: *kenapa* ditambah, bukan *apa*
+
+```sql
+-- Contoh kolom baru
+ALTER TABLE "environment" ADD COLUMN IF NOT EXISTS "tags" TEXT[] NOT NULL DEFAULT '{}';
+
+-- Contoh index baru
+CREATE INDEX IF NOT EXISTS "idx_environment_tags" ON "environment" USING GIN ("tags");
+
+-- Contoh hapus kolom
+ALTER TABLE "environment" DROP COLUMN IF EXISTS "deprecated_field";
+```
+
+#### 2. Jalankan migrasi di local dev — WAJIB sebelum commit
+
+```bash
+bun run db:migrate    # bunx prisma migrate dev — terapkan migration + regenerate client
+```
+
+Jangan commit schema change tanpa menjalankan `bun run db:migrate` terlebih dahulu. Migration yang belum dijalankan di local = migration yang belum terbukti valid.
+
+#### 3. Regenerate Prisma client
+
+`bun run db:migrate` sudah include generate. Jika hanya perlu generate tanpa migrate:
+```bash
+bun run db:generate   # bunx prisma generate
+```
+
+#### 4. Verifikasi
+
+Setelah migrasi berhasil, pastikan:
+- Tidak ada error di `bun run typecheck`
+- Server dev bisa start tanpa error
+- Migration file ada di `prisma/migrations/` dan sudah di-commit
+
+**Kenapa wajib:** Server production menjalankan migrasi otomatis saat startup (`MIGRATE_ON_STARTUP=true`). Jika migration file tidak ada atau SQL-nya salah, server crash saat deploy. Migration yang sudah diuji di local = deploy yang aman.
+
+**❌ Larangan:**
+- Schema change tanpa migration file
+- Commit migration file tanpa menjalankan `bun run db:migrate` di local
+- Pakai `bun run db:push` sebagai pengganti migration (db push tidak buat migration file)
+- Nama tabel PascalCase di SQL (harus lowercase sesuai konvensi project ini)
+
+---
 
 ### Secret Encryption
 
