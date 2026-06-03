@@ -429,7 +429,7 @@ function ConnectionsPage() {
           {/* ─── Toolbar ────────────────────────── */}
           {!isError && connections.length > 0 && (
             <Box
-              p="xs"
+              py={8}
               mb="md"
               maw={580}
             >
@@ -707,7 +707,9 @@ function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, 
 
 function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, onDelete }: CardProps) {
   return (
-    <Box
+    <Paper
+      radius={8}
+      withBorder
       p="sm"
       className="envman-conn-card"
       role="link"
@@ -720,7 +722,7 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
           onOpen()
         }
       }}
-    >
+     >
       <Group justify="space-between" wrap="nowrap">
         <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
           <ThemeIcon size={36} radius="md" variant="light" color="primary">
@@ -787,7 +789,7 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
           </Group>
         )}
       </Group>
-    </Box>
+    </Paper>
   )
 }
 

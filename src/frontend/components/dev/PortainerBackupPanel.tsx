@@ -471,7 +471,7 @@ function ScheduleTab({ connId }: { connId: string }) {
   if (scheduleQ.isLoading) return <Loader size="sm" mt="md" />;
 
   return (
-    <Paper withBorder>
+    <Paper withBorder p={"md"} mt={"md"}>
       <Stack gap="sm" pt="xs">
         {s && (
           <Group gap="xs">
@@ -608,149 +608,152 @@ function HistoryTab({ connId }: { connId: string }) {
     });
 
   return (
-    <Stack gap="sm" pt="xs">
-      <Group justify="space-between">
-        <Select
-          size="xs"
-          placeholder="Semua jenis"
-          clearable
-          value={typeFilter}
-          onChange={(v) => {
-            setTypeFilter(v);
-            setPage(1);
-          }}
-          data={[
-            { value: "PORTAINER_DB", label: "Database" },
-            { value: "COMPOSE_FILES", label: "Compose" },
-            { value: "FULL", label: "Full" },
-          ]}
-          w={160}
-        />
-        {selected.size > 0 && (
-          <Button
+    <Paper withBorder p={"md"} mt={"md"}>
+      <Stack gap="sm" pt="xs">
+        <Group justify="space-between">
+          <Select
             size="xs"
-            color="red"
-            variant="light"
-            leftSection={<TbTrash size={12} />}
-            loading={deleteMany.isPending}
-            onClick={() => confirmDelete(Array.from(selected))}
-          >
-            Hapus {selected.size} terpilih
-          </Button>
-        )}
-      </Group>
-
-      {listQ.isLoading ? (
-        <Loader size="sm" />
-      ) : backups.length === 0 ? (
-        <Text size="sm" c="dimmed" ta="center" py="lg">
-          Belum ada backup
-        </Text>
-      ) : (
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th w={36}>
-                <Checkbox checked={allChecked} onChange={toggleAll} size="xs" />
-              </Table.Th>
-              <Table.Th>Waktu</Table.Th>
-              <Table.Th>Jenis</Table.Th>
-              <Table.Th>Ukuran</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th w={72} />
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {backups.map((b) => (
-              <Table.Tr
-                key={b.id}
-                bg={
-                  selected.has(b.id)
-                    ? "var(--mantine-color-blue-light)"
-                    : undefined
-                }
-              >
-                <Table.Td>
-                  <Checkbox
-                    checked={selected.has(b.id)}
-                    onChange={() => toggleOne(b.id)}
-                    size="xs"
-                  />
-                </Table.Td>
-                <Table.Td>
-                  <Text size="xs">
-                    {new Date(b.createdAt).toLocaleString("id")}
-                  </Text>
-                  {b.note && (
-                    <Text size="xs" c="dimmed">
-                      {b.note}
+            placeholder="Semua jenis"
+            clearable
+            value={typeFilter}
+            onChange={(v) => {
+              setTypeFilter(v);
+              setPage(1);
+            }}
+            data={[
+              { value: "PORTAINER_DB", label: "Database" },
+              { value: "COMPOSE_FILES", label: "Compose" },
+              { value: "FULL", label: "Full" },
+            ]}
+            w={160}
+          />
+          {selected.size > 0 && (
+            <Button
+              size="xs"
+              color="red"
+              variant="light"
+              leftSection={<TbTrash size={12} />}
+              loading={deleteMany.isPending}
+              onClick={() => confirmDelete(Array.from(selected))}
+            >
+              Hapus {selected.size} terpilih
+            </Button>
+          )}
+        </Group>
+  
+        {listQ.isLoading ? (
+          <Loader size="sm" />
+        ) : backups.length === 0 ? (
+          <Text size="sm" c="dimmed" ta="center" py="lg">
+            Belum ada backup
+          </Text>
+        ) : (
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th w={36}>
+                  <Checkbox checked={allChecked} onChange={toggleAll} size="xs" />
+                </Table.Th>
+                <Table.Th>Waktu</Table.Th>
+                <Table.Th>Jenis</Table.Th>
+                <Table.Th>Ukuran</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th w={72} />
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {backups.map((b) => (
+                <Table.Tr
+                  key={b.id}
+                  bg={
+                    selected.has(b.id)
+                      ? "var(--mantine-color-blue-light)"
+                      : undefined
+                  }
+                >
+                  <Table.Td>
+                    <Checkbox
+                      checked={selected.has(b.id)}
+                      onChange={() => toggleOne(b.id)}
+                      size="xs"
+                    />
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs">
+                      {new Date(b.createdAt).toLocaleString("id")}
                     </Text>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  <Badge size="xs" variant="light">
-                    {TYPE_LABELS[b.type] ?? b.type}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="xs">{formatBytes(b.sizeBytes)}</Text>
-                </Table.Td>
-                <Table.Td>
-                  {b.ok ? (
-                    <Badge size="xs" color="green" variant="dot">
-                      OK
+                    {b.note && (
+                      <Text size="xs" c="dimmed">
+                        {b.note}
+                      </Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge size="xs" variant="light">
+                      {TYPE_LABELS[b.type] ?? b.type}
                     </Badge>
-                  ) : (
-                    <Tooltip label={b.error ?? "Gagal"} withArrow>
-                      <Badge size="xs" color="red" variant="dot">
-                        Gagal
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs">{formatBytes(b.sizeBytes)}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {b.ok ? (
+                      <Badge size="xs" color="green" variant="dot">
+                        OK
                       </Badge>
-                    </Tooltip>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  <Group gap={4} justify="flex-end">
-                    {b.ok && (
-                      <Tooltip label="Download" withArrow>
+                    ) : (
+                      <Tooltip label={b.error ?? "Gagal"} withArrow>
+                        <Badge size="xs" color="red" variant="dot">
+                          Gagal
+                        </Badge>
+                      </Tooltip>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={4} justify="flex-end">
+                      {b.ok && (
+                        <Tooltip label="Download" withArrow>
+                          <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            color="blue"
+                            component="a"
+                            href={`/api/envman/portainer/connections/${connId}/backups/${b.id}/download`}
+                            download
+                          >
+                            <TbDownload size={12} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                      <Tooltip label="Hapus" withArrow>
                         <ActionIcon
                           size="xs"
                           variant="subtle"
-                          color="blue"
-                          component="a"
-                          href={`/api/envman/portainer/connections/${connId}/backups/${b.id}/download`}
-                          download
+                          color="red"
+                          onClick={() => confirmDelete([b.id])}
                         >
-                          <TbDownload size={12} />
+                          <TbTrash size={12} />
                         </ActionIcon>
                       </Tooltip>
-                    )}
-                    <Tooltip label="Hapus" withArrow>
-                      <ActionIcon
-                        size="xs"
-                        variant="subtle"
-                        color="red"
-                        onClick={() => confirmDelete([b.id])}
-                      >
-                        <TbTrash size={12} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      )}
-
-      {(listQ.data?.totalPages ?? 1) > 1 && (
-        <Pagination
-          size="sm"
-          value={page}
-          onChange={setPage}
-          total={listQ.data?.totalPages ?? 1}
-        />
-      )}
-    </Stack>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        )}
+  
+        {(listQ.data?.totalPages ?? 1) > 1 && (
+          <Pagination
+            size="sm"
+            value={page}
+            onChange={setPage}
+            total={listQ.data?.totalPages ?? 1}
+          />
+        )}
+      </Stack>
+    </Paper>
+      
   );
 }
 
@@ -768,6 +771,7 @@ export function BackupPanelContent() {
   return (
     <Stack gap="md">
       <Select
+      maw={580}
         label="Pilih connection"
         placeholder="Pilih Portainer connection..."
         value={activeConn}
