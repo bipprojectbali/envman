@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   Alert,
+  Anchor,
   Badge,
   Box,
   Button,
@@ -8,7 +9,6 @@ import {
   Divider,
   Group,
   Kbd,
-  Modal,
   Paper,
   PasswordInput,
   SimpleGrid,
@@ -20,14 +20,15 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { useDebouncedValue, useDisclosure, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { useDebouncedValue, useHotkeys, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   TbAlertTriangle,
   TbCheck,
+  TbChevronLeft,
   TbClock,
   TbDatabaseExport,
   TbExternalLink,
@@ -49,6 +50,7 @@ import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 export const Route = createFileRoute('/envmanager/connections/')({
   validateSearch: (search: Record<string, unknown>) => ({
     tab: (search.tab as string) === 'backup' ? ('backup' as const) : ('connections' as const),
+    connectionForm: typeof search.connectionForm === 'string' ? search.connectionForm : undefined,
   }),
   component: ConnectionsPage,
 })
@@ -101,10 +103,8 @@ function ConnectionsPage() {
   const { data: sessionData } = useSession()
   const canViewConnections = hasCapability(sessionData?.user, 'connection:view')
   const canManageConnections = sessionData?.user?.role === 'SUPER_ADMIN'
-  const { tab } = Route.useSearch()
+  const { tab, connectionForm: connectionFormId } = Route.useSearch()
 
-  const [modalOpen, { open, close }] = useDisclosure(false)
-  const [editTarget, setEditTarget] = useState<Connection | null>(null)
   const [form, setForm] = useState({ name: '', portainerUrl: '', apiToken: '' })
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [search, setSearch] = useState('')
@@ -149,26 +149,28 @@ function ConnectionsPage() {
     return connections.filter((c) => c.name.toLowerCase().includes(q) || c.portainerUrl.toLowerCase().includes(q))
   }, [connections, debouncedSearch])
 
-  const openCreate = () => {
-    setEditTarget(null)
-    setForm({ name: '', portainerUrl: '', apiToken: '' })
-    setTestResult(null)
-    open()
-  }
+  const isFormOpen = !!connectionFormId
+  const editTarget = connectionFormId && connectionFormId !== 'new'
+    ? (connections.find((c) => c.id === connectionFormId) ?? null)
+    : null
 
-  const openEdit = (c: Connection) => {
-    setEditTarget(c)
-    setForm({ name: c.name, portainerUrl: c.portainerUrl, apiToken: '' })
-    setTestResult(null)
-    open()
-  }
+  // Sync form state saat masuk edit mode (setelah connections dimuat)
+  useEffect(() => {
+    if (connectionFormId === 'new') {
+      setForm({ name: '', portainerUrl: '', apiToken: '' })
+      setTestResult(null)
+    } else if (editTarget) {
+      setForm({ name: editTarget.name, portainerUrl: editTarget.portainerUrl, apiToken: '' })
+      setTestResult(null)
+    }
+  }, [connectionFormId, editTarget?.id])
 
-  const handleClose = () => {
-    close()
-    setEditTarget(null)
-    setForm({ name: '', portainerUrl: '', apiToken: '' })
-    setTestResult(null)
-  }
+  const openCreate = () =>
+    navigate({ to: '.', search: (prev) => ({ ...prev, connectionForm: 'new' }), replace: true })
+  const openEdit = (c: Connection) =>
+    navigate({ to: '.', search: (prev) => ({ ...prev, connectionForm: c.id }), replace: true })
+  const handleClose = () =>
+    navigate({ to: '.', search: (prev) => ({ ...prev, connectionForm: undefined }), replace: true })
 
   const testConnection = useMutation({
     mutationFn: async () => {
@@ -203,8 +205,8 @@ function ConnectionsPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['portainer', 'connections'] })
-      handleClose()
       notifyOk(editTarget ? 'Connection diperbarui' : 'Connection berhasil ditambahkan')
+      handleClose()
     },
     onError: (e) => notifyErr(e),
   })
@@ -262,6 +264,99 @@ function ConnectionsPage() {
 
   const totalEnvs = connections.reduce((s, c) => s + (c._count?.configs ?? 0), 0)
 
+  // ─── Inline form page (create / edit) ─────────────────────────────────────
+  if (isFormOpen) {
+    return (
+      <Paper withBorder p="md" radius="md">
+        <Stack gap="md">
+          <Group gap={6} align="center">
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={handleClose}>
+              <TbChevronLeft size={15} />
+            </ActionIcon>
+            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={handleClose}>
+              Connections
+            </Anchor>
+            <Text size="sm" c="dimmed">/</Text>
+            <Text size="sm" fw={600}>
+              {editTarget ? `Edit: ${editTarget.name}` : 'Tambah Connection'}
+            </Text>
+          </Group>
+          <Divider />
+          <TextInput
+            label="Nama"
+            placeholder="Production Portainer, Dev Server, ..."
+            description="Nama untuk identifikasi — akan muncul di setiap environment setup"
+            value={form.name}
+            autoFocus
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+          <TextInput
+            label="Portainer URL"
+            placeholder="https://portainer.example.com"
+            description="URL lengkap dengan protokol (https://) tanpa path"
+            value={form.portainerUrl}
+            onChange={(e) => setForm((f) => ({ ...f, portainerUrl: e.target.value.trim() }))}
+            error={
+              form.portainerUrl && !/^https?:\/\//.test(form.portainerUrl)
+                ? 'URL harus diawali http:// atau https://'
+                : undefined
+            }
+          />
+          <PasswordInput
+            label="API Token"
+            placeholder={editTarget ? '— kosongkan untuk pakai token lama —' : 'ptr_xxxxxxxxxxxx'}
+            description={
+              editTarget && !form.apiToken
+                ? 'Token tersimpan tetap digunakan jika dikosongkan'
+                : 'Buat di Portainer: Account → Access tokens → Add access token'
+            }
+            value={form.apiToken}
+            onChange={(e) => setForm((f) => ({ ...f, apiToken: e.target.value }))}
+          />
+          {testResult && (
+            <Alert
+              color={testResult.ok ? 'teal' : 'red'}
+              icon={testResult.ok ? <TbCheck size={14} /> : <TbAlertTriangle size={14} />}
+              p="xs"
+              withCloseButton
+              onClose={() => setTestResult(null)}
+            >
+              <Text size="xs">{testResult.message}</Text>
+            </Alert>
+          )}
+          <Group justify="space-between" gap="xs">
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<TbPlugConnected size={13} />}
+              loading={testConnection.isPending}
+              disabled={!form.portainerUrl || (!form.apiToken && !editTarget)}
+              onClick={() => testConnection.mutate()}
+            >
+              Test Connection
+            </Button>
+            <Text size="xs" c="dimmed">
+              {form.apiToken || editTarget ? '' : 'Test perlu URL + token'}
+            </Text>
+          </Group>
+          <Divider />
+          <Group justify="flex-end" gap="xs">
+            <Button variant="subtle" color="gray" onClick={handleClose}>Batal</Button>
+            <Button
+              leftSection={editTarget ? <TbCheck size={14} /> : <TbPlus size={14} />}
+              color="primary"
+              loading={saveConnection.isPending}
+              disabled={!form.name || !form.portainerUrl || (!editTarget && !form.apiToken)}
+              onClick={() => saveConnection.mutate()}
+            >
+              {editTarget ? 'Update' : 'Simpan Connection'}
+            </Button>
+          </Group>
+        </Stack>
+      </Paper>
+    )
+  }
+
   return (
     <Box>
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
@@ -269,8 +364,9 @@ function ConnectionsPage() {
 
       <Tabs
         value={tab}
+        variant='outline'
         onChange={(v) =>
-          navigate({ to: '/envmanager/connections', search: { tab: (v ?? 'connections') as 'connections' | 'backup' } })
+          navigate({ to: '/envmanager/connections', search: (prev) => ({ ...prev, tab: (v ?? 'connections') as 'connections' | 'backup', connectionForm: undefined }) })
         }
       >
         <Tabs.List mb="md">
@@ -335,10 +431,7 @@ function ConnectionsPage() {
             <Box
               p="xs"
               mb="md"
-              style={{
-                border: '1px solid var(--mantine-color-default-border)',
-                borderRadius: 'var(--mantine-radius-md)',
-              }}
+              maw={580}
             >
               <TextInput
                 ref={searchRef}
@@ -478,104 +571,6 @@ function ConnectionsPage() {
             </Stack>
           ) : null}
 
-          {/* ─── Create/Edit modal ─────────────── */}
-          <Modal
-            opened={modalOpen}
-            onClose={handleClose}
-            fullScreen={isMobile}
-            size="md"
-            centered
-            title={
-              <Group gap="xs">
-                <ThemeIcon size="sm" variant="light" color="primary" radius="md">
-                  <TbPlugConnected size={13} />
-                </ThemeIcon>
-                <Text fw={600} size="sm">
-                  {editTarget ? 'Edit Connection' : 'Tambah Connection'}
-                </Text>
-              </Group>
-            }
-          >
-            <Stack gap="md">
-              <TextInput
-                label="Nama"
-                placeholder="Production Portainer, Dev Server, ..."
-                description="Nama untuk identifikasi — akan muncul di setiap environment setup"
-                value={form.name}
-                autoFocus
-                data-autofocus
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-              <TextInput
-                label="Portainer URL"
-                placeholder="https://portainer.example.com"
-                description="URL lengkap dengan protokol (https://) tanpa path"
-                value={form.portainerUrl}
-                onChange={(e) => setForm((f) => ({ ...f, portainerUrl: e.target.value.trim() }))}
-                error={
-                  form.portainerUrl && !/^https?:\/\//.test(form.portainerUrl)
-                    ? 'URL harus diawali http:// atau https://'
-                    : undefined
-                }
-              />
-              <PasswordInput
-                label="API Token"
-                placeholder={editTarget ? '— kosongkan untuk pakai token lama —' : 'ptr_xxxxxxxxxxxx'}
-                description={
-                  editTarget && !form.apiToken
-                    ? 'Token tersimpan tetap digunakan jika dikosongkan'
-                    : 'Buat di Portainer: Account → Access tokens → Add access token'
-                }
-                value={form.apiToken}
-                onChange={(e) => setForm((f) => ({ ...f, apiToken: e.target.value }))}
-              />
-
-              {testResult && (
-                <Alert
-                  color={testResult.ok ? 'teal' : 'red'}
-                  icon={testResult.ok ? <TbCheck size={14} /> : <TbAlertTriangle size={14} />}
-                  p="xs"
-                  withCloseButton
-                  onClose={() => setTestResult(null)}
-                >
-                  <Text size="xs">{testResult.message}</Text>
-                </Alert>
-              )}
-
-              <Group justify="space-between" gap="xs">
-                <Button
-                  size="xs"
-                  variant="default"
-                  leftSection={<TbPlugConnected size={13} />}
-                  loading={testConnection.isPending}
-                  disabled={!form.portainerUrl || (!form.apiToken && !editTarget)}
-                  onClick={() => testConnection.mutate()}
-                >
-                  Test Connection
-                </Button>
-                <Text size="xs" c="dimmed">
-                  {form.apiToken || editTarget ? '' : 'Test perlu URL + token'}
-                </Text>
-              </Group>
-
-              <Divider />
-
-              <Group justify="flex-end" gap="xs">
-                <Button variant="subtle" color="gray" onClick={handleClose}>
-                  Batal
-                </Button>
-                <Button
-                  leftSection={editTarget ? <TbCheck size={14} /> : <TbPlus size={14} />}
-                  color="primary"
-                  loading={saveConnection.isPending}
-                  disabled={!form.name || !form.portainerUrl || (!editTarget && !form.apiToken)}
-                  onClick={() => saveConnection.mutate()}
-                >
-                  {editTarget ? 'Update' : 'Simpan Connection'}
-                </Button>
-              </Group>
-            </Stack>
-          </Modal>
         </Tabs.Panel>
 
         <Tabs.Panel value="backup" pt="xs">
@@ -614,6 +609,8 @@ function HealthBadge({ health }: { health?: { totalStacks: number; activeStacks:
 function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, onDelete }: CardProps) {
   return (
     <Paper
+      radius={8}
+      withBorder
       p="md"
       className="envman-conn-card"
       role="link"
@@ -723,7 +720,6 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
           onOpen()
         }
       }}
-      style={{ cursor: 'pointer', borderBottom: '1px solid var(--mantine-color-default-border)' }}
     >
       <Group justify="space-between" wrap="nowrap">
         <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>

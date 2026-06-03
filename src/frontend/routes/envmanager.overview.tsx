@@ -330,7 +330,7 @@ function OverviewPage() {
           sub="Portainer instance"
           color="teal"
           loading={loadingConnections}
-          onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections' } })}
+          onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections', connectionForm: undefined } })}
         />
         <StatCard
           icon={TbBrandGithub}
@@ -738,7 +738,7 @@ function OverviewPage() {
                 variant="subtle"
                 color="teal"
                 rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections' } })}
+                onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections', connectionForm: undefined } })}
               >
                 Kelola
               </Button>

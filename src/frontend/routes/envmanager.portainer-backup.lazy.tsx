@@ -8,7 +8,7 @@ export const Route = createLazyFileRoute('/envmanager/portainer-backup')({
 function PortainerBackupRedirect() {
   const navigate = useNavigate()
   useEffect(() => {
-    navigate({ to: '/envmanager/connections', search: { tab: 'backup' }, replace: true })
+    navigate({ to: '/envmanager/connections', search: { tab: 'backup', connectionForm: undefined }, replace: true })
   }, [navigate])
   return null
 }

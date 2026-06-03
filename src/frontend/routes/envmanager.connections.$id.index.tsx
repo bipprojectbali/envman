@@ -871,7 +871,7 @@ function ConnectionDetailPage() {
             onClick={() =>
               navigate({
                 to: "/envmanager/connections",
-                search: { tab: "connections" },
+                search: { tab: "connections", connectionForm: undefined },
               })
             }
           >
