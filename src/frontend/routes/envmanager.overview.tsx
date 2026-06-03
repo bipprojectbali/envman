@@ -422,7 +422,7 @@ function OverviewPage() {
                       fileNew: false,
                       viewFileId: undefined,
                       aliasId: undefined,
-                      aliasNew: false,
+                      aliasNew: false, viewAliasId: undefined,
                       noteId: undefined,
                       noteNew: false,
                       viewNoteId: undefined,

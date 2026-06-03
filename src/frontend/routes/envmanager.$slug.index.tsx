@@ -10,6 +10,7 @@ export const Route = createFileRoute('/envmanager/$slug/')({
     viewFileId: typeof search.viewFileId === 'string' ? search.viewFileId : undefined,
     aliasId: typeof search.aliasId === 'string' ? search.aliasId : undefined,
     aliasNew: search.aliasNew === true || search.aliasNew === 'true',
+    viewAliasId: typeof search.viewAliasId === 'string' ? search.viewAliasId : undefined,
     noteId: typeof search.noteId === 'string' ? search.noteId : undefined,
     noteNew: search.noteNew === true || search.noteNew === 'true',
     viewNoteId: typeof search.viewNoteId === 'string' ? search.viewNoteId : undefined,

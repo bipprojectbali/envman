@@ -161,7 +161,7 @@ export interface AliasesPanelProps {
 export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, noteId, noteNew, viewNoteId } = useSearch({
+  const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId, noteId, noteNew, viewNoteId } = useSearch({
     from: '/envmanager/$slug/',
   })
   const [search, setSearch] = useState('')
@@ -221,23 +221,35 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
     onError: (e) => notifyErr(e),
   })
 
+  const openView = (id: string) =>
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: false, viewAliasId: id, noteId, noteNew, viewNoteId },
+    })
+  const closeView = () =>
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: false, viewAliasId: undefined, noteId, noteNew, viewNoteId },
+    })
   const openEdit = (alias: Alias) =>
     navigate({
       to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId, fileNew, viewFileId, aliasId: alias.id, aliasNew: false, noteId, noteNew, viewNoteId },
+      search: { tab, fileId, fileNew, viewFileId, aliasId: alias.id, aliasNew: false, viewAliasId: undefined, noteId, noteNew, viewNoteId },
     })
   const openCreate = () =>
     navigate({
       to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: true, noteId, noteNew, viewNoteId },
+      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: true, viewAliasId: undefined, noteId, noteNew, viewNoteId },
     })
   const closeForm = () =>
     navigate({
       to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: false, noteId, noteNew, viewNoteId },
+      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: false, viewAliasId: undefined, noteId, noteNew, viewNoteId },
     })
 
   const confirmDelete = (alias: Alias) => {
@@ -255,6 +267,106 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
   }
 
   const formOpen = aliasNew || !!aliasId
+
+  // ─── Detail view ─────────────────────────────────────────────────────────
+  if (viewAliasId) {
+    const alias = aliases.find((a) => a.id === viewAliasId)
+    if (!alias) return null
+    return (
+      <Stack gap="md">
+        <Group gap={6} align="center">
+          <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeView}>
+            <TbChevronLeft size={15} />
+          </ActionIcon>
+          <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeView}>
+            Aliases
+          </Anchor>
+          <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
+          <Code fz="sm" fw={700}>{alias.name}</Code>
+        </Group>
+        <Divider />
+
+        <Stack gap="xs">
+          {/* Command */}
+          <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Perintah</Text>
+          <Group gap="xs" align="flex-start">
+            <Code block fz="sm" style={{ flex: 1, wordBreak: 'break-all' }}>
+              envman {alias.args}
+            </Code>
+            <CopyButton value={`envman ${alias.args}`} timeout={2000}>
+              {({ copied, copy }) => (
+                <Tooltip label={copied ? 'Disalin!' : 'Salin'} withArrow>
+                  <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                    {copied ? <TbCheck size={14} /> : <TbCopy size={14} />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </CopyButton>
+          </Group>
+
+          {/* Run command */}
+          <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>Jalankan via CLI</Text>
+          <Group gap="xs" align="flex-start">
+            <Code block fz="sm" style={{ flex: 1 }}>
+              envman run {slug}:{alias.name}
+            </Code>
+            <CopyButton value={`envman run ${slug}:${alias.name}`} timeout={2000}>
+              {({ copied, copy }) => (
+                <Tooltip label={copied ? 'Disalin!' : 'Salin'} withArrow>
+                  <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                    {copied ? <TbCheck size={14} /> : <TbCopy size={14} />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </CopyButton>
+          </Group>
+
+          {/* Description */}
+          {alias.description && (
+            <>
+              <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>Deskripsi</Text>
+              <Text size="sm">{alias.description}</Text>
+            </>
+          )}
+
+          {/* Tags */}
+          {alias.tags.length > 0 && (
+            <>
+              <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>Tags</Text>
+              <Group gap={4}>
+                {alias.tags.map((t) => (
+                  <Badge key={t} size="sm" variant="light" color="blue">{t}</Badge>
+                ))}
+              </Group>
+            </>
+          )}
+
+          {/* Meta */}
+          <Divider mt="xs" />
+          <Group gap="xs" wrap="wrap">
+            <Text size="xs" c="dimmed">Dibuat oleh <strong>{alias.creator.name}</strong></Text>
+            <Text size="xs" c="dimmed">·</Text>
+            <Text size="xs" c="dimmed">
+              {new Date(alias.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </Text>
+          </Group>
+
+          {/* Actions */}
+          {isOwner && (
+            <Group gap="xs" mt="xs">
+              <Button size="xs" variant="default" leftSection={<TbPencil size={13} />} onClick={() => openEdit(alias)}>
+                Edit
+              </Button>
+              <Button size="xs" variant="subtle" color="red" leftSection={<TbTrash size={13} />} onClick={() => confirmDelete(alias)}>
+                Hapus
+              </Button>
+            </Group>
+          )}
+        </Stack>
+      </Stack>
+    )
+  }
+
   if (formOpen) {
     const editingAlias = aliasId ? (aliases.find((a) => a.id === aliasId) ?? null) : null
     return (
@@ -412,10 +524,15 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
             <Box
               key={alias.id}
               p="sm"
+              role="button"
+              tabIndex={0}
               style={{
                 border: '1px solid var(--mantine-color-default-border)',
                 borderRadius: 'var(--mantine-radius-md)',
+                cursor: 'pointer',
               }}
+              onClick={() => openView(alias.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter') openView(alias.id) }}
             >
               <Group justify="space-between" wrap="nowrap" align="flex-start">
                 <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
@@ -433,7 +550,7 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                       )}
                     </CopyButton>
                     {alias.tags.length > 0 && (
-                      <Group gap={4} wrap="wrap">
+                      <Group gap={4} wrap="wrap" onClick={(e) => e.stopPropagation()}>
                         {alias.tags.map((tag) => (
                           <Badge
                             key={tag}
@@ -479,7 +596,7 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                 </Stack>
 
                 {isOwner && (
-                  <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+                  <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
                     <Tooltip label="Edit alias" withArrow>
                       <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEdit(alias)}>
                         <TbPencil size={14} />

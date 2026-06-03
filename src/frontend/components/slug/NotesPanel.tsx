@@ -421,7 +421,7 @@ function NoteCardGrid({
 export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: NotesPanelProps) {
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, noteId, noteNew, viewNoteId } = useSearch({
+  const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId, noteId, noteNew, viewNoteId } = useSearch({
     from: '/envmanager/$slug/',
   })
 
@@ -516,7 +516,7 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
         fileNew,
         viewFileId,
         aliasId,
-        aliasNew,
+        aliasNew, viewAliasId,
         noteId: undefined,
         noteNew: false,
         viewNoteId: note.id,
@@ -533,7 +533,7 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
         fileNew,
         viewFileId,
         aliasId,
-        aliasNew,
+        aliasNew, viewAliasId,
         noteId: note === 'new' ? undefined : note.id,
         noteNew: note === 'new',
         viewNoteId: undefined,
@@ -550,7 +550,7 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
         fileNew,
         viewFileId,
         aliasId,
-        aliasNew,
+        aliasNew, viewAliasId,
         noteId: undefined,
         noteNew: false,
         viewNoteId: undefined,

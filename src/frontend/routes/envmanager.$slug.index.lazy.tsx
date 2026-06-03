@@ -145,7 +145,7 @@ const HOVER_STYLES = `
 
 function ProjectDetailPage() {
   const { slug } = Route.useParams()
-  const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, noteId, noteNew, viewNoteId } = Route.useSearch()
+  const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId, noteId, noteNew, viewNoteId } = Route.useSearch()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: sessionData } = useSession()
@@ -182,7 +182,7 @@ function ProjectDetailPage() {
         fileNew,
         viewFileId,
         aliasId,
-        aliasNew,
+        aliasNew, viewAliasId,
         noteId,
         noteNew,
         viewNoteId,
