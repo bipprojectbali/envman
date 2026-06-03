@@ -537,6 +537,41 @@ async function cmdAlias(args: string[]) {
 
 // ─── Download helper: streaming with progress + timeout ──────────────────────
 
+function fmtBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function fmtSpeed(bps: number): string {
+  if (bps < 1024) return `${bps.toFixed(0)} B/s`
+  if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(1)} KB/s`
+  return `${(bps / 1024 / 1024).toFixed(1)} MB/s`
+}
+
+function fmtEta(secs: number): string {
+  if (!isFinite(secs) || secs <= 0) return '...'
+  if (secs < 60) return `${Math.ceil(secs)}s`
+  const m = Math.floor(secs / 60)
+  const s = Math.ceil(secs % 60)
+  return `${m}m ${s}s`
+}
+
+function renderProgress(received: number, total: number, speed: number, elapsed: number): string {
+  const BAR = 20
+  const pct = total > 0 ? Math.min(received / total, 1) : -1
+  const bar = pct >= 0
+    ? '[' + '█'.repeat(Math.floor(pct * BAR)) + '░'.repeat(BAR - Math.floor(pct * BAR)) + ']'
+    : ''
+  const pctStr = pct >= 0 ? ` ${(pct * 100).toFixed(0).padStart(3)}%` : ''
+  const sizeStr = total > 0
+    ? `  ${fmtBytes(received)} / ${fmtBytes(total)}`
+    : `  ${fmtBytes(received)}`
+  const speedStr = speed > 0 ? `  ${fmtSpeed(speed)}` : ''
+  const eta = speed > 0 && total > 0 ? `  ETA ${fmtEta((total - received) / speed)}` : ''
+  return `  ${bar}${pctStr}${sizeStr}${speedStr}${eta}`
+}
+
 async function downloadBinary(url: string, timeoutMs = 10 * 60 * 1000, showProgress = false): Promise<Buffer | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -550,29 +585,47 @@ async function downloadBinary(url: string, timeoutMs = 10 * 60 * 1000, showProgr
       return null
     }
 
+    // Content-Length = compressed size (server serves gzip); decompressed total ~2.5-3x
+    const compressedLen = parseInt(res.headers.get('content-length') ?? '0') || 0
+    // Estimate decompressed total: gzip ratio for Bun binaries is ~2.7x
+    const estimatedTotal = compressedLen > 0 ? Math.round(compressedLen * 2.7) : 0
+
     const chunks: Buffer[] = []
     const reader = res.body.getReader()
     let received = 0
-    let lastMb = 0
+    const startTime = Date.now()
+    let lastPrint = 0
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
       chunks.push(Buffer.from(value))
       received += value.length
+
       if (showProgress) {
-        const mb = Math.floor(received / (1024 * 1024))
-        if (mb > lastMb) {
-          process.stdout.write('.')
-          lastMb = mb
+        const now = Date.now()
+        if (now - lastPrint >= 250) {
+          lastPrint = now
+          const elapsed = (now - startTime) / 1000
+          const speed = elapsed > 0 ? received / elapsed : 0
+          const line = renderProgress(received, estimatedTotal, speed, elapsed)
+          process.stdout.write(`\r\x1b[K${line}`)
         }
       }
     }
+
     clearTimeout(timer)
-    if (showProgress) process.stdout.write(` ${(received / 1024 / 1024).toFixed(1)}MB\n`)
+    if (showProgress) {
+      const elapsed = (Date.now() - startTime) / 1000
+      const speed = elapsed > 0 ? received / elapsed : 0
+      process.stdout.write(
+        `\r\x1b[K  ✓ ${fmtBytes(received)}  ${fmtSpeed(speed)}  ${elapsed.toFixed(1)}s\n`
+      )
+    }
     return Buffer.concat(chunks)
   } catch (e) {
     clearTimeout(timer)
+    if (showProgress) process.stdout.write('\n')
     if ((e as Error).name === 'AbortError') return null
     throw e
   }
@@ -597,9 +650,9 @@ async function cmdUpdate() {
     writeFileSync(UPDATE_CACHE_FILE, JSON.stringify({ checkedAt: Date.now(), latestVersion: latest }))
     return
   }
-  console.log(`Update tersedia: v${VERSION} → v${latest}`)
-  process.stdout.write('Mengunduh')
   const platform = detectPlatform()
+  console.log(`Update tersedia: v${VERSION} → v${latest}`)
+  console.log(`Mengunduh envman ${platform}...`)
   const buf = await downloadBinary(`${server}/download/cli/${platform}`, 10 * 60 * 1000, true)
   if (!buf) {
     console.error('Download gagal atau timeout. Cek koneksi ke server.')
