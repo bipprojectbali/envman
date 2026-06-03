@@ -193,7 +193,7 @@ export const filesRouter = new Elysia()
       return { error: 'files harus berisi minimal satu file' }
     }
     if (body?.prefix !== undefined) {
-      const newPrefix = body.prefix.trim() || null
+      const newPrefix = typeof body.prefix === 'string' ? body.prefix.trim() || null : null
       if (newPrefix && newPrefix !== existing.prefix) {
         const dup = await prisma.projectFile.findFirst({ where: { projectId: project.id, prefix: newPrefix } })
         if (dup) {
