@@ -72,6 +72,7 @@ import {
 import { CodeEditor } from "@/frontend/components/CodeEditor";
 import { CompareModal } from "@/frontend/components/env/CompareModal";
 import { PortainerSync } from "@/frontend/components/PortainerSync";
+import { PortainerSetupInline } from "@/frontend/components/portainer/PortainerSetupInline";
 import { useExtensions } from "@/frontend/hooks/useExtensions";
 import { apiFetch } from "@/frontend/lib/api";
 import { notifyErr, notifyOk } from "@/frontend/lib/notify";
@@ -79,6 +80,7 @@ import { notifyErr, notifyOk } from "@/frontend/lib/notify";
 interface EnvSearch {
   compare?: boolean;
   integrations?: boolean;
+  portainerSetup?: 'new' | 'edit';
   editEnv?: boolean;
   bulk?: boolean;
   addVar?: boolean;
@@ -91,6 +93,9 @@ export const Route = createFileRoute("/envmanager/$slug/$env")({
   validateSearch: (search: Record<string, unknown>): EnvSearch => ({
     compare: truthy(search.compare) ? true : undefined,
     integrations: truthy(search.integrations) ? true : undefined,
+    portainerSetup: search.portainerSetup === 'new' || search.portainerSetup === 'edit'
+      ? (search.portainerSetup as 'new' | 'edit')
+      : undefined,
     editEnv: truthy(search.editEnv) ? true : undefined,
     bulk: truthy(search.bulk) ? true : undefined,
     addVar: truthy(search.addVar) ? true : undefined,
@@ -135,6 +140,7 @@ function VarsPage() {
   const {
     compare: compareSearch,
     integrations: integrationsSearch,
+    portainerSetup: portainerSetupSearch,
     editEnv: editEnvSearch,
     bulk: bulkSearch,
     addVar: addVarSearch,
@@ -152,6 +158,23 @@ function VarsPage() {
       to: ".",
       params: { slug, env },
       search: (prev) => ({ ...prev, compare: undefined }),
+      replace: true,
+    });
+
+  // Portainer setup inline — route-based navigation
+  const portainerSetupMode = portainerSetupSearch ?? null;
+  const openPortainerSetup = (mode: 'new' | 'edit') =>
+    navigate({
+      to: '.',
+      params: { slug, env },
+      search: (prev) => ({ ...prev, integrations: true, portainerSetup: mode }),
+      replace: true,
+    });
+  const closePortainerSetup = () =>
+    navigate({
+      to: '.',
+      params: { slug, env },
+      search: (prev) => ({ ...prev, portainerSetup: undefined }),
       replace: true,
     });
 
@@ -642,6 +665,19 @@ function VarsPage() {
     filteredVars.length > 0 && filteredVars.every((v) => selectedIds.has(v.id));
   const projectName: string = projectData?.project?.name ?? slug;
 
+  if (portainerSetupMode && portainerEnabled) {
+    return (
+      <Paper withBorder p="md" radius="md">
+        <PortainerSetupInline
+          slug={slug}
+          env={env}
+          mode={portainerSetupMode}
+          onClose={closePortainerSetup}
+        />
+      </Paper>
+    );
+  }
+
   if (integrationsOpen && portainerEnabled) {
     return (
       <Paper withBorder p="md" radius="md">
@@ -721,6 +757,7 @@ function VarsPage() {
               env={env}
               canEdit={canEdit}
               secretCount={secretCount}
+              onSetupOpen={openPortainerSetup}
             />
           </Stack>
 

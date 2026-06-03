@@ -67,6 +67,7 @@ interface Props {
   env: string
   canEdit: boolean
   secretCount: number
+  onSetupOpen: (mode: 'new' | 'edit') => void
 }
 
 interface PortainerStack {
@@ -160,20 +161,11 @@ function relativeTime(dateStr: string): string {
   return `${Math.floor(h / 24)} hari lalu`
 }
 
-export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
+export function PortainerSync({ slug, env, canEdit, secretCount, onSetupOpen }: Props) {
   const { data: session } = useSession()
   const isSuperAdmin = session?.user?.role === 'SUPER_ADMIN'
   const qc = useQueryClient()
-  const [setupOpen, { open: openSetup, close: closeSetup }] = useDisclosure(false)
   const [diffOpen, { open: openDiff, close: closeDiff }] = useDisclosure(false)
-
-  const [isEditing, setIsEditing] = useState(false)
-  const [step, setStep] = useState(0)
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
-  const [stacks, setStacks] = useState<PortainerStack[]>([])
-  const [selectedStack, setSelectedStack] = useState<PortainerStack | null>(null)
-  const [additionalSelectedStacks, setAdditionalSelectedStacks] = useState<PortainerStack[]>([])
-  const [probeError, setProbeError] = useState<string | null>(null)
 
   // Operasi async yang sedang berjalan — persist di localStorage agar tidak hilang saat reload
   const opsKey = `envman:portainer-op:${slug}:${env}`
@@ -232,27 +224,6 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
   const [execNewQuickCommand, setExecNewQuickCommand] = useState('')
   const execHistoryIdxRef = useRef(-1)
   const execOutputRef = useRef<HTMLDivElement>(null)
-
-  const handleClose = () => {
-    closeSetup()
-    setIsEditing(false)
-    setStep(0)
-    setSelectedConnectionId(null)
-    setStacks([])
-    setSelectedStack(null)
-    setAdditionalSelectedStacks([])
-    setProbeError(null)
-  }
-
-  const openEdit = (cfg: PortainerConfig) => {
-    setIsEditing(true)
-    setStep(0)
-    setSelectedConnectionId(cfg.connectionId ?? null)
-    setSelectedStack({ id: cfg.stackId, name: cfg.stackName, endpointId: cfg.endpointId })
-    setStacks([{ id: cfg.stackId, name: cfg.stackName, endpointId: cfg.endpointId }])
-    setProbeError(null)
-    openSetup()
-  }
 
   // ─── Queries ──────────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
@@ -359,53 +330,6 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
     },
     onError: (e: Error) => {
       alert(e.message)
-    },
-  })
-
-  const probe = useMutation({
-    mutationFn: (connectionId: string) =>
-      apiFetch(`/api/envman/portainer/connections/${connectionId}/probe`, { method: 'POST' }),
-    onSuccess: (data) => {
-      setStacks(data.stacks)
-      setProbeError(null)
-      setStep(1)
-    },
-    onError: (e: Error) => {
-      setStacks([])
-      setProbeError(e.message)
-    },
-  })
-
-  const saveConfig = useMutation({
-    mutationFn: async () => {
-      // Save primary config
-      await apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          connectionId: selectedConnectionId,
-          stackId: selectedStack!.id,
-          stackName: selectedStack!.name,
-          endpointId: selectedStack!.endpointId,
-        }),
-      })
-      // Add additional targets
-      for (const t of additionalSelectedStacks) {
-        await apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            addTarget: {
-              connectionId: selectedConnectionId,
-              stackId: t.id,
-              stackName: t.name,
-              endpointId: t.endpointId,
-            },
-          }),
-        })
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['portainer', slug, env] })
-      handleClose()
     },
   })
 
@@ -624,172 +548,6 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
   const displayUrl = config?.portainerUrl ?? ''
   const diff: DiffResult | undefined = diffData?.diff
 
-  // ─── Inline setup form (menggantikan modal) ──────────────────────────────
-  if (setupOpen) {
-    return (
-      <Stack gap="sm">
-        <Group gap={6} align="center">
-          <ActionIcon variant="subtle" color="gray" size="sm" onClick={handleClose}>
-            <TbChevronLeft size={15} />
-          </ActionIcon>
-          <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={handleClose}>
-            Portainer
-          </Text>
-          <Text size="sm" c="dimmed">/</Text>
-          <Text size="sm" fw={600}>
-            {isEditing ? 'Edit Konfigurasi' : 'Hubungkan ke Portainer'}
-          </Text>
-        </Group>
-        <Divider />
-
-        <Stepper active={step} size="xs" mb="xs" onStepClick={(s) => { if (s < step) setStep(s) }}>
-          <Stepper.Step label="Connection" />
-          <Stepper.Step label="Stack" />
-        </Stepper>
-
-        {step === 0 && (
-          <Stack gap="sm">
-            {connections.length === 0 ? (
-              <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-                <Text size="xs">
-                  Belum ada Portainer connection.{' '}
-                  <Anchor size="xs" href="/envmanager/connections">Tambah connection</Anchor>{' '}
-                  terlebih dahulu.
-                </Text>
-              </Alert>
-            ) : (
-              <>
-                <Text size="xs" c="dimmed">
-                  Pilih Portainer instance untuk environment{' '}
-                  <strong>{slug}:{env}</strong>.
-                </Text>
-                <Select
-                  label="Portainer Connection"
-                  placeholder="Pilih connection..."
-                  data={connections.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                    description: c.portainerUrl.replace(/^https?:\/\//, ''),
-                  }))}
-                  value={selectedConnectionId}
-                  onChange={setSelectedConnectionId}
-                  searchable
-                />
-                {probeError && (
-                  <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
-                    <Text size="xs">{probeError}</Text>
-                  </Alert>
-                )}
-              </>
-            )}
-            <Group justify="space-between" mt="xs">
-              <Button size="sm" variant="subtle" color="gray" component="a" href="/envmanager/connections" leftSection={<TbPlus size={13} />}>
-                Kelola Connections
-              </Button>
-              <Group gap="xs">
-                <Button variant="subtle" size="sm" color="gray" onClick={handleClose}>Batal</Button>
-                <Button
-                  size="sm"
-                  disabled={!selectedConnectionId || connections.length === 0}
-                  loading={probe.isPending}
-                  leftSection={<TbPlugConnected size={14} />}
-                  onClick={() => selectedConnectionId && probe.mutate(selectedConnectionId)}
-                >
-                  Load Stacks
-                </Button>
-              </Group>
-            </Group>
-          </Stack>
-        )}
-
-        {step === 1 && (
-          <Stack gap="sm">
-            <Alert color="teal" p="xs" icon={<TbCheck size={14} />}>
-              <Text size="xs" fw={500}>
-                {connections.find((c) => c.id === selectedConnectionId)?.name} — {stacks.length} stack ditemukan
-              </Text>
-            </Alert>
-            <Select
-              label="Stack target"
-              placeholder="Pilih stack..."
-              data={stacks.map((s) => ({ value: String(s.id), label: s.name, description: `Endpoint ${s.endpointId}` }))}
-              value={selectedStack ? String(selectedStack.id) : null}
-              onChange={(v) => setSelectedStack(stacks.find((s) => String(s.id) === v) ?? null)}
-              searchable
-              nothingFoundMessage="Stack tidak ditemukan"
-            />
-            {selectedStack && (
-              <Box p="sm">
-                <Text size="xs" c="dimmed" mb={6}>Ringkasan</Text>
-                <Stack gap={4}>
-                  {[
-                    ['Connection', connections.find((c) => c.id === selectedConnectionId)?.name ?? '—'],
-                    ['Project:Env', `${slug}:${env}`],
-                    ['Stack (primary)', selectedStack.name],
-                    ['Endpoint', `#${selectedStack.endpointId}`],
-                  ].map(([label, value]) => (
-                    <Group key={label} justify="space-between">
-                      <Text size="xs" c="dimmed">{label}</Text>
-                      <Code fz="xs">{value}</Code>
-                    </Group>
-                  ))}
-                </Stack>
-              </Box>
-            )}
-            {stacks.length > 1 && selectedStack && (
-              <Box>
-                <Text size="xs" c="dimmed" mb={6}>Stack tambahan (opsional)</Text>
-                <Select
-                  placeholder="Tambah stack lain..."
-                  data={stacks
-                    .filter((s) => s.id !== selectedStack.id && !additionalSelectedStacks.find((a) => a.id === s.id))
-                    .map((s) => ({ value: String(s.id), label: s.name }))}
-                  value={null}
-                  onChange={(v) => {
-                    const s = stacks.find((st) => String(st.id) === v)
-                    if (s) setAdditionalSelectedStacks((prev) => [...prev, s])
-                  }}
-                  searchable
-                  nothingFoundMessage="Tidak ada stack lain"
-                  size="xs"
-                />
-                {additionalSelectedStacks.length > 0 && (
-                  <Stack gap={4} mt="xs">
-                    {additionalSelectedStacks.map((s) => (
-                      <Group key={s.id} justify="space-between" p="xs" style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 6 }}>
-                        <Group gap="xs">
-                          <Badge size="xs" variant="outline" color="gray">ep#{s.endpointId}</Badge>
-                          <Text size="xs" ff="monospace">{s.name}</Text>
-                        </Group>
-                        <ActionIcon size="xs" variant="subtle" color="red"
-                          onClick={() => setAdditionalSelectedStacks((prev) => prev.filter((a) => a.id !== s.id))}>
-                          <TbX size={11} />
-                        </ActionIcon>
-                      </Group>
-                    ))}
-                  </Stack>
-                )}
-              </Box>
-            )}
-            <Group justify="space-between" mt="xs">
-              <Button variant="subtle" size="sm" color="gray" onClick={() => setStep(0)}>← Kembali</Button>
-              <Button
-                size="sm"
-                color="primary"
-                disabled={!selectedStack}
-                loading={saveConfig.isPending}
-                leftSection={<TbCheck size={14} />}
-                onClick={() => saveConfig.mutate()}
-              >
-                {isEditing ? 'Update' : 'Simpan & Hubungkan'}
-              </Button>
-            </Group>
-          </Stack>
-        )}
-      </Stack>
-    )
-  }
-
   return (
     <>
       {/* ─── Not configured ─────────────────────────────── */}
@@ -861,7 +619,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
               {canEdit && (
                 <Group gap="xs">
                   {connections.length > 0 ? (
-                    <Button size="sm" color="primary" leftSection={<TbPlugConnected size={14} />} onClick={openSetup}>
+                    <Button size="sm" color="primary" leftSection={<TbPlugConnected size={14} />} onClick={() => onSetupOpen('new')}>
                       Hubungkan ke Stack
                     </Button>
                   ) : (
@@ -967,7 +725,7 @@ export function PortainerSync({ slug, env, canEdit, secretCount }: Props) {
                 {canEdit && (
                   <>
                     <Tooltip label="Edit konfigurasi">
-                      <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => openEdit(config!)}>
+                      <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => onSetupOpen('edit')}>
                         <TbPencil size={13} />
                       </ActionIcon>
                     </Tooltip>
