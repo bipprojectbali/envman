@@ -173,6 +173,10 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
     key: `envman:aliases:${slug}:view`,
     defaultValue: 'list',
   })
+  const [groupByTag, setGroupByTag] = useLocalStorage<boolean>({
+    key: `envman:aliases:${slug}:groupByTag`,
+    defaultValue: true,
+  })
 
   const { data, isLoading } = useQuery<{ aliases: Alias[] }>({
     queryKey: ['envman', 'aliases', slug],
@@ -321,6 +325,18 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                 <TbLayoutGrid size={14} />
               </ActionIcon>
             </Tooltip>
+            {allTags.length > 0 && (
+              <Tooltip label={groupByTag ? 'Nonaktifkan group by tag' : 'Group by tag'} withArrow>
+                <ActionIcon
+                  size="sm"
+                  variant={groupByTag ? 'filled' : 'subtle'}
+                  color={groupByTag ? 'grape' : 'gray'}
+                  onClick={() => setGroupByTag((v) => !v)}
+                >
+                  <TbTag size={14} />
+                </ActionIcon>
+              </Tooltip>
+            )}
           </Group>
           {isOwner && (
             <Button variant="light" size="sm" leftSection={<TbPlus size={14} />} onClick={openCreate}>
@@ -479,6 +495,48 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
               </Group>
             </Box>
           ))
+          if (groupByTag && allTags.length > 0) {
+            const grouped = new Map<string, typeof filtered>()
+            const untagged: typeof filtered = []
+            for (const a of filtered) {
+              if (a.tags.length === 0) { untagged.push(a); continue }
+              const tag = a.tags[0]
+              if (!grouped.has(tag)) grouped.set(tag, [])
+              grouped.get(tag)!.push(a)
+            }
+            const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
+            const cardsByName = new Map(filtered.map((a, i) => [a.name, cards[i]]))
+            const renderGroup = (items: typeof filtered) =>
+              view === 'grid' ? (
+                <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">
+                  {items.map((a) => cardsByName.get(a.name))}
+                </SimpleGrid>
+              ) : (
+                <>{items.map((a) => cardsByName.get(a.name))}</>
+              )
+            return (
+              <Stack gap="md">
+                {groups.map(([tag, items]) => (
+                  <Stack key={tag} gap="xs">
+                    <Group gap={6} align="center">
+                      <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                      <Divider style={{ flex: 1 }} />
+                    </Group>
+                    {renderGroup(items)}
+                  </Stack>
+                ))}
+                {untagged.length > 0 && (
+                  <Stack gap="xs">
+                    <Group gap={6} align="center">
+                      <Text size="xs" c="dimmed" fw={500}>Tanpa tag</Text>
+                      <Divider style={{ flex: 1 }} />
+                    </Group>
+                    {renderGroup(untagged)}
+                  </Stack>
+                )}
+              </Stack>
+            )
+          }
           return view === 'grid' ? (
             <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">
               {cards}
