@@ -205,9 +205,9 @@ export const filesRouter = new Elysia()
     const updated = await prisma.projectFile.update({
       where: { id: existing.id },
       data: {
-        ...(body?.title !== undefined ? { title: body.title.trim() } : {}),
-        ...(body?.description !== undefined ? { description: body.description.trim() } : {}),
-        ...(body?.prefix !== undefined ? { prefix: body.prefix.trim() || null } : {}),
+        ...(body?.title !== undefined ? { title: typeof body.title === 'string' ? body.title.trim() : '' } : {}),
+        ...(body?.description !== undefined ? { description: typeof body.description === 'string' ? body.description.trim() : '' } : {}),
+        ...(body?.prefix !== undefined ? { prefix: typeof body.prefix === 'string' ? body.prefix.trim() || null : null } : {}),
         ...(body?.files !== undefined ? { files: body.files as any } : {}),
         ...(body?.tags !== undefined ? { tags: body.tags } : {}),
       },
