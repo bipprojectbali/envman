@@ -857,6 +857,10 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
     key: `envman:files:${slug}:sort`,
     defaultValue: 'updated',
   })
+  const [groupByTag, setGroupByTag] = useLocalStorage<boolean>({
+    key: `envman:files:${slug}:groupByTag`,
+    defaultValue: true,
+  })
   const [view, setView] = useLocalStorage<'list' | 'grid'>({
     key: `envman:files:${slug}:view`,
     defaultValue: 'list',
@@ -1340,6 +1344,18 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
                   <TbLayoutGrid size={14} />
                 </ActionIcon>
               </Tooltip>
+              {allTags.length > 0 && (
+                <Tooltip label={groupByTag ? 'Nonaktifkan group by tag' : 'Group by tag'}>
+                  <ActionIcon
+                    size="sm"
+                    variant={groupByTag ? 'filled' : 'subtle'}
+                    color={groupByTag ? 'grape' : 'gray'}
+                    onClick={() => setGroupByTag((v) => !v)}
+                  >
+                    <TbTag size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
             </Group>
           </Group>
           {tagFilter.length > 0 && <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} />}
@@ -1418,38 +1434,76 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
       {/* List */}
       {!isLoading && !isError && filtered.length > 0 && (
         <>
-          {view === 'grid' ? (
+          {groupByTag && allTags.length > 0 ? (
+            (() => {
+              const grouped = new Map<string, typeof filtered>()
+              const untagged: typeof filtered = []
+              for (const f of filtered) {
+                if (f.tags.length === 0) { untagged.push(f); continue }
+                const tag = f.tags[0]
+                if (!grouped.has(tag)) grouped.set(tag, [])
+                grouped.get(tag)!.push(f)
+              }
+              const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
+              const renderCards = (items: typeof filtered) =>
+                view === 'grid' ? (
+                  <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
+                    {items.map((f) => (
+                      <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
+                        onView={() => openView(f.id)} onEdit={() => openEdit(f)}
+                        onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
+                    ))}
+                  </SimpleGrid>
+                ) : (
+                  <Stack gap="xs">
+                    {items.map((f) => (
+                      <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
+                        onView={() => openView(f.id)} onEdit={() => openEdit(f)}
+                        onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
+                    ))}
+                  </Stack>
+                )
+              return (
+                <Stack gap="md">
+                  {groups.map(([tag, items]) => (
+                    <Stack key={tag} gap="xs">
+                      <Group gap={6} align="center">
+                        <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                        <Divider style={{ flex: 1 }} />
+                      </Group>
+                      {renderCards(items)}
+                    </Stack>
+                  ))}
+                  {untagged.length > 0 && (
+                    <Stack gap="xs">
+                      <Group gap={6} align="center">
+                        <Text size="xs" c="dimmed" fw={500}>Tanpa tag</Text>
+                        <Divider style={{ flex: 1 }} />
+                      </Group>
+                      {renderCards(untagged)}
+                    </Stack>
+                  )}
+                </Stack>
+              )
+            })()
+          ) : view === 'grid' ? (
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
               {paginated.map((f) => (
-                <FileCard
-                  key={f.id}
-                  file={f}
-                  slug={slug}
-                  canManage={canManageFile(f.author.id)}
-                  onView={() => openView(f.id)}
-                  onEdit={() => openEdit(f)}
-                  onDelete={() => deleteFile(f)}
-                  onTagClick={addTagFilter}
-                />
+                <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
+                  onView={() => openView(f.id)} onEdit={() => openEdit(f)}
+                  onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
               ))}
             </SimpleGrid>
           ) : (
             <Stack gap="xs">
               {paginated.map((f) => (
-                <FileCard
-                  key={f.id}
-                  file={f}
-                  slug={slug}
-                  canManage={canManageFile(f.author.id)}
-                  onView={() => openView(f.id)}
-                  onEdit={() => openEdit(f)}
-                  onDelete={() => deleteFile(f)}
-                  onTagClick={addTagFilter}
-                />
+                <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
+                  onView={() => openView(f.id)} onEdit={() => openEdit(f)}
+                  onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
               ))}
             </Stack>
           )}
-          {totalPages > 1 && (
+          {!groupByTag && totalPages > 1 && (
             <Group justify="center" mt="md">
               <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
             </Group>
