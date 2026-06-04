@@ -529,3 +529,12 @@ model TestMigrate {
   @@index([createdAt])
   @@map("test_migrate")
 }
+
+model AppSetting {
+  key         String   @id
+  value       String
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+
+  @@map("app_setting")
+}

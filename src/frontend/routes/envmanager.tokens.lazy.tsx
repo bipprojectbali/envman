@@ -45,7 +45,6 @@ import {
   TbLayoutList,
   TbLock,
   TbLockOpen,
-  TbPencil,
   TbPlus,
   TbRefresh,
   TbSearch,
@@ -419,7 +418,7 @@ function TokensPage() {
   const qc = useQueryClient()
   const { data: sessionData } = useSession()
   const canCreateToken = hasCapability(sessionData?.user, 'token:create')
-  const isMobile = useMediaQuery('(max-width: 48em)')
+  const _isMobile = useMediaQuery('(max-width: 48em)')
   const [editingToken, setEditingToken] = useState<ApiToken | null>(null)
   const [newToken, setNewToken] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -1461,7 +1460,10 @@ function TokensPage() {
           const grouped = new Map<string, typeof filteredTokens>()
           const untagged: typeof filteredTokens = []
           for (const t of filteredTokens) {
-            if ((t.tags ?? []).length === 0) { untagged.push(t); continue }
+            if ((t.tags ?? []).length === 0) {
+              untagged.push(t)
+              continue
+            }
             for (const tag of t.tags ?? []) {
               if (!grouped.has(tag)) grouped.set(tag, [])
               grouped.get(tag)!.push(t)
@@ -1472,29 +1474,56 @@ function TokensPage() {
             view === 'grid' ? (
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
                 {list.map((t) => (
-                  <TokenCard key={t.id} token={t} isUsageOpen={expandedUsage.has(t.id)} isCopied={copiedId === t.id}
+                  <TokenCard
+                    key={t.id}
+                    token={t}
+                    isUsageOpen={expandedUsage.has(t.id)}
+                    isCopied={copiedId === t.id}
                     togglePending={toggleToken.isPending && toggleToken.variables === t.id}
                     copyPending={copyToken.isPending && copyToken.variables === t.id}
                     rotatePending={rotateToken.isPending && rotateToken.variables === t.id}
-                    onToggle={() => toggleToken.mutate(t.id)} onCopy={() => copyToken.mutate(t.id)}
-                    onRotate={() => confirmRotate(t.id, t.name)} onEdit={() => goToEdit(t.id)}
+                    onToggle={() => toggleToken.mutate(t.id)}
+                    onCopy={() => copyToken.mutate(t.id)}
+                    onRotate={() => confirmRotate(t.id, t.name)}
+                    onEdit={() => goToEdit(t.id)}
                     onRevoke={() => revokeToken(t.id, t.name)}
-                    onUsageToggle={() => setExpandedUsage((prev) => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}
-                    onCardClick={() => goToDetail(t.id)} />
+                    onUsageToggle={() =>
+                      setExpandedUsage((prev) => {
+                        const s = new Set(prev)
+                        s.has(t.id) ? s.delete(t.id) : s.add(t.id)
+                        return s
+                      })
+                    }
+                    onCardClick={() => goToDetail(t.id)}
+                  />
                 ))}
               </SimpleGrid>
             ) : (
               <Stack gap="xs">
                 {list.map((t) => (
-                  <TokenCard key={t.id} token={t} compact isUsageOpen={expandedUsage.has(t.id)} isCopied={copiedId === t.id}
+                  <TokenCard
+                    key={t.id}
+                    token={t}
+                    compact
+                    isUsageOpen={expandedUsage.has(t.id)}
+                    isCopied={copiedId === t.id}
                     togglePending={toggleToken.isPending && toggleToken.variables === t.id}
                     copyPending={copyToken.isPending && copyToken.variables === t.id}
                     rotatePending={rotateToken.isPending && rotateToken.variables === t.id}
-                    onToggle={() => toggleToken.mutate(t.id)} onCopy={() => copyToken.mutate(t.id)}
-                    onRotate={() => confirmRotate(t.id, t.name)} onEdit={() => goToEdit(t.id)}
+                    onToggle={() => toggleToken.mutate(t.id)}
+                    onCopy={() => copyToken.mutate(t.id)}
+                    onRotate={() => confirmRotate(t.id, t.name)}
+                    onEdit={() => goToEdit(t.id)}
                     onRevoke={() => revokeToken(t.id, t.name)}
-                    onUsageToggle={() => setExpandedUsage((prev) => { const s = new Set(prev); s.has(t.id) ? s.delete(t.id) : s.add(t.id); return s })}
-                    onCardClick={() => goToDetail(t.id)} />
+                    onUsageToggle={() =>
+                      setExpandedUsage((prev) => {
+                        const s = new Set(prev)
+                        s.has(t.id) ? s.delete(t.id) : s.add(t.id)
+                        return s
+                      })
+                    }
+                    onCardClick={() => goToDetail(t.id)}
+                  />
                 ))}
               </Stack>
             )
@@ -1503,7 +1532,9 @@ function TokensPage() {
               {groups.map(([tag, tagTokens]) => (
                 <Stack key={tag} gap="xs">
                   <Group gap={6} align="center">
-                    <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                    <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>
+                      {tag}
+                    </Badge>
                     <Divider style={{ flex: 1 }} />
                   </Group>
                   {renderTokens(tagTokens)}
@@ -1512,7 +1543,9 @@ function TokensPage() {
               {untagged.length > 0 && (
                 <Stack gap="xs">
                   <Group gap={6} align="center">
-                    <Text size="xs" c="dimmed" fw={500}>Tanpa tag</Text>
+                    <Text size="xs" c="dimmed" fw={500}>
+                      Tanpa tag
+                    </Text>
                     <Divider style={{ flex: 1 }} />
                   </Group>
                   {renderTokens(untagged)}
@@ -1591,7 +1624,6 @@ function TokensPage() {
           )}
         </>
       ) : null}
-
     </Box>
   )
 }

@@ -10,7 +10,6 @@ import {
   Divider,
   Group,
   Pagination,
-  Paper,
   SegmentedControl,
   Select,
   SimpleGrid,
@@ -883,7 +882,8 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
         fileNew: false,
         viewFileId: id,
         aliasId: undefined,
-        aliasNew: false, viewAliasId: undefined,
+        aliasNew: false,
+        viewAliasId: undefined,
         noteId: undefined,
         noteNew: false,
         viewNoteId: undefined,
@@ -899,7 +899,8 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
         fileNew: false,
         viewFileId: undefined,
         aliasId: undefined,
-        aliasNew: false, viewAliasId: undefined,
+        aliasNew: false,
+        viewAliasId: undefined,
         noteId: undefined,
         noteNew: false,
         viewNoteId: undefined,
@@ -925,7 +926,8 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
         fileNew: false,
         viewFileId: undefined,
         aliasId: undefined,
-        aliasNew: false, viewAliasId: undefined,
+        aliasNew: false,
+        viewAliasId: undefined,
         noteId: undefined,
         noteNew: false,
         viewNoteId: undefined,
@@ -974,7 +976,8 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
         fileNew: false,
         viewFileId: undefined,
         aliasId: undefined,
-        aliasNew: false, viewAliasId: undefined,
+        aliasNew: false,
+        viewAliasId: undefined,
         noteId: undefined,
         noteNew: false,
         viewNoteId: undefined,
@@ -990,7 +993,8 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
         fileId: undefined,
         viewFileId: undefined,
         aliasId: undefined,
-        aliasNew: false, viewAliasId: undefined,
+        aliasNew: false,
+        viewAliasId: undefined,
         noteId: undefined,
         noteNew: false,
         viewNoteId: undefined,
@@ -1184,7 +1188,8 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
                         fileNew: false,
                         viewFileId: undefined,
                         aliasId: undefined,
-                        aliasNew: false, viewAliasId: undefined,
+                        aliasNew: false,
+                        viewAliasId: undefined,
                         noteId: undefined,
                         noteNew: false,
                         viewNoteId: undefined,
@@ -1439,7 +1444,10 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
               const grouped = new Map<string, typeof filtered>()
               const untagged: typeof filtered = []
               for (const f of filtered) {
-                if (f.tags.length === 0) { untagged.push(f); continue }
+                if (f.tags.length === 0) {
+                  untagged.push(f)
+                  continue
+                }
                 const tag = f.tags[0]
                 if (!grouped.has(tag)) grouped.set(tag, [])
                 grouped.get(tag)!.push(f)
@@ -1449,17 +1457,31 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
                 view === 'grid' ? (
                   <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
                     {items.map((f) => (
-                      <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
-                        onView={() => openView(f.id)} onEdit={() => openEdit(f)}
-                        onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
+                      <FileCard
+                        key={f.id}
+                        file={f}
+                        slug={slug}
+                        canManage={canManageFile(f.author.id)}
+                        onView={() => openView(f.id)}
+                        onEdit={() => openEdit(f)}
+                        onDelete={() => deleteFile(f)}
+                        onTagClick={addTagFilter}
+                      />
                     ))}
                   </SimpleGrid>
                 ) : (
                   <Stack gap="xs">
                     {items.map((f) => (
-                      <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
-                        onView={() => openView(f.id)} onEdit={() => openEdit(f)}
-                        onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
+                      <FileCard
+                        key={f.id}
+                        file={f}
+                        slug={slug}
+                        canManage={canManageFile(f.author.id)}
+                        onView={() => openView(f.id)}
+                        onEdit={() => openEdit(f)}
+                        onDelete={() => deleteFile(f)}
+                        onTagClick={addTagFilter}
+                      />
                     ))}
                   </Stack>
                 )
@@ -1468,7 +1490,9 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
                   {groups.map(([tag, items]) => (
                     <Stack key={tag} gap="xs">
                       <Group gap={6} align="center">
-                        <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                        <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>
+                          {tag}
+                        </Badge>
                         <Divider style={{ flex: 1 }} />
                       </Group>
                       {renderCards(items)}
@@ -1477,7 +1501,9 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
                   {untagged.length > 0 && (
                     <Stack gap="xs">
                       <Group gap={6} align="center">
-                        <Text size="xs" c="dimmed" fw={500}>Tanpa tag</Text>
+                        <Text size="xs" c="dimmed" fw={500}>
+                          Tanpa tag
+                        </Text>
                         <Divider style={{ flex: 1 }} />
                       </Group>
                       {renderCards(untagged)}
@@ -1489,17 +1515,31 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
           ) : view === 'grid' ? (
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
               {paginated.map((f) => (
-                <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
-                  onView={() => openView(f.id)} onEdit={() => openEdit(f)}
-                  onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
+                <FileCard
+                  key={f.id}
+                  file={f}
+                  slug={slug}
+                  canManage={canManageFile(f.author.id)}
+                  onView={() => openView(f.id)}
+                  onEdit={() => openEdit(f)}
+                  onDelete={() => deleteFile(f)}
+                  onTagClick={addTagFilter}
+                />
               ))}
             </SimpleGrid>
           ) : (
             <Stack gap="xs">
               {paginated.map((f) => (
-                <FileCard key={f.id} file={f} slug={slug} canManage={canManageFile(f.author.id)}
-                  onView={() => openView(f.id)} onEdit={() => openEdit(f)}
-                  onDelete={() => deleteFile(f)} onTagClick={addTagFilter} />
+                <FileCard
+                  key={f.id}
+                  file={f}
+                  slug={slug}
+                  canManage={canManageFile(f.author.id)}
+                  onView={() => openView(f.id)}
+                  onEdit={() => openEdit(f)}
+                  onDelete={() => deleteFile(f)}
+                  onTagClick={addTagFilter}
+                />
               ))}
             </Stack>
           )}

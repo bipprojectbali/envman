@@ -27,17 +27,12 @@ import {
   TextInput,
   ThemeIcon,
   Tooltip,
-} from "@mantine/core";
-import { useDisclosure, useLocalStorage, useMediaQuery } from "@mantine/hooks";
-import { modals } from "@mantine/modals";
-import {
-  useMutation,
-  useQueries,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+} from '@mantine/core'
+import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { modals } from '@mantine/modals'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   TbAlertTriangle,
   TbBookmark,
@@ -70,409 +65,359 @@ import {
   TbTool,
   TbTrash,
   TbX,
-} from "react-icons/tb";
-import { CodeEditor } from "@/frontend/components/CodeEditor";
-import { hasCapability, useSession } from "@/frontend/hooks/useAuth";
-import { apiFetch } from "@/frontend/lib/api";
-import { notifyErr, notifyOk } from "@/frontend/lib/notify";
+} from 'react-icons/tb'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
+import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
+import { apiFetch } from '@/frontend/lib/api'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 
-export const Route = createFileRoute("/envmanager/connections/$id/")({
+export const Route = createFileRoute('/envmanager/connections/$id/')({
   component: ConnectionDetailPage,
-});
+})
 
 interface LinkedEnv {
-  slug: string;
-  projectName: string;
-  envName: string;
-  lastSyncAt: string | null;
-  lastSyncOk: boolean | null;
+  slug: string
+  projectName: string
+  envName: string
+  lastSyncAt: string | null
+  lastSyncOk: boolean | null
 }
 
 interface StackInfo {
-  id: number;
-  name: string;
-  status: number;
-  type: number;
-  endpointId: number;
-  createdAt: string;
-  updatedAt: string;
-  linkedEnvs: LinkedEnv[];
+  id: number
+  name: string
+  status: number
+  type: number
+  endpointId: number
+  createdAt: string
+  updatedAt: string
+  linkedEnvs: LinkedEnv[]
 }
 
 interface ContainerInfo {
-  id: string;
-  shortId: string;
-  names: string[];
-  image: string;
-  status: string;
-  state: string;
-  ports: string[];
+  id: string
+  shortId: string
+  names: string[]
+  image: string
+  status: string
+  state: string
+  ports: string[]
 }
 
 interface LogLine {
-  stream: "stdout" | "stderr";
-  timestamp: string | null;
-  message: string;
+  stream: 'stdout' | 'stderr'
+  timestamp: string | null
+  message: string
 }
 
 const stateColor: Record<string, string> = {
-  running: "teal",
-  exited: "red",
-  paused: "yellow",
-  restarting: "orange",
-  dead: "red",
-  created: "gray",
-};
+  running: 'teal',
+  exited: 'red',
+  paused: 'yellow',
+  restarting: 'orange',
+  dead: 'red',
+  created: 'gray',
+}
 
 function fmtBytes(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${Math.round(bytes / 1024 / 1024)} MB`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${Math.round(bytes / 1024 / 1024)} MB`
 }
 
 function relTime(iso: string | null) {
-  if (!iso) return "—";
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "baru saja";
-  if (m < 60) return `${m}m lalu`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}j lalu`;
-  return `${Math.floor(h / 24)}h lalu`;
+  if (!iso) return '—'
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'baru saja'
+  if (m < 60) return `${m}m lalu`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}j lalu`
+  return `${Math.floor(h / 24)}h lalu`
 }
 
 function ConnectionDetailPage() {
-  const { id } = Route.useParams();
-  const navigate = useNavigate();
-  const qc = useQueryClient();
-  const isMobile = useMediaQuery("(max-width: 48em)");
-  const { data: sessionData } = useSession();
-  const user = sessionData?.user;
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
-  const canView = isSuperAdmin || hasCapability(user, "connection:view");
-  const canOperate = isSuperAdmin || hasCapability(user, "stack:operate");
-  const canMutate = isSuperAdmin || hasCapability(user, "stack:mutate");
-  const canPrune = isSuperAdmin || hasCapability(user, "stack:prune");
+  const { id } = Route.useParams()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const isMobile = useMediaQuery('(max-width: 48em)')
+  const { data: sessionData } = useSession()
+  const user = sessionData?.user
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const canView = isSuperAdmin || hasCapability(user, 'connection:view')
+  const canOperate = isSuperAdmin || hasCapability(user, 'stack:operate')
+  const canMutate = isSuperAdmin || hasCapability(user, 'stack:mutate')
+  const canPrune = isSuperAdmin || hasCapability(user, 'stack:prune')
 
   const [activeTab, setActiveTab] = useLocalStorage<string>({
     key: `envman:connection-detail:${id}:tab`,
-    defaultValue: "stacks",
-  });
+    defaultValue: 'stacks',
+  })
 
-  const [stackView, setStackView] = useLocalStorage<"grid" | "list">({
+  const [stackView, setStackView] = useLocalStorage<'grid' | 'list'>({
     key: `envman:connection-detail:${id}:view`,
-    defaultValue: "list",
-  });
+    defaultValue: 'list',
+  })
 
   // Search / filter / pagination
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [filterType, setFilterType] = useState<string | null>(null);
-  const [filterLinked, setFilterLinked] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 10;
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<string | null>(null)
+  const [filterType, setFilterType] = useState<string | null>(null)
+  const [filterLinked, setFilterLinked] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
 
   // Compose modal state
-  const [composeStack, setComposeStack] = useState<StackInfo | null>(null);
-  const [composeOpen, { open: openCompose, close: closeCompose }] =
-    useDisclosure(false);
-  const [composeEditing, setComposeEditing] = useState(false);
-  const [composeContent, setComposeContent] = useState("");
+  const [composeStack, setComposeStack] = useState<StackInfo | null>(null)
+  const [composeOpen, { open: openCompose, close: closeCompose }] = useDisclosure(false)
+  const [composeEditing, setComposeEditing] = useState(false)
+  const [composeContent, setComposeContent] = useState('')
 
   // Logs modal state
-  const [logsStack, setLogsStack] = useState<StackInfo | null>(null);
-  const [logsOpen, { open: openLogs, close: closeLogs }] = useDisclosure(false);
-  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(
-    null,
-  );
+  const [logsStack, setLogsStack] = useState<StackInfo | null>(null)
+  const [logsOpen, { open: openLogs, close: closeLogs }] = useDisclosure(false)
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null)
 
-  const [logTail, setLogTail] = useState(200);
-  const [showStdout, setShowStdout] = useState(true);
-  const [showStderr, setShowStderr] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const logViewportRef = useRef<HTMLDivElement>(null);
+  const [logTail, setLogTail] = useState(200)
+  const [showStdout, setShowStdout] = useState(true)
+  const [showStderr, setShowStderr] = useState(true)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoScroll, setAutoScroll] = useState(true)
+  const logViewportRef = useRef<HTMLDivElement>(null)
   const [liveLines, setLiveLines] = useState<
-    { stream: "stdout" | "stderr"; timestamp: string | null; message: string }[]
-  >([]);
-  const lastLogTimestamp = useRef<string | null>(null);
+    { stream: 'stdout' | 'stderr'; timestamp: string | null; message: string }[]
+  >([])
+  const lastLogTimestamp = useRef<string | null>(null)
 
   // Cleanup state — endpointId diambil dari stacks setelah load
-  const [cleanupEndpointId, setCleanupEndpointId] = useState<number | null>(
-    null,
-  );
+  const [cleanupEndpointId, setCleanupEndpointId] = useState<number | null>(null)
 
   // Exec drawer state
   type ExecContainer = {
-    containerId: string;
-    endpointId: number;
-    containerName: string;
-    stackName: string;
-  };
-  const [execContainer, setExecContainer] = useState<ExecContainer | null>(
-    null,
-  );
-  const [execOpen, { open: openExec, close: closeExec }] = useDisclosure(false);
-  const [execCommand, setExecCommand] = useState("");
+    containerId: string
+    endpointId: number
+    containerName: string
+    stackName: string
+  }
+  const [execContainer, setExecContainer] = useState<ExecContainer | null>(null)
+  const [execOpen, { open: openExec, close: closeExec }] = useDisclosure(false)
+  const [execCommand, setExecCommand] = useState('')
   const [execHistory, setExecHistory] = useState<
     {
-      command: string;
-      stdout: string[];
-      stderr: string[];
-      exitCode: number | null;
-      timestamp: number;
+      command: string
+      stdout: string[]
+      stderr: string[]
+      exitCode: number | null
+      timestamp: number
     }[]
-  >([]);
-  const [execQuickCommands, setExecQuickCommands] = useLocalStorage<
-    { id: string; label: string; command: string }[]
-  >({
-    key: "envman:exec:quick-commands",
+  >([])
+  const [execQuickCommands, setExecQuickCommands] = useLocalStorage<{ id: string; label: string; command: string }[]>({
+    key: 'envman:exec:quick-commands',
     defaultValue: [
-      { id: "ps", label: "ps", command: "ps aux" },
-      { id: "env", label: "env", command: "env | sort" },
-      { id: "df", label: "df", command: "df -h" },
+      { id: 'ps', label: 'ps', command: 'ps aux' },
+      { id: 'env', label: 'env', command: 'env | sort' },
+      { id: 'df', label: 'df', command: 'df -h' },
       {
-        id: "free",
-        label: "free",
-        command: "free -h 2>/dev/null || cat /proc/meminfo 2>/dev/null",
+        id: 'free',
+        label: 'free',
+        command: 'free -h 2>/dev/null || cat /proc/meminfo 2>/dev/null',
       },
       {
-        id: "netstat",
-        label: "netstat",
-        command: "netstat -tlnp 2>/dev/null || ss -tlnp",
+        id: 'netstat',
+        label: 'netstat',
+        command: 'netstat -tlnp 2>/dev/null || ss -tlnp',
       },
     ],
-  });
-  const [execShowQuickAdd, setExecShowQuickAdd] = useState(false);
-  const [execNewQuickLabel, setExecNewQuickLabel] = useState("");
-  const [execNewQuickCommand, setExecNewQuickCommand] = useState("");
-  const execHistoryIdxRef = useRef(-1);
-  const execOutputRef = useRef<HTMLDivElement>(null);
+  })
+  const [execShowQuickAdd, setExecShowQuickAdd] = useState(false)
+  const [execNewQuickLabel, setExecNewQuickLabel] = useState('')
+  const [execNewQuickCommand, setExecNewQuickCommand] = useState('')
+  const execHistoryIdxRef = useRef(-1)
+  const execOutputRef = useRef<HTMLDivElement>(null)
 
   // ─── Queries ──────────────────────────────────────────────────────────────
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["portainer", "connection-detail", id],
+    queryKey: ['portainer', 'connection-detail', id],
     queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/stacks`),
     refetchInterval: 30000,
-  });
+  })
 
   const { data: composeData, isFetching: composeFetching } = useQuery({
-    queryKey: ["portainer", "compose-file", id, composeStack?.id],
-    queryFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/stacks/${composeStack!.id}/file`,
-      ),
+    queryKey: ['portainer', 'compose-file', id, composeStack?.id],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/stacks/${composeStack!.id}/file`),
     enabled: composeOpen && !!composeStack,
     staleTime: 0,
-  });
+  })
 
   // Sync compose content ke state saat data tiba
   useEffect(() => {
     if (composeData?.content !== undefined && !composeEditing) {
-      setComposeContent(composeData.content);
+      setComposeContent(composeData.content)
     }
-  }, [composeData, composeEditing]);
+  }, [composeData, composeEditing])
 
   const {
     data: _logsData,
     isFetching: logsFetching,
     refetch: refetchLogs,
   } = useQuery({
-    queryKey: [
-      "portainer",
-      "container-logs",
-      id,
-      logsStack?.id,
-      selectedContainerId,
-      logTail,
-      showStdout,
-      showStderr,
-    ],
+    queryKey: ['portainer', 'container-logs', id, logsStack?.id, selectedContainerId, logTail, showStdout, showStderr],
     queryFn: async () => {
       const qs = new URLSearchParams({
         tail: String(logTail),
-        stdout: showStdout ? "1" : "0",
-        stderr: showStderr ? "1" : "0",
-        timestamps: "1",
-      });
+        stdout: showStdout ? '1' : '0',
+        stderr: showStderr ? '1' : '0',
+        timestamps: '1',
+      })
       const result = await apiFetch(
         `/api/envman/portainer/connections/${id}/stacks/${logsStack!.id}/logs/${selectedContainerId}?${qs}`,
-      );
+      )
       // Full load — reset liveLines
-      setLiveLines(result.lines ?? []);
-      const last = (result.lines ?? []).findLast?.((l: any) => l.timestamp);
-      if (last?.timestamp) lastLogTimestamp.current = last.timestamp;
-      return result;
+      setLiveLines(result.lines ?? [])
+      const last = (result.lines ?? []).findLast?.((l: any) => l.timestamp)
+      if (last?.timestamp) lastLogTimestamp.current = last.timestamp
+      return result
     },
     enabled: logsOpen && !!logsStack && !!selectedContainerId,
     staleTime: 0,
     refetchOnWindowFocus: false,
-  });
+  })
 
   // Incremental fetch saat auto-refresh aktif
   useEffect(() => {
-    if (!autoRefresh || !logsOpen || !logsStack || !selectedContainerId) return;
+    if (!autoRefresh || !logsOpen || !logsStack || !selectedContainerId) return
     const interval = setInterval(async () => {
       try {
         const qs = new URLSearchParams({
-          stdout: showStdout ? "1" : "0",
-          stderr: showStderr ? "1" : "0",
-          timestamps: "1",
-          tail: "100",
-        });
-        if (lastLogTimestamp.current) qs.set("since", lastLogTimestamp.current);
+          stdout: showStdout ? '1' : '0',
+          stderr: showStderr ? '1' : '0',
+          timestamps: '1',
+          tail: '100',
+        })
+        if (lastLogTimestamp.current) qs.set('since', lastLogTimestamp.current)
         const result = await apiFetch(
           `/api/envman/portainer/connections/${id}/stacks/${logsStack.id}/logs/${selectedContainerId}?${qs}`,
-        );
-        const newLines = (result.lines ?? []) as typeof liveLines;
+        )
+        const newLines = (result.lines ?? []) as typeof liveLines
         if (newLines.length > 0) {
-          setLiveLines((prev) => [...prev, ...newLines].slice(-2000)); // max 2000 baris
-          const last = newLines.findLast?.((l: any) => l.timestamp);
-          if (last?.timestamp) lastLogTimestamp.current = last.timestamp;
+          setLiveLines((prev) => [...prev, ...newLines].slice(-2000)) // max 2000 baris
+          const last = newLines.findLast?.((l: any) => l.timestamp)
+          if (last?.timestamp) lastLogTimestamp.current = last.timestamp
         }
       } catch {}
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [
-    autoRefresh,
-    logsOpen,
-    logsStack,
-    selectedContainerId,
-    showStdout,
-    showStderr,
-    id,
-  ]);
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [autoRefresh, logsOpen, logsStack, selectedContainerId, showStdout, showStderr, id])
 
   // Auto-scroll exec output ke bawah setiap kali history berubah
   useEffect(() => {
     if (execOpen && execOutputRef.current) {
-      execOutputRef.current.scrollTop = execOutputRef.current.scrollHeight;
+      execOutputRef.current.scrollTop = execOutputRef.current.scrollHeight
     }
-  }, [execOpen]);
+  }, [execOpen])
 
   const {
     data: imagesData,
     isFetching: imagesFetching,
     refetch: refetchImages,
   } = useQuery({
-    queryKey: ["portainer", "dangling-images", id, cleanupEndpointId],
-    queryFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/images/dangling?endpointId=${cleanupEndpointId}`,
-      ),
+    queryKey: ['portainer', 'dangling-images', id, cleanupEndpointId],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/images/dangling?endpointId=${cleanupEndpointId}`),
     enabled: cleanupEndpointId !== null,
     staleTime: 30000,
-  });
+  })
 
   const {
     data: containersData,
     isFetching: containersFetching,
     refetch: refetchContainers,
   } = useQuery({
-    queryKey: ["portainer", "stopped-containers", id, cleanupEndpointId],
+    queryKey: ['portainer', 'stopped-containers', id, cleanupEndpointId],
     queryFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/containers/stopped?endpointId=${cleanupEndpointId}`,
-      ),
+      apiFetch(`/api/envman/portainer/connections/${id}/containers/stopped?endpointId=${cleanupEndpointId}`),
     enabled: cleanupEndpointId !== null,
     staleTime: 30000,
-  });
+  })
 
   const {
     data: volumesData,
     isFetching: volumesFetching,
     refetch: refetchVolumes,
   } = useQuery({
-    queryKey: ["portainer", "unused-volumes", id, cleanupEndpointId],
-    queryFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/volumes/unused?endpointId=${cleanupEndpointId}`,
-      ),
+    queryKey: ['portainer', 'unused-volumes', id, cleanupEndpointId],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/volumes/unused?endpointId=${cleanupEndpointId}`),
     enabled: cleanupEndpointId !== null,
     staleTime: 30000,
-  });
+  })
 
   const {
     data: networksData,
     isFetching: networksFetching,
     refetch: refetchNetworks,
   } = useQuery({
-    queryKey: ["portainer", "unused-networks", id, cleanupEndpointId],
-    queryFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/networks/unused?endpointId=${cleanupEndpointId}`,
-      ),
+    queryKey: ['portainer', 'unused-networks', id, cleanupEndpointId],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/networks/unused?endpointId=${cleanupEndpointId}`),
     enabled: cleanupEndpointId !== null,
     staleTime: 30000,
-  });
+  })
 
-  const connection = data?.connection;
-  const stacks: StackInfo[] = data?.stacks ?? [];
-  const logLines: LogLine[] = liveLines;
+  const connection = data?.connection
+  const stacks: StackInfo[] = data?.stacks ?? []
+  const logLines: LogLine[] = liveLines
 
   // Set default endpointId dari stack pertama setelah data tiba
   useEffect(() => {
     if (stacks.length > 0 && cleanupEndpointId === null) {
-      setCleanupEndpointId(stacks[0].endpointId);
+      setCleanupEndpointId(stacks[0].endpointId)
     }
-  }, [stacks, cleanupEndpointId]);
+  }, [stacks, cleanupEndpointId])
 
   // Unique endpoint IDs dari semua stacks
-  const endpointIds = [...new Set(stacks.map((s) => s.endpointId))].sort();
+  const endpointIds = [...new Set(stacks.map((s) => s.endpointId))].sort()
 
   const filteredStacks = useMemo(() => {
-    let list = [...stacks];
+    let list = [...stacks]
     if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((s) => s.name.toLowerCase().includes(q));
+      const q = search.toLowerCase()
+      list = list.filter((s) => s.name.toLowerCase().includes(q))
     }
-    if (filterStatus === "active") list = list.filter((s) => s.status === 1);
-    if (filterStatus === "inactive") list = list.filter((s) => s.status !== 1);
-    if (filterType === "compose") list = list.filter((s) => s.type === 2);
-    if (filterType === "swarm") list = list.filter((s) => s.type !== 2);
-    if (filterLinked === "linked")
-      list = list.filter((s) => s.linkedEnvs.length > 0);
-    if (filterLinked === "unlinked")
-      list = list.filter((s) => s.linkedEnvs.length === 0);
-    return list;
-  }, [stacks, search, filterStatus, filterType, filterLinked]);
+    if (filterStatus === 'active') list = list.filter((s) => s.status === 1)
+    if (filterStatus === 'inactive') list = list.filter((s) => s.status !== 1)
+    if (filterType === 'compose') list = list.filter((s) => s.type === 2)
+    if (filterType === 'swarm') list = list.filter((s) => s.type !== 2)
+    if (filterLinked === 'linked') list = list.filter((s) => s.linkedEnvs.length > 0)
+    if (filterLinked === 'unlinked') list = list.filter((s) => s.linkedEnvs.length === 0)
+    return list
+  }, [stacks, search, filterStatus, filterType, filterLinked])
 
-  const totalPages = Math.max(1, Math.ceil(filteredStacks.length / PAGE_SIZE));
-  const pagedStacks = filteredStacks.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredStacks.length / PAGE_SIZE))
+  const pagedStacks = filteredStacks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const hasFilter =
-    !!search.trim() || !!filterStatus || !!filterType || !!filterLinked;
+  const hasFilter = !!search.trim() || !!filterStatus || !!filterType || !!filterLinked
 
   // Reset ke page 1 saat filter berubah
   useEffect(() => {
-    setPage(1);
-  }, []);
+    setPage(1)
+  }, [])
 
   // Query status per stack — langsung aktif, tampil di card tanpa klik apapun
   const stackStatusQueries = useQueries({
     queries: stacks.map((stack) => ({
-      queryKey: ["portainer", "stack-status", id, stack.id],
-      queryFn: () =>
-        apiFetch(
-          `/api/envman/portainer/connections/${id}/stacks/${stack.id}/status`,
-        ),
+      queryKey: ['portainer', 'stack-status', id, stack.id],
+      queryFn: () => apiFetch(`/api/envman/portainer/connections/${id}/stacks/${stack.id}/status`),
       enabled: stacks.length > 0,
       refetchInterval: 30000,
       staleTime: 20000,
     })),
-  });
+  })
   const stackStatusMap = Object.fromEntries(
     stacks.map((stack, i) => [
       stack.id,
       {
-        containers: (stackStatusQueries[i]?.data?.containers ??
-          []) as ContainerInfo[],
+        containers: (stackStatusQueries[i]?.data?.containers ?? []) as ContainerInfo[],
         isFetching: stackStatusQueries[i]?.isFetching ?? false,
       },
     ]),
-  );
+  )
 
   // Flatten all containers with their stack info for stats queries
   const allContainersFlat = stacks.flatMap((stack) =>
@@ -480,98 +425,80 @@ function ConnectionDetailPage() {
       stackId: stack.id,
       containerId: c.id,
     })),
-  );
+  )
 
   // Container stats — enabled only on Stacks tab, refetch every 10s
   const containerStatsQueries = useQueries({
     queries: allContainersFlat.map(({ stackId, containerId }) => ({
-      queryKey: ["portainer", "container-stats", id, stackId, containerId],
+      queryKey: ['portainer', 'container-stats', id, stackId, containerId],
       queryFn: () =>
-        apiFetch(
-          `/api/envman/portainer/connections/${id}/stacks/${stackId}/containers/${containerId}/stats`,
-        ),
-      enabled: activeTab === "stacks" && allContainersFlat.length > 0,
+        apiFetch(`/api/envman/portainer/connections/${id}/stacks/${stackId}/containers/${containerId}/stats`),
+      enabled: activeTab === 'stacks' && allContainersFlat.length > 0,
       refetchInterval: 10000,
       staleTime: 8000,
       retry: false,
     })),
-  });
+  })
   const containerStatsMap = Object.fromEntries(
     allContainersFlat.map(({ containerId }, i) => [
       containerId,
       containerStatsQueries[i]?.data as
         | {
-            cpuPercent: number;
-            memUsageMB: number;
-            memLimitMB: number;
-            memPercent: number;
-            netRxMB: number;
-            netTxMB: number;
+            cpuPercent: number
+            memUsageMB: number
+            memLimitMB: number
+            memPercent: number
+            netRxMB: number
+            netTxMB: number
           }
         | undefined,
     ]),
-  );
+  )
 
   // Auto-scroll logs
   useEffect(() => {
     if (autoScroll && logViewportRef.current) {
       logViewportRef.current.scrollTo({
         top: logViewportRef.current.scrollHeight,
-        behavior: "smooth",
-      });
+        behavior: 'smooth',
+      })
     }
-  }, [autoScroll]);
+  }, [autoScroll])
 
   // ─── Mutations ────────────────────────────────────────────────────────────
   const saveCompose = useMutation({
     mutationFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/stacks/${composeStack!.id}/file`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ content: composeContent }),
-        },
-      ),
+      apiFetch(`/api/envman/portainer/connections/${id}/stacks/${composeStack!.id}/file`, {
+        method: 'PUT',
+        body: JSON.stringify({ content: composeContent }),
+      }),
     onSuccess: () => {
-      notifyOk("Compose file berhasil disimpan");
-      setComposeEditing(false);
+      notifyOk('Compose file berhasil disimpan')
+      setComposeEditing(false)
       qc.invalidateQueries({
-        queryKey: ["portainer", "compose-file", id, composeStack?.id],
-      });
+        queryKey: ['portainer', 'compose-file', id, composeStack?.id],
+      })
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const restartContainer = useMutation({
-    mutationFn: ({
-      stackId,
-      containerId,
-    }: {
-      stackId: number;
-      containerId: string;
-    }) =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/stacks/${stackId}/containers/${containerId}/restart`,
-        {
-          method: "POST",
-        },
-      ),
+    mutationFn: ({ stackId, containerId }: { stackId: number; containerId: string }) =>
+      apiFetch(`/api/envman/portainer/connections/${id}/stacks/${stackId}/containers/${containerId}/restart`, {
+        method: 'POST',
+      }),
     onSuccess: (_, { stackId }) => {
-      notifyOk("Container berhasil di-restart");
+      notifyOk('Container berhasil di-restart')
       qc.invalidateQueries({
-        queryKey: ["portainer", "stack-status", id, stackId],
-      });
+        queryKey: ['portainer', 'stack-status', id, stackId],
+      })
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
-  const confirmRestartContainer = (
-    stack: StackInfo,
-    containerId: string,
-    containerName: string,
-  ) =>
+  const confirmRestartContainer = (stack: StackInfo, containerId: string, containerName: string) =>
     modals.openConfirmModal({
-      title: "Restart Container",
+      title: 'Restart Container',
       children: (
         <Stack gap="xs">
           <Text size="sm">
@@ -579,21 +506,19 @@ function ConnectionDetailPage() {
           </Text>
           <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
             <Text size="xs">
-              Container akan stop sebentar lalu start kembali. Request yang
-              sedang berjalan akan terputus.
+              Container akan stop sebentar lalu start kembali. Request yang sedang berjalan akan terputus.
             </Text>
           </Alert>
         </Stack>
       ),
-      labels: { confirm: "Restart", cancel: "Batal" },
-      confirmProps: { color: "orange" },
-      onConfirm: () =>
-        restartContainer.mutate({ stackId: stack.id, containerId }),
-    });
+      labels: { confirm: 'Restart', cancel: 'Batal' },
+      confirmProps: { color: 'orange' },
+      onConfirm: () => restartContainer.mutate({ stackId: stack.id, containerId }),
+    })
 
   const confirmSaveCompose = () =>
     modals.openConfirmModal({
-      title: "Simpan Compose File",
+      title: 'Simpan Compose File',
       children: (
         <Stack gap="xs">
           <Text size="sm">
@@ -601,131 +526,97 @@ function ConnectionDetailPage() {
           </Text>
           <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
             <Text size="xs">
-              Perubahan langsung diterapkan ke Portainer. Container mungkin
-              tidak otomatis restart — gunakan Recreate jika diperlukan.
+              Perubahan langsung diterapkan ke Portainer. Container mungkin tidak otomatis restart — gunakan Recreate
+              jika diperlukan.
             </Text>
           </Alert>
         </Stack>
       ),
-      labels: { confirm: "Simpan", cancel: "Batal" },
-      confirmProps: { color: "blue" },
+      labels: { confirm: 'Simpan', cancel: 'Batal' },
+      confirmProps: { color: 'blue' },
       onConfirm: () => saveCompose.mutate(),
-    });
+    })
 
   const repull = useMutation({
     mutationFn: (stackId: number) =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/stacks/${stackId}/repull`,
-        { method: "POST" },
-      ),
+      apiFetch(`/api/envman/portainer/connections/${id}/stacks/${stackId}/repull`, { method: 'POST' }),
     onSuccess: (_, stackId) => {
-      notifyOk("Repull berhasil — container restart dengan image terbaru");
+      notifyOk('Repull berhasil — container restart dengan image terbaru')
       qc.invalidateQueries({
-        queryKey: ["portainer", "stack-status", id, stackId],
-      });
+        queryKey: ['portainer', 'stack-status', id, stackId],
+      })
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const recreate = useMutation({
     mutationFn: (stackId: number) =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/stacks/${stackId}/recreate`,
-        { method: "POST" },
-      ),
-    onSuccess: () => notifyOk("Force recreate berhasil"),
+      apiFetch(`/api/envman/portainer/connections/${id}/stacks/${stackId}/recreate`, { method: 'POST' }),
+    onSuccess: () => notifyOk('Force recreate berhasil'),
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const pruneImages = useMutation({
     mutationFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/prune/images?endpointId=${cleanupEndpointId}`,
-        {
-          method: "POST",
-        },
-      ),
+      apiFetch(`/api/envman/portainer/connections/${id}/prune/images?endpointId=${cleanupEndpointId}`, {
+        method: 'POST',
+      }),
     onSuccess: (d: any) => {
       if (d.remaining > 0 && d.stuckByContainers > 0) {
         notifyOk(
           `${d.deletedCount} image dihapus — ${d.reclaimedMB} MB dibebaskan. ${d.stuckByContainers} image tidak bisa dihapus karena masih direferensi container (termasuk yang stopped).`,
-        );
+        )
       } else if (d.remaining > 0) {
-        notifyOk(
-          `${d.deletedCount} image dihapus — ${d.reclaimedMB} MB dibebaskan. ${d.remaining} image tersisa.`,
-        );
+        notifyOk(`${d.deletedCount} image dihapus — ${d.reclaimedMB} MB dibebaskan. ${d.remaining} image tersisa.`)
       } else {
-        notifyOk(
-          `${d.deletedCount} image dihapus — ${d.reclaimedMB} MB dibebaskan`,
-        );
+        notifyOk(`${d.deletedCount} image dihapus — ${d.reclaimedMB} MB dibebaskan`)
       }
-      refetchImages();
+      refetchImages()
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const pruneContainers = useMutation({
     mutationFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/prune/containers?endpointId=${cleanupEndpointId}`,
-        {
-          method: "POST",
-        },
-      ),
+      apiFetch(`/api/envman/portainer/connections/${id}/prune/containers?endpointId=${cleanupEndpointId}`, {
+        method: 'POST',
+      }),
     onSuccess: (d: any) => {
-      notifyOk(
-        `${d.deletedContainers?.length ?? 0} container dihapus — ${d.reclaimedMB} MB dibebaskan`,
-      );
-      refetchContainers();
-      refetchImages();
+      notifyOk(`${d.deletedContainers?.length ?? 0} container dihapus — ${d.reclaimedMB} MB dibebaskan`)
+      refetchContainers()
+      refetchImages()
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const pruneVolumes = useMutation({
     mutationFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/prune/volumes?endpointId=${cleanupEndpointId}`,
-        {
-          method: "POST",
-        },
-      ),
+      apiFetch(`/api/envman/portainer/connections/${id}/prune/volumes?endpointId=${cleanupEndpointId}`, {
+        method: 'POST',
+      }),
     onSuccess: (d: any) => {
-      notifyOk(
-        `${d.deletedVolumes?.length ?? 0} volume dihapus — ${d.reclaimedMB} MB dibebaskan`,
-      );
-      refetchVolumes();
+      notifyOk(`${d.deletedVolumes?.length ?? 0} volume dihapus — ${d.reclaimedMB} MB dibebaskan`)
+      refetchVolumes()
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const pruneNetworks = useMutation({
     mutationFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${id}/prune/networks?endpointId=${cleanupEndpointId}`,
-        {
-          method: "POST",
-        },
-      ),
+      apiFetch(`/api/envman/portainer/connections/${id}/prune/networks?endpointId=${cleanupEndpointId}`, {
+        method: 'POST',
+      }),
     onSuccess: (d: any) => {
-      notifyOk(`${d.deletedNetworks?.length ?? 0} network dihapus`);
-      refetchNetworks();
+      notifyOk(`${d.deletedNetworks?.length ?? 0} network dihapus`)
+      refetchNetworks()
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const execMutation = useMutation({
-    mutationFn: ({
-      containerId,
-      endpointId,
-      command,
-    }: {
-      containerId: string;
-      endpointId: number;
-      command: string;
-    }) =>
+    mutationFn: ({ containerId, endpointId, command }: { containerId: string; endpointId: number; command: string }) =>
       apiFetch(`/api/envman/portainer/connections/${id}/exec`, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify({ containerId, endpointId, command }),
       }),
     onSuccess: (data: any, { command }) => {
@@ -738,11 +629,11 @@ function ConnectionDetailPage() {
           timestamp: Date.now(),
         },
         ...prev,
-      ]);
-      setExecCommand("");
+      ])
+      setExecCommand('')
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   // ─── Confirm helpers ──────────────────────────────────────────────────────
   const confirmRepull = (stack: StackInfo) =>
@@ -755,17 +646,15 @@ function ConnectionDetailPage() {
           </Text>
           <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
             <Text size="xs">
-              Setara{" "}
-              <Code fz="xs">docker compose pull && docker compose up -d</Code>.
-              Container akan restart.
+              Setara <Code fz="xs">docker compose pull && docker compose up -d</Code>. Container akan restart.
             </Text>
           </Alert>
         </Stack>
       ),
-      labels: { confirm: "Repull & Restart", cancel: "Batal" },
-      confirmProps: { color: "blue" },
+      labels: { confirm: 'Repull & Restart', cancel: 'Batal' },
+      confirmProps: { color: 'blue' },
       onConfirm: () => repull.mutate(stack.id),
-    });
+    })
 
   const confirmRecreate = (stack: StackInfo) =>
     modals.openConfirmModal({
@@ -773,25 +662,23 @@ function ConnectionDetailPage() {
       children: (
         <Stack gap="xs">
           <Text size="sm">
-            Stop dan start ulang container di stack{" "}
-            <strong>{stack.name}</strong>?
+            Stop dan start ulang container di stack <strong>{stack.name}</strong>?
           </Text>
           <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
             <Text size="xs">
-              Image tidak di-pull ulang. Setara{" "}
-              <Code fz="xs">docker compose stop && up -d</Code>.
+              Image tidak di-pull ulang. Setara <Code fz="xs">docker compose stop && up -d</Code>.
             </Text>
           </Alert>
         </Stack>
       ),
-      labels: { confirm: "Recreate", cancel: "Batal" },
-      confirmProps: { color: "orange" },
+      labels: { confirm: 'Recreate', cancel: 'Batal' },
+      confirmProps: { color: 'orange' },
       onConfirm: () => recreate.mutate(stack.id),
-    });
+    })
 
   const confirmPruneImages = () =>
     modals.openConfirmModal({
-      title: "Hapus Dangling Images",
+      title: 'Hapus Dangling Images',
       children: (
         <Stack gap="xs">
           <Text size="sm">
@@ -799,45 +686,32 @@ function ConnectionDetailPage() {
             {imagesData?.totalSizeMB ?? 0} MB)?
           </Text>
           <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs">
-              Hanya image yang tidak dipakai container manapun. Tidak bisa
-              dibatalkan.
-            </Text>
+            <Text size="xs">Hanya image yang tidak dipakai container manapun. Tidak bisa dibatalkan.</Text>
           </Alert>
         </Stack>
       ),
-      labels: { confirm: "Hapus", cancel: "Batal" },
-      confirmProps: { color: "red" },
+      labels: { confirm: 'Hapus', cancel: 'Batal' },
+      confirmProps: { color: 'red' },
       onConfirm: () => pruneImages.mutate(),
-    });
+    })
 
   // Capability gate — butuh connection:view minimal
   if (!canView) {
     return (
       <Box p="md">
-        <Alert
-          color="yellow"
-          icon={<TbAlertTriangle size={16} />}
-          variant="light"
-        >
+        <Alert color="yellow" icon={<TbAlertTriangle size={16} />} variant="light">
           <Text size="sm" fw={600} mb={4}>
             Tidak punya izin lihat connection detail
           </Text>
           <Text size="xs">
-            Minta SUPER_ADMIN untuk grant capability{" "}
-            <code>connection:view</code>.
+            Minta SUPER_ADMIN untuk grant capability <code>connection:view</code>.
           </Text>
-          <Button
-            size="xs"
-            mt="sm"
-            component={Link}
-            to="/envmanager/connections"
-          >
+          <Button size="xs" mt="sm" component={Link} to="/envmanager/connections">
             ← Kembali
           </Button>
         </Alert>
       </Box>
-    );
+    )
   }
 
   if (isLoading) {
@@ -845,7 +719,7 @@ function ConnectionDetailPage() {
       <Group justify="center" py="xl">
         <Loader />
       </Group>
-    );
+    )
   }
 
   if (!connection) {
@@ -856,7 +730,7 @@ function ConnectionDetailPage() {
           ← Kembali
         </Button>
       </Alert>
-    );
+    )
   }
 
   return (
@@ -870,12 +744,12 @@ function ConnectionDetailPage() {
             size="sm"
             onClick={() =>
               navigate({
-                to: "/envmanager/connections",
-                search: { tab: "connections", connectionForm: undefined },
+                to: '/envmanager/connections',
+                search: { tab: 'connections', connectionForm: undefined },
               })
             }
           >
-            <TbChevronLeft size={"64"} />
+            <TbChevronLeft size={'64'} />
           </ActionIcon>
           <ThemeIcon size={36} radius="md" variant="gradient">
             <TbPlugConnected size={18} />
@@ -886,9 +760,9 @@ function ConnectionDetailPage() {
                 fw={700}
                 size="md"
                 style={{
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {connection.name}
@@ -899,38 +773,21 @@ function ConnectionDetailPage() {
             </Group>
             <Group gap="xs">
               <Text size="xs" c="dimmed" ff="monospace">
-                {connection.portainerUrl.replace(/^https?:\/\//, "")}
+                {connection.portainerUrl.replace(/^https?:\/\//, '')}
               </Text>
-              <Anchor
-                size="xs"
-                href={connection.portainerUrl}
-                target="_blank"
-                rel="noreferrer"
-                c="dimmed"
-              >
-                <TbExternalLink size={11} style={{ verticalAlign: "middle" }} />
+              <Anchor size="xs" href={connection.portainerUrl} target="_blank" rel="noreferrer" c="dimmed">
+                <TbExternalLink size={11} style={{ verticalAlign: 'middle' }} />
               </Anchor>
             </Group>
           </Box>
         </Group>
-        <ActionIcon
-          size="sm"
-          variant="subtle"
-          color="gray"
-          loading={isFetching}
-          onClick={() => refetch()}
-        >
+        <ActionIcon size="sm" variant="subtle" color="gray" loading={isFetching} onClick={() => refetch()}>
           <TbRefresh size={14} />
         </ActionIcon>
       </Group>
 
       {/* ─── Tabs ───────────────────────────────────────── */}
-      <Tabs
-        variant="outline"
-        value={activeTab}
-        onChange={(v) => setActiveTab(v ?? "stacks")}
-        mb="sm"
-      >
+      <Tabs variant="outline" value={activeTab} onChange={(v) => setActiveTab(v ?? 'stacks')} mb="sm">
         <Tabs.List>
           <Tabs.Tab value="stacks" leftSection={<TbServer size={14} />}>
             Stacks
@@ -947,7 +804,7 @@ function ConnectionDetailPage() {
       </Tabs>
 
       {/* ─── Tab: Stacks ────────────────────────────────── */}
-      {activeTab === "stacks" && (
+      {activeTab === 'stacks' && (
         <>
           {/* ─── Stacks header ──────────────────────────────── */}
           <Group justify="space-between" mb="sm" wrap="wrap" gap="xs">
@@ -957,28 +814,18 @@ function ConnectionDetailPage() {
               </Text>
               <Badge size="sm" variant="light" color="gray">
                 {filteredStacks.length}
-                {filteredStacks.length !== stacks.length
-                  ? `/${stacks.length}`
-                  : ""}
+                {filteredStacks.length !== stacks.length ? `/${stacks.length}` : ''}
               </Badge>
             </Group>
             {stacks.length > 0 && (
-              <Tooltip
-                label={stackView === "grid" ? "Tampilan list" : "Tampilan grid"}
-              >
+              <Tooltip label={stackView === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
                 <ActionIcon
                   size="sm"
                   variant="subtle"
                   color="gray"
-                  onClick={() =>
-                    setStackView((v) => (v === "grid" ? "list" : "grid"))
-                  }
+                  onClick={() => setStackView((v) => (v === 'grid' ? 'list' : 'grid'))}
                 >
-                  {stackView === "grid" ? (
-                    <TbLayoutList size={15} />
-                  ) : (
-                    <TbLayoutGrid size={15} />
-                  )}
+                  {stackView === 'grid' ? <TbLayoutList size={15} /> : <TbLayoutGrid size={15} />}
                 </ActionIcon>
               </Tooltip>
             )}
@@ -995,12 +842,7 @@ function ConnectionDetailPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 rightSection={
                   search ? (
-                    <ActionIcon
-                      size="xs"
-                      variant="subtle"
-                      color="gray"
-                      onClick={() => setSearch("")}
-                    >
+                    <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setSearch('')}>
                       <TbX size={11} />
                     </ActionIcon>
                   ) : undefined
@@ -1013,8 +855,8 @@ function ConnectionDetailPage() {
                 placeholder="Status"
                 leftSection={<TbFilter size={12} />}
                 data={[
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
                 ]}
                 value={filterStatus}
                 onChange={setFilterStatus}
@@ -1026,8 +868,8 @@ function ConnectionDetailPage() {
                 placeholder="Type"
                 leftSection={<TbFilter size={12} />}
                 data={[
-                  { value: "compose", label: "Compose" },
-                  { value: "swarm", label: "Swarm" },
+                  { value: 'compose', label: 'Compose' },
+                  { value: 'swarm', label: 'Swarm' },
                 ]}
                 value={filterType}
                 onChange={setFilterType}
@@ -1039,8 +881,8 @@ function ConnectionDetailPage() {
                 placeholder="Linked envman"
                 leftSection={<TbFilter size={12} />}
                 data={[
-                  { value: "linked", label: "Terhubung" },
-                  { value: "unlinked", label: "Tidak terhubung" },
+                  { value: 'linked', label: 'Terhubung' },
+                  { value: 'unlinked', label: 'Tidak terhubung' },
                 ]}
                 value={filterLinked}
                 onChange={setFilterLinked}
@@ -1053,12 +895,12 @@ function ConnectionDetailPage() {
                     variant="light"
                     color="blue"
                     rightSection={<TbX size={10} />}
-                    style={{ cursor: "pointer" }}
+                    style={{ cursor: 'pointer' }}
                     onClick={() => {
-                      setSearch("");
-                      setFilterStatus(null);
-                      setFilterType(null);
-                      setFilterLinked(null);
+                      setSearch('')
+                      setFilterStatus(null)
+                      setFilterType(null)
+                      setFilterLinked(null)
                     }}
                   >
                     Reset
@@ -1070,9 +912,7 @@ function ConnectionDetailPage() {
 
           {stacks.length === 0 ? (
             <Alert color="gray" icon={<TbServer size={14} />} p="xs">
-              <Text size="xs">
-                Tidak ada stack ditemukan di Portainer instance ini.
-              </Text>
+              <Text size="xs">Tidak ada stack ditemukan di Portainer instance ini.</Text>
             </Alert>
           ) : filteredStacks.length === 0 ? (
             <Box
@@ -1080,14 +920,11 @@ function ConnectionDetailPage() {
               ta="center"
               mb="xl"
               style={{
-                borderRadius: "var(--mantine-radius-md)",
-                border: "1px solid var(--mantine-color-default-border)",
+                borderRadius: 'var(--mantine-radius-md)',
+                border: '1px solid var(--mantine-color-default-border)',
               }}
             >
-              <TbSearch
-                size={28}
-                style={{ opacity: 0.2, margin: "0 auto 8px" }}
-              />
+              <TbSearch size={28} style={{ opacity: 0.2, margin: '0 auto 8px' }} />
               <Text size="sm" fw={500} mb={4}>
                 Tidak ada stack yang cocok
               </Text>
@@ -1099,41 +936,32 @@ function ConnectionDetailPage() {
                 variant="subtle"
                 leftSection={<TbX size={12} />}
                 onClick={() => {
-                  setSearch("");
-                  setFilterStatus(null);
-                  setFilterType(null);
-                  setFilterLinked(null);
+                  setSearch('')
+                  setFilterStatus(null)
+                  setFilterType(null)
+                  setFilterLinked(null)
                 }}
               >
                 Reset filter
               </Button>
             </Box>
-          ) : stackView === "grid" ? (
+          ) : stackView === 'grid' ? (
             <>
-              <SimpleGrid
-                cols={{ base: 1, sm: 2 }}
-                spacing="md"
-                mb={totalPages > 1 ? "sm" : "xl"}
-              >
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb={totalPages > 1 ? 'sm' : 'xl'}>
                 {pagedStacks.map((stack) => {
-                  const {
-                    containers: stackContainers,
-                    isFetching: stackFetching,
-                  } = stackStatusMap[stack.id] ?? {
+                  const { containers: stackContainers, isFetching: stackFetching } = stackStatusMap[stack.id] ?? {
                     containers: [],
                     isFetching: false,
-                  };
-                  const runningCount = stackContainers.filter(
-                    (c) => c.state === "running",
-                  ).length;
-                  const totalCount = stackContainers.length;
+                  }
+                  const runningCount = stackContainers.filter((c) => c.state === 'running').length
+                  const totalCount = stackContainers.length
                   return (
                     <Paper
                       key={stack.id}
                       style={{
-                        borderRadius: "var(--mantine-radius-md)",
-                        border: "1px solid var(--mantine-color-default-border)",
-                        overflow: "hidden",
+                        borderRadius: 'var(--mantine-radius-md)',
+                        border: '1px solid var(--mantine-color-default-border)',
+                        overflow: 'hidden',
                       }}
                     >
                       {/* ── Stack header ─────────────────────────── */}
@@ -1144,7 +972,7 @@ function ConnectionDetailPage() {
                               size={40}
                               radius="md"
                               variant="light"
-                              color={stack.status === 1 ? "teal" : "red"}
+                              color={stack.status === 1 ? 'teal' : 'red'}
                             >
                               <TbServer size={20} />
                             </ThemeIcon>
@@ -1154,22 +982,18 @@ function ConnectionDetailPage() {
                                   fw={700}
                                   size="md"
                                   style={{
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
                                   {stack.name}
                                 </Text>
-                                <Badge
-                                  size="xs"
-                                  color={stack.status === 1 ? "teal" : "red"}
-                                  variant="light"
-                                >
-                                  {stack.status === 1 ? "active" : "inactive"}
+                                <Badge size="xs" color={stack.status === 1 ? 'teal' : 'red'} variant="light">
+                                  {stack.status === 1 ? 'active' : 'inactive'}
                                 </Badge>
                                 <Badge size="xs" variant="outline" color="gray">
-                                  {stack.type === 2 ? "compose" : "swarm"}
+                                  {stack.type === 2 ? 'compose' : 'swarm'}
                                 </Badge>
                                 <Badge size="xs" variant="dot" color="gray">
                                   ep#{stack.endpointId}
@@ -1183,13 +1007,7 @@ function ConnectionDetailPage() {
                                   <Badge
                                     size="xs"
                                     variant="light"
-                                    color={
-                                      runningCount === totalCount
-                                        ? "teal"
-                                        : runningCount > 0
-                                          ? "yellow"
-                                          : "red"
-                                    }
+                                    color={runningCount === totalCount ? 'teal' : runningCount > 0 ? 'yellow' : 'red'}
                                   >
                                     {runningCount}/{totalCount} running
                                   </Badge>
@@ -1208,9 +1026,9 @@ function ConnectionDetailPage() {
                                 color="gray"
                                 leftSection={<TbFileCode size={13} />}
                                 onClick={() => {
-                                  setComposeStack(stack);
-                                  setComposeEditing(false);
-                                  openCompose();
+                                  setComposeStack(stack)
+                                  setComposeEditing(false)
+                                  openCompose()
                                 }}
                               >
                                 Compose
@@ -1223,10 +1041,7 @@ function ConnectionDetailPage() {
                                   variant="light"
                                   color="blue"
                                   leftSection={<TbRefreshDot size={13} />}
-                                  loading={
-                                    repull.isPending &&
-                                    (repull.variables as number) === stack.id
-                                  }
+                                  loading={repull.isPending && (repull.variables as number) === stack.id}
                                   onClick={() => confirmRepull(stack)}
                                 >
                                   Repull
@@ -1240,10 +1055,7 @@ function ConnectionDetailPage() {
                                   variant="light"
                                   color="orange"
                                   leftSection={<TbRefresh size={13} />}
-                                  loading={
-                                    recreate.isPending &&
-                                    (recreate.variables as number) === stack.id
-                                  }
+                                  loading={recreate.isPending && (recreate.variables as number) === stack.id}
                                   onClick={() => confirmRecreate(stack)}
                                 >
                                   Recreate
@@ -1274,26 +1086,22 @@ function ConnectionDetailPage() {
                                 key={c.id}
                                 p="sm"
                                 style={{
-                                  borderRadius: "var(--mantine-radius-md)",
-                                  cursor: "pointer",
+                                  borderRadius: 'var(--mantine-radius-md)',
+                                  cursor: 'pointer',
                                 }}
                                 onClick={() => {
-                                  setLogsStack(stack);
-                                  setSelectedContainerId(c.id);
-                                  openLogs();
+                                  setLogsStack(stack)
+                                  setSelectedContainerId(c.id)
+                                  openLogs()
                                 }}
                               >
-                                <Group
-                                  justify="space-between"
-                                  wrap="nowrap"
-                                  gap="xs"
-                                >
+                                <Group justify="space-between" wrap="nowrap" gap="xs">
                                   <Group gap="sm" style={{ minWidth: 0 }}>
                                     <ThemeIcon
                                       size={32}
                                       radius="md"
                                       variant="light"
-                                      color={stateColor[c.state] ?? "gray"}
+                                      color={stateColor[c.state] ?? 'gray'}
                                     >
                                       <TbServer size={15} />
                                     </ThemeIcon>
@@ -1302,9 +1110,9 @@ function ConnectionDetailPage() {
                                         size="sm"
                                         fw={600}
                                         style={{
-                                          overflow: "hidden",
-                                          textOverflow: "ellipsis",
-                                          whiteSpace: "nowrap",
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          whiteSpace: 'nowrap',
                                         }}
                                       >
                                         {c.names[0]}
@@ -1317,66 +1125,44 @@ function ConnectionDetailPage() {
                                           fz={10}
                                           c="dimmed"
                                           style={{
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap",
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
                                             maxWidth: 160,
                                           }}
                                         >
-                                          {c.image.split("/").pop()}
+                                          {c.image.split('/').pop()}
                                         </Text>
                                       </Group>
                                       {(() => {
-                                        const s = containerStatsMap[c.id];
-                                        if (!s) return null;
+                                        const s = containerStatsMap[c.id]
+                                        if (!s) return null
                                         return (
                                           <Group gap={6} mt={2} wrap="nowrap">
                                             <Badge
                                               size="xs"
                                               variant="dot"
-                                              color={
-                                                s.cpuPercent > 80
-                                                  ? "red"
-                                                  : s.cpuPercent > 50
-                                                    ? "orange"
-                                                    : "teal"
-                                              }
+                                              color={s.cpuPercent > 80 ? 'red' : s.cpuPercent > 50 ? 'orange' : 'teal'}
                                             >
                                               CPU {s.cpuPercent.toFixed(1)}%
                                             </Badge>
                                             <Badge
                                               size="xs"
                                               variant="dot"
-                                              color={
-                                                s.memPercent > 80
-                                                  ? "red"
-                                                  : s.memPercent > 50
-                                                    ? "orange"
-                                                    : "blue"
-                                              }
+                                              color={s.memPercent > 80 ? 'red' : s.memPercent > 50 ? 'orange' : 'blue'}
                                             >
                                               {s.memUsageMB}MB
                                             </Badge>
                                           </Group>
-                                        );
+                                        )
                                       })()}
                                     </Box>
                                   </Group>
-                                  <Group
-                                    gap="xs"
-                                    wrap="nowrap"
-                                    style={{ flexShrink: 0 }}
-                                  >
-                                    <Badge
-                                      size="sm"
-                                      color={stateColor[c.state] ?? "gray"}
-                                      variant="light"
-                                    >
+                                  <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                                    <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">
                                       {c.state}
                                     </Badge>
-                                    {c.ports.length > 0 && (
-                                      <Code fz={10}>{c.ports[0]}</Code>
-                                    )}
+                                    {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
                                     {canMutate && (
                                       <Tooltip label="Restart container">
                                         <ActionIcon
@@ -1385,16 +1171,11 @@ function ConnectionDetailPage() {
                                           color="orange"
                                           loading={
                                             restartContainer.isPending &&
-                                            (restartContainer.variables as any)
-                                              ?.containerId === c.id
+                                            (restartContainer.variables as any)?.containerId === c.id
                                           }
                                           onClick={(e) => {
-                                            e.stopPropagation();
-                                            confirmRestartContainer(
-                                              stack,
-                                              c.id,
-                                              c.names[0],
-                                            );
+                                            e.stopPropagation()
+                                            confirmRestartContainer(stack, c.id, c.names[0])
                                           }}
                                         >
                                           <TbRefresh size={13} />
@@ -1407,10 +1188,10 @@ function ConnectionDetailPage() {
                                         variant="subtle"
                                         color="gray"
                                         onClick={(e) => {
-                                          e.stopPropagation();
-                                          setLogsStack(stack);
-                                          setSelectedContainerId(c.id);
-                                          openLogs();
+                                          e.stopPropagation()
+                                          setLogsStack(stack)
+                                          setSelectedContainerId(c.id)
+                                          openLogs()
                                         }}
                                       >
                                         <TbFileText size={13} />
@@ -1423,15 +1204,15 @@ function ConnectionDetailPage() {
                                           variant="subtle"
                                           color="teal"
                                           onClick={(e) => {
-                                            e.stopPropagation();
+                                            e.stopPropagation()
                                             setExecContainer({
                                               containerId: c.id,
                                               endpointId: stack.endpointId,
                                               containerName: c.names[0],
                                               stackName: stack.name,
-                                            });
-                                            setExecHistory([]);
-                                            openExec();
+                                            })
+                                            setExecHistory([])
+                                            openExec()
                                           }}
                                         >
                                           <TbTerminal2 size={13} />
@@ -1474,11 +1255,7 @@ function ConnectionDetailPage() {
                                       size="sm"
                                       variant="light"
                                       color={
-                                        env.lastSyncOk === true
-                                          ? "teal"
-                                          : env.lastSyncOk === false
-                                            ? "red"
-                                            : "gray"
+                                        env.lastSyncOk === true ? 'teal' : env.lastSyncOk === false ? 'red' : 'gray'
                                       }
                                       leftSection={
                                         env.lastSyncOk === true ? (
@@ -1488,7 +1265,7 @@ function ConnectionDetailPage() {
                                         ) : undefined
                                       }
                                       rightSection={<TbChevronRight size={9} />}
-                                      style={{ cursor: "pointer" }}
+                                      style={{ cursor: 'pointer' }}
                                     >
                                       {env.projectName}:{env.envName}
                                     </Badge>
@@ -1500,42 +1277,32 @@ function ConnectionDetailPage() {
                         </Stack>
                       </Box>
                     </Paper>
-                  );
+                  )
                 })}
               </SimpleGrid>
               {totalPages > 1 && (
                 <Group justify="center" mb="xl">
-                  <Pagination
-                    total={totalPages}
-                    value={page}
-                    onChange={setPage}
-                    size="sm"
-                  />
+                  <Pagination total={totalPages} value={page} onChange={setPage} size="sm" />
                 </Group>
               )}
             </>
           ) : (
             <>
-              <Stack gap="md" mb={totalPages > 1 ? "sm" : "xl"}>
+              <Stack gap="md" mb={totalPages > 1 ? 'sm' : 'xl'}>
                 {pagedStacks.map((stack) => {
-                  const {
-                    containers: stackContainers,
-                    isFetching: stackFetching,
-                  } = stackStatusMap[stack.id] ?? {
+                  const { containers: stackContainers, isFetching: stackFetching } = stackStatusMap[stack.id] ?? {
                     containers: [],
                     isFetching: false,
-                  };
-                  const runningCount = stackContainers.filter(
-                    (c) => c.state === "running",
-                  ).length;
-                  const totalCount = stackContainers.length;
+                  }
+                  const runningCount = stackContainers.filter((c) => c.state === 'running').length
+                  const totalCount = stackContainers.length
                   return (
                     <Box
                       key={stack.id}
                       style={{
-                        borderRadius: "var(--mantine-radius-md)",
-                        border: "1px solid var(--mantine-color-default-border)",
-                        overflow: "hidden",
+                        borderRadius: 'var(--mantine-radius-md)',
+                        border: '1px solid var(--mantine-color-default-border)',
+                        overflow: 'hidden',
                       }}
                     >
                       <Box p="md">
@@ -1545,7 +1312,7 @@ function ConnectionDetailPage() {
                               size={40}
                               radius="md"
                               variant="light"
-                              color={stack.status === 1 ? "teal" : "red"}
+                              color={stack.status === 1 ? 'teal' : 'red'}
                             >
                               <TbServer size={20} />
                             </ThemeIcon>
@@ -1555,22 +1322,18 @@ function ConnectionDetailPage() {
                                   fw={700}
                                   size="md"
                                   style={{
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
                                   {stack.name}
                                 </Text>
-                                <Badge
-                                  size="xs"
-                                  color={stack.status === 1 ? "teal" : "red"}
-                                  variant="light"
-                                >
-                                  {stack.status === 1 ? "active" : "inactive"}
+                                <Badge size="xs" color={stack.status === 1 ? 'teal' : 'red'} variant="light">
+                                  {stack.status === 1 ? 'active' : 'inactive'}
                                 </Badge>
                                 <Badge size="xs" variant="outline" color="gray">
-                                  {stack.type === 2 ? "compose" : "swarm"}
+                                  {stack.type === 2 ? 'compose' : 'swarm'}
                                 </Badge>
                                 <Badge size="xs" variant="dot" color="gray">
                                   ep#{stack.endpointId}
@@ -1584,13 +1347,7 @@ function ConnectionDetailPage() {
                                   <Badge
                                     size="xs"
                                     variant="light"
-                                    color={
-                                      runningCount === totalCount
-                                        ? "teal"
-                                        : runningCount > 0
-                                          ? "yellow"
-                                          : "red"
-                                    }
+                                    color={runningCount === totalCount ? 'teal' : runningCount > 0 ? 'yellow' : 'red'}
                                   >
                                     {runningCount}/{totalCount} running
                                   </Badge>
@@ -1606,10 +1363,7 @@ function ConnectionDetailPage() {
                                 variant="light"
                                 color="blue"
                                 leftSection={<TbRefreshDot size={13} />}
-                                loading={
-                                  repull.isPending &&
-                                  (repull.variables as number) === stack.id
-                                }
+                                loading={repull.isPending && (repull.variables as number) === stack.id}
                                 onClick={() => confirmRepull(stack)}
                               >
                                 Repull
@@ -1621,10 +1375,7 @@ function ConnectionDetailPage() {
                                 variant="light"
                                 color="orange"
                                 leftSection={<TbRefresh size={13} />}
-                                loading={
-                                  recreate.isPending &&
-                                  (recreate.variables as number) === stack.id
-                                }
+                                loading={recreate.isPending && (recreate.variables as number) === stack.id}
                                 onClick={() => confirmRecreate(stack)}
                               >
                                 Recreate
@@ -1652,28 +1403,23 @@ function ConnectionDetailPage() {
                                 key={c.id}
                                 p="sm"
                                 style={{
-                                  borderRadius: "var(--mantine-radius-md)",
-                                  border:
-                                    "1px solid var(--mantine-color-default-border)",
-                                  cursor: "pointer",
+                                  borderRadius: 'var(--mantine-radius-md)',
+                                  border: '1px solid var(--mantine-color-default-border)',
+                                  cursor: 'pointer',
                                 }}
                                 onClick={() => {
-                                  setLogsStack(stack);
-                                  setSelectedContainerId(c.id);
-                                  openLogs();
+                                  setLogsStack(stack)
+                                  setSelectedContainerId(c.id)
+                                  openLogs()
                                 }}
                               >
-                                <Group
-                                  justify="space-between"
-                                  wrap="nowrap"
-                                  gap="xs"
-                                >
+                                <Group justify="space-between" wrap="nowrap" gap="xs">
                                   <Group gap="sm" style={{ minWidth: 0 }}>
                                     <ThemeIcon
                                       size={32}
                                       radius="md"
                                       variant="light"
-                                      color={stateColor[c.state] ?? "gray"}
+                                      color={stateColor[c.state] ?? 'gray'}
                                     >
                                       <TbServer size={15} />
                                     </ThemeIcon>
@@ -1682,9 +1428,9 @@ function ConnectionDetailPage() {
                                         size="sm"
                                         fw={600}
                                         style={{
-                                          overflow: "hidden",
-                                          textOverflow: "ellipsis",
-                                          whiteSpace: "nowrap",
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          whiteSpace: 'nowrap',
                                         }}
                                       >
                                         {c.names[0]}
@@ -1697,32 +1443,22 @@ function ConnectionDetailPage() {
                                           fz={10}
                                           c="dimmed"
                                           style={{
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap",
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
                                             maxWidth: 200,
                                           }}
                                         >
-                                          {c.image.split("/").pop()}
+                                          {c.image.split('/').pop()}
                                         </Text>
                                       </Group>
                                     </Box>
                                   </Group>
-                                  <Group
-                                    gap="xs"
-                                    wrap="nowrap"
-                                    style={{ flexShrink: 0 }}
-                                  >
-                                    <Badge
-                                      size="sm"
-                                      color={stateColor[c.state] ?? "gray"}
-                                      variant="light"
-                                    >
+                                  <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                                    <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">
                                       {c.state}
                                     </Badge>
-                                    {c.ports.length > 0 && (
-                                      <Code fz={10}>{c.ports[0]}</Code>
-                                    )}
+                                    {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
                                     {canMutate && (
                                       <Tooltip label="Restart container">
                                         <ActionIcon
@@ -1731,16 +1467,11 @@ function ConnectionDetailPage() {
                                           color="orange"
                                           loading={
                                             restartContainer.isPending &&
-                                            (restartContainer.variables as any)
-                                              ?.containerId === c.id
+                                            (restartContainer.variables as any)?.containerId === c.id
                                           }
                                           onClick={(e) => {
-                                            e.stopPropagation();
-                                            confirmRestartContainer(
-                                              stack,
-                                              c.id,
-                                              c.names[0],
-                                            );
+                                            e.stopPropagation()
+                                            confirmRestartContainer(stack, c.id, c.names[0])
                                           }}
                                         >
                                           <TbRefresh size={13} />
@@ -1753,10 +1484,10 @@ function ConnectionDetailPage() {
                                         variant="subtle"
                                         color="gray"
                                         onClick={(e) => {
-                                          e.stopPropagation();
-                                          setLogsStack(stack);
-                                          setSelectedContainerId(c.id);
-                                          openLogs();
+                                          e.stopPropagation()
+                                          setLogsStack(stack)
+                                          setSelectedContainerId(c.id)
+                                          openLogs()
                                         }}
                                       >
                                         <TbFileText size={13} />
@@ -1769,15 +1500,15 @@ function ConnectionDetailPage() {
                                           variant="subtle"
                                           color="teal"
                                           onClick={(e) => {
-                                            e.stopPropagation();
+                                            e.stopPropagation()
                                             setExecContainer({
                                               containerId: c.id,
                                               endpointId: stack.endpointId,
                                               containerName: c.names[0],
                                               stackName: stack.name,
-                                            });
-                                            setExecHistory([]);
-                                            openExec();
+                                            })
+                                            setExecHistory([])
+                                            openExec()
                                           }}
                                         >
                                           <TbTerminal2 size={13} />
@@ -1818,11 +1549,7 @@ function ConnectionDetailPage() {
                                       size="sm"
                                       variant="light"
                                       color={
-                                        env.lastSyncOk === true
-                                          ? "teal"
-                                          : env.lastSyncOk === false
-                                            ? "red"
-                                            : "gray"
+                                        env.lastSyncOk === true ? 'teal' : env.lastSyncOk === false ? 'red' : 'gray'
                                       }
                                       leftSection={
                                         env.lastSyncOk === true ? (
@@ -1832,7 +1559,7 @@ function ConnectionDetailPage() {
                                         ) : undefined
                                       }
                                       rightSection={<TbChevronRight size={9} />}
-                                      style={{ cursor: "pointer" }}
+                                      style={{ cursor: 'pointer' }}
                                     >
                                       {env.projectName}:{env.envName}
                                     </Badge>
@@ -1844,17 +1571,12 @@ function ConnectionDetailPage() {
                         </Stack>
                       </Box>
                     </Box>
-                  );
+                  )
                 })}
               </Stack>
               {totalPages > 1 && (
                 <Group justify="center" mb="xl">
-                  <Pagination
-                    total={totalPages}
-                    value={page}
-                    onChange={setPage}
-                    size="sm"
-                  />
+                  <Pagination total={totalPages} value={page} onChange={setPage} size="sm" />
                 </Group>
               )}
             </>
@@ -1863,7 +1585,7 @@ function ConnectionDetailPage() {
       )}
 
       {/* ─── Tab: Maintenance ───────────────────────────── */}
-      {activeTab === "maintenance" && (
+      {activeTab === 'maintenance' && (
         <>
           <Divider
             mb="md"
@@ -1881,7 +1603,7 @@ function ConnectionDetailPage() {
           <Paper
             p="md"
             style={{
-              borderRadius: "var(--mantine-radius-md)",
+              borderRadius: 'var(--mantine-radius-md)',
             }}
           >
             {/* Endpoint selector */}
@@ -1894,9 +1616,9 @@ function ConnectionDetailPage() {
                   <Badge
                     key={epId}
                     size="sm"
-                    variant={cleanupEndpointId === epId ? "filled" : "outline"}
+                    variant={cleanupEndpointId === epId ? 'filled' : 'outline'}
                     color="gray"
-                    style={{ cursor: "pointer" }}
+                    style={{ cursor: 'pointer' }}
                     onClick={() => setCleanupEndpointId(epId)}
                   >
                     #{epId}
@@ -1921,11 +1643,7 @@ function ConnectionDetailPage() {
               </Box>
               <Group gap="xs">
                 {imagesData && (
-                  <Badge
-                    size="sm"
-                    variant="light"
-                    color={imagesData.count > 0 ? "orange" : "teal"}
-                  >
+                  <Badge size="sm" variant="light" color={imagesData.count > 0 ? 'orange' : 'teal'}>
                     {imagesData.count} image — {imagesData.totalSizeMB} MB
                   </Badge>
                 )}
@@ -1960,29 +1678,22 @@ function ConnectionDetailPage() {
 
             {imagesData?.count === 0 ? (
               <Alert color="teal" icon={<TbCheck size={14} />} p="xs">
-                <Text size="xs">
-                  Tidak ada dangling images. Host Docker bersih!
-                </Text>
+                <Text size="xs">Tidak ada dangling images. Host Docker bersih!</Text>
               </Alert>
             ) : imagesData?.images && imagesData.images.length > 0 ? (
               <Box
                 mb="md"
                 style={{
-                  borderRadius: "var(--mantine-radius-sm)",
-                  border: "1px solid var(--mantine-color-default-border)",
-                  overflow: "hidden",
+                  borderRadius: 'var(--mantine-radius-sm)',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  overflow: 'hidden',
                 }}
               >
                 <ScrollArea.Autosize mah={200}>
-                  <Table
-                    fz="xs"
-                    horizontalSpacing="sm"
-                    verticalSpacing={4}
-                    highlightOnHover
-                  >
+                  <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
                     <Table.Thead
                       style={{
-                        background: "var(--mantine-color-default-hover)",
+                        background: 'var(--mantine-color-default-hover)',
                       }}
                     >
                       <Table.Tr>
@@ -2019,20 +1730,13 @@ function ConnectionDetailPage() {
 
             {/* Info jika ada stuck images setelah prune */}
             {pruneImages.data?.stuckByContainers > 0 && (
-              <Alert
-                color="orange"
-                icon={<TbAlertTriangle size={14} />}
-                p="xs"
-                mb="sm"
-              >
+              <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs" mb="sm">
                 <Text size="xs" fw={500} mb={2}>
                   {pruneImages.data.stuckByContainers} image tidak bisa dihapus
                 </Text>
                 <Text size="xs" c="dimmed">
-                  Image masih direferensi oleh container yang stopped. Hapus
-                  container tersebut terlebih dahulu dengan{" "}
-                  <strong>Prune Volumes</strong> atau hapus manual di Portainer,
-                  lalu coba prune ulang.
+                  Image masih direferensi oleh container yang stopped. Hapus container tersebut terlebih dahulu dengan{' '}
+                  <strong>Prune Volumes</strong> atau hapus manual di Portainer, lalu coba prune ulang.
                 </Text>
                 {pruneImages.data.stuckImages?.length > 0 && (
                   <Group gap="xs" mt="xs" wrap="wrap">
@@ -2071,15 +1775,9 @@ function ConnectionDetailPage() {
               </Box>
               <Group gap="xs">
                 {containersData && (
-                  <Badge
-                    size="sm"
-                    variant="light"
-                    color={containersData.count > 0 ? "orange" : "teal"}
-                  >
+                  <Badge size="sm" variant="light" color={containersData.count > 0 ? 'orange' : 'teal'}>
                     {containersData.count} container
-                    {containersData.totalSizeMB > 0
-                      ? ` — ${containersData.totalSizeMB} MB`
-                      : ""}
+                    {containersData.totalSizeMB > 0 ? ` — ${containersData.totalSizeMB} MB` : ''}
                   </Badge>
                 )}
                 <ActionIcon
@@ -2100,31 +1798,25 @@ function ConnectionDetailPage() {
                     loading={pruneContainers.isPending}
                     onClick={() =>
                       modals.openConfirmModal({
-                        title: "Hapus Stopped Containers",
+                        title: 'Hapus Stopped Containers',
                         children: (
                           <Stack gap="xs">
                             <Text size="sm">
-                              Hapus <strong>{containersData.count}</strong>{" "}
-                              stopped/dead container?
+                              Hapus <strong>{containersData.count}</strong> stopped/dead container?
                             </Text>
-                            <Alert
-                              color="orange"
-                              icon={<TbAlertTriangle size={14} />}
-                              p="xs"
-                            >
+                            <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
                               <Text size="xs">
-                                Container yang dihapus tidak bisa dikembalikan.
-                                Image yang dipakai container ini mungkin bisa
-                                di-prune setelah ini.
+                                Container yang dihapus tidak bisa dikembalikan. Image yang dipakai container ini mungkin
+                                bisa di-prune setelah ini.
                               </Text>
                             </Alert>
                           </Stack>
                         ),
                         labels: {
-                          confirm: "Hapus Containers",
-                          cancel: "Batal",
+                          confirm: 'Hapus Containers',
+                          cancel: 'Batal',
                         },
-                        confirmProps: { color: "red" },
+                        confirmProps: { color: 'red' },
                         onConfirm: () => pruneContainers.mutate(),
                       })
                     }
@@ -2142,21 +1834,16 @@ function ConnectionDetailPage() {
               <Box
                 mb="md"
                 style={{
-                  borderRadius: "var(--mantine-radius-sm)",
-                  border: "1px solid var(--mantine-color-default-border)",
-                  overflow: "hidden",
+                  borderRadius: 'var(--mantine-radius-sm)',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  overflow: 'hidden',
                 }}
               >
                 <ScrollArea.Autosize mah={200}>
-                  <Table
-                    fz="xs"
-                    horizontalSpacing="sm"
-                    verticalSpacing={4}
-                    highlightOnHover
-                  >
+                  <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
                     <Table.Thead
                       style={{
-                        background: "var(--mantine-color-default-hover)",
+                        background: 'var(--mantine-color-default-hover)',
                       }}
                     >
                       <Table.Tr>
@@ -2174,24 +1861,18 @@ function ConnectionDetailPage() {
                             <Code fz={10}>{c.id}</Code>
                           </Table.Td>
                           <Table.Td>
-                            <Text fz="xs">{c.name || "—"}</Text>
+                            <Text fz="xs">{c.name || '—'}</Text>
                           </Table.Td>
                           <Table.Td>
                             <Code fz={10}>{c.image}</Code>
                           </Table.Td>
                           <Table.Td>
-                            <Badge
-                              size="xs"
-                              color={stateColor[c.state] ?? "gray"}
-                              variant="light"
-                            >
+                            <Badge size="xs" color={stateColor[c.state] ?? 'gray'} variant="light">
                               {c.status}
                             </Badge>
                           </Table.Td>
                           <Table.Td>
-                            <Text fz="xs">
-                              {c.size > 0 ? fmtBytes(c.size) : "—"}
-                            </Text>
+                            <Text fz="xs">{c.size > 0 ? fmtBytes(c.size) : '—'}</Text>
                           </Table.Td>
                         </Table.Tr>
                       ))}
@@ -2226,11 +1907,7 @@ function ConnectionDetailPage() {
               </Box>
               <Group gap="xs">
                 {volumesData && (
-                  <Badge
-                    size="sm"
-                    variant="light"
-                    color={volumesData.count > 0 ? "orange" : "teal"}
-                  >
+                  <Badge size="sm" variant="light" color={volumesData.count > 0 ? 'orange' : 'teal'}>
                     {volumesData.count} volume
                   </Badge>
                 )}
@@ -2252,27 +1929,21 @@ function ConnectionDetailPage() {
                     loading={pruneVolumes.isPending}
                     onClick={() =>
                       modals.openConfirmModal({
-                        title: "Hapus Unused Volumes",
+                        title: 'Hapus Unused Volumes',
                         children: (
                           <Stack gap="xs">
                             <Text size="sm">
-                              Hapus <strong>{volumesData.count}</strong> volume
-                              yang tidak dipakai?
+                              Hapus <strong>{volumesData.count}</strong> volume yang tidak dipakai?
                             </Text>
-                            <Alert
-                              color="red"
-                              icon={<TbAlertTriangle size={14} />}
-                              p="xs"
-                            >
+                            <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
                               <Text size="xs" fw={600}>
-                                Data di volume yang dihapus tidak bisa
-                                dikembalikan.
+                                Data di volume yang dihapus tidak bisa dikembalikan.
                               </Text>
                             </Alert>
                           </Stack>
                         ),
-                        labels: { confirm: "Hapus Volumes", cancel: "Batal" },
-                        confirmProps: { color: "red" },
+                        labels: { confirm: 'Hapus Volumes', cancel: 'Batal' },
+                        confirmProps: { color: 'red' },
                         onConfirm: () => pruneVolumes.mutate(),
                       })
                     }
@@ -2287,25 +1958,20 @@ function ConnectionDetailPage() {
                 <Text size="xs">Tidak ada unused volumes.</Text>
               </Alert>
             ) : volumesData?.volumes?.length > 0 ? (
-                <Stack
-                  gap={"md"}
+              <Stack
+                gap={'md'}
                 mb="md"
                 style={{
-                  borderRadius: "var(--mantine-radius-sm)",
-                  border: "1px solid var(--mantine-color-default-border)",
-                  overflow: "hidden",
+                  borderRadius: 'var(--mantine-radius-sm)',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  overflow: 'hidden',
                 }}
               >
                 <ScrollArea.Autosize mah={200}>
-                  <Table
-                    fz="xs"
-                    horizontalSpacing="sm"
-                    verticalSpacing={4}
-                    highlightOnHover
-                  >
+                  <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
                     <Table.Thead
                       style={{
-                        background: "var(--mantine-color-default-hover)",
+                        background: 'var(--mantine-color-default-hover)',
                       }}
                     >
                       <Table.Tr>
@@ -2359,11 +2025,7 @@ function ConnectionDetailPage() {
               </Box>
               <Group gap="xs">
                 {networksData && (
-                  <Badge
-                    size="sm"
-                    variant="light"
-                    color={networksData.count > 0 ? "orange" : "teal"}
-                  >
+                  <Badge size="sm" variant="light" color={networksData.count > 0 ? 'orange' : 'teal'}>
                     {networksData.count} network
                   </Badge>
                 )}
@@ -2385,15 +2047,14 @@ function ConnectionDetailPage() {
                     loading={pruneNetworks.isPending}
                     onClick={() =>
                       modals.openConfirmModal({
-                        title: "Hapus Unused Networks",
+                        title: 'Hapus Unused Networks',
                         children: (
                           <Text size="sm">
-                            Hapus <strong>{networksData.count}</strong> network
-                            Docker yang tidak dipakai?
+                            Hapus <strong>{networksData.count}</strong> network Docker yang tidak dipakai?
                           </Text>
                         ),
-                        labels: { confirm: "Hapus Networks", cancel: "Batal" },
-                        confirmProps: { color: "orange" },
+                        labels: { confirm: 'Hapus Networks', cancel: 'Batal' },
+                        confirmProps: { color: 'orange' },
                         onConfirm: () => pruneNetworks.mutate(),
                       })
                     }
@@ -2411,21 +2072,16 @@ function ConnectionDetailPage() {
               <Box
                 mb="md"
                 style={{
-                  borderRadius: "var(--mantine-radius-sm)",
-                  border: "1px solid var(--mantine-color-default-border)",
-                  overflow: "hidden",
+                  borderRadius: 'var(--mantine-radius-sm)',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  overflow: 'hidden',
                 }}
               >
                 <ScrollArea.Autosize mah={200}>
-                  <Table
-                    fz="xs"
-                    horizontalSpacing="sm"
-                    verticalSpacing={4}
-                    highlightOnHover
-                  >
+                  <Table fz="xs" horizontalSpacing="sm" verticalSpacing={4} highlightOnHover>
                     <Table.Thead
                       style={{
-                        background: "var(--mantine-color-default-hover)",
+                        background: 'var(--mantine-color-default-hover)',
                       }}
                     >
                       <Table.Tr>
@@ -2465,8 +2121,8 @@ function ConnectionDetailPage() {
       <Modal
         opened={composeOpen}
         onClose={() => {
-          closeCompose();
-          setComposeEditing(false);
+          closeCompose()
+          setComposeEditing(false)
         }}
         title={
           <Group gap="xs">
@@ -2498,7 +2154,7 @@ function ConnectionDetailPage() {
                     docker-compose.yml
                   </Badge>
                   <Text fz={10} c="dimmed">
-                    {composeContent.split("\n").length} baris
+                    {composeContent.split('\n').length} baris
                   </Text>
                 </Group>
                 <Group gap="xs">
@@ -2521,8 +2177,8 @@ function ConnectionDetailPage() {
                         variant="subtle"
                         color="gray"
                         onClick={() => {
-                          setComposeEditing(false);
-                          setComposeContent(composeData?.content ?? "");
+                          setComposeEditing(false)
+                          setComposeContent(composeData?.content ?? '')
                         }}
                       >
                         Batal
@@ -2542,9 +2198,9 @@ function ConnectionDetailPage() {
               </Group>
               <Box
                 style={{
-                  borderRadius: "var(--mantine-radius-sm)",
-                  border: "1px solid var(--mantine-color-default-border)",
-                  overflow: "hidden",
+                  borderRadius: 'var(--mantine-radius-sm)',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  overflow: 'hidden',
                 }}
               >
                 <CodeEditor
@@ -2557,14 +2213,9 @@ function ConnectionDetailPage() {
                 />
               </Box>
               {composeEditing && (
-                <Alert
-                  color="orange"
-                  icon={<TbAlertTriangle size={14} />}
-                  p="xs"
-                >
+                <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
                   <Text size="xs">
-                    Perubahan langsung ke Portainer. Gunakan{" "}
-                    <strong>Recreate</strong> atau <strong>Repull</strong>{" "}
+                    Perubahan langsung ke Portainer. Gunakan <strong>Recreate</strong> atau <strong>Repull</strong>{' '}
                     setelah save untuk menerapkan ke container.
                   </Text>
                 </Alert>
@@ -2578,11 +2229,11 @@ function ConnectionDetailPage() {
       <Modal
         opened={logsOpen}
         onClose={() => {
-          closeLogs();
-          setAutoRefresh(false);
-          setSelectedContainerId(null);
-          setLiveLines([]);
-          lastLogTimestamp.current = null;
+          closeLogs()
+          setAutoRefresh(false)
+          setSelectedContainerId(null)
+          setLiveLines([])
+          lastLogTimestamp.current = null
         }}
         title={
           <Group gap="xs">
@@ -2597,11 +2248,11 @@ function ConnectionDetailPage() {
                 size="xs"
                 variant="outline"
                 color="gray"
-                style={{ cursor: "pointer" }}
+                style={{ cursor: 'pointer' }}
                 onClick={() => {
-                  setSelectedContainerId(null);
-                  setLiveLines([]);
-                  lastLogTimestamp.current = null;
+                  setSelectedContainerId(null)
+                  setLiveLines([])
+                  lastLogTimestamp.current = null
                 }}
               >
                 ← ganti container
@@ -2620,57 +2271,39 @@ function ConnectionDetailPage() {
                 Pilih container untuk melihat logs:
               </Text>
               {(() => {
-                const s = logsStack ? stackStatusMap[logsStack.id] : undefined;
-                const logsContainers = s?.containers ?? [];
-                const logsLoading =
-                  s?.isFetching && logsContainers.length === 0;
-                return logsLoading;
+                const s = logsStack ? stackStatusMap[logsStack.id] : undefined
+                const logsContainers = s?.containers ?? []
+                const logsLoading = s?.isFetching && logsContainers.length === 0
+                return logsLoading
               })() ? (
                 <Group gap="xs" align="center" py="md" justify="center">
                   <Loader size="sm" />
                   <Text size="sm" c="dimmed">
-                    Memuat daftar container di stack{" "}
-                    <strong>{logsStack?.name}</strong>...
+                    Memuat daftar container di stack <strong>{logsStack?.name}</strong>...
                   </Text>
                 </Group>
-              ) : (logsStack
-                  ? (stackStatusMap[logsStack.id]?.containers ?? [])
-                  : []
-                ).length === 0 ? (
-                <Alert
-                  color="orange"
-                  icon={<TbAlertTriangle size={14} />}
-                  p="sm"
-                >
+              ) : (logsStack ? (stackStatusMap[logsStack.id]?.containers ?? []) : []).length === 0 ? (
+                <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="sm">
                   <Text size="xs">
-                    Tidak ada container ditemukan di stack{" "}
-                    <strong>{logsStack?.name}</strong>.
+                    Tidak ada container ditemukan di stack <strong>{logsStack?.name}</strong>.
                   </Text>
                 </Alert>
               ) : (
                 <Stack gap="xs">
-                  {(logsStack
-                    ? (stackStatusMap[logsStack.id]?.containers ?? [])
-                    : []
-                  ).map((c) => (
+                  {(logsStack ? (stackStatusMap[logsStack.id]?.containers ?? []) : []).map((c) => (
                     <Box
                       key={c.id}
                       p="sm"
                       style={{
-                        borderRadius: "var(--mantine-radius-md)",
-                        border: "1px solid var(--mantine-color-default-border)",
-                        cursor: "pointer",
+                        borderRadius: 'var(--mantine-radius-md)',
+                        border: '1px solid var(--mantine-color-default-border)',
+                        cursor: 'pointer',
                       }}
                       onClick={() => setSelectedContainerId(c.id)}
                     >
                       <Group justify="space-between" wrap="nowrap">
                         <Group gap="sm" style={{ minWidth: 0 }}>
-                          <ThemeIcon
-                            size={32}
-                            radius="md"
-                            variant="light"
-                            color={stateColor[c.state] ?? "gray"}
-                          >
+                          <ThemeIcon size={32} radius="md" variant="light" color={stateColor[c.state] ?? 'gray'}>
                             <TbFileText size={16} />
                           </ThemeIcon>
                           <Box style={{ minWidth: 0 }}>
@@ -2678,9 +2311,9 @@ function ConnectionDetailPage() {
                               size="sm"
                               fw={600}
                               style={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
                               }}
                             >
                               {c.names[0]}
@@ -2693,32 +2326,23 @@ function ConnectionDetailPage() {
                                 fz={10}
                                 c="dimmed"
                                 style={{
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
                                   maxWidth: 200,
                                 }}
                               >
-                                {c.image.split("/").pop()}
+                                {c.image.split('/').pop()}
                               </Text>
                             </Group>
                           </Box>
                         </Group>
                         <Group gap="xs" wrap="nowrap">
-                          <Badge
-                            size="sm"
-                            color={stateColor[c.state] ?? "gray"}
-                            variant="light"
-                          >
+                          <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">
                             {c.state}
                           </Badge>
-                          {c.ports.length > 0 && (
-                            <Code fz={10}>{c.ports[0]}</Code>
-                          )}
-                          <TbChevronRight
-                            size={14}
-                            color="var(--mantine-color-dimmed)"
-                          />
+                          {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
+                          <TbChevronRight size={14} color="var(--mantine-color-dimmed)" />
                         </Group>
                       </Group>
                     </Box>
@@ -2731,25 +2355,19 @@ function ConnectionDetailPage() {
             <>
               {/* Info container terpilih */}
               {(() => {
-                const c = (
-                  logsStack
-                    ? (stackStatusMap[logsStack.id]?.containers ?? [])
-                    : []
-                ).find((x) => x.id === selectedContainerId);
+                const c = (logsStack ? (stackStatusMap[logsStack.id]?.containers ?? []) : []).find(
+                  (x) => x.id === selectedContainerId,
+                )
                 return c ? (
                   <Box
                     p="xs"
                     style={{
-                      borderRadius: "var(--mantine-radius-md)",
-                      background: "var(--mantine-color-default-hover)",
+                      borderRadius: 'var(--mantine-radius-md)',
+                      background: 'var(--mantine-color-default-hover)',
                     }}
                   >
                     <Group gap="sm" wrap="nowrap">
-                      <Badge
-                        size="sm"
-                        color={stateColor[c.state] ?? "gray"}
-                        variant="light"
-                      >
+                      <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">
                         {c.state}
                       </Badge>
                       <Text size="xs" fw={600}>
@@ -2763,16 +2381,16 @@ function ConnectionDetailPage() {
                         c="dimmed"
                         style={{
                           flex: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        {c.image.split("/").pop()}
+                        {c.image.split('/').pop()}
                       </Text>
                     </Group>
                   </Box>
-                ) : null;
+                ) : null
               })()}
 
               {/* Controls */}
@@ -2835,10 +2453,10 @@ function ConnectionDetailPage() {
                         const text = logLines
                           .map(
                             (l) =>
-                              `[${l.stream}] ${l.timestamp ? `${new Date(l.timestamp).toLocaleTimeString("id-ID")} ` : ""}${l.message}`,
+                              `[${l.stream}] ${l.timestamp ? `${new Date(l.timestamp).toLocaleTimeString('id-ID')} ` : ''}${l.message}`,
                           )
-                          .join("\n");
-                        navigator.clipboard.writeText(text);
+                          .join('\n')
+                        navigator.clipboard.writeText(text)
                       }}
                     >
                       <TbCopy size={13} />
@@ -2852,18 +2470,15 @@ function ConnectionDetailPage() {
                       disabled={logLines.length === 0}
                       onClick={() => {
                         const text = logLines
-                          .map(
-                            (l) =>
-                              `[${l.stream.toUpperCase()}] ${l.timestamp ?? ""} ${l.message}`,
-                          )
-                          .join("\n");
-                        const blob = new Blob([text], { type: "text/plain" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `${logsStack?.name ?? "stack"}-${selectedContainerId.slice(0, 8)}.log`;
-                        a.click();
-                        URL.revokeObjectURL(url);
+                          .map((l) => `[${l.stream.toUpperCase()}] ${l.timestamp ?? ''} ${l.message}`)
+                          .join('\n')
+                        const blob = new Blob([text], { type: 'text/plain' })
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `${logsStack?.name ?? 'stack'}-${selectedContainerId.slice(0, 8)}.log`
+                        a.click()
+                        URL.revokeObjectURL(url)
                       }}
                     >
                       <TbDownload size={13} />
@@ -2880,9 +2495,9 @@ function ConnectionDetailPage() {
               ) : (
                 <Box
                   style={{
-                    borderRadius: "var(--mantine-radius-sm)",
-                    border: "1px solid var(--mantine-color-default-border)",
-                    overflow: "hidden",
+                    borderRadius: 'var(--mantine-radius-sm)',
+                    border: '1px solid var(--mantine-color-default-border)',
+                    overflow: 'hidden',
                   }}
                 >
                   <Group
@@ -2890,8 +2505,8 @@ function ConnectionDetailPage() {
                     py={4}
                     justify="space-between"
                     style={{
-                      background: "#161b22",
-                      borderBottom: "1px solid #30363d",
+                      background: '#161b22',
+                      borderBottom: '1px solid #30363d',
                     }}
                   >
                     <Group gap="xs">
@@ -2914,17 +2529,16 @@ function ConnectionDetailPage() {
                     viewportRef={logViewportRef}
                     onScrollPositionChange={({ y }) => {
                       if (logViewportRef.current) {
-                        const { scrollHeight, clientHeight } =
-                          logViewportRef.current;
-                        setAutoScroll(y + clientHeight >= scrollHeight - 20);
+                        const { scrollHeight, clientHeight } = logViewportRef.current
+                        setAutoScroll(y + clientHeight >= scrollHeight - 20)
                       }
                     }}
                   >
                     <Box
                       p="xs"
                       style={{
-                        background: "#0d1117",
-                        fontFamily: "monospace",
+                        background: '#0d1117',
+                        fontFamily: 'monospace',
                         fontSize: 12,
                         lineHeight: 1.6,
                         minHeight: 120,
@@ -2939,9 +2553,9 @@ function ConnectionDetailPage() {
                           <Box
                             key={i}
                             style={{
-                              display: "flex",
+                              display: 'flex',
                               gap: 8,
-                              alignItems: "flex-start",
+                              alignItems: 'flex-start',
                             }}
                           >
                             {line.timestamp && (
@@ -2950,21 +2564,18 @@ function ConnectionDetailPage() {
                                 fz={10}
                                 ff="monospace"
                                 style={{
-                                  color: "#8b949e",
+                                  color: '#8b949e',
                                   flexShrink: 0,
-                                  userSelect: "none",
+                                  userSelect: 'none',
                                   paddingTop: 1,
                                 }}
                               >
-                                {new Date(line.timestamp).toLocaleTimeString(
-                                  "id-ID",
-                                  {
-                                    hour12: false,
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    second: "2-digit",
-                                  },
-                                )}
+                                {new Date(line.timestamp).toLocaleTimeString('id-ID', {
+                                  hour12: false,
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                })}
                               </Text>
                             )}
                             <Text
@@ -2972,28 +2583,22 @@ function ConnectionDetailPage() {
                               fz={9}
                               ff="monospace"
                               style={{
-                                color:
-                                  line.stream === "stderr"
-                                    ? "#ff7b72"
-                                    : "#7ee787",
+                                color: line.stream === 'stderr' ? '#ff7b72' : '#7ee787',
                                 flexShrink: 0,
                                 paddingTop: 2,
-                                userSelect: "none",
+                                userSelect: 'none',
                               }}
                             >
-                              {line.stream === "stderr" ? "ERR" : "OUT"}
+                              {line.stream === 'stderr' ? 'ERR' : 'OUT'}
                             </Text>
                             <Text
                               span
                               fz={12}
                               ff="monospace"
                               style={{
-                                color:
-                                  line.stream === "stderr"
-                                    ? "#ff7b72"
-                                    : "#e6edf3",
-                                wordBreak: "break-all",
-                                whiteSpace: "pre-wrap",
+                                color: line.stream === 'stderr' ? '#ff7b72' : '#e6edf3',
+                                wordBreak: 'break-all',
+                                whiteSpace: 'pre-wrap',
                               }}
                             >
                               {line.message}
@@ -3013,9 +2618,9 @@ function ConnectionDetailPage() {
       <Drawer
         opened={execOpen}
         onClose={() => {
-          closeExec();
-          setExecCommand("");
-          execHistoryIdxRef.current = -1;
+          closeExec()
+          setExecCommand('')
+          execHistoryIdxRef.current = -1
         }}
         position="right"
         size="xl"
@@ -3037,32 +2642,25 @@ function ConnectionDetailPage() {
         styles={{
           body: {
             padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            height: "calc(100vh - 60px)",
-            overflow: "hidden",
+            display: 'flex',
+            flexDirection: 'column',
+            height: 'calc(100vh - 60px)',
+            overflow: 'hidden',
           },
         }}
       >
         {/* ── Quick commands ──────────────────────────────── */}
         <Box
           style={{
-            background: "var(--mantine-color-default-hover)",
-            borderBottom: "1px solid var(--mantine-color-default-border)",
+            background: 'var(--mantine-color-default-hover)',
+            borderBottom: '1px solid var(--mantine-color-default-border)',
             flexShrink: 0,
           }}
         >
           <Box px="sm" pt="sm" pb="sm">
-            <Group
-              gap="xs"
-              justify="space-between"
-              mb={execQuickCommands.length > 0 || execShowQuickAdd ? "xs" : 0}
-            >
+            <Group gap="xs" justify="space-between" mb={execQuickCommands.length > 0 || execShowQuickAdd ? 'xs' : 0}>
               <Group gap={6} align="center">
-                <TbBookmark
-                  size={12}
-                  style={{ color: "var(--mantine-color-teal-6)" }}
-                />
+                <TbBookmark size={12} style={{ color: 'var(--mantine-color-teal-6)' }} />
                 <Text size="xs" fw={600}>
                   Quick Commands
                 </Text>
@@ -3078,32 +2676,26 @@ function ConnectionDetailPage() {
                       variant="subtle"
                       color="red"
                       onClick={() => {
-                        setExecHistory([]);
-                        execHistoryIdxRef.current = -1;
+                        setExecHistory([])
+                        execHistoryIdxRef.current = -1
                       }}
                     >
                       <TbEraser size={12} />
                     </ActionIcon>
                   </Tooltip>
                 )}
-                <Tooltip
-                  label={execShowQuickAdd ? "Batal" : "Tambah quick command"}
-                >
+                <Tooltip label={execShowQuickAdd ? 'Batal' : 'Tambah quick command'}>
                   <ActionIcon
                     size="xs"
-                    variant={execShowQuickAdd ? "light" : "subtle"}
-                    color={execShowQuickAdd ? "red" : "teal"}
+                    variant={execShowQuickAdd ? 'light' : 'subtle'}
+                    color={execShowQuickAdd ? 'red' : 'teal'}
                     onClick={() => {
-                      setExecShowQuickAdd((v) => !v);
-                      setExecNewQuickLabel("");
-                      setExecNewQuickCommand("");
+                      setExecShowQuickAdd((v) => !v)
+                      setExecNewQuickLabel('')
+                      setExecNewQuickCommand('')
                     }}
                   >
-                    {execShowQuickAdd ? (
-                      <TbX size={12} />
-                    ) : (
-                      <TbPlus size={12} />
-                    )}
+                    {execShowQuickAdd ? <TbX size={12} /> : <TbPlus size={12} />}
                   </ActionIcon>
                 </Tooltip>
               </Group>
@@ -3114,9 +2706,9 @@ function ConnectionDetailPage() {
                 p="xs"
                 mb="xs"
                 style={{
-                  borderRadius: "var(--mantine-radius-sm)",
-                  border: "1px solid var(--mantine-color-default-border)",
-                  background: "var(--mantine-color-body)",
+                  borderRadius: 'var(--mantine-radius-sm)',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  background: 'var(--mantine-color-body)',
                 }}
               >
                 <Group gap="xs" align="flex-end">
@@ -3136,11 +2728,7 @@ function ConnectionDetailPage() {
                     onChange={(e) => setExecNewQuickCommand(e.target.value)}
                     style={{ flex: 1 }}
                     onKeyDown={(e) => {
-                      if (
-                        e.key === "Enter" &&
-                        execNewQuickLabel.trim() &&
-                        execNewQuickCommand.trim()
-                      ) {
+                      if (e.key === 'Enter' && execNewQuickLabel.trim() && execNewQuickCommand.trim()) {
                         setExecQuickCommands((prev) => [
                           ...prev,
                           {
@@ -3148,10 +2736,10 @@ function ConnectionDetailPage() {
                             label: execNewQuickLabel.trim(),
                             command: execNewQuickCommand.trim(),
                           },
-                        ]);
-                        setExecNewQuickLabel("");
-                        setExecNewQuickCommand("");
-                        setExecShowQuickAdd(false);
+                        ])
+                        setExecNewQuickLabel('')
+                        setExecNewQuickCommand('')
+                        setExecShowQuickAdd(false)
                       }
                     }}
                   />
@@ -3160,9 +2748,7 @@ function ConnectionDetailPage() {
                     variant="filled"
                     color="teal"
                     mb={1}
-                    disabled={
-                      !execNewQuickLabel.trim() || !execNewQuickCommand.trim()
-                    }
+                    disabled={!execNewQuickLabel.trim() || !execNewQuickCommand.trim()}
                     onClick={() => {
                       setExecQuickCommands((prev) => [
                         ...prev,
@@ -3171,10 +2757,10 @@ function ConnectionDetailPage() {
                           label: execNewQuickLabel.trim(),
                           command: execNewQuickCommand.trim(),
                         },
-                      ]);
-                      setExecNewQuickLabel("");
-                      setExecNewQuickCommand("");
-                      setExecShowQuickAdd(false);
+                      ])
+                      setExecNewQuickLabel('')
+                      setExecNewQuickCommand('')
+                      setExecShowQuickAdd(false)
                     }}
                   >
                     <TbCheck size={12} />
@@ -3201,22 +2787,22 @@ function ConnectionDetailPage() {
                       <Box
                         component="button"
                         onClick={() => {
-                          setExecCommand(qc.command);
-                          execHistoryIdxRef.current = -1;
+                          setExecCommand(qc.command)
+                          execHistoryIdxRef.current = -1
                         }}
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
+                          display: 'inline-flex',
+                          alignItems: 'center',
                           gap: 4,
-                          background: "var(--mantine-color-teal-light)",
-                          color: "var(--mantine-color-teal-text)",
-                          border: "none",
-                          borderRadius: "4px 0 0 4px",
-                          padding: "2px 7px",
+                          background: 'var(--mantine-color-teal-light)',
+                          color: 'var(--mantine-color-teal-text)',
+                          border: 'none',
+                          borderRadius: '4px 0 0 4px',
+                          padding: '2px 7px',
                           fontSize: 11,
                           fontWeight: 600,
-                          cursor: "pointer",
-                          userSelect: "none",
+                          cursor: 'pointer',
+                          userSelect: 'none',
                           lineHeight: 1.6,
                         }}
                       >
@@ -3225,27 +2811,22 @@ function ConnectionDetailPage() {
                       </Box>
                       <Box
                         component="button"
-                        onClick={() =>
-                          setExecQuickCommands((prev) =>
-                            prev.filter((x) => x.id !== qc.id),
-                          )
-                        }
+                        onClick={() => setExecQuickCommands((prev) => prev.filter((x) => x.id !== qc.id))}
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                           width: 18,
-                          background: "var(--mantine-color-teal-light)",
-                          border: "none",
-                          borderLeft:
-                            "1px solid var(--mantine-color-teal-light-hover)",
-                          borderRadius: "0 4px 4px 0",
-                          cursor: "pointer",
-                          color: "var(--mantine-color-teal-text)",
+                          background: 'var(--mantine-color-teal-light)',
+                          border: 'none',
+                          borderLeft: '1px solid var(--mantine-color-teal-light-hover)',
+                          borderRadius: '0 4px 4px 0',
+                          cursor: 'pointer',
+                          color: 'var(--mantine-color-teal-text)',
                           fontSize: 13,
                           lineHeight: 1,
                           padding: 0,
-                          alignSelf: "stretch",
+                          alignSelf: 'stretch',
                         }}
                       >
                         ×
@@ -3259,62 +2840,56 @@ function ConnectionDetailPage() {
         </Box>
 
         {/* ── Terminal output ─────────────────────────────── */}
-        <Box
-          ref={execOutputRef}
-          style={{ flex: 1, overflowY: "auto", background: "#0d1117" }}
-        >
+        <Box ref={execOutputRef} style={{ flex: 1, overflowY: 'auto', background: '#0d1117' }}>
           {execHistory.length === 0 && !execMutation.isPending ? (
             <Box p="md">
-              <Text fz={12} ff="monospace" style={{ color: "#8b949e" }}>
-                Connected to{" "}
-                <Text span ff="monospace" style={{ color: "#79c0ff" }}>
+              <Text fz={12} ff="monospace" style={{ color: '#8b949e' }}>
+                Connected to{' '}
+                <Text span ff="monospace" style={{ color: '#79c0ff' }}>
                   {execContainer?.containerName}
                 </Text>
-                <Text span ff="monospace" style={{ color: "#8b949e" }}>
-                  {" "}
+                <Text span ff="monospace" style={{ color: '#8b949e' }}>
+                  {' '}
                   ({execContainer?.stackName})
                 </Text>
               </Text>
-              <Text fz={11} ff="monospace" mt={6} style={{ color: "#636e7b" }}>
-                Ketik command lalu tekan{" "}
+              <Text fz={11} ff="monospace" mt={6} style={{ color: '#636e7b' }}>
+                Ketik command lalu tekan{' '}
                 <Text
                   span
                   style={{
-                    color: "#e6edf3",
-                    background: "#21262d",
-                    padding: "1px 5px",
+                    color: '#e6edf3',
+                    background: '#21262d',
+                    padding: '1px 5px',
                     borderRadius: 3,
                   }}
                 >
                   Enter
-                </Text>{" "}
-                untuk eksekusi. Gunakan{" "}
+                </Text>{' '}
+                untuk eksekusi. Gunakan{' '}
                 <Text
                   span
                   style={{
-                    color: "#e6edf3",
-                    background: "#21262d",
-                    padding: "1px 5px",
+                    color: '#e6edf3',
+                    background: '#21262d',
+                    padding: '1px 5px',
                     borderRadius: 3,
                   }}
                 >
                   ↑↓
-                </Text>{" "}
+                </Text>{' '}
                 untuk navigasi riwayat.
               </Text>
             </Box>
           ) : (
-            <Box
-              p="sm"
-              style={{ display: "flex", flexDirection: "column", gap: 8 }}
-            >
+            <Box p="sm" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[...[...execHistory].reverse().entries()].map(([i, entry]) => (
                 <Box
                   key={i}
                   style={{
                     borderRadius: 6,
-                    border: "1px solid #21262d",
-                    overflow: "hidden",
+                    border: '1px solid #21262d',
+                    overflow: 'hidden',
                   }}
                 >
                   {/* Command bar */}
@@ -3325,53 +2900,31 @@ function ConnectionDetailPage() {
                     wrap="nowrap"
                     justify="space-between"
                     style={{
-                      background: "#161b22",
+                      background: '#161b22',
                       borderBottom:
-                        entry.stdout.length > 0 || entry.stderr.length > 0
-                          ? "1px solid #21262d"
-                          : undefined,
+                        entry.stdout.length > 0 || entry.stderr.length > 0 ? '1px solid #21262d' : undefined,
                     }}
                   >
-                    <Group
-                      gap={6}
-                      wrap="nowrap"
-                      style={{ flex: 1, minWidth: 0 }}
-                    >
-                      <Text
-                        span
-                        fz={12}
-                        ff="monospace"
-                        style={{ color: "#3fb950", flexShrink: 0 }}
-                      >
+                    <Group gap={6} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+                      <Text span fz={12} ff="monospace" style={{ color: '#3fb950', flexShrink: 0 }}>
                         ❯
                       </Text>
-                      <Text
-                        span
-                        fz={12}
-                        ff="monospace"
-                        style={{ color: "#79c0ff", wordBreak: "break-all" }}
-                      >
+                      <Text span fz={12} ff="monospace" style={{ color: '#79c0ff', wordBreak: 'break-all' }}>
                         {entry.command}
                       </Text>
                     </Group>
                     <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
-                      <Text fz={10} style={{ color: "#636e7b" }}>
-                        {new Date(entry.timestamp).toLocaleTimeString("id-ID", {
+                      <Text fz={10} style={{ color: '#636e7b' }}>
+                        {new Date(entry.timestamp).toLocaleTimeString('id-ID', {
                           hour12: false,
                         })}
                       </Text>
                       <Badge
                         size="xs"
                         variant="dot"
-                        color={
-                          entry.exitCode === 0
-                            ? "teal"
-                            : entry.exitCode === null
-                              ? "gray"
-                              : "red"
-                        }
+                        color={entry.exitCode === 0 ? 'teal' : entry.exitCode === null ? 'gray' : 'red'}
                       >
-                        {entry.exitCode === null ? "?" : entry.exitCode}
+                        {entry.exitCode === null ? '?' : entry.exitCode}
                       </Badge>
                       <Tooltip label="Copy output" openDelay={400}>
                         <ActionIcon
@@ -3379,11 +2932,8 @@ function ConnectionDetailPage() {
                           variant="subtle"
                           color="gray"
                           onClick={() => {
-                            const text = [
-                              ...entry.stdout,
-                              ...entry.stderr,
-                            ].join("\n");
-                            navigator.clipboard.writeText(text).catch(() => {});
+                            const text = [...entry.stdout, ...entry.stderr].join('\n')
+                            navigator.clipboard.writeText(text).catch(() => {})
                           }}
                         >
                           <TbClipboard size={11} />
@@ -3394,11 +2944,7 @@ function ConnectionDetailPage() {
                   {/* Output lines */}
                   {entry.stdout.length === 0 && entry.stderr.length === 0 ? (
                     <Box px="sm" py={6}>
-                      <Text
-                        fz={11}
-                        ff="monospace"
-                        style={{ color: "#636e7b", fontStyle: "italic" }}
-                      >
+                      <Text fz={11} ff="monospace" style={{ color: '#636e7b', fontStyle: 'italic' }}>
                         (no output)
                       </Text>
                     </Box>
@@ -3410,9 +2956,9 @@ function ConnectionDetailPage() {
                           fz={11}
                           ff="monospace"
                           style={{
-                            color: "#e6edf3",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-all",
+                            color: '#e6edf3',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-all',
                             lineHeight: 1.6,
                           }}
                         >
@@ -3425,9 +2971,9 @@ function ConnectionDetailPage() {
                           fz={11}
                           ff="monospace"
                           style={{
-                            color: "#ff7b72",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-all",
+                            color: '#ff7b72',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-all',
                             lineHeight: 1.6,
                           }}
                         >
@@ -3447,19 +2993,19 @@ function ConnectionDetailPage() {
                 px="sm"
                 py={8}
                 style={{
-                  background: "#161b22",
+                  background: '#161b22',
                   borderRadius: 6,
-                  border: "1px solid #21262d",
+                  border: '1px solid #21262d',
                 }}
               >
                 <Loader size="xs" color="teal" />
-                <Text fz={11} ff="monospace" style={{ color: "#636e7b" }}>
-                  running{" "}
-                  <Text span ff="monospace" style={{ color: "#79c0ff" }}>
+                <Text fz={11} ff="monospace" style={{ color: '#636e7b' }}>
+                  running{' '}
+                  <Text span ff="monospace" style={{ color: '#79c0ff' }}>
                     {execCommand}
                   </Text>
-                  <Text span style={{ color: "#636e7b" }}>
-                    {" "}
+                  <Text span style={{ color: '#636e7b' }}>
+                    {' '}
                     ...
                   </Text>
                 </Text>
@@ -3471,70 +3017,55 @@ function ConnectionDetailPage() {
         {/* ── Command input ───────────────────────────────── */}
         <Box
           style={{
-            borderTop: "1px solid #21262d",
-            background: "#010409",
+            borderTop: '1px solid #21262d',
+            background: '#010409',
             flexShrink: 0,
-            padding: "10px 12px 8px",
+            padding: '10px 12px 8px',
           }}
         >
           <Group gap="xs" wrap="nowrap" align="center">
-            <Text
-              fz={14}
-              ff="monospace"
-              style={{ color: "#3fb950", flexShrink: 0, userSelect: "none" }}
-            >
+            <Text fz={14} ff="monospace" style={{ color: '#3fb950', flexShrink: 0, userSelect: 'none' }}>
               ❯
             </Text>
             <TextInput
               style={{ flex: 1 }}
               size="sm"
-              placeholder={execMutation.isPending ? "waiting..." : "command..."}
+              placeholder={execMutation.isPending ? 'waiting...' : 'command...'}
               value={execCommand}
               onChange={(e) => {
-                execHistoryIdxRef.current = -1;
-                setExecCommand(e.target.value);
+                execHistoryIdxRef.current = -1
+                setExecCommand(e.target.value)
               }}
               onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  execCommand.trim() &&
-                  !execMutation.isPending &&
-                  execContainer
-                ) {
+                if (e.key === 'Enter' && execCommand.trim() && !execMutation.isPending && execContainer) {
                   execMutation.mutate({
                     containerId: execContainer.containerId,
                     endpointId: execContainer.endpointId,
                     command: execCommand.trim(),
-                  });
-                  return;
+                  })
+                  return
                 }
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  const newIdx = Math.min(
-                    execHistoryIdxRef.current + 1,
-                    execHistory.length - 1,
-                  );
-                  execHistoryIdxRef.current = newIdx;
-                  if (execHistory[newIdx])
-                    setExecCommand(execHistory[newIdx].command);
-                  return;
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  const newIdx = Math.min(execHistoryIdxRef.current + 1, execHistory.length - 1)
+                  execHistoryIdxRef.current = newIdx
+                  if (execHistory[newIdx]) setExecCommand(execHistory[newIdx].command)
+                  return
                 }
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  const newIdx = Math.max(execHistoryIdxRef.current - 1, -1);
-                  execHistoryIdxRef.current = newIdx;
-                  setExecCommand(
-                    newIdx === -1 ? "" : (execHistory[newIdx]?.command ?? ""),
-                  );
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  const newIdx = Math.max(execHistoryIdxRef.current - 1, -1)
+                  execHistoryIdxRef.current = newIdx
+                  setExecCommand(newIdx === -1 ? '' : (execHistory[newIdx]?.command ?? ''))
                 }
               }}
               styles={{
                 input: {
-                  fontFamily: "monospace",
+                  fontFamily: 'monospace',
                   fontSize: 13,
-                  background: "#0d1117",
-                  border: "1px solid #30363d",
-                  color: "#e6edf3",
+                  background: '#0d1117',
+                  border: '1px solid #30363d',
+                  color: '#e6edf3',
                 },
               }}
               disabled={execMutation.isPending}
@@ -3545,9 +3076,7 @@ function ConnectionDetailPage() {
               variant="filled"
               color="teal"
               loading={execMutation.isPending}
-              disabled={
-                !execCommand.trim() || execMutation.isPending || !execContainer
-              }
+              disabled={!execCommand.trim() || execMutation.isPending || !execContainer}
               onClick={() =>
                 execContainer &&
                 execMutation.mutate({
@@ -3561,11 +3090,11 @@ function ConnectionDetailPage() {
             </ActionIcon>
           </Group>
           <Group mt={5} justify="space-between">
-            <Text fz={10} style={{ color: "#636e7b" }}>
+            <Text fz={10} style={{ color: '#636e7b' }}>
               ↑↓ history · Enter jalankan · Esc tutup
             </Text>
             {execHistory.length > 0 && (
-              <Text fz={10} style={{ color: "#636e7b" }}>
+              <Text fz={10} style={{ color: '#636e7b' }}>
                 {execHistory.length} command dijalankan
               </Text>
             )}
@@ -3573,5 +3102,5 @@ function ConnectionDetailPage() {
         </Box>
       </Drawer>
     </Box>
-  );
+  )
 }

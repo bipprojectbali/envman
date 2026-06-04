@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia'
 import { getProjectAccess } from '../../lib/access'
+import { getSettingBool, getSettingNumber } from '../../lib/app-settings'
 import { audit } from '../../lib/audit'
 import { requireEnvAuth } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
@@ -41,16 +42,33 @@ export const tokensRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    if (!hasCapability(caller, 'token:create')) {
-      set.status = 403
-      return { error: 'Tidak punya izin create API token. Hubungi SUPER_ADMIN.' }
+    const isSuperAdminOrGranted = hasCapability(caller, 'token:create')
+    if (!isSuperAdminOrGranted) {
+      if (caller.role === 'QC') {
+        set.status = 403
+        return { error: 'QC tidak dapat membuat token.' }
+      }
+      const allowed = await getSettingBool('user_token_creation', true)
+      if (!allowed) {
+        set.status = 403
+        return { error: 'Pembuatan token dinonaktifkan oleh administrator.' }
+      }
     }
     const body = await request.json().catch(() => null)
     if (!body?.name) {
       set.status = 400
       return { error: 'name required' }
     }
-    const { name, scopes = [], tags, canWrite = false, expiresAt } = body
+    const { name, scopes = [], tags, canWrite = false } = body
+    let expiresAt = body.expiresAt ?? null
+    // Enforce max lifetime untuk user yang bukan SUPER_ADMIN/granted
+    if (!isSuperAdminOrGranted) {
+      const maxDays = await getSettingNumber('user_token_max_days', 0)
+      if (maxDays > 0) {
+        const maxExpiry = new Date(Date.now() + maxDays * 86_400_000)
+        if (!expiresAt || new Date(expiresAt) > maxExpiry) expiresAt = maxExpiry.toISOString()
+      }
+    }
     // Validate each scope — user must have access to every project in scopes
     for (const scope of scopes as string[]) {
       const projectSlug = scope.split(':')[0]

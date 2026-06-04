@@ -16,10 +16,21 @@ function audit(userId: string | null, action: string, detail: string | null, ip:
   prisma.auditLog.create({ data: { userId, action, detail, ip } }).catch(() => {})
 }
 
+// Trusted origins = baseURL origin + optional extras dari env
+const trustedOrigins: string[] = [env.BETTER_AUTH_URL]
+if (env.BETTER_AUTH_TRUSTED_ORIGINS) {
+  trustedOrigins.push(
+    ...env.BETTER_AUTH_TRUSTED_ORIGINS.split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
+  )
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
+  trustedOrigins,
 
   advanced: {
     // Set nama cookie session secara eksplisit jadi "session" (kompatibel dengan existing frontend)

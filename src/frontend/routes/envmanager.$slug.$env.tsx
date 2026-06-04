@@ -26,17 +26,12 @@ import {
   TextInput,
   ThemeIcon,
   Tooltip,
-} from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
-import { modals } from "@mantine/modals";
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+} from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
+import { modals } from '@mantine/modals'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
 import {
   TbAlertTriangle,
   TbBrandDocker,
@@ -68,73 +63,74 @@ import {
   TbTrash,
   TbVariable,
   TbX,
-} from "react-icons/tb";
-import { CodeEditor } from "@/frontend/components/CodeEditor";
-import { CompareModal } from "@/frontend/components/env/CompareModal";
-import { PortainerSync } from "@/frontend/components/PortainerSync";
-import { PortainerSetupInline } from "@/frontend/components/portainer/PortainerSetupInline";
-import { useExtensions } from "@/frontend/hooks/useExtensions";
-import { apiFetch } from "@/frontend/lib/api";
-import { notifyErr, notifyOk } from "@/frontend/lib/notify";
+} from 'react-icons/tb'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
+import { CompareModal } from '@/frontend/components/env/CompareModal'
+import { PortainerSync } from '@/frontend/components/PortainerSync'
+import { PortainerSetupInline } from '@/frontend/components/portainer/PortainerSetupInline'
+import { useExtensions } from '@/frontend/hooks/useExtensions'
+import { apiFetch } from '@/frontend/lib/api'
+import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 
 interface EnvSearch {
-  compare?: boolean;
-  integrations?: boolean;
-  portainerSetup?: 'new' | 'edit';
-  editEnv?: boolean;
-  bulk?: boolean;
-  addVar?: boolean;
+  compare?: boolean
+  integrations?: boolean
+  portainerSetup?: 'new' | 'edit'
+  editEnv?: boolean
+  bulk?: boolean
+  addVar?: boolean
 }
 
-const truthy = (v: unknown) => v === true || v === "true" || v === "1";
+const truthy = (v: unknown) => v === true || v === 'true' || v === '1'
 
-export const Route = createFileRoute("/envmanager/$slug/$env")({
+export const Route = createFileRoute('/envmanager/$slug/$env')({
   component: VarsPage,
   validateSearch: (search: Record<string, unknown>): EnvSearch => ({
     compare: truthy(search.compare) ? true : undefined,
     integrations: truthy(search.integrations) ? true : undefined,
-    portainerSetup: search.portainerSetup === 'new' || search.portainerSetup === 'edit'
-      ? (search.portainerSetup as 'new' | 'edit')
-      : undefined,
+    portainerSetup:
+      search.portainerSetup === 'new' || search.portainerSetup === 'edit'
+        ? (search.portainerSetup as 'new' | 'edit')
+        : undefined,
     editEnv: truthy(search.editEnv) ? true : undefined,
     bulk: truthy(search.bulk) ? true : undefined,
     addVar: truthy(search.addVar) ? true : undefined,
   }),
-});
+})
 
 interface EnvVar {
-  id: string;
-  key: string;
-  value: string;
-  isSecret: boolean;
-  isDisabled: boolean;
-  updatedAt: string;
+  id: string
+  key: string
+  value: string
+  isSecret: boolean
+  isDisabled: boolean
+  updatedAt: string
 }
 
-type FilterType = "all" | "plain" | "secret";
+type FilterType = 'all' | 'plain' | 'secret'
 
 function relTime(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  const h = Math.floor(diff / 3600000);
-  const d = Math.floor(diff / 86400000);
-  if (m < 1) return "baru saja";
-  if (m < 60) return `${m}m`;
-  if (h < 24) return `${h}j`;
-  if (d < 30) return `${d}h`;
-  return new Date(iso).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-  });
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  const h = Math.floor(diff / 3600000)
+  const d = Math.floor(diff / 86400000)
+  if (m < 1) return 'baru saja'
+  if (m < 60) return `${m}m`
+  if (h < 24) return `${h}j`
+  if (d < 30) return `${d}h`
+  return new Date(iso).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+  })
 }
 
 function VarsPage() {
-  const { slug, env } = Route.useParams();
-  const navigate = useNavigate();
-  const qc = useQueryClient();
-  const isMobile = useMediaQuery("(max-width: 48em)");
-  const { data: extensions } = useExtensions();
-  const portainerEnabled = extensions?.portainer ?? true;
+  const { slug, env } = Route.useParams()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const isMobile = useMediaQuery('(max-width: 48em)')
+  const { data: extensions } = useExtensions()
+  const portainerEnabled = extensions?.portainer ?? true
 
   // Compare modal — state disinkron dengan ?compare=1 di URL agar reload tidak menutup modal
   const {
@@ -144,373 +140,322 @@ function VarsPage() {
     editEnv: editEnvSearch,
     bulk: bulkSearch,
     addVar: addVarSearch,
-  } = Route.useSearch();
-  const compareOpen = compareSearch === true;
+  } = Route.useSearch()
+  const compareOpen = compareSearch === true
   const openCompare = () =>
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, compare: true }),
       replace: true,
-    });
+    })
   const closeCompare = () =>
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, compare: undefined }),
       replace: true,
-    });
+    })
 
   // Portainer setup inline — route-based navigation
-  const portainerSetupMode = portainerSetupSearch ?? null;
+  const portainerSetupMode = portainerSetupSearch ?? null
   const openPortainerSetup = (mode: 'new' | 'edit') =>
     navigate({
       to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, integrations: true, portainerSetup: mode }),
       replace: true,
-    });
+    })
   const closePortainerSetup = () =>
     navigate({
       to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, portainerSetup: undefined }),
       replace: true,
-    });
+    })
 
   // Integrations drawer — juga via query agar reload tidak menutup
-  const integrationsOpen = integrationsSearch === true;
+  const integrationsOpen = integrationsSearch === true
   const openIntegrations = () =>
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, integrations: true }),
       replace: true,
-    });
+    })
   const closeIntegrations = () =>
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, integrations: undefined }),
       replace: true,
-    });
+    })
 
   // Edit .env modal — via query agar reload tidak menutup
-  const editEnvOpen = editEnvSearch === true;
+  const editEnvOpen = editEnvSearch === true
   const openEditEnv = () =>
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, editEnv: true }),
       replace: true,
-    });
+    })
   const closeEditEnv = () =>
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, editEnv: undefined }),
       replace: true,
-    });
+    })
 
   // Paste .env modal — via query agar reload tidak menutup
-  const bulkOpen = bulkSearch === true;
+  const bulkOpen = bulkSearch === true
   const openBulk = () =>
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, bulk: true }),
       replace: true,
-    });
+    })
   const closeBulk = () =>
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, bulk: undefined }),
       replace: true,
-    });
+    })
 
   // form state
-  const [form, setForm] = useState({ key: "", value: "", isSecret: false });
-  const [bulkText, setBulkText] = useState("");
-  const [bulkAllSecret, setBulkAllSecret] = useState(false);
-  const [editEnvText, setEditEnvText] = useState("");
+  const [form, setForm] = useState({ key: '', value: '', isSecret: false })
+  const [bulkText, setBulkText] = useState('')
+  const [bulkAllSecret, setBulkAllSecret] = useState(false)
+  const [editEnvText, setEditEnvText] = useState('')
 
   // Tambah Var inline page — via query
-  const addVarOpen = addVarSearch === true;
+  const addVarOpen = addVarSearch === true
   const openAdd = () =>
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, addVar: true }),
       replace: true,
-    });
+    })
   const closeAdd = () => {
-    setForm({ key: "", value: "", isSecret: false });
+    setForm({ key: '', value: '', isSecret: false })
     navigate({
-      to: ".",
+      to: '.',
       params: { slug, env },
       search: (prev) => ({ ...prev, addVar: undefined }),
       replace: true,
-    });
-  };
+    })
+  }
 
   // table state
-  const [revealed, setRevealed] = useState<Set<string>>(new Set());
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ value: "", isSecret: false });
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<FilterType>("all");
-  const [filterDisabled, setFilterDisabled] = useState<
-    "all" | "active" | "disabled"
-  >("all");
-  const [sort, setSort] = useState<
-    "key-asc" | "key-desc" | "newest" | "oldest"
-  >("key-asc");
-  const [varsPage, setVarsPage] = useState(1);
-  const VARS_LIMIT = 50;
-  const [copiedAll, setCopiedAll] = useState(false);
-  const [copiedSelected, setCopiedSelected] = useState(false);
+  const [revealed, setRevealed] = useState<Set<string>>(new Set())
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ value: '', isSecret: false })
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
+  const [filterType, setFilterType] = useState<FilterType>('all')
+  const [filterDisabled, setFilterDisabled] = useState<'all' | 'active' | 'disabled'>('all')
+  const [sort, setSort] = useState<'key-asc' | 'key-desc' | 'newest' | 'oldest'>('key-asc')
+  const [varsPage, setVarsPage] = useState(1)
+  const VARS_LIMIT = 50
+  const [copiedAll, setCopiedAll] = useState(false)
+  const [copiedSelected, setCopiedSelected] = useState(false)
 
   // queries
   const { data: projectData } = useQuery({
-    queryKey: ["envman", "project", slug],
+    queryKey: ['envman', 'project', slug],
     queryFn: () => apiFetch(`/api/envman/projects/${slug}`),
-  });
+  })
   const { data: statusData } = useQuery({
-    queryKey: ["envman", "status"],
-    queryFn: () => apiFetch("/api/envman/status"),
+    queryKey: ['envman', 'status'],
+    queryFn: () => apiFetch('/api/envman/status'),
     staleTime: 60000,
-  });
+  })
   useEffect(() => {
-    setVarsPage(1);
-  }, []);
+    setVarsPage(1)
+  }, [])
 
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ["envman", "vars", slug, env, varsPage, search],
+    queryKey: ['envman', 'vars', slug, env, varsPage, search],
     queryFn: () =>
       apiFetch(
-        `/api/envman/projects/${slug}/environments/${env}/vars?limit=${VARS_LIMIT}&offset=${(varsPage - 1) * VARS_LIMIT}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+        `/api/envman/projects/${slug}/environments/${env}/vars?limit=${VARS_LIMIT}&offset=${(varsPage - 1) * VARS_LIMIT}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
       ),
     refetchInterval: 15000,
     placeholderData: keepPreviousData,
-  });
+  })
 
   const { data: portainerData } = useQuery({
-    queryKey: ["portainer", slug, env],
-    queryFn: () =>
-      apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`),
+    queryKey: ['portainer', slug, env],
+    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`),
     staleTime: 30000,
-  });
+  })
 
   const { data: historyData } = useQuery({
-    queryKey: ["portainer", "history", slug, env],
-    queryFn: () =>
-      apiFetch(
-        `/api/envman/projects/${slug}/environments/${env}/portainer/history`,
-      ),
+    queryKey: ['portainer', 'history', slug, env],
+    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/history`),
     enabled: integrationsOpen && !!portainerData?.config,
     staleTime: 30000,
-  });
+  })
 
-  const myRole: string = projectData?.project?.myRole ?? "VIEWER";
-  const canEdit = myRole === "OWNER" || myRole === "EDITOR";
-  const encryptionEnabled: boolean = statusData?.encryptionEnabled ?? false;
-  const vars: EnvVar[] = data?.vars ?? [];
-  const varsTotal: number = data?.total ?? vars.length;
-  const varsTotalPages = Math.ceil(varsTotal / VARS_LIMIT);
+  const myRole: string = projectData?.project?.myRole ?? 'VIEWER'
+  const canEdit = myRole === 'OWNER' || myRole === 'EDITOR'
+  const encryptionEnabled: boolean = statusData?.encryptionEnabled ?? false
+  const vars: EnvVar[] = data?.vars ?? []
+  const varsTotal: number = data?.total ?? vars.length
+  const varsTotalPages = Math.ceil(varsTotal / VARS_LIMIT)
 
   const filteredVars = useMemo(() => {
-    let list = [...vars];
+    let list = [...vars]
     // search sudah di-handle server — hanya filter client-side yang tersisa
-    if (filterType === "plain") list = list.filter((v) => !v.isSecret);
-    if (filterType === "secret") list = list.filter((v) => v.isSecret);
-    if (filterDisabled === "active") list = list.filter((v) => !v.isDisabled);
-    if (filterDisabled === "disabled") list = list.filter((v) => v.isDisabled);
-    if (sort === "key-asc") list.sort((a, b) => a.key.localeCompare(b.key));
-    if (sort === "key-desc") list.sort((a, b) => b.key.localeCompare(a.key));
-    if (sort === "newest")
-      list.sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-      );
-    if (sort === "oldest")
-      list.sort(
-        (a, b) =>
-          new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
-      );
-    return list;
-  }, [vars, filterType, filterDisabled, sort]);
+    if (filterType === 'plain') list = list.filter((v) => !v.isSecret)
+    if (filterType === 'secret') list = list.filter((v) => v.isSecret)
+    if (filterDisabled === 'active') list = list.filter((v) => !v.isDisabled)
+    if (filterDisabled === 'disabled') list = list.filter((v) => v.isDisabled)
+    if (sort === 'key-asc') list.sort((a, b) => a.key.localeCompare(b.key))
+    if (sort === 'key-desc') list.sort((a, b) => b.key.localeCompare(a.key))
+    if (sort === 'newest') list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    if (sort === 'oldest') list.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())
+    return list
+  }, [vars, filterType, filterDisabled, sort])
 
-  const plainCount = vars.filter((v) => !v.isSecret).length;
-  const secretCount = vars.filter((v) => v.isSecret).length;
-  const disabledCount = vars.filter((v) => v.isDisabled).length;
-  const activeCount = vars.filter((v) => !v.isDisabled).length;
+  const plainCount = vars.filter((v) => !v.isSecret).length
+  const secretCount = vars.filter((v) => v.isSecret).length
+  const disabledCount = vars.filter((v) => v.isDisabled).length
+  const activeCount = vars.filter((v) => !v.isDisabled).length
 
   const toEnvLine = (v: EnvVar) => {
-    const val = v.value === "***" ? "***" : v.value;
-    const needsQuotes =
-      val.includes(" ") ||
-      val.includes("#") ||
-      val.includes('"') ||
-      val.includes("'");
-    return needsQuotes
-      ? `${v.key}="${val.replace(/"/g, '\\"')}"`
-      : `${v.key}=${val}`;
-  };
-  const toEnvText = (list: EnvVar[]) => list.map(toEnvLine).join("\n");
+    const val = v.value === '***' ? '***' : v.value
+    const needsQuotes = val.includes(' ') || val.includes('#') || val.includes('"') || val.includes("'")
+    return needsQuotes ? `${v.key}="${val.replace(/"/g, '\\"')}"` : `${v.key}=${val}`
+  }
+  const toEnvText = (list: EnvVar[]) => list.map(toEnvLine).join('\n')
   const copyToClipboard = (text: string, setCopied: (v: boolean) => void) =>
     navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
 
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => {
-      const s = new Set(prev);
-      s.has(id) ? s.delete(id) : s.add(id);
-      return s;
-    });
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
   const toggleSelectAll = () =>
-    setSelectedIds((prev) =>
-      prev.size === filteredVars.length
-        ? new Set()
-        : new Set(filteredVars.map((v) => v.id)),
-    );
-  const clearSelection = () => setSelectedIds(new Set());
+    setSelectedIds((prev) => (prev.size === filteredVars.length ? new Set() : new Set(filteredVars.map((v) => v.id))))
+  const clearSelection = () => setSelectedIds(new Set())
   const toggleReveal = (id: string) =>
     setRevealed((prev) => {
-      const s = new Set(prev);
-      s.has(id) ? s.delete(id) : s.add(id);
-      return s;
-    });
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
 
   const startEdit = (v: EnvVar) => {
-    setEditingId(v.id);
+    setEditingId(v.id)
     setEditForm({
-      value: v.isSecret && !revealed.has(v.id) ? "" : v.value,
+      value: v.isSecret && !revealed.has(v.id) ? '' : v.value,
       isSecret: v.isSecret,
-    });
-  };
-  const cancelEdit = () => setEditingId(null);
+    })
+  }
+  const cancelEdit = () => setEditingId(null)
 
   // mutations
   const addVar = useMutation({
     mutationFn: (body: typeof form) =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["envman", "vars", slug, env] });
-      closeAdd();
-      notifyOk("Variabel ditambahkan");
+      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })
+      closeAdd()
+      notifyOk('Variabel ditambahkan')
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const deleteVar = (key: string) =>
     modals.openConfirmModal({
-      title: "Hapus variabel",
+      title: 'Hapus variabel',
       children: (
         <Text size="sm">
           Hapus <Code>{key}</Code>?
         </Text>
       ),
-      labels: { confirm: "Hapus", cancel: "Batal" },
-      confirmProps: { color: "red" },
+      labels: { confirm: 'Hapus', cancel: 'Batal' },
+      confirmProps: { color: 'red' },
       onConfirm: () =>
-        apiFetch(
-          `/api/envman/projects/${slug}/environments/${env}/vars/${key}`,
-          { method: "DELETE" },
-        )
+        apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars/${key}`, { method: 'DELETE' })
           .then(() => {
-            qc.invalidateQueries({ queryKey: ["envman", "vars", slug, env] });
-            notifyOk(`${key} dihapus`);
+            qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })
+            notifyOk(`${key} dihapus`)
           })
           .catch(notifyErr),
-    });
+    })
 
   const updateVar = useMutation({
-    mutationFn: ({
-      key,
-      value,
-      isSecret,
-    }: {
-      key: string;
-      value: string;
-      isSecret: boolean;
-    }) =>
+    mutationFn: ({ key, value, isSecret }: { key: string; value: string; isSecret: boolean }) =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify({ key, value, isSecret }),
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["envman", "vars", slug, env] });
-      setEditingId(null);
-      notifyOk("Variabel diperbarui");
+      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })
+      setEditingId(null)
+      notifyOk('Variabel diperbarui')
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const toggleDisabled = useMutation({
     mutationFn: (key: string) =>
-      apiFetch<{ isDisabled: boolean }>(
-        `/api/envman/projects/${slug}/environments/${env}/vars/${key}/toggle`,
-        {
-          method: "PATCH",
-        },
-      ),
+      apiFetch<{ isDisabled: boolean }>(`/api/envman/projects/${slug}/environments/${env}/vars/${key}/toggle`, {
+        method: 'PATCH',
+      }),
     onMutate: async (key) => {
-      await qc.cancelQueries({ queryKey: ["envman", "vars", slug, env] });
-      const previous = qc.getQueryData(["envman", "vars", slug, env]);
-      qc.setQueryData(["envman", "vars", slug, env], (old: any) => ({
+      await qc.cancelQueries({ queryKey: ['envman', 'vars', slug, env] })
+      const previous = qc.getQueryData(['envman', 'vars', slug, env])
+      qc.setQueryData(['envman', 'vars', slug, env], (old: any) => ({
         ...old,
-        vars:
-          old?.vars?.map((v: any) =>
-            v.key === key ? { ...v, isDisabled: !v.isDisabled } : v,
-          ) ?? [],
-      }));
-      return { previous };
+        vars: old?.vars?.map((v: any) => (v.key === key ? { ...v, isDisabled: !v.isDisabled } : v)) ?? [],
+      }))
+      return { previous }
     },
     onError: (e, _key, context) => {
-      if (context?.previous)
-        qc.setQueryData(["envman", "vars", slug, env], context.previous);
-      notifyErr(e);
+      if (context?.previous) qc.setQueryData(['envman', 'vars', slug, env], context.previous)
+      notifyErr(e)
     },
-    onSuccess: (data) =>
-      notifyOk(
-        data.isDisabled ? "Variabel dinonaktifkan" : "Variabel diaktifkan",
-      ),
-    onSettled: () =>
-      qc.invalidateQueries({ queryKey: ["envman", "vars", slug, env] }),
-  });
+    onSuccess: (data) => notifyOk(data.isDisabled ? 'Variabel dinonaktifkan' : 'Variabel diaktifkan'),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }),
+  })
 
   const clearAll = useMutation({
     mutationFn: () =>
       Promise.all(
         vars.map((v) =>
-          apiFetch(
-            `/api/envman/projects/${slug}/environments/${env}/vars/${v.key}`,
-            { method: "DELETE" },
-          ),
+          apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars/${v.key}`, { method: 'DELETE' }),
         ),
       ),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["envman", "vars", slug, env] });
-      notifyOk("Semua variabel dihapus");
+      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })
+      notifyOk('Semua variabel dihapus')
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const bulkToggleType = useMutation({
     mutationFn: (targetSecret: boolean) =>
       Promise.all(
         vars
-          .filter((v) => v.isSecret !== targetSecret && v.value !== "***")
+          .filter((v) => v.isSecret !== targetSecret && v.value !== '***')
           .map((v) =>
             apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
-              method: "POST",
+              method: 'POST',
               body: JSON.stringify({
                 key: v.key,
                 value: v.value,
@@ -520,125 +465,109 @@ function VarsPage() {
           ),
       ),
     onSuccess: (_: unknown, targetSecret: boolean) => {
-      qc.invalidateQueries({ queryKey: ["envman", "vars", slug, env] });
-      notifyOk(
-        targetSecret
-          ? "Semua variabel ditandai secret"
-          : "Semua variabel ditandai plain",
-      );
+      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })
+      notifyOk(targetSecret ? 'Semua variabel ditandai secret' : 'Semua variabel ditandai plain')
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const bulkImport = useMutation({
     mutationFn: () =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
-        method: "PUT",
+        method: 'PUT',
         body: JSON.stringify({
-          vars: Object.fromEntries(
-            parsedBulk.map(({ key, value }) => [key, value]),
-          ),
+          vars: Object.fromEntries(parsedBulk.map(({ key, value }) => [key, value])),
           secrets: bulkAllSecret ? parsedBulk.map(({ key }) => key) : [],
         }),
       }),
     onSuccess: (data: { count: number }) => {
-      qc.invalidateQueries({ queryKey: ["envman", "vars", slug, env] });
-      closeBulk();
-      setBulkText("");
-      setBulkAllSecret(false);
-      notifyOk(`${data.count} variabel berhasil diimpor`);
+      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })
+      closeBulk()
+      setBulkText('')
+      setBulkAllSecret(false)
+      notifyOk(`${data.count} variabel berhasil diimpor`)
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const parsedEditEnv = useMemo(() => {
-    const result: { key: string; value: string }[] = [];
-    for (const raw of editEnvText.split("\n")) {
-      const line = raw.trim();
-      if (!line || line.startsWith("#")) continue;
-      const eq = line.indexOf("=");
-      if (eq === -1) continue;
-      const key = line.slice(0, eq).trim();
-      if (!key) continue;
-      let value = line.slice(eq + 1);
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      )
-        value = value.slice(1, -1);
-      result.push({ key, value });
+    const result: { key: string; value: string }[] = []
+    for (const raw of editEnvText.split('\n')) {
+      const line = raw.trim()
+      if (!line || line.startsWith('#')) continue
+      const eq = line.indexOf('=')
+      if (eq === -1) continue
+      const key = line.slice(0, eq).trim()
+      if (!key) continue
+      let value = line.slice(eq + 1)
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+        value = value.slice(1, -1)
+      result.push({ key, value })
     }
-    return result;
-  }, [editEnvText]);
+    return result
+  }, [editEnvText])
 
   const editEnvSave = useMutation({
     mutationFn: () => {
-      const secretKeys = vars.filter((v) => v.isSecret).map((v) => v.key);
+      const secretKeys = vars.filter((v) => v.isSecret).map((v) => v.key)
       return apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
-        method: "PUT",
+        method: 'PUT',
         body: JSON.stringify({
-          vars: Object.fromEntries(
-            parsedEditEnv.map(({ key, value }) => [key, value]),
-          ),
-          secrets: secretKeys.filter((k) =>
-            parsedEditEnv.some((p) => p.key === k),
-          ),
+          vars: Object.fromEntries(parsedEditEnv.map(({ key, value }) => [key, value])),
+          secrets: secretKeys.filter((k) => parsedEditEnv.some((p) => p.key === k)),
         }),
-      });
+      })
     },
     onSuccess: (data: { count: number }) => {
-      qc.invalidateQueries({ queryKey: ["envman", "vars", slug, env] });
-      closeEditEnv();
-      notifyOk(`${data.count} variabel disimpan`);
+      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })
+      closeEditEnv()
+      notifyOk(`${data.count} variabel disimpan`)
     },
     onError: (e) => notifyErr(e),
-  });
+  })
 
   const openEditEnvModal = () => {
-    setEditEnvText(toEnvText(vars.filter((v) => v.value !== "***")));
-    openEditEnv();
-  };
+    setEditEnvText(toEnvText(vars.filter((v) => v.value !== '***')))
+    openEditEnv()
+  }
 
   const parsedBulk = useMemo(() => {
-    const result: { key: string; value: string }[] = [];
-    for (const raw of bulkText.split("\n")) {
-      const line = raw.trim();
-      if (!line || line.startsWith("#")) continue;
-      const eq = line.indexOf("=");
-      if (eq === -1) continue;
-      const key = line.slice(0, eq).trim();
-      if (!key) continue;
-      let value = line.slice(eq + 1);
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      )
-        value = value.slice(1, -1);
-      result.push({ key, value });
+    const result: { key: string; value: string }[] = []
+    for (const raw of bulkText.split('\n')) {
+      const line = raw.trim()
+      if (!line || line.startsWith('#')) continue
+      const eq = line.indexOf('=')
+      if (eq === -1) continue
+      const key = line.slice(0, eq).trim()
+      if (!key) continue
+      let value = line.slice(eq + 1)
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+        value = value.slice(1, -1)
+      result.push({ key, value })
     }
-    return result;
-  }, [bulkText]);
+    return result
+  }, [bulkText])
 
   const confirmClearAll = () =>
     modals.openConfirmModal({
-      title: "Hapus semua variabel",
+      title: 'Hapus semua variabel',
       children: (
         <Text size="sm">
-          Hapus semua <strong>{vars.length} variabel</strong> dari{" "}
+          Hapus semua <strong>{vars.length} variabel</strong> dari{' '}
           <strong>
             {slug}:{env}
           </strong>
           ? Tidak bisa dibatalkan.
         </Text>
       ),
-      labels: { confirm: "Hapus Semua", cancel: "Batal" },
-      confirmProps: { color: "red" },
+      labels: { confirm: 'Hapus Semua', cancel: 'Batal' },
+      confirmProps: { color: 'red' },
       onConfirm: () => clearAll.mutate(),
-    });
+    })
 
   const confirmBulkToggle = (targetSecret: boolean) =>
     modals.openConfirmModal({
-      title: targetSecret ? "Jadikan semua Secret" : "Jadikan semua Plain",
+      title: targetSecret ? 'Jadikan semua Secret' : 'Jadikan semua Plain',
       children: (
         <Text size="sm">
           {targetSecret ? (
@@ -653,29 +582,23 @@ function VarsPage() {
         </Text>
       ),
       labels: {
-        confirm: targetSecret ? "Jadikan Secret" : "Jadikan Plain",
-        cancel: "Batal",
+        confirm: targetSecret ? 'Jadikan Secret' : 'Jadikan Plain',
+        cancel: 'Batal',
       },
-      confirmProps: { color: targetSecret ? "red" : "gray" },
+      confirmProps: { color: targetSecret ? 'red' : 'gray' },
       onConfirm: () => bulkToggleType.mutate(targetSecret),
-    });
+    })
 
-  const cliCommand = `envman -e ${slug}:${env} -- bun dev`;
-  const allFilteredSelected =
-    filteredVars.length > 0 && filteredVars.every((v) => selectedIds.has(v.id));
-  const projectName: string = projectData?.project?.name ?? slug;
+  const cliCommand = `envman -e ${slug}:${env} -- bun dev`
+  const allFilteredSelected = filteredVars.length > 0 && filteredVars.every((v) => selectedIds.has(v.id))
+  const projectName: string = projectData?.project?.name ?? slug
 
   if (portainerSetupMode && portainerEnabled) {
     return (
       <Paper withBorder p="md" radius="md">
-        <PortainerSetupInline
-          slug={slug}
-          env={env}
-          mode={portainerSetupMode}
-          onClose={closePortainerSetup}
-        />
+        <PortainerSetupInline slug={slug} env={env} mode={portainerSetupMode} onClose={closePortainerSetup} />
       </Paper>
-    );
+    )
   }
 
   if (integrationsOpen && portainerEnabled) {
@@ -683,41 +606,18 @@ function VarsPage() {
       <Paper withBorder p="md" radius="md">
         <Box>
           {/* Breadcrumb */}
-          <Group gap={6} align="center" p={"md"}>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              onClick={closeIntegrations}
-            >
+          <Group gap={6} align="center" p={'md'}>
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeIntegrations}>
               <TbChevronLeft size={15} />
             </ActionIcon>
-            <Anchor
-              component="span"
-              size="sm"
-              c="dimmed"
-              style={{ cursor: "pointer" }}
-              onClick={closeIntegrations}
-            >
+            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeIntegrations}>
               {projectName}
             </Anchor>
-            <TbChevronRight
-              size={12}
-              style={{ color: "var(--mantine-color-dimmed)", flexShrink: 0 }}
-            />
-            <Anchor
-              component="span"
-              size="sm"
-              c="dimmed"
-              style={{ cursor: "pointer" }}
-              onClick={closeIntegrations}
-            >
+            <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
+            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeIntegrations}>
               {env}
             </Anchor>
-            <TbChevronRight
-              size={12}
-              style={{ color: "var(--mantine-color-dimmed)", flexShrink: 0 }}
-            />
+            <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
             <Text size="sm" fw={600}>
               Integrasi
             </Text>
@@ -725,13 +625,13 @@ function VarsPage() {
           <Divider />
 
           {/* Portainer section */}
-          <Stack gap="md" p={"md"}>
+          <Stack gap="md" p={'md'}>
             <Group justify="space-between" align="center" wrap="nowrap">
               <Group gap="xs" wrap="nowrap">
                 <TbBrandDocker
                   size={18}
                   style={{
-                    color: "var(--mantine-color-cyan-6)",
+                    color: 'var(--mantine-color-cyan-6)',
                     flexShrink: 0,
                   }}
                 />
@@ -744,12 +644,8 @@ function VarsPage() {
                   </Text>
                 </Box>
               </Group>
-              <Badge
-                size="xs"
-                variant="dot"
-                color={portainerData?.config ? "teal" : "gray"}
-              >
-                {portainerData?.config ? "Tersambung" : "Belum tersambung"}
+              <Badge size="xs" variant="dot" color={portainerData?.config ? 'teal' : 'gray'}>
+                {portainerData?.config ? 'Tersambung' : 'Belum tersambung'}
               </Badge>
             </Group>
             <PortainerSync
@@ -765,17 +661,8 @@ function VarsPage() {
           {portainerData?.config && (
             <Stack gap="xs">
               <Group gap="xs" align="center">
-                <TbHistory
-                  size={14}
-                  style={{ color: "var(--mantine-color-dimmed)" }}
-                />
-                <Text
-                  size="xs"
-                  fw={600}
-                  c="dimmed"
-                  tt="uppercase"
-                  style={{ letterSpacing: "0.05em" }}
-                >
+                <TbHistory size={14} style={{ color: 'var(--mantine-color-dimmed)' }} />
+                <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
                   Riwayat Sync
                 </Text>
                 {historyData?.logs?.length > 0 && (
@@ -802,33 +689,26 @@ function VarsPage() {
                       align="flex-start"
                       py={6}
                       style={{
-                        borderBottom:
-                          "1px solid var(--mantine-color-default-border)",
+                        borderBottom: '1px solid var(--mantine-color-default-border)',
                       }}
                     >
                       <Box
                         style={{
                           width: 6,
                           height: 6,
-                          borderRadius: "50%",
+                          borderRadius: '50%',
                           marginTop: 6,
                           flexShrink: 0,
-                          background: log.ok
-                            ? "var(--mantine-color-teal-5)"
-                            : "var(--mantine-color-red-5)",
+                          background: log.ok ? 'var(--mantine-color-teal-5)' : 'var(--mantine-color-red-5)',
                         }}
                       />
                       <Box style={{ flex: 1, minWidth: 0 }}>
                         <Group gap={6} wrap="wrap">
-                          <Badge
-                            size="xs"
-                            color={log.ok ? "teal" : "red"}
-                            variant="light"
-                          >
-                            {log.ok ? "Berhasil" : "Gagal"}
+                          <Badge size="xs" color={log.ok ? 'teal' : 'red'} variant="light">
+                            {log.ok ? 'Berhasil' : 'Gagal'}
                           </Badge>
                           <Badge size="xs" variant="outline" color="gray">
-                            {log.triggeredBy === "auto" ? "auto" : "manual"}
+                            {log.triggeredBy === 'auto' ? 'auto' : 'manual'}
                           </Badge>
                           <Text size="xs" c="dimmed">
                             {log.varsCount} vars
@@ -840,7 +720,7 @@ function VarsPage() {
                           )}
                         </Group>
                         <Text size="xs" c="dimmed" mt={2}>
-                          {new Date(log.createdAt).toLocaleString("id-ID")}
+                          {new Date(log.createdAt).toLocaleString('id-ID')}
                           {log.user && ` · ${log.user.name}`}
                         </Text>
                         {log.error && (
@@ -858,12 +738,11 @@ function VarsPage() {
 
           {/* Coming soon — minimal */}
           <Text size="xs" c="dimmed">
-            Integrasi lain (Vault, Doppler, Kubernetes) akan tersedia di rilis
-            berikutnya.
+            Integrasi lain (Vault, Doppler, Kubernetes) akan tersedia di rilis berikutnya.
           </Text>
         </Box>
       </Paper>
-    );
+    )
   }
 
   if (editEnvOpen) {
@@ -872,27 +751,13 @@ function VarsPage() {
         <Stack gap="lg">
           {/* Breadcrumb */}
           <Group gap={6} align="center">
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              onClick={closeEditEnv}
-            >
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeEditEnv}>
               <TbChevronLeft size={15} />
             </ActionIcon>
-            <Anchor
-              component="span"
-              size="sm"
-              c="dimmed"
-              style={{ cursor: "pointer" }}
-              onClick={closeEditEnv}
-            >
+            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeEditEnv}>
               {env}
             </Anchor>
-            <TbChevronRight
-              size={12}
-              style={{ color: "var(--mantine-color-dimmed)", flexShrink: 0 }}
-            />
+            <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
             <Text size="sm" fw={600}>
               Edit .env
             </Text>
@@ -912,8 +777,7 @@ function VarsPage() {
                 styles={{ title: { fontSize: 12 } }}
               >
                 <Text size="xs">
-                  <strong>{secretCount} secret var</strong> tidak ditampilkan —
-                  akan tetap dipertahankan.
+                  <strong>{secretCount} secret var</strong> tidak ditampilkan — akan tetap dipertahankan.
                 </Text>
               </Alert>
             )}
@@ -935,11 +799,7 @@ function VarsPage() {
             </Stack>
             <Group justify="space-between" align="center" wrap="wrap" gap="xs">
               {parsedEditEnv.length > 0 ? (
-                <Badge
-                  variant="light"
-                  color="blue"
-                  leftSection={<TbCheck size={11} />}
-                >
+                <Badge variant="light" color="blue" leftSection={<TbCheck size={11} />}>
                   {parsedEditEnv.length} variabel
                 </Badge>
               ) : (
@@ -960,15 +820,13 @@ function VarsPage() {
                 disabled={parsedEditEnv.length === 0}
                 leftSection={<TbCheck size={14} />}
               >
-                {parsedEditEnv.length > 0
-                  ? `Simpan ${parsedEditEnv.length} variabel`
-                  : "Simpan"}
+                {parsedEditEnv.length > 0 ? `Simpan ${parsedEditEnv.length} variabel` : 'Simpan'}
               </Button>
             </Group>
           </Stack>
         </Stack>
       </Paper>
-    );
+    )
   }
 
   if (addVarOpen) {
@@ -977,27 +835,13 @@ function VarsPage() {
         <Stack gap="lg">
           {/* Breadcrumb */}
           <Group gap={6} align="center">
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              onClick={closeAdd}
-            >
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeAdd}>
               <TbChevronLeft size={15} />
             </ActionIcon>
-            <Anchor
-              component="span"
-              size="sm"
-              c="dimmed"
-              style={{ cursor: "pointer" }}
-              onClick={closeAdd}
-            >
+            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeAdd}>
               {env}
             </Anchor>
-            <TbChevronRight
-              size={12}
-              style={{ color: "var(--mantine-color-dimmed)", flexShrink: 0 }}
-            />
+            <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
             <Text size="sm" fw={600}>
               Tambah Variabel
             </Text>
@@ -1013,7 +857,7 @@ function VarsPage() {
               onChange={(e) =>
                 setForm((f) => ({
                   ...f,
-                  key: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"),
+                  key: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_'),
                 }))
               }
               rightSection={
@@ -1023,8 +867,8 @@ function VarsPage() {
                   </Text>
                 ) : undefined
               }
-              styles={{ input: { fontFamily: "monospace" } }}
-              size={isMobile ? "sm" : "md"}
+              styles={{ input: { fontFamily: 'monospace' } }}
+              size={isMobile ? 'sm' : 'md'}
             />
             {form.isSecret ? (
               <PasswordInput
@@ -1032,77 +876,56 @@ function VarsPage() {
                 placeholder="Nilai rahasia..."
                 description="Akan dienkripsi sebelum disimpan"
                 value={form.value}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, value: e.target.value }))
-                }
-                size={isMobile ? "sm" : "md"}
+                onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
+                size={isMobile ? 'sm' : 'md'}
               />
             ) : (
               <TextInput
                 label="Value"
                 placeholder="Nilai..."
                 value={form.value}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, value: e.target.value }))
-                }
-                size={isMobile ? "sm" : "md"}
+                onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
+                size={isMobile ? 'sm' : 'md'}
               />
             )}
             <Box
               p="sm"
               style={{
-                borderRadius: "var(--mantine-radius-sm)",
-                background: "var(--mantine-color-default-hover)",
+                borderRadius: 'var(--mantine-radius-sm)',
+                background: 'var(--mantine-color-default-hover)',
               }}
             >
               <Group justify="space-between" align="center" wrap="nowrap">
                 <Box style={{ minWidth: 0 }}>
                   <Text size="sm" fw={500}>
-                    {form.isSecret ? "Secret" : "Plain"}
+                    {form.isSecret ? 'Secret' : 'Plain'}
                   </Text>
-                  <Text
-                    size="xs"
-                    c="dimmed"
-                    style={{ whiteSpace: isMobile ? "normal" : "nowrap" }}
-                  >
-                    {form.isSecret
-                      ? "Nilai dienkripsi, tersembunyi di UI"
-                      : "Nilai terlihat semua member"}
+                  <Text size="xs" c="dimmed" style={{ whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
+                    {form.isSecret ? 'Nilai dienkripsi, tersembunyi di UI' : 'Nilai terlihat semua member'}
                   </Text>
                 </Box>
                 <ActionIcon
                   size={36}
-                  variant={form.isSecret ? "filled" : "light"}
-                  color={form.isSecret ? "red" : "gray"}
-                  onClick={() =>
-                    setForm((f) => ({ ...f, isSecret: !f.isSecret }))
-                  }
+                  variant={form.isSecret ? 'filled' : 'light'}
+                  color={form.isSecret ? 'red' : 'gray'}
+                  onClick={() => setForm((f) => ({ ...f, isSecret: !f.isSecret }))}
                   style={{ flexShrink: 0 }}
                 >
-                  {form.isSecret ? (
-                    <TbLock size={16} />
-                  ) : (
-                    <TbLockOpen size={16} />
-                  )}
+                  {form.isSecret ? <TbLock size={16} /> : <TbLockOpen size={16} />}
                 </ActionIcon>
               </Group>
             </Box>
             <Divider />
             <Group justify="flex-end" gap="xs">
-              <Button
-                variant="subtle"
-                color="gray"
-                onClick={closeAdd}
-                disabled={addVar.isPending}
-              >
+              <Button variant="subtle" color="gray" onClick={closeAdd} disabled={addVar.isPending}>
                 Batal
               </Button>
               <Button
                 onClick={() => addVar.mutate(form)}
                 loading={addVar.isPending}
-                disabled={!form.key || form.value === ""}
+                disabled={!form.key || form.value === ''}
                 leftSection={<TbPlus size={14} />}
-                size={isMobile ? "md" : "sm"}
+                size={isMobile ? 'md' : 'sm'}
               >
                 Tambah Variabel
               </Button>
@@ -1110,7 +933,7 @@ function VarsPage() {
           </Stack>
         </Stack>
       </Paper>
-    );
+    )
   }
 
   if (bulkOpen) {
@@ -1124,9 +947,9 @@ function VarsPage() {
               color="gray"
               size="sm"
               onClick={() => {
-                closeBulk();
-                setBulkText("");
-                setBulkAllSecret(false);
+                closeBulk()
+                setBulkText('')
+                setBulkAllSecret(false)
               }}
             >
               <TbChevronLeft size={15} />
@@ -1135,19 +958,16 @@ function VarsPage() {
               component="span"
               size="sm"
               c="dimmed"
-              style={{ cursor: "pointer" }}
+              style={{ cursor: 'pointer' }}
               onClick={() => {
-                closeBulk();
-                setBulkText("");
-                setBulkAllSecret(false);
+                closeBulk()
+                setBulkText('')
+                setBulkAllSecret(false)
               }}
             >
               {env}
             </Anchor>
-            <TbChevronRight
-              size={12}
-              style={{ color: "var(--mantine-color-dimmed)", flexShrink: 0 }}
-            />
+            <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
             <Text size="sm" fw={600}>
               Paste .env
             </Text>
@@ -1158,9 +978,7 @@ function VarsPage() {
             <Textarea
               label="Konten .env"
               description="Komentar (#) dan baris kosong diabaikan."
-              placeholder={
-                'DATABASE_URL=postgres://...\nREDIS_URL=redis://...\nAPI_KEY="nilai dengan spasi"'
-              }
+              placeholder={'DATABASE_URL=postgres://...\nREDIS_URL=redis://...\nAPI_KEY="nilai dengan spasi"'}
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
               autoFocus
@@ -1169,24 +987,15 @@ function VarsPage() {
               maxRows={isMobile ? 10 : 16}
               styles={{
                 input: {
-                  fontFamily: "monospace",
+                  fontFamily: 'monospace',
                   fontSize: isMobile ? 13 : 12,
                 },
               }}
             />
             {parsedBulk.length > 0 && (
               <>
-                <Group
-                  justify="space-between"
-                  align="center"
-                  wrap="wrap"
-                  gap="xs"
-                >
-                  <Badge
-                    variant="light"
-                    color="blue"
-                    leftSection={<TbCheck size={11} />}
-                  >
+                <Group justify="space-between" align="center" wrap="wrap" gap="xs">
+                  <Badge variant="light" color="blue" leftSection={<TbCheck size={11} />}>
                     {parsedBulk.length} variabel terdeteksi
                   </Badge>
                   <Checkbox
@@ -1198,21 +1007,16 @@ function VarsPage() {
                 </Group>
                 <Box
                   style={{
-                    borderRadius: "var(--mantine-radius-sm)",
-                    border: "1px solid var(--mantine-color-default-border)",
-                    overflow: "hidden",
+                    borderRadius: 'var(--mantine-radius-sm)',
+                    border: '1px solid var(--mantine-color-default-border)',
+                    overflow: 'hidden',
                   }}
                 >
                   <ScrollArea.Autosize mah={isMobile ? 160 : 200}>
-                    <Table
-                      fz="xs"
-                      horizontalSpacing="xs"
-                      verticalSpacing={4}
-                      highlightOnHover
-                    >
+                    <Table fz="xs" horizontalSpacing="xs" verticalSpacing={4} highlightOnHover>
                       <Table.Thead
                         style={{
-                          background: "var(--mantine-color-default-hover)",
+                          background: 'var(--mantine-color-default-hover)',
                         }}
                       >
                         <Table.Tr>
@@ -1232,12 +1036,10 @@ function VarsPage() {
                               <Text
                                 fz="xs"
                                 ff="monospace"
-                                c={!value ? "dimmed" : undefined}
-                                fs={!value ? "italic" : undefined}
+                                c={!value ? 'dimmed' : undefined}
+                                fs={!value ? 'italic' : undefined}
                               >
-                                {bulkAllSecret
-                                  ? "••••••••"
-                                  : value || "(kosong)"}
+                                {bulkAllSecret ? '••••••••' : value || '(kosong)'}
                               </Text>
                             </Table.Td>
                           </Table.Tr>
@@ -1262,28 +1064,20 @@ function VarsPage() {
                 disabled={parsedBulk.length === 0}
                 leftSection={<TbFileImport size={14} />}
               >
-                {parsedBulk.length > 0
-                  ? `Import ${parsedBulk.length} variabel`
-                  : "Import"}
+                {parsedBulk.length > 0 ? `Import ${parsedBulk.length} variabel` : 'Import'}
               </Button>
             </Group>
           </Stack>
         </Stack>
       </Paper>
-    );
+    )
   }
 
   return (
     <Box>
       {/* ─── Breadcrumb ─────────────────────── */}
 
-      <Group
-        mb="md"
-        justify="space-between"
-        align="center"
-        gap="xs"
-        wrap="nowrap"
-      >
+      <Group mb="md" justify="space-between" align="center" gap="xs" wrap="nowrap">
         {/* Kiri: breadcrumb navigasi */}
         <Group gap={4} align="center" style={{ minWidth: 0, flex: 1 }}>
           <Anchor
@@ -1291,39 +1085,36 @@ function VarsPage() {
             c="dimmed"
             onClick={() =>
               navigate({
-                to: "/envmanager",
+                to: '/envmanager',
                 search: { create: false, editSlug: undefined },
               })
             }
             style={{
-              display: "flex",
-              alignItems: "center",
+              display: 'flex',
+              alignItems: 'center',
               gap: 4,
               flexShrink: 0,
             }}
           >
             <TbHome size={12} />
-            {!isMobile && "Projects"}
+            {!isMobile && 'Projects'}
           </Anchor>
-          <TbChevronRight
-            size={12}
-            color="var(--mantine-color-dimmed)"
-            style={{ flexShrink: 0 }}
-          />
+          <TbChevronRight size={12} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
           <Anchor
             size="xs"
             c="dimmed"
             onClick={() =>
               navigate({
-                to: "/envmanager/$slug",
+                to: '/envmanager/$slug',
                 params: { slug },
                 search: {
-                  tab: "environments",
+                  tab: 'environments',
                   fileId: undefined,
                   fileNew: false,
                   viewFileId: undefined,
                   aliasId: undefined,
-                  aliasNew: false, viewAliasId: undefined,
+                  aliasNew: false,
+                  viewAliasId: undefined,
                   noteId: undefined,
                   noteNew: false,
                   viewNoteId: undefined,
@@ -1331,59 +1122,31 @@ function VarsPage() {
               })
             }
             style={{
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
               maxWidth: isMobile ? 80 : 160,
             }}
           >
             {slug}
           </Anchor>
-          <TbChevronRight
-            size={12}
-            color="var(--mantine-color-dimmed)"
-            style={{ flexShrink: 0 }}
-          />
-          <Badge
-            size="sm"
-            variant="filled"
-            color="blue"
-            radius="sm"
-            style={{ flexShrink: 0 }}
-          >
+          <TbChevronRight size={12} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+          <Badge size="sm" variant="filled" color="blue" radius="sm" style={{ flexShrink: 0 }}>
             {env}
           </Badge>
         </Group>
 
         {/* Kanan: status badge + integrations + refresh */}
         <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
-          <Tooltip
-            label={
-              encryptionEnabled
-                ? "AES-256-GCM aktif"
-                : "MASTER_KEY belum di-set — plaintext mode"
-            }
-          >
+          <Tooltip label={encryptionEnabled ? 'AES-256-GCM aktif' : 'MASTER_KEY belum di-set — plaintext mode'}>
             <Badge
               size="sm"
-              variant={encryptionEnabled ? "light" : "dot"}
-              color={encryptionEnabled ? "teal" : "orange"}
-              leftSection={
-                encryptionEnabled ? (
-                  <TbShieldLock size={11} />
-                ) : (
-                  <TbAlertTriangle size={11} />
-                )
-              }
-              style={{ cursor: "default" }}
+              variant={encryptionEnabled ? 'light' : 'dot'}
+              color={encryptionEnabled ? 'teal' : 'orange'}
+              leftSection={encryptionEnabled ? <TbShieldLock size={11} /> : <TbAlertTriangle size={11} />}
+              style={{ cursor: 'default' }}
             >
-              {isMobile
-                ? encryptionEnabled
-                  ? "AES"
-                  : "!"
-                : encryptionEnabled
-                  ? "Encrypted"
-                  : "Plaintext"}
+              {isMobile ? (encryptionEnabled ? 'AES' : '!') : encryptionEnabled ? 'Encrypted' : 'Plaintext'}
             </Badge>
           </Tooltip>
 
@@ -1392,35 +1155,27 @@ function VarsPage() {
             <Tooltip
               label={
                 portainerData?.config
-                  ? `Portainer tersambung${portainerData.unsyncedCount > 0 ? ` · ${portainerData.unsyncedCount} belum di-sync` : ""}`
-                  : "Sambungkan ke Portainer (opsional)"
+                  ? `Portainer tersambung${portainerData.unsyncedCount > 0 ? ` · ${portainerData.unsyncedCount} belum di-sync` : ''}`
+                  : 'Sambungkan ke Portainer (opsional)'
               }
             >
               <Indicator
-                color={
-                  portainerData?.config
-                    ? portainerData.unsyncedCount > 0
-                      ? "orange"
-                      : "teal"
-                    : "gray"
-                }
+                color={portainerData?.config ? (portainerData.unsyncedCount > 0 ? 'orange' : 'teal') : 'gray'}
                 size={8}
                 offset={4}
-                processing={
-                  !!portainerData?.config && portainerData.unsyncedCount > 0
-                }
+                processing={!!portainerData?.config && portainerData.unsyncedCount > 0}
                 disabled={!portainerData?.config}
               >
                 <Group>
                   <Button
                     size="compact-xs"
-                    variant={portainerData?.config ? "light" : "subtle"}
-                    color={portainerData?.config ? "cyan" : "gray"}
+                    variant={portainerData?.config ? 'light' : 'subtle'}
+                    color={portainerData?.config ? 'cyan' : 'gray'}
                     leftSection={<TbPlugConnected size={12} />}
                     onClick={openIntegrations}
                     px={isMobile ? 6 : 8}
                   >
-                    {isMobile ? "" : "Integrasi"}
+                    {isMobile ? '' : 'Integrasi'}
                   </Button>
                 </Group>
               </Indicator>
@@ -1428,13 +1183,7 @@ function VarsPage() {
           )}
 
           <Tooltip label="Refresh">
-            <ActionIcon
-              size="sm"
-              variant="subtle"
-              color="gray"
-              loading={isFetching}
-              onClick={() => refetch()}
-            >
+            <ActionIcon size="sm" variant="subtle" color="gray" loading={isFetching} onClick={() => refetch()}>
               <TbRefresh size={14} />
             </ActionIcon>
           </Tooltip>
@@ -1451,8 +1200,7 @@ function VarsPage() {
           styles={{ title: { fontSize: 13 } }}
         >
           <Text size="xs">
-            {secretCount} secret var tersimpan sebagai{" "}
-            <strong>plaintext</strong>. Set <Code fz="xs">MASTER_KEY</Code> →{" "}
+            {secretCount} secret var tersimpan sebagai <strong>plaintext</strong>. Set <Code fz="xs">MASTER_KEY</Code> →{' '}
             <Code fz="xs">openssl rand -hex 32</Code>
           </Text>
         </Alert>
@@ -1478,40 +1226,32 @@ function VarsPage() {
             </Text>
             <Badge
               size="sm"
-              variant={filterType === "plain" ? "filled" : "light"}
+              variant={filterType === 'plain' ? 'filled' : 'light'}
               color="gray"
               leftSection={<TbLockOpen size={10} />}
-              style={{ cursor: "pointer" }}
-              onClick={() =>
-                setFilterType((f) => (f === "plain" ? "all" : "plain"))
-              }
+              style={{ cursor: 'pointer' }}
+              onClick={() => setFilterType((f) => (f === 'plain' ? 'all' : 'plain'))}
             >
               {plainCount} plain
             </Badge>
             <Badge
               size="sm"
-              variant={filterType === "secret" ? "filled" : "light"}
+              variant={filterType === 'secret' ? 'filled' : 'light'}
               color="red"
               leftSection={<TbLock size={10} />}
-              style={{ cursor: "pointer" }}
-              onClick={() =>
-                setFilterType((f) => (f === "secret" ? "all" : "secret"))
-              }
+              style={{ cursor: 'pointer' }}
+              onClick={() => setFilterType((f) => (f === 'secret' ? 'all' : 'secret'))}
             >
               {secretCount} secret
             </Badge>
             {disabledCount > 0 && (
               <Badge
                 size="sm"
-                variant={filterDisabled === "disabled" ? "filled" : "light"}
+                variant={filterDisabled === 'disabled' ? 'filled' : 'light'}
                 color="orange"
                 leftSection={<TbToggleLeft size={10} />}
-                style={{ cursor: "pointer" }}
-                onClick={() =>
-                  setFilterDisabled((f) =>
-                    f === "disabled" ? "all" : "disabled",
-                  )
-                }
+                style={{ cursor: 'pointer' }}
+                onClick={() => setFilterDisabled((f) => (f === 'disabled' ? 'all' : 'disabled'))}
               >
                 {disabledCount} off
               </Badge>
@@ -1528,11 +1268,11 @@ function VarsPage() {
                     sections={[
                       {
                         value: (plainCount / vars.length) * 100,
-                        color: "var(--mantine-color-gray-5)",
+                        color: 'var(--mantine-color-gray-5)',
                       },
                       {
                         value: (secretCount / vars.length) * 100,
-                        color: "var(--mantine-color-red-5)",
+                        color: 'var(--mantine-color-red-5)',
                       },
                     ]}
                   />
@@ -1543,25 +1283,17 @@ function VarsPage() {
               </>
             )}
           </Group>
-          <Group
-            p={"sm"}
-            gap={4}
-            wrap="nowrap"
-            align="center"
-            maw={540}
-            bg="dark.5"
-            style={{ borderRadius: 8 }}
-          >
-            <Text fz={10} style={{ flex: 1, wordBreak: "break-all" }}>
+          <Group p={'sm'} gap={4} wrap="nowrap" align="center" maw={540} bg="dark.5" style={{ borderRadius: 8 }}>
+            <Text fz={10} style={{ flex: 1, wordBreak: 'break-all' }}>
               {cliCommand}
             </Text>
             <CopyButton value={cliCommand}>
               {({ copied, copy }) => (
-                <Tooltip label={copied ? "Copied!" : "Copy CLI"}>
+                <Tooltip label={copied ? 'Copied!' : 'Copy CLI'}>
                   <ActionIcon
                     size="xs"
                     variant="subtle"
-                    color={copied ? "teal" : "gray"}
+                    color={copied ? 'teal' : 'gray'}
                     onClick={copy}
                     style={{ flexShrink: 0 }}
                   >
@@ -1584,16 +1316,16 @@ function VarsPage() {
           onChange={(e) => setSearch(e.target.value)}
           maw={540}
           rightSection={
-            search || filterType !== "all" || filterDisabled !== "all" ? (
+            search || filterType !== 'all' || filterDisabled !== 'all' ? (
               <Tooltip label="Reset semua filter">
                 <ActionIcon
                   size="sm"
                   variant="subtle"
                   color="gray"
                   onClick={() => {
-                    setSearch("");
-                    setFilterType("all");
-                    setFilterDisabled("all");
+                    setSearch('')
+                    setFilterType('all')
+                    setFilterDisabled('all')
                   }}
                 >
                   <TbX size={12} />
@@ -1601,11 +1333,7 @@ function VarsPage() {
               </Tooltip>
             ) : undefined
           }
-          rightSectionWidth={
-            search || filterType !== "all" || filterDisabled !== "all"
-              ? 32
-              : undefined
-          }
+          rightSectionWidth={search || filterType !== 'all' || filterDisabled !== 'all' ? 32 : undefined}
           radius="md"
         />
 
@@ -1613,17 +1341,17 @@ function VarsPage() {
         <Group justify="space-between" gap="xs" wrap="wrap" align="center">
           {/* View tools */}
           <Group gap={4} wrap="nowrap">
-            {(search || filterType !== "all" || filterDisabled !== "all") && (
+            {(search || filterType !== 'all' || filterDisabled !== 'all') && (
               <Badge
                 size="sm"
                 variant="light"
                 color="blue"
                 leftSection={<TbFilter size={10} />}
-                style={{ cursor: "pointer" }}
+                style={{ cursor: 'pointer' }}
                 onClick={() => {
-                  setSearch("");
-                  setFilterType("all");
-                  setFilterDisabled("all");
+                  setSearch('')
+                  setFilterType('all')
+                  setFilterDisabled('all')
                 }}
               >
                 {filteredVars.length}/{vars.length}
@@ -1639,12 +1367,12 @@ function VarsPage() {
                   radius="md"
                   leftSection={<TbSortAscending size={13} />}
                   value={sort}
-                  onChange={(v) => setSort((v ?? "key-asc") as typeof sort)}
+                  onChange={(v) => setSort((v ?? 'key-asc') as typeof sort)}
                   data={[
-                    { label: "A → Z", value: "key-asc" },
-                    { label: "Z → A", value: "key-desc" },
-                    { label: "Terbaru", value: "newest" },
-                    { label: "Terlama", value: "oldest" },
+                    { label: 'A → Z', value: 'key-asc' },
+                    { label: 'Z → A', value: 'key-desc' },
+                    { label: 'Terbaru', value: 'newest' },
+                    { label: 'Terlama', value: 'oldest' },
                   ]}
                   allowDeselect={false}
                 />
@@ -1656,14 +1384,10 @@ function VarsPage() {
                       <ActionIcon
                         size="sm"
                         variant="subtle"
-                        color={copiedAll || copiedSelected ? "teal" : "gray"}
+                        color={copiedAll || copiedSelected ? 'teal' : 'gray'}
                         radius="md"
                       >
-                        {copiedAll || copiedSelected ? (
-                          <TbCheck size={14} />
-                        ) : (
-                          <TbCopy size={14} />
-                        )}
+                        {copiedAll || copiedSelected ? <TbCheck size={14} /> : <TbCopy size={14} />}
                       </ActionIcon>
                     </Tooltip>
                   </Menu.Target>
@@ -1676,9 +1400,7 @@ function VarsPage() {
                           {vars.length}
                         </Badge>
                       }
-                      onClick={() =>
-                        copyToClipboard(toEnvText(vars), setCopiedAll)
-                      }
+                      onClick={() => copyToClipboard(toEnvText(vars), setCopiedAll)}
                     >
                       Semua variabel
                     </Menu.Item>
@@ -1690,9 +1412,7 @@ function VarsPage() {
                             {filteredVars.length}
                           </Badge>
                         }
-                        onClick={() =>
-                          copyToClipboard(toEnvText(filteredVars), setCopiedAll)
-                        }
+                        onClick={() => copyToClipboard(toEnvText(filteredVars), setCopiedAll)}
                       >
                         Hasil filter
                       </Menu.Item>
@@ -1700,20 +1420,13 @@ function VarsPage() {
                     <Menu.Item
                       leftSection={<TbCopy size={14} />}
                       rightSection={
-                        <Badge
-                          size="xs"
-                          variant="light"
-                          color={selectedIds.size > 0 ? "blue" : "gray"}
-                        >
+                        <Badge size="xs" variant="light" color={selectedIds.size > 0 ? 'blue' : 'gray'}>
                           {selectedIds.size}
                         </Badge>
                       }
                       disabled={selectedIds.size === 0}
                       onClick={() =>
-                        copyToClipboard(
-                          toEnvText(vars.filter((v) => selectedIds.has(v.id))),
-                          setCopiedSelected,
-                        )
+                        copyToClipboard(toEnvText(vars.filter((v) => selectedIds.has(v.id))), setCopiedSelected)
                       }
                     >
                       Yang dipilih
@@ -1723,13 +1436,7 @@ function VarsPage() {
 
                 {/* Compare */}
                 <Tooltip label="Bandingkan dengan .env local">
-                  <ActionIcon
-                    size="sm"
-                    variant="subtle"
-                    color="grape"
-                    radius="md"
-                    onClick={openCompare}
-                  >
+                  <ActionIcon size="sm" variant="subtle" color="grape" radius="md" onClick={openCompare}>
                     <TbGitCompare size={14} />
                   </ActionIcon>
                 </Tooltip>
@@ -1744,32 +1451,21 @@ function VarsPage() {
               <Menu shadow="md" width={220} position="bottom-end">
                 <Menu.Target>
                   <Tooltip label="Import / edit .env">
-                    <ActionIcon
-                      size="sm"
-                      variant="subtle"
-                      color="gray"
-                      radius="md"
-                    >
+                    <ActionIcon size="sm" variant="subtle" color="gray" radius="md">
                       <TbFileImport size={14} />
                     </ActionIcon>
                   </Tooltip>
                 </Menu.Target>
                 <Menu.Dropdown>
                   <Menu.Label>File .env</Menu.Label>
-                  <Menu.Item
-                    leftSection={<TbFileImport size={14} />}
-                    onClick={openBulk}
-                  >
+                  <Menu.Item leftSection={<TbFileImport size={14} />} onClick={openBulk}>
                     Paste .env
                     <Text size="xs" c="dimmed">
                       Import dari clipboard
                     </Text>
                   </Menu.Item>
                   {vars.length > 0 && (
-                    <Menu.Item
-                      leftSection={<TbPencil size={14} />}
-                      onClick={openEditEnvModal}
-                    >
+                    <Menu.Item leftSection={<TbPencil size={14} />} onClick={openEditEnvModal}>
                       Edit .env
                       <Text size="xs" c="dimmed">
                         Edit semua vars sekaligus
@@ -1780,12 +1476,7 @@ function VarsPage() {
               </Menu>
 
               {/* Tambah Var — CTA primary */}
-              <Button
-                size="sm"
-                leftSection={<TbPlus size={14} />}
-                onClick={openAdd}
-                radius="md"
-              >
+              <Button size="sm" leftSection={<TbPlus size={14} />} onClick={openAdd} radius="md">
                 Tambah Var
               </Button>
 
@@ -1794,12 +1485,7 @@ function VarsPage() {
                 <Menu shadow="md" width={230} position="bottom-end">
                   <Menu.Target>
                     <Tooltip label="Lebih banyak aksi">
-                      <ActionIcon
-                        size="sm"
-                        variant="subtle"
-                        color="gray"
-                        radius="md"
-                      >
+                      <ActionIcon size="sm" variant="subtle" color="gray" radius="md">
                         <TbDots size={14} />
                       </ActionIcon>
                     </Tooltip>
@@ -1819,20 +1505,19 @@ function VarsPage() {
                         Semua plain → Secret
                       </Menu.Item>
                     )}
-                    {secretCount > 0 &&
-                      vars.every((v) => !v.isSecret || v.value !== "***") && (
-                        <Menu.Item
-                          leftSection={<TbLockOpen size={14} />}
-                          rightSection={
-                            <Badge size="xs" variant="light" color="gray">
-                              {secretCount}
-                            </Badge>
-                          }
-                          onClick={() => confirmBulkToggle(false)}
-                        >
-                          Semua secret → Plain
-                        </Menu.Item>
-                      )}
+                    {secretCount > 0 && vars.every((v) => !v.isSecret || v.value !== '***') && (
+                      <Menu.Item
+                        leftSection={<TbLockOpen size={14} />}
+                        rightSection={
+                          <Badge size="xs" variant="light" color="gray">
+                            {secretCount}
+                          </Badge>
+                        }
+                        onClick={() => confirmBulkToggle(false)}
+                      >
+                        Semua secret → Plain
+                      </Menu.Item>
+                    )}
                     <Menu.Divider />
                     <Menu.Label c="red">Zona berbahaya</Menu.Label>
                     <Menu.Item
@@ -1861,8 +1546,8 @@ function VarsPage() {
           mb="xs"
           p="xs"
           style={{
-            borderRadius: "var(--mantine-radius-md)",
-            background: "var(--mantine-color-blue-light)",
+            borderRadius: 'var(--mantine-radius-md)',
+            background: 'var(--mantine-color-blue-light)',
           }}
         >
           <Group gap="xs" align="center" wrap="wrap">
@@ -1873,25 +1558,12 @@ function VarsPage() {
               size="xs"
               variant="light"
               color="blue"
-              leftSection={
-                copiedSelected ? <TbCheck size={12} /> : <TbCopy size={12} />
-              }
-              onClick={() =>
-                copyToClipboard(
-                  toEnvText(vars.filter((v) => selectedIds.has(v.id))),
-                  setCopiedSelected,
-                )
-              }
+              leftSection={copiedSelected ? <TbCheck size={12} /> : <TbCopy size={12} />}
+              onClick={() => copyToClipboard(toEnvText(vars.filter((v) => selectedIds.has(v.id))), setCopiedSelected)}
             >
-              {copiedSelected ? "Tersalin!" : "Copy .env"}
+              {copiedSelected ? 'Tersalin!' : 'Copy .env'}
             </Button>
-            <Button
-              size="xs"
-              variant="subtle"
-              color="gray"
-              onClick={clearSelection}
-              leftSection={<TbX size={11} />}
-            >
+            <Button size="xs" variant="subtle" color="gray" onClick={clearSelection} leftSection={<TbX size={11} />}>
               Batal
             </Button>
           </Group>
@@ -1901,45 +1573,28 @@ function VarsPage() {
       {/* ─── Empty state ────────────────────── */}
       {vars.length === 0 ? (
         <Box
-          p={{ base: "lg", sm: "xl" }}
+          p={{ base: 'lg', sm: 'xl' }}
           ta="center"
           style={{
-            borderRadius: "var(--mantine-radius-md)",
-            border: "1px solid var(--mantine-color-default-border)",
+            borderRadius: 'var(--mantine-radius-md)',
+            border: '1px solid var(--mantine-color-default-border)',
           }}
         >
-          <ThemeIcon
-            size={48}
-            variant="light"
-            color="blue"
-            radius="xl"
-            mx="auto"
-            mb="md"
-          >
+          <ThemeIcon size={48} variant="light" color="blue" radius="xl" mx="auto" mb="md">
             <TbVariable size={24} />
           </ThemeIcon>
           <Text fw={600} size="md" mb={6}>
             Environment ini masih kosong
           </Text>
           <Text size="sm" c="dimmed" mb="lg" maw={320} mx="auto">
-            Tambah variabel satu per satu atau paste dari file{" "}
-            <Code fz="xs">.env</Code>
+            Tambah variabel satu per satu atau paste dari file <Code fz="xs">.env</Code>
           </Text>
           {canEdit && (
             <Group justify="center" gap="xs">
-              <Button
-                size="sm"
-                variant="light"
-                leftSection={<TbFileImport size={14} />}
-                onClick={openBulk}
-              >
+              <Button size="sm" variant="light" leftSection={<TbFileImport size={14} />} onClick={openBulk}>
                 Paste .env
               </Button>
-              <Button
-                size="sm"
-                leftSection={<TbPlus size={14} />}
-                onClick={openAdd}
-              >
+              <Button size="sm" leftSection={<TbPlus size={14} />} onClick={openAdd}>
                 Tambah Var
               </Button>
             </Group>
@@ -1950,18 +1605,11 @@ function VarsPage() {
           p="xl"
           ta="center"
           style={{
-            borderRadius: "var(--mantine-radius-md)",
-            border: "1px dashed var(--mantine-color-default-border)",
+            borderRadius: 'var(--mantine-radius-md)',
+            border: '1px dashed var(--mantine-color-default-border)',
           }}
         >
-          <ThemeIcon
-            size={44}
-            radius="xl"
-            variant="light"
-            color="gray"
-            mx="auto"
-            mb="sm"
-          >
+          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
             <TbSearch size={22} />
           </ThemeIcon>
           <Text size="sm" fw={500} mb={4}>
@@ -1974,9 +1622,9 @@ function VarsPage() {
             size="xs"
             variant="subtle"
             onClick={() => {
-              setSearch("");
-              setFilterType("all");
-              setFilterDisabled("all");
+              setSearch('')
+              setFilterType('all')
+              setFilterDisabled('all')
             }}
             leftSection={<TbX size={12} />}
           >
@@ -1995,9 +1643,9 @@ function VarsPage() {
                   key={v.id}
                   p="sm"
                   style={{
-                    borderRadius: "var(--mantine-radius-md)",
-                    border: "1px solid var(--mantine-color-primary)",
-                    background: "var(--mantine-color-violet-light)",
+                    borderRadius: 'var(--mantine-radius-md)',
+                    border: '1px solid var(--mantine-color-primary)',
+                    background: 'var(--mantine-color-violet-light)',
                   }}
                 >
                   {/* Key + type toggle */}
@@ -2006,9 +1654,9 @@ function VarsPage() {
                       fz="xs"
                       fw={700}
                       style={{
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                         flex: 1,
                         minWidth: 0,
                       }}
@@ -2017,21 +1665,13 @@ function VarsPage() {
                     </Code>
                     <Badge
                       size="xs"
-                      variant={editForm.isSecret ? "filled" : "outline"}
-                      color={editForm.isSecret ? "red" : "gray"}
-                      leftSection={
-                        editForm.isSecret ? (
-                          <TbLock size={9} />
-                        ) : (
-                          <TbLockOpen size={9} />
-                        )
-                      }
-                      style={{ cursor: "pointer", flexShrink: 0 }}
-                      onClick={() =>
-                        setEditForm((f) => ({ ...f, isSecret: !f.isSecret }))
-                      }
+                      variant={editForm.isSecret ? 'filled' : 'outline'}
+                      color={editForm.isSecret ? 'red' : 'gray'}
+                      leftSection={editForm.isSecret ? <TbLock size={9} /> : <TbLockOpen size={9} />}
+                      style={{ cursor: 'pointer', flexShrink: 0 }}
+                      onClick={() => setEditForm((f) => ({ ...f, isSecret: !f.isSecret }))}
                     >
-                      {editForm.isSecret ? "secret" : "plain"}
+                      {editForm.isSecret ? 'secret' : 'plain'}
                     </Badge>
                   </Group>
                   {/* Input */}
@@ -2041,17 +1681,15 @@ function VarsPage() {
                       value={editForm.value}
                       placeholder="Nilai baru..."
                       autoFocus
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, value: e.target.value }))
-                      }
+                      onChange={(e) => setEditForm((f) => ({ ...f, value: e.target.value }))}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter")
+                        if (e.key === 'Enter')
                           updateVar.mutate({
                             key: v.key,
                             value: editForm.value,
                             isSecret: editForm.isSecret,
-                          });
-                        if (e.key === "Escape") cancelEdit();
+                          })
+                        if (e.key === 'Escape') cancelEdit()
                       }}
                     />
                   ) : (
@@ -2060,17 +1698,15 @@ function VarsPage() {
                       value={editForm.value}
                       placeholder="Nilai baru..."
                       autoFocus
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, value: e.target.value }))
-                      }
+                      onChange={(e) => setEditForm((f) => ({ ...f, value: e.target.value }))}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter")
+                        if (e.key === 'Enter')
                           updateVar.mutate({
                             key: v.key,
                             value: editForm.value,
                             isSecret: editForm.isSecret,
-                          });
-                        if (e.key === "Escape") cancelEdit();
+                          })
+                        if (e.key === 'Escape') cancelEdit()
                       }}
                     />
                   )}
@@ -2103,7 +1739,7 @@ function VarsPage() {
                     </Button>
                   </Group>
                 </Box>
-              );
+              )
             }
 
             return (
@@ -2111,13 +1747,11 @@ function VarsPage() {
                 key={v.id}
                 p="sm"
                 style={{
-                  borderRadius: "var(--mantine-radius-md)",
-                  border: `1px solid ${selectedIds.has(v.id) ? "var(--mantine-color-blue-4)" : "var(--mantine-color-default-border)"}`,
+                  borderRadius: 'var(--mantine-radius-md)',
+                  border: `1px solid ${selectedIds.has(v.id) ? 'var(--mantine-color-blue-4)' : 'var(--mantine-color-default-border)'}`,
                   opacity: v.isDisabled ? 0.5 : 1,
-                  background: selectedIds.has(v.id)
-                    ? "var(--mantine-color-blue-light)"
-                    : undefined,
-                  transition: "opacity 0.15s",
+                  background: selectedIds.has(v.id) ? 'var(--mantine-color-blue-light)' : undefined,
+                  transition: 'opacity 0.15s',
                 }}
               >
                 {/* Baris 1: checkbox + key + badge + waktu */}
@@ -2126,23 +1760,19 @@ function VarsPage() {
                     <ActionIcon
                       size={28}
                       variant="subtle"
-                      color={selectedIds.has(v.id) ? "blue" : "gray"}
+                      color={selectedIds.has(v.id) ? 'blue' : 'gray'}
                       onClick={() => toggleSelect(v.id)}
                       style={{ flexShrink: 0 }}
                     >
-                      {selectedIds.has(v.id) ? (
-                        <TbSquareCheckFilled size={16} />
-                      ) : (
-                        <TbSquare size={16} />
-                      )}
+                      {selectedIds.has(v.id) ? <TbSquareCheckFilled size={16} /> : <TbSquare size={16} />}
                     </ActionIcon>
                     <Code
                       fz="xs"
                       fw={700}
                       style={{
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                         flex: 1,
                         minWidth: 0,
                       }}
@@ -2150,35 +1780,29 @@ function VarsPage() {
                       {v.key}
                     </Code>
                     {v.isDisabled && (
-                      <Badge
-                        size="xs"
-                        variant="dot"
-                        color="orange"
-                        style={{ flexShrink: 0 }}
-                      >
+                      <Badge size="xs" variant="dot" color="orange" style={{ flexShrink: 0 }}>
                         off
                       </Badge>
                     )}
                     <Badge
                       size="xs"
-                      color={v.isSecret ? "red" : "gray"}
-                      variant={v.isSecret ? "light" : "outline"}
+                      color={v.isSecret ? 'red' : 'gray'}
+                      variant={v.isSecret ? 'light' : 'outline'}
                       leftSection={v.isSecret ? <TbLock size={9} /> : undefined}
                       style={{
                         flexShrink: 0,
-                        cursor:
-                          canEdit && v.value !== "***" ? "pointer" : undefined,
+                        cursor: canEdit && v.value !== '***' ? 'pointer' : undefined,
                       }}
                       onClick={() => {
-                        if (!canEdit || v.value === "***") return;
+                        if (!canEdit || v.value === '***') return
                         updateVar.mutate({
                           key: v.key,
                           value: v.value,
                           isSecret: !v.isSecret,
-                        });
+                        })
                       }}
                     >
-                      {v.isSecret ? "secret" : "plain"}
+                      {v.isSecret ? 'secret' : 'plain'}
                     </Badge>
                   </Group>
                   <Text fz={10} c="dimmed" style={{ flexShrink: 0 }}>
@@ -2192,7 +1816,7 @@ function VarsPage() {
                   px="xs"
                   py={6}
                   style={{
-                    background: "var(--mantine-color-default-hover)",
+                    background: 'var(--mantine-color-default-hover)',
                     borderRadius: 6,
                     minHeight: 32,
                   }}
@@ -2202,35 +1826,27 @@ function VarsPage() {
                       <Text
                         fz="xs"
                         ff="monospace"
-                        c={revealed.has(v.id) ? undefined : "dimmed"}
+                        c={revealed.has(v.id) ? undefined : 'dimmed'}
                         style={{
                           letterSpacing: revealed.has(v.id) ? undefined : 3,
-                          userSelect: "none",
+                          userSelect: 'none',
                           flex: 1,
                         }}
                       >
-                        {revealed.has(v.id) ? v.value : "••••••••••"}
+                        {revealed.has(v.id) ? v.value : '••••••••••'}
                       </Text>
                       <ActionIcon
                         size={28}
                         variant="subtle"
-                        color={revealed.has(v.id) ? "blue" : "gray"}
+                        color={revealed.has(v.id) ? 'blue' : 'gray'}
                         onClick={() => toggleReveal(v.id)}
                         style={{ flexShrink: 0 }}
                       >
-                        {revealed.has(v.id) ? (
-                          <TbEyeOff size={14} />
-                        ) : (
-                          <TbEye size={14} />
-                        )}
+                        {revealed.has(v.id) ? <TbEyeOff size={14} /> : <TbEye size={14} />}
                       </ActionIcon>
                     </Group>
                   ) : (
-                    <Text
-                      fz="xs"
-                      ff="monospace"
-                      style={{ wordBreak: "break-all" }}
-                    >
+                    <Text fz="xs" ff="monospace" style={{ wordBreak: 'break-all' }}>
                       {v.value || (
                         <Text span c="dimmed" fs="italic">
                           (kosong)
@@ -2244,12 +1860,7 @@ function VarsPage() {
                 <Group gap={4} justify="flex-end" wrap="nowrap">
                   <CopyButton value={toEnvLine(v)}>
                     {({ copied, copy }) => (
-                      <ActionIcon
-                        size={32}
-                        variant="subtle"
-                        color={copied ? "teal" : "gray"}
-                        onClick={copy}
-                      >
+                      <ActionIcon size={32} variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
                         {copied ? <TbCheck size={15} /> : <TbCopy size={15} />}
                       </ActionIcon>
                     )}
@@ -2259,40 +1870,23 @@ function VarsPage() {
                       <ActionIcon
                         size={32}
                         variant="subtle"
-                        color={v.isDisabled ? "orange" : "teal"}
-                        loading={
-                          toggleDisabled.isPending &&
-                          toggleDisabled.variables === v.key
-                        }
+                        color={v.isDisabled ? 'orange' : 'teal'}
+                        loading={toggleDisabled.isPending && toggleDisabled.variables === v.key}
                         onClick={() => toggleDisabled.mutate(v.key)}
                       >
-                        {v.isDisabled ? (
-                          <TbToggleLeft size={17} />
-                        ) : (
-                          <TbToggleRight size={17} />
-                        )}
+                        {v.isDisabled ? <TbToggleLeft size={17} /> : <TbToggleRight size={17} />}
                       </ActionIcon>
-                      <ActionIcon
-                        size={32}
-                        variant="subtle"
-                        color="primary"
-                        onClick={() => startEdit(v)}
-                      >
+                      <ActionIcon size={32} variant="subtle" color="primary" onClick={() => startEdit(v)}>
                         <TbPencil size={15} />
                       </ActionIcon>
-                      <ActionIcon
-                        size={32}
-                        variant="subtle"
-                        color="red"
-                        onClick={() => deleteVar(v.key)}
-                      >
+                      <ActionIcon size={32} variant="subtle" color="red" onClick={() => deleteVar(v.key)}>
                         <TbTrash size={15} />
                       </ActionIcon>
                     </>
                   )}
                 </Group>
               </Box>
-            );
+            )
           })}
 
           <Text size="xs" c="dimmed" ta="center" py="xs">
@@ -2306,33 +1900,23 @@ function VarsPage() {
         ══════════════════════════════════════ */
         <Box
           style={{
-            borderRadius: "var(--mantine-radius-md)",
-            border: "1px solid var(--mantine-color-default-border)",
-            overflow: "hidden",
+            borderRadius: 'var(--mantine-radius-md)',
+            border: '1px solid var(--mantine-color-default-border)',
+            overflow: 'hidden',
           }}
         >
           <Table highlightOnHover verticalSpacing="xs" horizontalSpacing="sm">
-            <Table.Thead
-              style={{ background: "var(--mantine-color-default-hover)" }}
-            >
+            <Table.Thead style={{ background: 'var(--mantine-color-default-hover)' }}>
               <Table.Tr>
                 <Table.Th w={36}>
-                  <Tooltip
-                    label={
-                      allFilteredSelected ? "Batalkan semua" : "Pilih semua"
-                    }
-                  >
+                  <Tooltip label={allFilteredSelected ? 'Batalkan semua' : 'Pilih semua'}>
                     <ActionIcon
                       size="xs"
                       variant="subtle"
-                      color={allFilteredSelected ? "blue" : "gray"}
+                      color={allFilteredSelected ? 'blue' : 'gray'}
                       onClick={toggleSelectAll}
                     >
-                      {allFilteredSelected ? (
-                        <TbSquareCheckFilled size={14} />
-                      ) : (
-                        <TbSquare size={14} />
-                      )}
+                      {allFilteredSelected ? <TbSquareCheckFilled size={14} /> : <TbSquare size={14} />}
                     </ActionIcon>
                   </Tooltip>
                 </Table.Th>
@@ -2340,9 +1924,9 @@ function VarsPage() {
                   w={260}
                   style={{
                     fontSize: 11,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "var(--mantine-color-dimmed)",
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: 'var(--mantine-color-dimmed)',
                   }}
                 >
                   Key
@@ -2350,9 +1934,9 @@ function VarsPage() {
                 <Table.Th
                   style={{
                     fontSize: 11,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "var(--mantine-color-dimmed)",
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: 'var(--mantine-color-dimmed)',
                   }}
                 >
                   Value
@@ -2361,9 +1945,9 @@ function VarsPage() {
                   w={90}
                   style={{
                     fontSize: 11,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "var(--mantine-color-dimmed)",
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: 'var(--mantine-color-dimmed)',
                   }}
                 >
                   Diperbarui
@@ -2372,9 +1956,9 @@ function VarsPage() {
                   w={canEdit ? 130 : 50}
                   style={{
                     fontSize: 11,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    color: "var(--mantine-color-dimmed)",
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: 'var(--mantine-color-dimmed)',
                   }}
                 >
                   Aksi
@@ -2383,45 +1967,29 @@ function VarsPage() {
             </Table.Thead>
             <Table.Tbody>
               {filteredVars.map((v) => {
-                const isEditing = editingId === v.id;
+                const isEditing = editingId === v.id
 
                 if (isEditing) {
                   return (
                     <Table.Tr
                       key={v.id}
                       style={{
-                        background: "var(--mantine-color-violet-light)",
+                        background: 'var(--mantine-color-violet-light)',
                       }}
                     >
                       <Table.Td />
                       <Table.Td>
                         <Group gap={6} wrap="nowrap">
-                          <Code
-                            fz="xs"
-                            fw={700}
-                            style={{ whiteSpace: "nowrap" }}
-                          >
+                          <Code fz="xs" fw={700} style={{ whiteSpace: 'nowrap' }}>
                             {v.key}
                           </Code>
-                          <Tooltip
-                            label={
-                              editForm.isSecret
-                                ? "Klik → plain"
-                                : "Klik → secret"
-                            }
-                          >
+                          <Tooltip label={editForm.isSecret ? 'Klik → plain' : 'Klik → secret'}>
                             <Badge
                               size="xs"
-                              variant={editForm.isSecret ? "filled" : "outline"}
-                              color={editForm.isSecret ? "red" : "gray"}
-                              leftSection={
-                                editForm.isSecret ? (
-                                  <TbLock size={9} />
-                                ) : (
-                                  <TbLockOpen size={9} />
-                                )
-                              }
-                              style={{ cursor: "pointer", flexShrink: 0 }}
+                              variant={editForm.isSecret ? 'filled' : 'outline'}
+                              color={editForm.isSecret ? 'red' : 'gray'}
+                              leftSection={editForm.isSecret ? <TbLock size={9} /> : <TbLockOpen size={9} />}
+                              style={{ cursor: 'pointer', flexShrink: 0 }}
                               onClick={() =>
                                 setEditForm((f) => ({
                                   ...f,
@@ -2429,7 +1997,7 @@ function VarsPage() {
                                 }))
                               }
                             >
-                              {editForm.isSecret ? "secret" : "plain"}
+                              {editForm.isSecret ? 'secret' : 'plain'}
                             </Badge>
                           </Tooltip>
                         </Group>
@@ -2448,13 +2016,13 @@ function VarsPage() {
                               }))
                             }
                             onKeyDown={(e) => {
-                              if (e.key === "Enter")
+                              if (e.key === 'Enter')
                                 updateVar.mutate({
                                   key: v.key,
                                   value: editForm.value,
                                   isSecret: editForm.isSecret,
-                                });
-                              if (e.key === "Escape") cancelEdit();
+                                })
+                              if (e.key === 'Escape') cancelEdit()
                             }}
                           />
                         ) : (
@@ -2470,13 +2038,13 @@ function VarsPage() {
                               }))
                             }
                             onKeyDown={(e) => {
-                              if (e.key === "Enter")
+                              if (e.key === 'Enter')
                                 updateVar.mutate({
                                   key: v.key,
                                   value: editForm.value,
                                   isSecret: editForm.isSecret,
-                                });
-                              if (e.key === "Escape") cancelEdit();
+                                })
+                              if (e.key === 'Escape') cancelEdit()
                             }}
                           />
                         )}
@@ -2502,19 +2070,14 @@ function VarsPage() {
                             </ActionIcon>
                           </Tooltip>
                           <Tooltip label="Batal (Esc)">
-                            <ActionIcon
-                              size="sm"
-                              variant="subtle"
-                              color="gray"
-                              onClick={cancelEdit}
-                            >
+                            <ActionIcon size="sm" variant="subtle" color="gray" onClick={cancelEdit}>
                               <TbX size={13} />
                             </ActionIcon>
                           </Tooltip>
                         </Group>
                       </Table.Td>
                     </Table.Tr>
-                  );
+                  )
                 }
 
                 return (
@@ -2522,84 +2085,59 @@ function VarsPage() {
                     key={v.id}
                     style={{
                       opacity: v.isDisabled ? 0.45 : 1,
-                      background: selectedIds.has(v.id)
-                        ? "var(--mantine-color-blue-light)"
-                        : undefined,
-                      transition: "opacity 0.15s",
+                      background: selectedIds.has(v.id) ? 'var(--mantine-color-blue-light)' : undefined,
+                      transition: 'opacity 0.15s',
                     }}
                   >
                     <Table.Td>
                       <ActionIcon
                         size="xs"
                         variant="subtle"
-                        color={selectedIds.has(v.id) ? "blue" : "gray"}
+                        color={selectedIds.has(v.id) ? 'blue' : 'gray'}
                         onClick={() => toggleSelect(v.id)}
                       >
-                        {selectedIds.has(v.id) ? (
-                          <TbSquareCheckFilled size={14} />
-                        ) : (
-                          <TbSquare size={14} />
-                        )}
+                        {selectedIds.has(v.id) ? <TbSquareCheckFilled size={14} /> : <TbSquare size={14} />}
                       </ActionIcon>
                     </Table.Td>
                     <Table.Td>
                       <Group gap={6} wrap="nowrap">
-                        <Code fz="xs" fw={600} style={{ whiteSpace: "nowrap" }}>
+                        <Code fz="xs" fw={600} style={{ whiteSpace: 'nowrap' }}>
                           {v.key}
                         </Code>
                         {v.isDisabled && (
-                          <Badge
-                            size="xs"
-                            variant="dot"
-                            color="orange"
-                            style={{ flexShrink: 0 }}
-                          >
+                          <Badge size="xs" variant="dot" color="orange" style={{ flexShrink: 0 }}>
                             off
                           </Badge>
                         )}
                         {canEdit ? (
-                          <Tooltip
-                            label={
-                              v.isSecret ? "Klik → plain" : "Klik → secret"
-                            }
-                            position="right"
-                          >
+                          <Tooltip label={v.isSecret ? 'Klik → plain' : 'Klik → secret'} position="right">
                             <Badge
                               size="xs"
-                              color={v.isSecret ? "red" : "gray"}
-                              variant={v.isSecret ? "light" : "outline"}
-                              leftSection={
-                                v.isSecret ? <TbLock size={9} /> : undefined
-                              }
+                              color={v.isSecret ? 'red' : 'gray'}
+                              variant={v.isSecret ? 'light' : 'outline'}
+                              leftSection={v.isSecret ? <TbLock size={9} /> : undefined}
                               style={{
-                                cursor:
-                                  v.value === "***" ? "not-allowed" : "pointer",
+                                cursor: v.value === '***' ? 'not-allowed' : 'pointer',
                                 flexShrink: 0,
                               }}
                               onClick={() => {
-                                if (v.value === "***") return;
+                                if (v.value === '***') return
                                 updateVar.mutate({
                                   key: v.key,
                                   value: v.value,
                                   isSecret: !v.isSecret,
-                                });
+                                })
                               }}
                             >
-                              {updateVar.isPending &&
-                              updateVar.variables?.key === v.key
-                                ? "…"
+                              {updateVar.isPending && updateVar.variables?.key === v.key
+                                ? '…'
                                 : v.isSecret
-                                  ? "secret"
-                                  : "plain"}
+                                  ? 'secret'
+                                  : 'plain'}
                             </Badge>
                           </Tooltip>
                         ) : v.isSecret ? (
-                          <Badge
-                            size="xs"
-                            color="red"
-                            variant="light"
-                            leftSection={<TbLock size={9} />}
-                          >
+                          <Badge size="xs" color="red" variant="light" leftSection={<TbLock size={9} />}>
                             secret
                           </Badge>
                         ) : null}
@@ -2612,43 +2150,27 @@ function VarsPage() {
                             <Text
                               fz="xs"
                               ff="monospace"
-                              c={revealed.has(v.id) ? undefined : "dimmed"}
+                              c={revealed.has(v.id) ? undefined : 'dimmed'}
                               style={{
-                                letterSpacing: revealed.has(v.id)
-                                  ? undefined
-                                  : 3,
-                                userSelect: revealed.has(v.id)
-                                  ? undefined
-                                  : "none",
+                                letterSpacing: revealed.has(v.id) ? undefined : 3,
+                                userSelect: revealed.has(v.id) ? undefined : 'none',
                               }}
                             >
-                              {revealed.has(v.id) ? v.value : "••••••••••"}
+                              {revealed.has(v.id) ? v.value : '••••••••••'}
                             </Text>
-                            <Tooltip
-                              label={
-                                revealed.has(v.id) ? "Sembunyikan" : "Tampilkan"
-                              }
-                            >
+                            <Tooltip label={revealed.has(v.id) ? 'Sembunyikan' : 'Tampilkan'}>
                               <ActionIcon
                                 size="xs"
                                 variant="subtle"
-                                color={revealed.has(v.id) ? "blue" : "gray"}
+                                color={revealed.has(v.id) ? 'blue' : 'gray'}
                                 onClick={() => toggleReveal(v.id)}
                               >
-                                {revealed.has(v.id) ? (
-                                  <TbEyeOff size={12} />
-                                ) : (
-                                  <TbEye size={12} />
-                                )}
+                                {revealed.has(v.id) ? <TbEyeOff size={12} /> : <TbEye size={12} />}
                               </ActionIcon>
                             </Tooltip>
                           </>
                         ) : (
-                          <Text
-                            fz="xs"
-                            ff="monospace"
-                            style={{ wordBreak: "break-all" }}
-                          >
+                          <Text fz="xs" ff="monospace" style={{ wordBreak: 'break-all' }}>
                             {v.value || (
                               <Text span c="dimmed" fz="xs" fs="italic">
                                 (kosong)
@@ -2659,15 +2181,8 @@ function VarsPage() {
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Tooltip
-                        label={new Date(v.updatedAt).toLocaleString("id-ID")}
-                        position="left"
-                      >
-                        <Text
-                          fz={10}
-                          c="dimmed"
-                          style={{ whiteSpace: "nowrap", cursor: "default" }}
-                        >
+                      <Tooltip label={new Date(v.updatedAt).toLocaleString('id-ID')} position="left">
+                        <Text fz={10} c="dimmed" style={{ whiteSpace: 'nowrap', cursor: 'default' }}>
                           {relTime(v.updatedAt)}
                         </Text>
                       </Tooltip>
@@ -2676,63 +2191,33 @@ function VarsPage() {
                       <Group gap={4} wrap="nowrap">
                         <CopyButton value={toEnvLine(v)}>
                           {({ copied, copy }) => (
-                            <Tooltip
-                              label={copied ? "Tersalin!" : "Copy KEY=value"}
-                            >
-                              <ActionIcon
-                                size="sm"
-                                variant="subtle"
-                                color={copied ? "teal" : "gray"}
-                                onClick={copy}
-                              >
-                                {copied ? (
-                                  <TbCheck size={13} />
-                                ) : (
-                                  <TbCopy size={13} />
-                                )}
+                            <Tooltip label={copied ? 'Tersalin!' : 'Copy KEY=value'}>
+                              <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                                {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
                               </ActionIcon>
                             </Tooltip>
                           )}
                         </CopyButton>
                         {canEdit && (
                           <>
-                            <Tooltip
-                              label={v.isDisabled ? "Aktifkan" : "Nonaktifkan"}
-                            >
+                            <Tooltip label={v.isDisabled ? 'Aktifkan' : 'Nonaktifkan'}>
                               <ActionIcon
                                 size="sm"
                                 variant="subtle"
-                                color={v.isDisabled ? "orange" : "teal"}
-                                loading={
-                                  toggleDisabled.isPending &&
-                                  toggleDisabled.variables === v.key
-                                }
+                                color={v.isDisabled ? 'orange' : 'teal'}
+                                loading={toggleDisabled.isPending && toggleDisabled.variables === v.key}
                                 onClick={() => toggleDisabled.mutate(v.key)}
                               >
-                                {v.isDisabled ? (
-                                  <TbToggleLeft size={15} />
-                                ) : (
-                                  <TbToggleRight size={15} />
-                                )}
+                                {v.isDisabled ? <TbToggleLeft size={15} /> : <TbToggleRight size={15} />}
                               </ActionIcon>
                             </Tooltip>
                             <Tooltip label="Edit">
-                              <ActionIcon
-                                size="sm"
-                                variant="subtle"
-                                color="primary"
-                                onClick={() => startEdit(v)}
-                              >
+                              <ActionIcon size="sm" variant="subtle" color="primary" onClick={() => startEdit(v)}>
                                 <TbPencil size={13} />
                               </ActionIcon>
                             </Tooltip>
                             <Tooltip label="Hapus">
-                              <ActionIcon
-                                size="sm"
-                                variant="subtle"
-                                color="red"
-                                onClick={() => deleteVar(v.key)}
-                              >
+                              <ActionIcon size="sm" variant="subtle" color="red" onClick={() => deleteVar(v.key)}>
                                 <TbTrash size={13} />
                               </ActionIcon>
                             </Tooltip>
@@ -2741,7 +2226,7 @@ function VarsPage() {
                       </Group>
                     </Table.Td>
                   </Table.Tr>
-                );
+                )
               })}
             </Table.Tbody>
           </Table>
@@ -2750,8 +2235,8 @@ function VarsPage() {
               px="sm"
               py={6}
               style={{
-                borderTop: "1px solid var(--mantine-color-default-border)",
-                background: "var(--mantine-color-default-hover)",
+                borderTop: '1px solid var(--mantine-color-default-border)',
+                background: 'var(--mantine-color-default-hover)',
               }}
             >
               <Group justify="space-between" wrap="wrap" gap="xs">
@@ -2759,19 +2244,13 @@ function VarsPage() {
                   <strong>{varsTotal}</strong> variabel total
                   {activeCount < vars.length && (
                     <>
-                      {" "}
-                      · <strong>{activeCount}</strong> aktif ·{" "}
-                      <strong>{disabledCount}</strong> disabled
+                      {' '}
+                      · <strong>{activeCount}</strong> aktif · <strong>{disabledCount}</strong> disabled
                     </>
                   )}
                 </Text>
                 {varsTotalPages > 1 && (
-                  <Pagination
-                    value={varsPage}
-                    onChange={setVarsPage}
-                    total={varsTotalPages}
-                    size="xs"
-                  />
+                  <Pagination value={varsPage} onChange={setVarsPage} total={varsTotalPages} size="xs" />
                 )}
               </Group>
             </Box>
@@ -2780,13 +2259,7 @@ function VarsPage() {
       )}
 
       {/* Compare modal — VIEWER+ */}
-      <CompareModal
-        opened={compareOpen}
-        onClose={closeCompare}
-        slug={slug}
-        env={env}
-        canEdit={canEdit}
-      />
+      <CompareModal opened={compareOpen} onClose={closeCompare} slug={slug} env={env} canEdit={canEdit} />
     </Box>
-  );
+  )
 }

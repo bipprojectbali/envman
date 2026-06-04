@@ -11,38 +11,31 @@ import {
   Tabs,
   Text,
   Tooltip,
-} from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
-import {
-  TbBan,
-  TbCheck,
-  TbCopy,
-  TbKey,
-  TbShieldCheck,
-  TbUser,
-} from "react-icons/tb";
-import { UserAvatar } from "@/frontend/components/UserAvatar";
-import { apiFetch } from "@/frontend/lib/api";
-import { AccessMatrixTab } from "./AccessMatrixTab";
-import { PermissionsTab } from "./PermissionsTab";
-import { ProfileTab } from "./ProfileTab";
-import type { UserAccess } from "./types";
-import { GLOBAL_ROLE_COLOR } from "./types";
+} from '@mantine/core'
+import { useQuery } from '@tanstack/react-query'
+import { TbBan, TbCheck, TbCopy, TbKey, TbShieldCheck, TbUser } from 'react-icons/tb'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
+import { apiFetch } from '@/frontend/lib/api'
+import { AccessMatrixTab } from './AccessMatrixTab'
+import { PermissionsTab } from './PermissionsTab'
+import { ProfileTab } from './ProfileTab'
+import type { UserAccess } from './types'
+import { GLOBAL_ROLE_COLOR } from './types'
 
 export function UserDrawerContent({ userId }: { userId: string }) {
   const { data, isLoading } = useQuery<UserAccess>({
-    queryKey: ["admin", "envman-users", userId, "access"],
+    queryKey: ['admin', 'envman-users', userId, 'access'],
     queryFn: () => apiFetch(`/api/envman/admin/users/${userId}/access`),
-  });
+  })
 
   if (isLoading || !data) {
     return (
       <Stack gap="md">
         <Box
           style={{
-            border: "1px solid var(--mantine-color-default-border)",
+            border: '1px solid var(--mantine-color-default-border)',
             borderRadius: 8,
-            overflow: "hidden",
+            overflow: 'hidden',
           }}
         >
           <Skeleton height={4} radius={0} />
@@ -69,7 +62,7 @@ export function UserDrawerContent({ userId }: { userId: string }) {
         </Box>
         <Box
           style={{
-            border: "1px solid var(--mantine-color-default-border)",
+            border: '1px solid var(--mantine-color-default-border)',
             borderRadius: 8,
           }}
           p="md"
@@ -81,57 +74,54 @@ export function UserDrawerContent({ userId }: { userId: string }) {
           </Stack>
         </Box>
       </Stack>
-    );
+    )
   }
 
-  const { user, projects } = data;
-  const accessibleProjects = projects.filter(
-    (p) => p.projectRole !== null,
-  ).length;
+  const { user, projects } = data
+  const accessibleProjects = projects.filter((p) => p.projectRole !== null).length
   const envOverrides = projects.reduce(
-    (sum, p) =>
-      sum + p.environments.filter((e) => e.envRole !== "inherit").length,
+    (sum, p) => sum + p.environments.filter((e) => e.envRole !== 'inherit').length,
     0,
-  );
-  const permissionCount = user.permissions.length;
-  const isSuperAdmin = user.role === "SUPER_ADMIN";
-  const isUserOnly = user.role === "USER";
-  const roleColor = GLOBAL_ROLE_COLOR[user.role];
+  )
+  const permissionCount = user.permissions.length
+  const isSuperAdmin = user.role === 'SUPER_ADMIN'
+  const isUserOnly = user.role === 'USER'
+  const roleColor = GLOBAL_ROLE_COLOR[user.role]
 
   return (
     <Stack gap="md">
       {/* Header card */}
       <Box
         style={{
-          border: "1px solid var(--mantine-color-default-border)",
+          border: '1px solid var(--mantine-color-default-border)',
           borderRadius: 8,
-          overflow: "hidden",
+          overflow: 'hidden',
         }}
       >
         <Box p="md">
           <Group gap="md" wrap="nowrap">
-            <Box style={{ position: "relative", flexShrink: 0 }}>
+            <Box style={{ position: 'relative', flexShrink: 0 }}>
               <UserAvatar
                 user={user}
                 size={56}
                 color={roleColor}
                 variant="gradient"
-                gradient={{ from: roleColor, to: "grape" }}
+                gradient={{ from: roleColor, to: 'grape' }}
               />
               {user.blocked && (
                 <Box
                   style={{
-                    position: "absolute",
+                    position: 'absolute',
                     bottom: 0,
                     right: 0,
-                    background: "var(--mantine-color-red-6)",
-                    borderRadius: "50%",
+                    background: 'var(--mantine-color-red-6)',
+                    borderRadius: '50%',
                     width: 18,
                     height: 18,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "2px solid var(--mantine-color-body)",
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '2px solid var(--mantine-color-body)',
                   }}
                 >
                   <TbBan size={10} color="white" />
@@ -148,16 +138,8 @@ export function UserDrawerContent({ userId }: { userId: string }) {
                 </Text>
                 <CopyButton value={user.email}>
                   {({ copied, copy }) => (
-                    <Tooltip
-                      label={copied ? "Disalin" : "Copy email"}
-                      withArrow
-                    >
-                      <ActionIcon
-                        size="xs"
-                        variant="subtle"
-                        color="gray"
-                        onClick={copy}
-                      >
+                    <Tooltip label={copied ? 'Disalin' : 'Copy email'} withArrow>
+                      <ActionIcon size="xs" variant="subtle" color="gray" onClick={copy}>
                         {copied ? <TbCheck size={10} /> : <TbCopy size={10} />}
                       </ActionIcon>
                     </Tooltip>
@@ -169,12 +151,7 @@ export function UserDrawerContent({ userId }: { userId: string }) {
                   {user.role}
                 </Badge>
                 {user.blocked && (
-                  <Badge
-                    size="xs"
-                    color="red"
-                    variant="light"
-                    leftSection={<TbBan size={9} />}
-                  >
+                  <Badge size="xs" color="red" variant="light" leftSection={<TbBan size={9} />}>
                     Blocked
                   </Badge>
                 )}
@@ -193,22 +170,18 @@ export function UserDrawerContent({ userId }: { userId: string }) {
           {[
             {
               value: accessibleProjects,
-              label: "Projects",
-              color: accessibleProjects > 0 ? "violet" : "gray",
+              label: 'Projects',
+              color: accessibleProjects > 0 ? 'violet' : 'gray',
             },
             {
               value: envOverrides,
-              label: "Overrides",
-              color: envOverrides > 0 ? "orange" : "gray",
+              label: 'Overrides',
+              color: envOverrides > 0 ? 'orange' : 'gray',
             },
             {
-              value: isSuperAdmin ? "∞" : permissionCount,
-              label: "Capabilities",
-              color: isSuperAdmin
-                ? "violet"
-                : permissionCount > 0
-                  ? "teal"
-                  : "gray",
+              value: isSuperAdmin ? '∞' : permissionCount,
+              label: 'Capabilities',
+              color: isSuperAdmin ? 'violet' : permissionCount > 0 ? 'teal' : 'gray',
             },
           ].map((s) => (
             <Stack key={s.label} gap={2} align="center">
@@ -270,5 +243,5 @@ export function UserDrawerContent({ userId }: { userId: string }) {
         )}
       </Tabs>
     </Stack>
-  );
+  )
 }

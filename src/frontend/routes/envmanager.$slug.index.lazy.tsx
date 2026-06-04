@@ -145,7 +145,8 @@ const HOVER_STYLES = `
 
 function ProjectDetailPage() {
   const { slug } = Route.useParams()
-  const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId, noteId, noteNew, viewNoteId } = Route.useSearch()
+  const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId, noteId, noteNew, viewNoteId } =
+    Route.useSearch()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: sessionData } = useSession()
@@ -182,7 +183,8 @@ function ProjectDetailPage() {
         fileNew,
         viewFileId,
         aliasId,
-        aliasNew, viewAliasId,
+        aliasNew,
+        viewAliasId,
         noteId,
         noteNew,
         viewNoteId,
@@ -222,7 +224,7 @@ function ProjectDetailPage() {
 
   const allEnvTags = useMemo(() => {
     const set = new Set<string>()
-    for (const e of envs) for (const t of (e.tags ?? [])) set.add(t)
+    for (const e of envs) for (const t of e.tags ?? []) set.add(t)
     return [...set].sort()
   }, [envs])
 
@@ -302,7 +304,7 @@ function ProjectDetailPage() {
     onError: (e) => notifyErr(e),
   })
 
-  const renameEnv = (oldName: string, varCount: number) => {
+  const _renameEnv = (oldName: string, varCount: number) => {
     const modalId = `rename-env-${oldName}`
     const otherNames = envs.filter((e) => e.name !== oldName).map((e) => e.name)
     modals.open({
@@ -967,23 +969,30 @@ function ProjectDetailPage() {
                         const grouped = new Map<string, typeof filteredEnvs>()
                         const untagged: typeof filteredEnvs = []
                         for (const env of filteredEnvs) {
-                          if ((env.tags ?? []).length === 0) { untagged.push(env); continue }
+                          if ((env.tags ?? []).length === 0) {
+                            untagged.push(env)
+                            continue
+                          }
                           for (const t of env.tags ?? []) {
                             if (!grouped.has(t)) grouped.set(t, [])
                             grouped.get(t)!.push(env)
                           }
                         }
                         const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
-                        const renderGroup = (groupCards: typeof filteredEnvs) => {
+                        const _renderGroup = (groupCards: typeof filteredEnvs) => {
                           const gc = groupCards.map((ge) => {
-                            const gc2 = getEnvColor(ge.name)
-                            const vc = ge._count?.vars ?? 0
-                            const gt = () => navigate({ to: '/envmanager/$slug/$env', params: { slug, env: ge.name } })
+                            const _gc2 = getEnvColor(ge.name)
+                            const _vc = ge._count?.vars ?? 0
+                            const _gt = () => navigate({ to: '/envmanager/$slug/$env', params: { slug, env: ge.name } })
                             return cards[filteredEnvs.indexOf(ge)]
                           })
-                          return envView === 'grid'
-                            ? <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{gc}</SimpleGrid>
-                            : <Stack gap="xs">{gc}</Stack>
+                          return envView === 'grid' ? (
+                            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">
+                              {gc}
+                            </SimpleGrid>
+                          ) : (
+                            <Stack gap="xs">{gc}</Stack>
+                          )
                         }
                         const cardsByEnv = new Map(filteredEnvs.map((e, i) => [e.name, cards[i]]))
                         return (
@@ -991,25 +1000,35 @@ function ProjectDetailPage() {
                             {groups.map(([tag, tagEnvs]) => (
                               <Stack key={tag} gap="xs">
                                 <Group gap={6} align="center">
-                                  <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                                  <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>
+                                    {tag}
+                                  </Badge>
                                   <Divider style={{ flex: 1 }} />
                                 </Group>
-                                {envView === 'grid'
-                                  ? <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{tagEnvs.map((e) => cardsByEnv.get(e.name))}</SimpleGrid>
-                                  : <Stack gap="xs">{tagEnvs.map((e) => cardsByEnv.get(e.name))}</Stack>
-                                }
+                                {envView === 'grid' ? (
+                                  <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">
+                                    {tagEnvs.map((e) => cardsByEnv.get(e.name))}
+                                  </SimpleGrid>
+                                ) : (
+                                  <Stack gap="xs">{tagEnvs.map((e) => cardsByEnv.get(e.name))}</Stack>
+                                )}
                               </Stack>
                             ))}
                             {untagged.length > 0 && (
                               <Stack gap="xs">
                                 <Group gap={6} align="center">
-                                  <Text size="xs" c="dimmed" fw={500}>Lainnya</Text>
+                                  <Text size="xs" c="dimmed" fw={500}>
+                                    Lainnya
+                                  </Text>
                                   <Divider style={{ flex: 1 }} />
                                 </Group>
-                                {envView === 'grid'
-                                  ? <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">{untagged.map((e) => cardsByEnv.get(e.name))}</SimpleGrid>
-                                  : <Stack gap="xs">{untagged.map((e) => cardsByEnv.get(e.name))}</Stack>
-                                }
+                                {envView === 'grid' ? (
+                                  <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="xs">
+                                    {untagged.map((e) => cardsByEnv.get(e.name))}
+                                  </SimpleGrid>
+                                ) : (
+                                  <Stack gap="xs">{untagged.map((e) => cardsByEnv.get(e.name))}</Stack>
+                                )}
                               </Stack>
                             )}
                           </Stack>
@@ -1030,8 +1049,21 @@ function ProjectDetailPage() {
               {/* Create + Edit modals */}
               <Modal
                 opened={createOpen}
-                onClose={() => { closeCreate(); setNewEnvName(''); setNewEnvTags([]) }}
-                title={<Group gap="xs"><ThemeIcon size="sm" variant="light" color="blue" radius="md"><TbPlus size={13} /></ThemeIcon><Text fw={600} size="sm">Buat Environment</Text></Group>}
+                onClose={() => {
+                  closeCreate()
+                  setNewEnvName('')
+                  setNewEnvTags([])
+                }}
+                title={
+                  <Group gap="xs">
+                    <ThemeIcon size="sm" variant="light" color="blue" radius="md">
+                      <TbPlus size={13} />
+                    </ThemeIcon>
+                    <Text fw={600} size="sm">
+                      Buat Environment
+                    </Text>
+                  </Group>
+                }
                 size="sm"
               >
                 <Stack gap="sm">
@@ -1040,7 +1072,10 @@ function ProjectDetailPage() {
                     placeholder="production, staging-eu, dev-alice..."
                     value={newEnvName}
                     onChange={(ev) => setNewEnvName(ev.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    onKeyDown={(ev) => { if (ev.key === 'Enter' && newEnvValid && !newEnvDuplicate) addEnv.mutate({ name: newEnvName, tags: newEnvTags }) }}
+                    onKeyDown={(ev) => {
+                      if (ev.key === 'Enter' && newEnvValid && !newEnvDuplicate)
+                        addEnv.mutate({ name: newEnvName, tags: newEnvTags })
+                    }}
                     leftSection={<TbVariable size={14} />}
                     error={newEnvError ?? undefined}
                     styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
@@ -1048,9 +1083,18 @@ function ProjectDetailPage() {
                   />
                   {envs.length < ENV_PRESETS.length && (
                     <Group gap={6}>
-                      <Text size="xs" c="dimmed">Preset:</Text>
+                      <Text size="xs" c="dimmed">
+                        Preset:
+                      </Text>
                       {ENV_PRESETS.filter((p) => !envs.some((e) => e.name === p)).map((preset) => (
-                        <Badge key={preset} size="sm" variant="outline" color={getEnvColor(preset)} style={{ cursor: 'pointer' }} onClick={() => setNewEnvName(preset)}>
+                        <Badge
+                          key={preset}
+                          size="sm"
+                          variant="outline"
+                          color={getEnvColor(preset)}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setNewEnvName(preset)}
+                        >
                           {preset}
                         </Badge>
                       ))}
@@ -1064,8 +1108,22 @@ function ProjectDetailPage() {
                     onChange={setNewEnvTags}
                   />
                   <Group justify="flex-end" mt="xs">
-                    <Button variant="default" onClick={() => { closeCreate(); setNewEnvName(''); setNewEnvTags([]) }}>Batal</Button>
-                    <Button leftSection={<TbPlus size={14} />} onClick={() => addEnv.mutate({ name: newEnvName, tags: newEnvTags })} loading={addEnv.isPending} disabled={!newEnvValid || newEnvDuplicate}>
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        closeCreate()
+                        setNewEnvName('')
+                        setNewEnvTags([])
+                      }}
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      leftSection={<TbPlus size={14} />}
+                      onClick={() => addEnv.mutate({ name: newEnvName, tags: newEnvTags })}
+                      loading={addEnv.isPending}
+                      disabled={!newEnvValid || newEnvDuplicate}
+                    >
                       Buat
                     </Button>
                   </Group>
@@ -1075,7 +1133,16 @@ function ProjectDetailPage() {
               <Modal
                 opened={!!editEnv}
                 onClose={() => setEditEnv(null)}
-                title={<Group gap="xs"><ThemeIcon size="sm" variant="light" color="blue" radius="md"><TbPencil size={13} /></ThemeIcon><Text fw={600} size="sm">Edit Environment</Text></Group>}
+                title={
+                  <Group gap="xs">
+                    <ThemeIcon size="sm" variant="light" color="blue" radius="md">
+                      <TbPencil size={13} />
+                    </ThemeIcon>
+                    <Text fw={600} size="sm">
+                      Edit Environment
+                    </Text>
+                  </Group>
+                }
                 size="sm"
               >
                 {editEnv && (
@@ -1087,7 +1154,11 @@ function ProjectDetailPage() {
                         onChange={(ev) => setEditName(ev.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                         leftSection={<TbVariable size={14} />}
                         styles={{ input: { fontFamily: 'ui-monospace, monospace' } }}
-                        error={editName.length > 0 && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(editName) ? 'Format tidak valid' : undefined}
+                        error={
+                          editName.length > 0 && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(editName)
+                            ? 'Format tidak valid'
+                            : undefined
+                        }
                       />
                     )}
                     <TagsInput
@@ -1099,7 +1170,9 @@ function ProjectDetailPage() {
                     />
                     <Divider />
                     <Group justify="flex-end">
-                      <Button variant="default" onClick={() => setEditEnv(null)}>Batal</Button>
+                      <Button variant="default" onClick={() => setEditEnv(null)}>
+                        Batal
+                      </Button>
                       <Button
                         onClick={() => updateEnv.mutate({ oldName: editEnv.name, name: editName, tags: editTags })}
                         loading={updateEnv.isPending}

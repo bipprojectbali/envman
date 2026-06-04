@@ -290,7 +290,7 @@ export const projectsRouter = new Elysia()
             }
           : {}),
       },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, image: true },
       take: 200,
       orderBy: { name: 'asc' },
     })

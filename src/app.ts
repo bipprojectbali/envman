@@ -9,9 +9,9 @@ import { audit } from './lib/audit'
 import { auth } from './lib/auth'
 import { requireAuth } from './lib/auth-middleware'
 import { prisma } from './lib/db'
-import { redis } from './lib/redis'
 import { env } from './lib/env'
 import { addConnection, broadcastToAdmins, removeConnection } from './lib/presence'
+import { redis } from './lib/redis'
 import { getIp, getPublicOrigin } from './lib/request'
 import { adminRouter } from './routes/admin/index'
 import { envmanRouter } from './routes/envman/index'
@@ -503,7 +503,10 @@ export function createApp() {
           where: { id: params.userId },
           select: { image: true },
         })
-        if (!user?.image) { set.status = 404; return null }
+        if (!user?.image) {
+          set.status = 404
+          return null
+        }
 
         const cacheKey = `avatar:${params.userId}`
         try {
@@ -516,11 +519,16 @@ export function createApp() {
               headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=3600' },
             })
           }
-        } catch { /* Redis miss — continue to fetch */ }
+        } catch {
+          /* Redis miss — continue to fetch */
+        }
 
         try {
           const res = await fetch(user.image, { signal: AbortSignal.timeout(5000) })
-          if (!res.ok) { set.status = 404; return null }
+          if (!res.ok) {
+            set.status = 404
+            return null
+          }
           const ct = res.headers.get('content-type') ?? 'image/jpeg'
           const bytes = await res.arrayBuffer()
           const b64 = Buffer.from(bytes).toString('base64')

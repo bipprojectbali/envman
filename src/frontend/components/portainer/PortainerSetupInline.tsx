@@ -1,20 +1,7 @@
-import {
-  Alert,
-  Anchor,
-  Badge,
-  Box,
-  Button,
-  Code,
-  Divider,
-  Group,
-  Select,
-  Stack,
-  Stepper,
-  Text,
-} from '@mantine/core'
+import { Alert, Anchor, Badge, Box, Button, Code, Divider, Group, Select, Stack, Stepper, Text } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { TbAlertTriangle, TbCheck, TbChevronLeft, TbPlus, TbPlugConnected, TbX } from 'react-icons/tb'
+import { TbAlertTriangle, TbCheck, TbChevronLeft, TbPlugConnected, TbPlus, TbX } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 
 interface PortainerConnection {
@@ -23,7 +10,7 @@ interface PortainerConnection {
   portainerUrl: string
 }
 
-interface Stack {
+interface PortainerStack {
   id: number
   name: string
   endpointId: number
@@ -57,17 +44,17 @@ export function PortainerSetupInline({ slug, env, mode, onClose }: Props) {
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(
     mode === 'edit' ? (existingConfig?.connectionId ?? null) : null,
   )
-  const [stacks, setStacks] = useState<Stack[]>(
+  const [stacks, setStacks] = useState<PortainerStack[]>(
     mode === 'edit' && existingConfig
       ? [{ id: existingConfig.stackId, name: existingConfig.stackName, endpointId: existingConfig.endpointId }]
       : [],
   )
-  const [selectedStack, setSelectedStack] = useState<Stack | null>(
+  const [selectedStack, setSelectedStack] = useState<PortainerStack | null>(
     mode === 'edit' && existingConfig
       ? { id: existingConfig.stackId, name: existingConfig.stackName, endpointId: existingConfig.endpointId }
       : null,
   )
-  const [additionalSelectedStacks, setAdditionalSelectedStacks] = useState<Stack[]>([])
+  const [additionalSelectedStacks, setAdditionalSelectedStacks] = useState<PortainerStack[]>([])
   const [probeError, setProbeError] = useState<string | null>(null)
 
   const probe = useMutation({
@@ -126,14 +113,23 @@ export function PortainerSetupInline({ slug, env, mode, onClose }: Props) {
         <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={onClose}>
           Integrasi
         </Text>
-        <Text size="sm" c="dimmed">/</Text>
+        <Text size="sm" c="dimmed">
+          /
+        </Text>
         <Text size="sm" fw={600}>
           {mode === 'edit' ? 'Edit Konfigurasi Portainer' : 'Hubungkan ke Portainer'}
         </Text>
       </Group>
       <Divider />
 
-      <Stepper active={step} size="xs" mb="xs" onStepClick={(s) => { if (s < step) setStep(s) }}>
+      <Stepper
+        active={step}
+        size="xs"
+        mb="xs"
+        onStepClick={(s) => {
+          if (s < step) setStep(s)
+        }}
+      >
         <Stepper.Step label="Connection" />
         <Stepper.Step label="Stack" />
       </Stepper>
@@ -144,14 +140,20 @@ export function PortainerSetupInline({ slug, env, mode, onClose }: Props) {
             <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
               <Text size="xs">
                 Belum ada Portainer connection.{' '}
-                <Anchor size="xs" href="/envmanager/connections">Tambah connection</Anchor>{' '}
+                <Anchor size="xs" href="/envmanager/connections">
+                  Tambah connection
+                </Anchor>{' '}
                 terlebih dahulu.
               </Text>
             </Alert>
           ) : (
             <>
               <Text size="xs" c="dimmed">
-                Pilih Portainer instance untuk environment <strong>{slug}:{env}</strong>.
+                Pilih Portainer instance untuk environment{' '}
+                <strong>
+                  {slug}:{env}
+                </strong>
+                .
               </Text>
               <Select
                 label="Portainer Connection"
@@ -173,11 +175,20 @@ export function PortainerSetupInline({ slug, env, mode, onClose }: Props) {
             </>
           )}
           <Group justify="space-between" mt="xs">
-            <Button size="sm" variant="subtle" color="gray" component="a" href="/envmanager/connections" leftSection={<TbPlus size={13} />}>
+            <Button
+              size="sm"
+              variant="subtle"
+              color="gray"
+              component="a"
+              href="/envmanager/connections"
+              leftSection={<TbPlus size={13} />}
+            >
               Kelola Connections
             </Button>
             <Group gap="xs">
-              <Button variant="subtle" size="sm" color="gray" onClick={onClose}>Batal</Button>
+              <Button variant="subtle" size="sm" color="gray" onClick={onClose}>
+                Batal
+              </Button>
               <Button
                 size="sm"
                 disabled={!selectedConnectionId || connections.length === 0}
@@ -209,17 +220,29 @@ export function PortainerSetupInline({ slug, env, mode, onClose }: Props) {
             nothingFoundMessage="Stack tidak ditemukan"
           />
           {selectedStack && (
-            <Box p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
-              <Text size="xs" c="dimmed" mb={6}>Ringkasan</Text>
+            <Box
+              p="sm"
+              style={{
+                border: '1px solid var(--mantine-color-default-border)',
+                borderRadius: 'var(--mantine-radius-md)',
+              }}
+            >
+              <Text size="xs" c="dimmed" mb={6}>
+                Ringkasan
+              </Text>
               <Stack gap={4}>
-                {([
-                  ['Connection', connections.find((c) => c.id === selectedConnectionId)?.name ?? '—'],
-                  ['Project:Env', `${slug}:${env}`],
-                  ['Stack (primary)', selectedStack.name],
-                  ['Endpoint', `#${selectedStack.endpointId}`],
-                ] as [string, string][]).map(([label, value]) => (
+                {(
+                  [
+                    ['Connection', connections.find((c) => c.id === selectedConnectionId)?.name ?? '—'],
+                    ['Project:Env', `${slug}:${env}`],
+                    ['Stack (primary)', selectedStack.name],
+                    ['Endpoint', `#${selectedStack.endpointId}`],
+                  ] as [string, string][]
+                ).map(([label, value]) => (
                   <Group key={label} justify="space-between">
-                    <Text size="xs" c="dimmed">{label}</Text>
+                    <Text size="xs" c="dimmed">
+                      {label}
+                    </Text>
                     <Code fz="xs">{value}</Code>
                   </Group>
                 ))}
@@ -228,7 +251,9 @@ export function PortainerSetupInline({ slug, env, mode, onClose }: Props) {
           )}
           {stacks.length > 1 && selectedStack && (
             <Box>
-              <Text size="xs" c="dimmed" mb={6}>Stack tambahan (opsional)</Text>
+              <Text size="xs" c="dimmed" mb={6}>
+                Stack tambahan (opsional)
+              </Text>
               <Select
                 placeholder="Tambah stack lain..."
                 data={stacks
@@ -246,11 +271,19 @@ export function PortainerSetupInline({ slug, env, mode, onClose }: Props) {
               {additionalSelectedStacks.length > 0 && (
                 <Stack gap={4} mt="xs">
                   {additionalSelectedStacks.map((s) => (
-                    <Group key={s.id} justify="space-between" p="xs"
-                      style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 6 }}>
+                    <Group
+                      key={s.id}
+                      justify="space-between"
+                      p="xs"
+                      style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 6 }}
+                    >
                       <Group gap="xs">
-                        <Badge size="xs" variant="outline" color="gray">ep#{s.endpointId}</Badge>
-                        <Text size="xs" ff="monospace">{s.name}</Text>
+                        <Badge size="xs" variant="outline" color="gray">
+                          ep#{s.endpointId}
+                        </Badge>
+                        <Text size="xs" ff="monospace">
+                          {s.name}
+                        </Text>
                       </Group>
                       <TbX
                         size={12}
@@ -264,7 +297,9 @@ export function PortainerSetupInline({ slug, env, mode, onClose }: Props) {
             </Box>
           )}
           <Group justify="space-between" mt="xs">
-            <Button variant="subtle" size="sm" color="gray" onClick={() => setStep(0)}>← Kembali</Button>
+            <Button variant="subtle" size="sm" color="gray" onClick={() => setStep(0)}>
+              ← Kembali
+            </Button>
             <Button
               size="sm"
               color="primary"

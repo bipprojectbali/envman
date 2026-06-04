@@ -15,7 +15,7 @@ export const Route = createFileRoute('/dashboard')({
       })
       if (!data?.user) throw redirect({ to: '/login' })
       if (data.user.blocked) throw redirect({ to: '/blocked' })
-      if (data.user.role === 'USER') throw redirect({ to: '/profile' })
+      if (data.user.role === 'USER') throw redirect({ to: '/profile', search: { tab: 'account' } })
       // Dashboard = QC ticket workflow + SUPER_ADMIN. ADMIN tidak boleh akses —
       // collaboration model: ADMIN landing di /envmanager.
       if (data.user.role === 'ADMIN')

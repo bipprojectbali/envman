@@ -219,7 +219,6 @@ function LoginPage() {
 
                 <Button
                   type="submit"
-                  
                   size="md"
                   variant="gradient"
                   leftSection={<TbLogin size={17} />}
@@ -237,7 +236,6 @@ function LoginPage() {
               fullWidth
               component="a"
               href="/api/auth/google"
-              
               size="md"
               variant="default"
               leftSection={<FcGoogle size={18} />}

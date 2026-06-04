@@ -14,7 +14,6 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core'
-import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from '@tanstack/react-router'
@@ -37,6 +36,7 @@ import {
   TbVariable,
 } from 'react-icons/tb'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { hasCapability, useLogout, useSession } from '@/frontend/hooks/useAuth'
 import { useExtensions } from '@/frontend/hooks/useExtensions'
 
@@ -246,7 +246,12 @@ function EnvManagerLayout() {
             <Menu position="bottom-end" withArrow shadow="md" width={200}>
               <Menu.Target>
                 <Box style={{ position: 'relative', cursor: 'pointer' }}>
-                  <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="sm" color="primary" variant="gradient" />
+                  <UserAvatar
+                    user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }}
+                    size="sm"
+                    color="primary"
+                    variant="gradient"
+                  />
                   <Box
                     style={{
                       position: 'absolute',
@@ -270,7 +275,10 @@ function EnvManagerLayout() {
                     {user?.email}
                   </Text>
                 </Menu.Label>
-                <Menu.Item leftSection={<TbUser size={14} />} onClick={() => navigate({ to: '/profile' })}>
+                <Menu.Item
+                  leftSection={<TbUser size={14} />}
+                  onClick={() => navigate({ to: '/profile', search: { tab: 'account' } })}
+                >
                   Profile
                 </Menu.Item>
                 <Menu.Divider />
@@ -633,7 +641,12 @@ function EnvManagerLayout() {
               <Menu position="right-end" withArrow shadow="md" width={220}>
                 <Menu.Target>
                   <Box style={{ position: 'relative', cursor: 'pointer' }}>
-                    <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="md" color="primary" variant="gradient" />
+                    <UserAvatar
+                      user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }}
+                      size="md"
+                      color="primary"
+                      variant="gradient"
+                    />
                     <Box
                       style={{
                         position: 'absolute',
@@ -689,7 +702,12 @@ function EnvManagerLayout() {
                   >
                     <Group gap="xs" wrap="nowrap">
                       <Box style={{ position: 'relative', flexShrink: 0 }}>
-                        <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="md" color="primary" variant="gradient" />
+                        <UserAvatar
+                          user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }}
+                          size="md"
+                          color="primary"
+                          variant="gradient"
+                        />
                         <Box
                           style={{
                             position: 'absolute',

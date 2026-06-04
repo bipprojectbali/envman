@@ -400,6 +400,7 @@ function GistForm({ gist, onClose }: { gist?: Gist; onClose: () => void }) {
           </Tabs.List>
 
           {files.map((f, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: gist files have no stable id
             <Tabs.Panel key={i} value={String(i)} pt="sm">
               <Stack gap="xs">
                 {/* Toolbar: filename + language + write/preview */}
@@ -1543,17 +1544,29 @@ function GistsPage() {
               view === 'list' ? (
                 <Stack gap="xs">
                   {list.map((g) => (
-                    <GistCard key={g.id} gist={g} isOwner={canManageGist(g.user.id)}
-                      onView={() => goToView(g.id)} onEdit={() => goToEdit(g.id)}
-                      onDelete={() => deleteGist(g)} onTagClick={addTagFilter} />
+                    <GistCard
+                      key={g.id}
+                      gist={g}
+                      isOwner={canManageGist(g.user.id)}
+                      onView={() => goToView(g.id)}
+                      onEdit={() => goToEdit(g.id)}
+                      onDelete={() => deleteGist(g)}
+                      onTagClick={addTagFilter}
+                    />
                   ))}
                 </Stack>
               ) : (
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
                   {list.map((g) => (
-                    <GistCard key={g.id} gist={g} isOwner={canManageGist(g.user.id)}
-                      onView={() => goToView(g.id)} onEdit={() => goToEdit(g.id)}
-                      onDelete={() => deleteGist(g)} onTagClick={addTagFilter} />
+                    <GistCard
+                      key={g.id}
+                      gist={g}
+                      isOwner={canManageGist(g.user.id)}
+                      onView={() => goToView(g.id)}
+                      onEdit={() => goToEdit(g.id)}
+                      onDelete={() => deleteGist(g)}
+                      onTagClick={addTagFilter}
+                    />
                   ))}
                 </SimpleGrid>
               )
@@ -1563,7 +1576,10 @@ function GistsPage() {
             const grouped = new Map<string, typeof filtered>()
             const untagged: typeof filtered = []
             for (const g of filtered) {
-              if (g.tags.length === 0) { untagged.push(g); continue }
+              if (g.tags.length === 0) {
+                untagged.push(g)
+                continue
+              }
               const tag = g.tags[0]
               if (!grouped.has(tag)) grouped.set(tag, [])
               grouped.get(tag)!.push(g)
@@ -1574,7 +1590,9 @@ function GistsPage() {
                 {groups.map(([tag, items]) => (
                   <Stack key={tag} gap="xs">
                     <Group gap={6} align="center">
-                      <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                      <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>
+                        {tag}
+                      </Badge>
                       <Divider style={{ flex: 1 }} />
                     </Group>
                     {renderCards(items)}
@@ -1583,7 +1601,9 @@ function GistsPage() {
                 {untagged.length > 0 && (
                   <Stack gap="xs">
                     <Group gap={6} align="center">
-                      <Text size="xs" c="dimmed" fw={500}>Tanpa tag</Text>
+                      <Text size="xs" c="dimmed" fw={500}>
+                        Tanpa tag
+                      </Text>
                       <Divider style={{ flex: 1 }} />
                     </Group>
                     {renderCards(untagged)}

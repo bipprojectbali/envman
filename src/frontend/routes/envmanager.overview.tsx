@@ -330,7 +330,9 @@ function OverviewPage() {
           sub="Portainer instance"
           color="teal"
           loading={loadingConnections}
-          onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections', connectionForm: undefined } })}
+          onClick={() =>
+            navigate({ to: '/envmanager/connections', search: { tab: 'connections', connectionForm: undefined } })
+          }
         />
         <StatCard
           icon={TbBrandGithub}
@@ -422,7 +424,8 @@ function OverviewPage() {
                       fileNew: false,
                       viewFileId: undefined,
                       aliasId: undefined,
-                      aliasNew: false, viewAliasId: undefined,
+                      aliasNew: false,
+                      viewAliasId: undefined,
                       noteId: undefined,
                       noteNew: false,
                       viewNoteId: undefined,
@@ -738,7 +741,9 @@ function OverviewPage() {
                 variant="subtle"
                 color="teal"
                 rightSection={<TbArrowRight size={12} />}
-                onClick={() => navigate({ to: '/envmanager/connections', search: { tab: 'connections', connectionForm: undefined } })}
+                onClick={() =>
+                  navigate({ to: '/envmanager/connections', search: { tab: 'connections', connectionForm: undefined } })
+                }
               >
                 Kelola
               </Button>

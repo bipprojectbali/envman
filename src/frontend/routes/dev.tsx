@@ -8,6 +8,7 @@ const validTabs = [
   'user-logs',
   'database',
   'project',
+  'file-health',
   'extensions',
   'settings',
 ] as const
@@ -25,7 +26,7 @@ export const Route = createFileRoute('/dev')({
       })
       if (!data?.user) throw redirect({ to: '/login' })
       if (data.user.blocked) throw redirect({ to: '/blocked' })
-      if (data.user.role !== 'SUPER_ADMIN') throw redirect({ to: '/profile' })
+      if (data.user.role !== 'SUPER_ADMIN') throw redirect({ to: '/profile', search: { tab: 'account' } })
     } catch (e) {
       if (e instanceof Error) throw redirect({ to: '/login' })
       throw e

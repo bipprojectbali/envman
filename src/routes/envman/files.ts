@@ -206,8 +206,12 @@ export const filesRouter = new Elysia()
       where: { id: existing.id },
       data: {
         ...(body?.title !== undefined ? { title: typeof body.title === 'string' ? body.title.trim() : '' } : {}),
-        ...(body?.description !== undefined ? { description: typeof body.description === 'string' ? body.description.trim() : '' } : {}),
-        ...(body?.prefix !== undefined ? { prefix: typeof body.prefix === 'string' ? body.prefix.trim() || null : null } : {}),
+        ...(body?.description !== undefined
+          ? { description: typeof body.description === 'string' ? body.description.trim() : '' }
+          : {}),
+        ...(body?.prefix !== undefined
+          ? { prefix: typeof body.prefix === 'string' ? body.prefix.trim() || null : null }
+          : {}),
         ...(body?.files !== undefined ? { files: body.files as any } : {}),
         ...(body?.tags !== undefined ? { tags: body.tags } : {}),
       },

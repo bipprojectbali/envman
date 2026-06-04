@@ -14,26 +14,23 @@ import {
   Modal,
   NumberInput,
   ScrollArea,
-  Select,
   Skeleton,
   Stack,
-  Stepper,
   Switch,
   Text,
   TextInput,
   ThemeIcon,
   Tooltip,
-} from "@mantine/core";
-import { useDisclosure, useLocalStorage } from "@mantine/hooks";
-import { modals } from "@mantine/modals";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+} from '@mantine/core'
+import { useDisclosure, useLocalStorage } from '@mantine/hooks'
+import { modals } from '@mantine/modals'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   TbAlertTriangle,
   TbBookmark,
   TbCheck,
-  TbChevronLeft,
   TbChevronRight,
   TbClipboard,
   TbCloud,
@@ -58,344 +55,288 @@ import {
   TbTerminal2,
   TbTrash,
   TbX,
-} from "react-icons/tb";
-import { CodeEditor } from "@/frontend/components/CodeEditor";
-import { useSession } from "../hooks/useAuth";
+} from 'react-icons/tb'
+import { CodeEditor } from '@/frontend/components/CodeEditor'
+import { useSession } from '../hooks/useAuth'
 
 interface Props {
-  slug: string;
-  env: string;
-  canEdit: boolean;
-  secretCount: number;
-  onSetupOpen: (mode: "new" | "edit") => void;
-}
-
-interface PortainerStack {
-  id: number;
-  name: string;
-  endpointId: number;
+  slug: string
+  env: string
+  canEdit: boolean
+  secretCount: number
+  onSetupOpen: (mode: 'new' | 'edit') => void
 }
 
 interface PortainerConnection {
-  id: string;
-  name: string;
-  portainerUrl: string;
+  id: string
+  name: string
+  portainerUrl: string
 }
 
 interface StackTarget {
-  id: string;
-  stackId: number;
-  stackName: string;
-  endpointId: number;
-  label?: string | null;
+  id: string
+  stackId: number
+  stackName: string
+  endpointId: number
+  label?: string | null
 }
 
 interface PortainerConfig {
-  id: string;
-  portainerUrl?: string | null;
-  stackId: number;
-  stackName: string;
-  endpointId: number;
-  lastSyncAt: string | null;
-  lastSyncOk: boolean | null;
-  connectionId?: string | null;
-  connectionName?: string | null;
-  autoSync?: boolean;
-  additionalTargets?: StackTarget[];
+  id: string
+  portainerUrl?: string | null
+  stackId: number
+  stackName: string
+  endpointId: number
+  lastSyncAt: string | null
+  lastSyncOk: boolean | null
+  connectionId?: string | null
+  connectionName?: string | null
+  autoSync?: boolean
+  additionalTargets?: StackTarget[]
 }
 
 interface ContainerInfo {
-  id: string;
-  shortId: string;
-  names: string[];
-  image: string;
-  status: string;
-  state: string;
-  ports: string[];
+  id: string
+  shortId: string
+  names: string[]
+  image: string
+  status: string
+  state: string
+  ports: string[]
 }
 
 interface LogLine {
-  stream: "stdout" | "stderr";
-  timestamp: string | null;
-  message: string;
+  stream: 'stdout' | 'stderr'
+  timestamp: string | null
+  message: string
 }
 
 const stateColor: Record<string, string> = {
-  running: "teal",
-  exited: "red",
-  paused: "yellow",
-  restarting: "orange",
-  dead: "red",
-  created: "gray",
-};
+  running: 'teal',
+  exited: 'red',
+  paused: 'yellow',
+  restarting: 'orange',
+  dead: 'red',
+  created: 'gray',
+}
 
 interface DiffItem {
-  key: string;
-  oldValue: string;
-  newValue: string;
+  key: string
+  oldValue: string
+  newValue: string
 }
 
 interface DiffResult {
-  added: string[];
-  removed: string[];
-  changed: DiffItem[];
-  unchanged: string[];
-  totalCurrent: number;
-  totalProposed: number;
+  added: string[]
+  removed: string[]
+  changed: DiffItem[]
+  unchanged: string[]
+  totalCurrent: number
+  totalProposed: number
 }
 
 const apiFetch = (url: string, opts?: RequestInit) =>
   fetch(url, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     ...opts,
   }).then(async (r) => {
-    const body = await r.json();
-    if (!r.ok) throw new Error(body.error ?? "Request failed");
-    return body;
-  });
+    const body = await r.json()
+    if (!r.ok) throw new Error(body.error ?? 'Request failed')
+    return body
+  })
 
 function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "baru saja";
-  if (m < 60) return `${m} menit lalu`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam lalu`;
-  return `${Math.floor(h / 24)} hari lalu`;
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'baru saja'
+  if (m < 60) return `${m} menit lalu`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} jam lalu`
+  return `${Math.floor(h / 24)} hari lalu`
 }
 
-export function PortainerSync({
-  slug,
-  env,
-  canEdit,
-  secretCount,
-  onSetupOpen,
-}: Props) {
-  const { data: session } = useSession();
-  const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
-  const qc = useQueryClient();
-  const [diffOpen, { open: openDiff, close: closeDiff }] = useDisclosure(false);
+export function PortainerSync({ slug, env, canEdit, secretCount, onSetupOpen }: Props) {
+  const { data: session } = useSession()
+  const isSuperAdmin = session?.user?.role === 'SUPER_ADMIN'
+  const qc = useQueryClient()
+  const [diffOpen, { open: openDiff, close: closeDiff }] = useDisclosure(false)
 
   // Operasi async yang sedang berjalan — persist di localStorage agar tidak hilang saat reload
-  const opsKey = `envman:portainer-op:${slug}:${env}`;
+  const opsKey = `envman:portainer-op:${slug}:${env}`
   type OpState = {
-    type: "repull" | "recreate";
-    startedAt: number;
-    step: string;
-    done: boolean;
-    error: string | null;
-  };
+    type: 'repull' | 'recreate'
+    startedAt: number
+    step: string
+    done: boolean
+    error: string | null
+  }
   const [activeOp, setActiveOp] = useState<OpState | null>(() => {
     try {
-      const s = localStorage.getItem(opsKey);
-      return s ? JSON.parse(s) : null;
+      const s = localStorage.getItem(opsKey)
+      return s ? JSON.parse(s) : null
     } catch {
-      return null;
+      return null
     }
-  });
+  })
   const setOp = useCallback(
     (op: OpState | null) => {
-      setActiveOp(op);
-      if (op) localStorage.setItem(opsKey, JSON.stringify(op));
-      else localStorage.removeItem(opsKey);
+      setActiveOp(op)
+      if (op) localStorage.setItem(opsKey, JSON.stringify(op))
+      else localStorage.removeItem(opsKey)
     },
     [opsKey],
-  );
+  )
 
   // Logs modal
-  const [logsOpen, { open: openLogs, close: closeLogs }] = useDisclosure(false);
-  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(
-    null,
-  );
-  const [logTail, setLogTail] = useState(200);
-  const [showStdout, setShowStdout] = useState(true);
-  const [showStderr, setShowStderr] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const logViewportRef = useRef<HTMLDivElement>(null);
+  const [logsOpen, { open: openLogs, close: closeLogs }] = useDisclosure(false)
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null)
+  const [logTail, setLogTail] = useState(200)
+  const [showStdout, setShowStdout] = useState(true)
+  const [showStderr, setShowStderr] = useState(true)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoScroll, setAutoScroll] = useState(true)
+  const logViewportRef = useRef<HTMLDivElement>(null)
 
   // Compose editor modal state
-  const [composeOpen, { open: openCompose, close: closeCompose }] =
-    useDisclosure(false);
-  const [composeContent, setComposeContent] = useState("");
+  const [composeOpen, { open: openCompose, close: closeCompose }] = useDisclosure(false)
+  const [composeContent, setComposeContent] = useState('')
 
   // Exec modal state
   type ExecContainer = {
-    containerId: string;
-    endpointId: number;
-    containerName: string;
-  };
-  const [execOpen, { open: openExec, close: closeExec }] = useDisclosure(false);
-  const [execContainer, setExecContainer] = useState<ExecContainer | null>(
-    null,
-  );
-  const [execCommand, setExecCommand] = useState("");
+    containerId: string
+    endpointId: number
+    containerName: string
+  }
+  const [execOpen, { open: openExec, close: closeExec }] = useDisclosure(false)
+  const [execContainer, setExecContainer] = useState<ExecContainer | null>(null)
+  const [execCommand, setExecCommand] = useState('')
   const [execHistory, setExecHistory] = useState<
     {
-      command: string;
-      stdout: string[];
-      stderr: string[];
-      exitCode: number | null;
-      timestamp: number;
+      command: string
+      stdout: string[]
+      stderr: string[]
+      exitCode: number | null
+      timestamp: number
     }[]
-  >([]);
-  const [execQuickCommands, setExecQuickCommands] = useLocalStorage<
-    { id: string; label: string; command: string }[]
-  >({
-    key: "envman:exec:quick-commands",
+  >([])
+  const [execQuickCommands, setExecQuickCommands] = useLocalStorage<{ id: string; label: string; command: string }[]>({
+    key: 'envman:exec:quick-commands',
     defaultValue: [
-      { id: "ps", label: "ps", command: "ps aux" },
-      { id: "env", label: "env", command: "env | sort" },
-      { id: "df", label: "df", command: "df -h" },
+      { id: 'ps', label: 'ps', command: 'ps aux' },
+      { id: 'env', label: 'env', command: 'env | sort' },
+      { id: 'df', label: 'df', command: 'df -h' },
       {
-        id: "free",
-        label: "free",
-        command: "free -h 2>/dev/null || cat /proc/meminfo 2>/dev/null",
+        id: 'free',
+        label: 'free',
+        command: 'free -h 2>/dev/null || cat /proc/meminfo 2>/dev/null',
       },
       {
-        id: "netstat",
-        label: "netstat",
-        command: "netstat -tlnp 2>/dev/null || ss -tlnp",
+        id: 'netstat',
+        label: 'netstat',
+        command: 'netstat -tlnp 2>/dev/null || ss -tlnp',
       },
     ],
-  });
-  const [execShowQuickAdd, setExecShowQuickAdd] = useState(false);
-  const [execNewQuickLabel, setExecNewQuickLabel] = useState("");
-  const [execNewQuickCommand, setExecNewQuickCommand] = useState("");
-  const execHistoryIdxRef = useRef(-1);
-  const execOutputRef = useRef<HTMLDivElement>(null);
+  })
+  const [execShowQuickAdd, setExecShowQuickAdd] = useState(false)
+  const [execNewQuickLabel, setExecNewQuickLabel] = useState('')
+  const [execNewQuickCommand, setExecNewQuickCommand] = useState('')
+  const execHistoryIdxRef = useRef(-1)
+  const execOutputRef = useRef<HTMLDivElement>(null)
 
   // ─── Queries ──────────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
-    queryKey: ["portainer", slug, env],
-    queryFn: () =>
-      apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`),
-  });
+    queryKey: ['portainer', slug, env],
+    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`),
+  })
 
   const { data: connectionsData } = useQuery({
-    queryKey: ["portainer", "connections"],
-    queryFn: () => apiFetch("/api/envman/portainer/connections"),
-  });
+    queryKey: ['portainer', 'connections'],
+    queryFn: () => apiFetch('/api/envman/portainer/connections'),
+  })
 
   const { data: diffData, isFetching: diffFetching } = useQuery({
-    queryKey: ["portainer", "diff", slug, env],
+    queryKey: ['portainer', 'diff', slug, env],
     queryFn: () =>
-      apiFetch(
-        `/api/envman/projects/${slug}/environments/${env}/portainer/sync-preview`,
-        { method: "POST" },
-      ),
+      apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/sync-preview`, { method: 'POST' }),
     enabled: diffOpen,
-  });
+  })
 
-  const config: PortainerConfig | null = data?.config ?? null;
-  const connections: PortainerConnection[] = connectionsData?.connections ?? [];
+  const config: PortainerConfig | null = data?.config ?? null
+  const connections: PortainerConnection[] = connectionsData?.connections ?? []
 
   const {
     data: statusData,
     isFetching: statusFetching,
     refetch: _refetchStatus,
   } = useQuery({
-    queryKey: [
-      "portainer",
-      "env-status",
-      slug,
-      env,
-      config?.connectionId,
-      config?.stackId,
-    ],
+    queryKey: ['portainer', 'env-status', slug, env, config?.connectionId, config?.stackId],
     queryFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/status`,
-      ),
+      apiFetch(`/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/status`),
     enabled: !!config?.connectionId,
     refetchInterval: 30000,
     staleTime: 20000,
-  });
+  })
 
-  const containers: ContainerInfo[] = statusData?.containers ?? [];
+  const containers: ContainerInfo[] = statusData?.containers ?? []
 
   const {
     data: logsData,
     isFetching: logsFetching,
     refetch: refetchLogs,
   } = useQuery({
-    queryKey: [
-      "portainer",
-      "env-logs",
-      slug,
-      env,
-      selectedContainerId,
-      logTail,
-      showStdout,
-      showStderr,
-    ],
+    queryKey: ['portainer', 'env-logs', slug, env, selectedContainerId, logTail, showStdout, showStderr],
     queryFn: () => {
       const qs = new URLSearchParams({
         tail: String(logTail),
-        stdout: showStdout ? "1" : "0",
-        stderr: showStderr ? "1" : "0",
-        timestamps: "1",
-      });
+        stdout: showStdout ? '1' : '0',
+        stderr: showStderr ? '1' : '0',
+        timestamps: '1',
+      })
       return apiFetch(
         `/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/logs/${selectedContainerId}?${qs}`,
-      );
+      )
     },
     enabled: logsOpen && !!config?.connectionId && !!selectedContainerId,
     refetchInterval: autoRefresh ? 5000 : false,
     staleTime: 0,
-  });
+  })
 
-  const logLines: LogLine[] = logsData?.lines ?? [];
+  const logLines: LogLine[] = logsData?.lines ?? []
 
   const composeQuery = useQuery({
-    queryKey: ["portainer", "compose", config?.connectionId, config?.stackId],
-    queryFn: () =>
-      apiFetch(
-        `/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/file`,
-      ),
+    queryKey: ['portainer', 'compose', config?.connectionId, config?.stackId],
+    queryFn: () => apiFetch(`/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/file`),
     enabled: composeOpen && !!config?.connectionId && !!config?.stackId,
     staleTime: 0,
-  });
+  })
   useEffect(() => {
-    if (composeQuery.data?.content !== undefined)
-      setComposeContent(composeQuery.data.content);
-  }, [composeQuery.data]);
+    if (composeQuery.data?.content !== undefined) setComposeContent(composeQuery.data.content)
+  }, [composeQuery.data])
 
   // Auto-scroll logs
   useEffect(() => {
     if (autoScroll && logViewportRef.current) {
       logViewportRef.current.scrollTo({
         top: logViewportRef.current.scrollHeight,
-        behavior: "smooth",
-      });
+        behavior: 'smooth',
+      })
     }
-  }, [autoScroll]);
+  }, [autoScroll])
 
   useEffect(() => {
     if (execOpen && execOutputRef.current) {
-      execOutputRef.current.scrollTop = execOutputRef.current.scrollHeight;
+      execOutputRef.current.scrollTop = execOutputRef.current.scrollHeight
     }
-  }, [execOpen]);
+  }, [execOpen])
 
   // ─── Mutations ────────────────────────────────────────────────────────────
   const execMutation = useMutation({
-    mutationFn: ({
-      containerId,
-      endpointId,
-      command,
-    }: {
-      containerId: string;
-      endpointId: number;
-      command: string;
-    }) =>
-      apiFetch(
-        `/api/envman/portainer/connections/${config!.connectionId}/exec`,
-        {
-          method: "POST",
-          body: JSON.stringify({ containerId, endpointId, command }),
-        },
-      ),
+    mutationFn: ({ containerId, endpointId, command }: { containerId: string; endpointId: number; command: string }) =>
+      apiFetch(`/api/envman/portainer/connections/${config!.connectionId}/exec`, {
+        method: 'POST',
+        body: JSON.stringify({ containerId, endpointId, command }),
+      }),
     onSuccess: (data: any, { command }) => {
       setExecHistory((prev) => [
         {
@@ -406,135 +347,119 @@ export function PortainerSync({
           timestamp: Date.now(),
         },
         ...prev,
-      ]);
-      setExecCommand("");
+      ])
+      setExecCommand('')
     },
     onError: (e: Error) => {
-      alert(e.message);
+      alert(e.message)
     },
-  });
+  })
 
   const deleteConfig = () =>
     modals.openConfirmModal({
-      title: "Hapus konfigurasi Portainer",
+      title: 'Hapus konfigurasi Portainer',
       children: (
         <Text size="sm">
           Hapus konfigurasi Portainer untuk <strong>{env}</strong>?
         </Text>
       ),
-      labels: { confirm: "Hapus", cancel: "Batal" },
-      confirmProps: { color: "red" },
+      labels: { confirm: 'Hapus', cancel: 'Batal' },
+      confirmProps: { color: 'red' },
       onConfirm: () =>
         apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`, {
-          method: "DELETE",
-        }).then(() =>
-          qc.invalidateQueries({ queryKey: ["portainer", slug, env] }),
-        ),
-    });
+          method: 'DELETE',
+        }).then(() => qc.invalidateQueries({ queryKey: ['portainer', slug, env] })),
+    })
 
   const sync = useMutation({
-    mutationFn: () =>
-      apiFetch(
-        `/api/envman/projects/${slug}/environments/${env}/portainer/sync`,
-        { method: "POST" },
-      ),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["portainer", slug, env] }),
-  });
+    mutationFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/sync`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['portainer', slug, env] }),
+  })
 
   const repull = useMutation({
     mutationFn: () => {
       setOp({
-        type: "repull",
+        type: 'repull',
         startedAt: Date.now(),
-        step: "Pulling image terbaru...",
+        step: 'Pulling image terbaru...',
         done: false,
         error: null,
-      });
-      return apiFetch(
-        `/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/repull`,
-        {
-          method: "POST",
-        },
-      );
+      })
+      return apiFetch(`/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/repull`, {
+        method: 'POST',
+      })
     },
     onSuccess: () => {
       setOp({
-        type: "repull",
+        type: 'repull',
         startedAt: activeOp?.startedAt ?? Date.now(),
-        step: "Selesai — container restart dengan image terbaru",
+        step: 'Selesai — container restart dengan image terbaru',
         done: true,
         error: null,
-      });
+      })
       qc.invalidateQueries({
-        queryKey: ["portainer", "env-status", slug, env],
-      });
-      setTimeout(() => setOp(null), 8000);
+        queryKey: ['portainer', 'env-status', slug, env],
+      })
+      setTimeout(() => setOp(null), 8000)
     },
     onError: (e: Error) => {
       setOp({
-        type: "repull",
+        type: 'repull',
         startedAt: activeOp?.startedAt ?? Date.now(),
         step: e.message,
         done: true,
         error: e.message,
-      });
+      })
     },
-  });
+  })
 
   const recreate = useMutation({
     mutationFn: () => {
       setOp({
-        type: "recreate",
+        type: 'recreate',
         startedAt: Date.now(),
-        step: "Menghentikan container...",
+        step: 'Menghentikan container...',
         done: false,
         error: null,
-      });
-      return apiFetch(
-        `/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/recreate`,
-        {
-          method: "POST",
-        },
-      );
+      })
+      return apiFetch(`/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/recreate`, {
+        method: 'POST',
+      })
     },
     onSuccess: () => {
       setOp({
-        type: "recreate",
+        type: 'recreate',
         startedAt: activeOp?.startedAt ?? Date.now(),
-        step: "Selesai — container berhasil di-recreate",
+        step: 'Selesai — container berhasil di-recreate',
         done: true,
         error: null,
-      });
+      })
       qc.invalidateQueries({
-        queryKey: ["portainer", "env-status", slug, env],
-      });
-      setTimeout(() => setOp(null), 8000);
+        queryKey: ['portainer', 'env-status', slug, env],
+      })
+      setTimeout(() => setOp(null), 8000)
     },
     onError: (e: Error) => {
       setOp({
-        type: "recreate",
+        type: 'recreate',
         startedAt: activeOp?.startedAt ?? Date.now(),
         step: e.message,
         done: true,
         error: e.message,
-      });
+      })
     },
-  });
+  })
 
   // Polling elapsed time saat operasi berjalan
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
     if (!activeOp || activeOp.done) {
-      setElapsed(0);
-      return;
+      setElapsed(0)
+      return
     }
-    const t = setInterval(
-      () => setElapsed(Math.floor((Date.now() - activeOp.startedAt) / 1000)),
-      1000,
-    );
-    return () => clearInterval(t);
-  }, [activeOp]);
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - activeOp.startedAt) / 1000)), 1000)
+    return () => clearInterval(t)
+  }, [activeOp])
 
   const confirmRepull = () =>
     modals.openConfirmModal({
@@ -546,16 +471,15 @@ export function PortainerSync({
           </Text>
           <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
             <Text size="xs">
-              Setara <Code fz="xs">docker compose pull && up -d</Code>.
-              Container akan restart.
+              Setara <Code fz="xs">docker compose pull && up -d</Code>. Container akan restart.
             </Text>
           </Alert>
         </Stack>
       ),
-      labels: { confirm: "Repull & Restart", cancel: "Batal" },
-      confirmProps: { color: "blue" },
+      labels: { confirm: 'Repull & Restart', cancel: 'Batal' },
+      confirmProps: { color: 'blue' },
       onConfirm: () => repull.mutate(),
-    });
+    })
 
   const confirmRecreate = () =>
     modals.openConfirmModal({
@@ -563,85 +487,77 @@ export function PortainerSync({
       children: (
         <Stack gap="xs">
           <Text size="sm">
-            Stop dan start ulang container di stack{" "}
-            <strong>{config?.stackName}</strong>?
+            Stop dan start ulang container di stack <strong>{config?.stackName}</strong>?
           </Text>
           <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
             <Text size="xs">
-              Image tidak di-pull ulang. Setara{" "}
-              <Code fz="xs">docker compose stop && up -d</Code>.
+              Image tidak di-pull ulang. Setara <Code fz="xs">docker compose stop && up -d</Code>.
             </Text>
           </Alert>
         </Stack>
       ),
-      labels: { confirm: "Recreate", cancel: "Batal" },
-      confirmProps: { color: "orange" },
+      labels: { confirm: 'Recreate', cancel: 'Batal' },
+      confirmProps: { color: 'orange' },
       onConfirm: () => recreate.mutate(),
-    });
+    })
 
   const saveCompose = useMutation({
     mutationFn: (content: string) =>
-      apiFetch(
-        `/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/file`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ content }),
-        },
-      ),
+      apiFetch(`/api/envman/portainer/connections/${config!.connectionId}/stacks/${config!.stackId}/file`, {
+        method: 'PUT',
+        body: JSON.stringify({ content }),
+      }),
     onSuccess: () => {
-      closeCompose();
+      closeCompose()
     },
     onError: (e: Error) => {
-      alert(e.message);
+      alert(e.message)
     },
-  });
+  })
 
   const toggleAutoSync = useMutation({
     mutationFn: (autoSync: boolean) =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: JSON.stringify({ autoSync }),
       }),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["portainer", slug, env] }),
-  });
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['portainer', slug, env] }),
+  })
 
   const _addTarget = useMutation({
     mutationFn: (target: {
-      connectionId?: string;
-      stackId: number;
-      stackName: string;
-      endpointId: number;
-      label?: string;
+      connectionId?: string
+      stackId: number
+      stackName: string
+      endpointId: number
+      label?: string
     }) =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: JSON.stringify({ addTarget: target }),
       }),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["portainer", slug, env] }),
-  });
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['portainer', slug, env] }),
+  })
 
   const removeTarget = useMutation({
     mutationFn: (targetId: string) =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: JSON.stringify({ removeTargetId: targetId }),
       }),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["portainer", slug, env] }),
-  });
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['portainer', slug, env] }),
+  })
 
   const confirmSync = () =>
     modals.openConfirmModal({
-      title: "Sync vars ke Portainer",
+      title: 'Sync vars ke Portainer',
       children: (
         <Stack gap="xs">
           <Text size="sm">
-            Push semua vars{" "}
+            Push semua vars{' '}
             <strong>
               {slug}:{env}
-            </strong>{" "}
+            </strong>{' '}
             ke stack <strong>{config?.stackName}</strong>?
           </Text>
           {secretCount > 0 && (
@@ -650,34 +566,25 @@ export function PortainerSync({
                 {secretCount} secret var akan di-decrypt
               </Text>
               <Text size="xs" c="dimmed">
-                Nilai dikirim sebagai plaintext dan tersimpan di{" "}
-                <Code fz="xs">stack.env</Code>.
+                Nilai dikirim sebagai plaintext dan tersimpan di <Code fz="xs">stack.env</Code>.
               </Text>
             </Alert>
           )}
           <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs">
-              Semua env vars di stack akan diganti dan mungkin trigger redeploy
-              container.
-            </Text>
+            <Text size="xs">Semua env vars di stack akan diganti dan mungkin trigger redeploy container.</Text>
           </Alert>
         </Stack>
       ),
-      labels: { confirm: "Sync sekarang", cancel: "Batal" },
-      confirmProps: { color: "violet" },
+      labels: { confirm: 'Sync sekarang', cancel: 'Batal' },
+      confirmProps: { color: 'violet' },
       onConfirm: () => sync.mutate(),
-    });
+    })
 
-  if (isLoading) return null;
+  if (isLoading) return null
 
-  const syncStatus =
-    config?.lastSyncOk === true
-      ? "success"
-      : config?.lastSyncOk === false
-        ? "failed"
-        : "never";
-  const displayUrl = config?.portainerUrl ?? "";
-  const diff: DiffResult | undefined = diffData?.diff;
+  const syncStatus = config?.lastSyncOk === true ? 'success' : config?.lastSyncOk === false ? 'failed' : 'never'
+  const displayUrl = config?.portainerUrl ?? ''
+  const diff: DiffResult | undefined = diffData?.diff
 
   return (
     <>
@@ -697,7 +604,7 @@ export function PortainerSync({
                 <Text size="xs" c="dimmed" mt={2}>
                   {connections.length > 0
                     ? `${connections.length} connection tersedia — hubungkan ke stack Portainer`
-                    : "Belum ada Portainer connection yang dikonfigurasi"}
+                    : 'Belum ada Portainer connection yang dikonfigurasi'}
                 </Text>
               </Box>
             </Group>
@@ -707,43 +614,34 @@ export function PortainerSync({
           <Box p="md">
             <Stack gap="sm">
               <Text size="xs" c="dimmed" lh={1.6}>
-                Hubungkan environment{" "}
+                Hubungkan environment{' '}
                 <Code fz="xs">
                   {slug}:{env}
-                </Code>{" "}
-                ke Portainer stack untuk bisa sync env vars langsung ke
-                container. Perubahan vars akan diterapkan saat sync tanpa perlu
-                deploy ulang manual.
+                </Code>{' '}
+                ke Portainer stack untuk bisa sync env vars langsung ke container. Perubahan vars akan diterapkan saat
+                sync tanpa perlu deploy ulang manual.
               </Text>
 
               {connections.length === 0 ? (
-                <Alert
-                  color="blue"
-                  icon={<TbServer size={14} />}
-                  p="sm"
-                  radius="md"
-                >
+                <Alert color="blue" icon={<TbServer size={14} />} p="sm" radius="md">
                   <Text size="xs" fw={500} mb={4}>
                     Belum ada Portainer connection
                   </Text>
                   <Text size="xs" c="dimmed">
-                    Tambah connection di halaman Connections terlebih dahulu,
-                    lalu kembali ke sini untuk menghubungkan ke stack.
+                    Tambah connection di halaman Connections terlebih dahulu, lalu kembali ke sini untuk menghubungkan
+                    ke stack.
                   </Text>
                 </Alert>
               ) : (
                 <Box
                   p="sm"
                   style={{
-                    borderRadius: "var(--mantine-radius-md)",
-                    border: "1px solid var(--mantine-color-default-border)",
+                    borderRadius: 'var(--mantine-radius-md)',
+                    border: '1px solid var(--mantine-color-default-border)',
                   }}
                 >
                   <Group gap="xs">
-                    <TbPlugConnected
-                      size={14}
-                      color="var(--mantine-color-primary)"
-                    />
+                    <TbPlugConnected size={14} color="var(--mantine-color-primary)" />
                     <Text size="xs" c="blue.7" fw={500}>
                       {connections.length} connection siap digunakan
                     </Text>
@@ -758,7 +656,7 @@ export function PortainerSync({
                       size="sm"
                       color="primary"
                       leftSection={<TbPlugConnected size={14} />}
-                      onClick={() => onSetupOpen("new")}
+                      onClick={() => onSetupOpen('new')}
                     >
                       Hubungkan ke Stack
                     </Button>
@@ -795,9 +693,9 @@ export function PortainerSync({
         /* ─── Configured ────────────────────────────────── */
         <Box
           style={{
-            border: "1px solid var(--mantine-color-default-border)",
-            borderRadius: "var(--mantine-radius-md)",
-            overflow: "hidden",
+            border: '1px solid var(--mantine-color-default-border)',
+            borderRadius: 'var(--mantine-radius-md)',
+            overflow: 'hidden',
           }}
         >
           {/* ── Header ──────────────────────────────────────── */}
@@ -805,7 +703,7 @@ export function PortainerSync({
             gap="xs"
             p="sm"
             style={{
-              borderBottom: "1px solid var(--mantine-color-default-border)",
+              borderBottom: '1px solid var(--mantine-color-default-border)',
             }}
           >
             {/* Row 1: identity + status + manage */}
@@ -815,13 +713,7 @@ export function PortainerSync({
                   size={32}
                   radius="md"
                   variant="light"
-                  color={
-                    syncStatus === "failed"
-                      ? "red"
-                      : syncStatus === "success"
-                        ? "teal"
-                        : "gray"
-                  }
+                  color={syncStatus === 'failed' ? 'red' : syncStatus === 'success' ? 'teal' : 'gray'}
                   style={{ flexShrink: 0 }}
                 >
                   <TbCloud size={15} />
@@ -853,49 +745,29 @@ export function PortainerSync({
                   </Group>
                 </Box>
               </Group>
-              <Group
-                gap={4}
-                wrap="nowrap"
-                style={{ flexShrink: 0 }}
-                align="center"
-              >
-                {syncStatus === "success" && (
-                  <Badge
-                    size="xs"
-                    color="teal"
-                    variant="light"
-                    leftSection={<TbCheck size={9} />}
-                  >
+              <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }} align="center">
+                {syncStatus === 'success' && (
+                  <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={9} />}>
                     synced
                   </Badge>
                 )}
-                {syncStatus === "failed" && (
-                  <Badge
-                    size="xs"
-                    color="red"
-                    variant="light"
-                    leftSection={<TbX size={9} />}
-                  >
+                {syncStatus === 'failed' && (
+                  <Badge size="xs" color="red" variant="light" leftSection={<TbX size={9} />}>
                     failed
                   </Badge>
                 )}
-                {syncStatus === "never" && (
+                {syncStatus === 'never' && (
                   <Badge size="xs" color="gray" variant="outline">
                     belum sync
                   </Badge>
                 )}
                 {sync.isError && (
-                  <Tooltip
-                    label={(sync.error as Error).message}
-                    position="left"
-                    multiline
-                    maw={260}
-                  >
+                  <Tooltip label={(sync.error as Error).message} position="left" multiline maw={260}>
                     <TbAlertTriangle
                       size={14}
                       style={{
-                        color: "var(--mantine-color-red-5)",
-                        cursor: "help",
+                        color: 'var(--mantine-color-red-5)',
+                        cursor: 'help',
                       }}
                     />
                   </Tooltip>
@@ -903,22 +775,12 @@ export function PortainerSync({
                 {canEdit && (
                   <>
                     <Tooltip label="Edit konfigurasi">
-                      <ActionIcon
-                        size="sm"
-                        variant="subtle"
-                        color="gray"
-                        onClick={() => onSetupOpen("edit")}
-                      >
+                      <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => onSetupOpen('edit')}>
                         <TbPencil size={13} />
                       </ActionIcon>
                     </Tooltip>
                     <Tooltip label="Hapus koneksi">
-                      <ActionIcon
-                        size="sm"
-                        variant="subtle"
-                        color="red"
-                        onClick={deleteConfig}
-                      >
+                      <ActionIcon size="sm" variant="subtle" color="red" onClick={deleteConfig}>
                         <TbTrash size={13} />
                       </ActionIcon>
                     </Tooltip>
@@ -981,14 +843,8 @@ export function PortainerSync({
                 <Button
                   size="xs"
                   color="primary"
-                  variant={sync.isPending ? "filled" : "light"}
-                  leftSection={
-                    sync.isPending ? (
-                      <Loader size={10} color="white" />
-                    ) : (
-                      <TbCloudUpload size={12} />
-                    )
-                  }
+                  variant={sync.isPending ? 'filled' : 'light'}
+                  leftSection={sync.isPending ? <Loader size={10} color="white" /> : <TbCloudUpload size={12} />}
                   onClick={confirmSync}
                   loading={sync.isPending}
                 >
@@ -1001,12 +857,7 @@ export function PortainerSync({
           {/* ── Body ────────────────────────────────────────── */}
           <Stack gap="sm" p="sm">
             {/* Stats: Last sync + links */}
-            <Group
-              gap="xs"
-              wrap="wrap"
-              justify="space-between"
-              align="flex-start"
-            >
+            <Group gap="xs" wrap="wrap" justify="space-between" align="flex-start">
               <Group gap="lg" wrap="wrap">
                 <Box>
                   <Text size="xs" c="dimmed" fw={500} mb={2}>
@@ -1016,14 +867,12 @@ export function PortainerSync({
                     <TbHistory
                       size={12}
                       style={{
-                        color: "var(--mantine-color-dimmed)",
+                        color: 'var(--mantine-color-dimmed)',
                         flexShrink: 0,
                       }}
                     />
                     <Text size="xs" fw={600}>
-                      {config.lastSyncAt
-                        ? relativeTime(config.lastSyncAt)
-                        : "—"}
+                      {config.lastSyncAt ? relativeTime(config.lastSyncAt) : '—'}
                     </Text>
                   </Group>
                 </Box>
@@ -1080,13 +929,13 @@ export function PortainerSync({
               <Box
                 p="xs"
                 style={{
-                  borderRadius: "var(--mantine-radius-md)",
-                  border: `1px solid ${activeOp.error ? "var(--mantine-color-red-4)" : activeOp.done ? "var(--mantine-color-teal-4)" : "var(--mantine-color-blue-4)"}`,
+                  borderRadius: 'var(--mantine-radius-md)',
+                  border: `1px solid ${activeOp.error ? 'var(--mantine-color-red-4)' : activeOp.done ? 'var(--mantine-color-teal-4)' : 'var(--mantine-color-blue-4)'}`,
                   background: activeOp.error
-                    ? "var(--mantine-color-red-light)"
+                    ? 'var(--mantine-color-red-light)'
                     : activeOp.done
-                      ? "var(--mantine-color-teal-light)"
-                      : "var(--mantine-color-blue-light)",
+                      ? 'var(--mantine-color-teal-light)'
+                      : 'var(--mantine-color-blue-light)',
                 }}
               >
                 <Group justify="space-between" wrap="nowrap" gap="xs">
@@ -1095,9 +944,7 @@ export function PortainerSync({
                       size={26}
                       radius="md"
                       variant="light"
-                      color={
-                        activeOp.error ? "red" : activeOp.done ? "teal" : "blue"
-                      }
+                      color={activeOp.error ? 'red' : activeOp.done ? 'teal' : 'blue'}
                       style={{ flexShrink: 0 }}
                     >
                       {!activeOp.done ? (
@@ -1113,15 +960,9 @@ export function PortainerSync({
                         <Badge
                           size="xs"
                           variant="filled"
-                          color={
-                            activeOp.error
-                              ? "red"
-                              : activeOp.done
-                                ? "teal"
-                                : "blue"
-                          }
+                          color={activeOp.error ? 'red' : activeOp.done ? 'teal' : 'blue'}
                         >
-                          {activeOp.type === "repull" ? "Repull" : "Recreate"}
+                          {activeOp.type === 'repull' ? 'Repull' : 'Recreate'}
                         </Badge>
                         {!activeOp.done && (
                           <Text fz={10} c="dimmed">
@@ -1129,30 +970,20 @@ export function PortainerSync({
                           </Text>
                         )}
                       </Group>
-                      <Text
-                        size="xs"
-                        fw={500}
-                        c={activeOp.error ? "red" : undefined}
-                        truncate
-                      >
+                      <Text size="xs" fw={500} c={activeOp.error ? 'red' : undefined} truncate>
                         {activeOp.step}
                       </Text>
                       {!activeOp.done && (
                         <Text fz={10} c="dimmed" mt={2}>
-                          {activeOp.type === "repull"
-                            ? "Portainer sedang pull image dan restart container..."
-                            : "Portainer sedang stop dan start ulang container..."}
+                          {activeOp.type === 'repull'
+                            ? 'Portainer sedang pull image dan restart container...'
+                            : 'Portainer sedang stop dan start ulang container...'}
                         </Text>
                       )}
                     </Box>
                   </Group>
                   {activeOp.done && (
-                    <ActionIcon
-                      size="xs"
-                      variant="subtle"
-                      color="gray"
-                      onClick={() => setOp(null)}
-                    >
+                    <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setOp(null)}>
                       <TbX size={12} />
                     </ActionIcon>
                   )}
@@ -1201,26 +1032,22 @@ export function PortainerSync({
                     key={c.id}
                     p="xs"
                     style={{
-                      borderRadius: "var(--mantine-radius-md)",
-                      border: "1px solid var(--mantine-color-default-border)",
-                      cursor: "pointer",
+                      borderRadius: 'var(--mantine-radius-md)',
+                      border: '1px solid var(--mantine-color-default-border)',
+                      cursor: 'pointer',
                     }}
                     onClick={() => {
-                      setSelectedContainerId(c.id);
-                      openLogs();
+                      setSelectedContainerId(c.id)
+                      openLogs()
                     }}
                   >
                     <Group justify="space-between" wrap="nowrap" gap="xs">
-                      <Group
-                        gap="xs"
-                        style={{ minWidth: 0, flex: 1 }}
-                        wrap="nowrap"
-                      >
+                      <Group gap="xs" style={{ minWidth: 0, flex: 1 }} wrap="nowrap">
                         <ThemeIcon
                           size={28}
                           radius="md"
                           variant="light"
-                          color={stateColor[c.state] ?? "gray"}
+                          color={stateColor[c.state] ?? 'gray'}
                           style={{ flexShrink: 0 }}
                         >
                           <TbServer size={13} />
@@ -1233,37 +1060,26 @@ export function PortainerSync({
                             <Code fz={10} c="dimmed">
                               {c.shortId}
                             </Code>
-                            <Text
-                              fz={10}
-                              c="dimmed"
-                              truncate
-                              style={{ maxWidth: 140 }}
-                            >
-                              {c.image.split("/").pop()}
+                            <Text fz={10} c="dimmed" truncate style={{ maxWidth: 140 }}>
+                              {c.image.split('/').pop()}
                             </Text>
                           </Group>
                         </Box>
                       </Group>
                       <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                        <Badge
-                          size="xs"
-                          color={stateColor[c.state] ?? "gray"}
-                          variant="light"
-                        >
+                        <Badge size="xs" color={stateColor[c.state] ?? 'gray'} variant="light">
                           {c.state}
                         </Badge>
-                        {c.ports.length > 0 && (
-                          <Code fz={10}>{c.ports[0]}</Code>
-                        )}
+                        {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
                         <Tooltip label="Lihat logs">
                           <ActionIcon
                             size="sm"
                             variant="subtle"
                             color="gray"
                             onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedContainerId(c.id);
-                              openLogs();
+                              e.stopPropagation()
+                              setSelectedContainerId(c.id)
+                              openLogs()
                             }}
                           >
                             <TbFileText size={13} />
@@ -1276,14 +1092,14 @@ export function PortainerSync({
                               variant="subtle"
                               color="teal"
                               onClick={(e) => {
-                                e.stopPropagation();
+                                e.stopPropagation()
                                 setExecContainer({
                                   containerId: c.id,
                                   endpointId: config!.endpointId,
                                   containerName: c.names[0],
-                                });
-                                setExecHistory([]);
-                                openExec();
+                                })
+                                setExecHistory([])
+                                openExec()
                               }}
                             >
                               <TbTerminal2 size={13} />
@@ -1302,8 +1118,8 @@ export function PortainerSync({
               <Box
                 p="xs"
                 style={{
-                  borderRadius: "var(--mantine-radius-md)",
-                  background: "var(--mantine-color-default-hover)",
+                  borderRadius: 'var(--mantine-radius-md)',
+                  background: 'var(--mantine-color-default-hover)',
                 }}
               >
                 <Group justify="space-between" gap="xs" wrap="nowrap">
@@ -1322,9 +1138,7 @@ export function PortainerSync({
                   </Box>
                   <Switch
                     checked={config.autoSync ?? false}
-                    onChange={(e) =>
-                      toggleAutoSync.mutate(e.currentTarget.checked)
-                    }
+                    onChange={(e) => toggleAutoSync.mutate(e.currentTarget.checked)}
                     size="sm"
                     style={{ flexShrink: 0 }}
                   />
@@ -1333,90 +1147,76 @@ export function PortainerSync({
             )}
 
             {/* Additional stack targets */}
-            {config.additionalTargets &&
-              config.additionalTargets.length > 0 && (
-                <>
-                  <Divider
-                    label={
-                      <Text size="xs" c="dimmed">
-                        Stack tambahan
-                      </Text>
-                    }
-                    labelPosition="left"
-                  />
-                  <Stack gap="xs">
-                    {config.additionalTargets.map((t) => (
-                      <Box
-                        key={t.id}
-                        p="xs"
-                        style={{
-                          borderRadius: "var(--mantine-radius-md)",
-                          border:
-                            "1px solid var(--mantine-color-default-border)",
-                        }}
-                      >
-                        <Group justify="space-between" gap="xs" wrap="nowrap">
-                          <Group gap="xs" wrap="wrap" style={{ minWidth: 0 }}>
-                            <Badge size="xs" variant="outline" color="gray">
-                              ep#{t.endpointId}
-                            </Badge>
-                            <Text size="xs" fw={500} ff="monospace">
-                              {t.stackName}
+            {config.additionalTargets && config.additionalTargets.length > 0 && (
+              <>
+                <Divider
+                  label={
+                    <Text size="xs" c="dimmed">
+                      Stack tambahan
+                    </Text>
+                  }
+                  labelPosition="left"
+                />
+                <Stack gap="xs">
+                  {config.additionalTargets.map((t) => (
+                    <Box
+                      key={t.id}
+                      p="xs"
+                      style={{
+                        borderRadius: 'var(--mantine-radius-md)',
+                        border: '1px solid var(--mantine-color-default-border)',
+                      }}
+                    >
+                      <Group justify="space-between" gap="xs" wrap="nowrap">
+                        <Group gap="xs" wrap="wrap" style={{ minWidth: 0 }}>
+                          <Badge size="xs" variant="outline" color="gray">
+                            ep#{t.endpointId}
+                          </Badge>
+                          <Text size="xs" fw={500} ff="monospace">
+                            {t.stackName}
+                          </Text>
+                          {t.label && (
+                            <Text size="xs" c="dimmed">
+                              ({t.label})
                             </Text>
-                            {t.label && (
-                              <Text size="xs" c="dimmed">
-                                ({t.label})
-                              </Text>
-                            )}
-                          </Group>
-                          {canEdit && (
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="red"
-                              style={{ flexShrink: 0 }}
-                              onClick={() => removeTarget.mutate(t.id)}
-                            >
-                              <TbTrash size={12} />
-                            </ActionIcon>
                           )}
                         </Group>
-                      </Box>
-                    ))}
-                  </Stack>
-                </>
-              )}
+                        {canEdit && (
+                          <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            color="red"
+                            style={{ flexShrink: 0 }}
+                            onClick={() => removeTarget.mutate(t.id)}
+                          >
+                            <TbTrash size={12} />
+                          </ActionIcon>
+                        )}
+                      </Group>
+                    </Box>
+                  ))}
+                </Stack>
+              </>
+            )}
 
             {/* Alerts */}
-            {syncStatus === "never" && (
-              <Alert
-                color="blue"
-                icon={<TbCloudUpload size={14} />}
-                p="xs"
-                radius="md"
-              >
+            {syncStatus === 'never' && (
+              <Alert color="blue" icon={<TbCloudUpload size={14} />} p="xs" radius="md">
                 <Text size="xs" fw={500} mb={2}>
                   Belum pernah disync
                 </Text>
                 <Text size="xs" c="dimmed">
-                  Klik <strong>Sync Vars</strong> untuk pertama kali push env
-                  vars ke stack Portainer.
+                  Klik <strong>Sync Vars</strong> untuk pertama kali push env vars ke stack Portainer.
                 </Text>
               </Alert>
             )}
-            {syncStatus === "failed" && (
-              <Alert
-                color="red"
-                icon={<TbAlertTriangle size={14} />}
-                p="xs"
-                radius="md"
-              >
+            {syncStatus === 'failed' && (
+              <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs" radius="md">
                 <Text size="xs" fw={500} mb={2}>
                   Sync terakhir gagal
                 </Text>
                 <Text size="xs" c="dimmed">
-                  Periksa koneksi ke Portainer dan pastikan stack masih aktif,
-                  lalu coba sync ulang.
+                  Periksa koneksi ke Portainer dan pastikan stack masih aktif, lalu coba sync ulang.
                 </Text>
               </Alert>
             )}
@@ -1469,15 +1269,11 @@ export function PortainerSync({
               )}
             </Group>
 
-            {diff.added.length === 0 &&
-              diff.removed.length === 0 &&
-              diff.changed.length === 0 && (
-                <Alert color="teal" icon={<TbCheck size={14} />} p="xs">
-                  <Text size="xs">
-                    Semua vars sudah sinkron. Tidak perlu sync.
-                  </Text>
-                </Alert>
-              )}
+            {diff.added.length === 0 && diff.removed.length === 0 && diff.changed.length === 0 && (
+              <Alert color="teal" icon={<TbCheck size={14} />} p="xs">
+                <Text size="xs">Semua vars sudah sinkron. Tidak perlu sync.</Text>
+              </Alert>
+            )}
 
             <ScrollArea.Autosize mah={400}>
               <Stack gap="xs">
@@ -1486,9 +1282,9 @@ export function PortainerSync({
                     key={key}
                     p="xs"
                     style={{
-                      borderRadius: "var(--mantine-radius-sm)",
-                      background: "var(--mantine-color-teal-light)",
-                      borderLeft: "3px solid var(--mantine-color-teal-5)",
+                      borderRadius: 'var(--mantine-radius-sm)',
+                      background: 'var(--mantine-color-teal-light)',
+                      borderLeft: '3px solid var(--mantine-color-teal-5)',
                     }}
                   >
                     <Group gap="xs">
@@ -1509,9 +1305,9 @@ export function PortainerSync({
                     key={key}
                     p="xs"
                     style={{
-                      borderRadius: "var(--mantine-radius-sm)",
-                      background: "var(--mantine-color-red-light)",
-                      borderLeft: "3px solid var(--mantine-color-red-5)",
+                      borderRadius: 'var(--mantine-radius-sm)',
+                      background: 'var(--mantine-color-red-light)',
+                      borderLeft: '3px solid var(--mantine-color-red-5)',
                     }}
                   >
                     <Group gap="xs">
@@ -1532,9 +1328,9 @@ export function PortainerSync({
                     key={item.key}
                     p="xs"
                     style={{
-                      borderRadius: "var(--mantine-radius-sm)",
-                      background: "var(--mantine-color-yellow-light)",
-                      borderLeft: "3px solid var(--mantine-color-yellow-5)",
+                      borderRadius: 'var(--mantine-radius-sm)',
+                      background: 'var(--mantine-color-yellow-light)',
+                      borderLeft: '3px solid var(--mantine-color-yellow-5)',
                     }}
                   >
                     <Group gap="xs" mb={4}>
@@ -1551,7 +1347,7 @@ export function PortainerSync({
                           lama
                         </Text>
                         <Code fz={10} c="red.5">
-                          {item.oldValue || "(kosong)"}
+                          {item.oldValue || '(kosong)'}
                         </Code>
                       </Group>
                       <Group gap="xs">
@@ -1559,7 +1355,7 @@ export function PortainerSync({
                           baru
                         </Text>
                         <Code fz={10} c="teal.5">
-                          {item.newValue || "(kosong)"}
+                          {item.newValue || '(kosong)'}
                         </Code>
                       </Group>
                     </Stack>
@@ -1573,8 +1369,8 @@ export function PortainerSync({
                 color="primary"
                 leftSection={<TbCloudUpload size={14} />}
                 onClick={() => {
-                  closeDiff();
-                  confirmSync();
+                  closeDiff()
+                  confirmSync()
                 }}
               >
                 Lanjut Sync
@@ -1583,7 +1379,7 @@ export function PortainerSync({
           </Stack>
         ) : (
           <Alert color="red" icon={<TbAlertTriangle size={14} />} p="xs">
-            <Text size="xs">{diffData?.error ?? "Gagal mengambil diff"}</Text>
+            <Text size="xs">{diffData?.error ?? 'Gagal mengambil diff'}</Text>
           </Alert>
         )}
       </Modal>
@@ -1592,9 +1388,9 @@ export function PortainerSync({
       <Modal
         opened={logsOpen}
         onClose={() => {
-          closeLogs();
-          setAutoRefresh(false);
-          setSelectedContainerId(null);
+          closeLogs()
+          setAutoRefresh(false)
+          setSelectedContainerId(null)
         }}
         title={
           <Group gap="xs">
@@ -1609,7 +1405,7 @@ export function PortainerSync({
                 size="xs"
                 variant="outline"
                 color="gray"
-                style={{ cursor: "pointer" }}
+                style={{ cursor: 'pointer' }}
                 onClick={() => setSelectedContainerId(null)}
               >
                 ← ganti container
@@ -1631,19 +1427,13 @@ export function PortainerSync({
                 <Group gap="xs" align="center" py="md" justify="center">
                   <Loader size="sm" />
                   <Text size="sm" c="dimmed">
-                    Memuat daftar container di stack{" "}
-                    <strong>{config?.stackName}</strong>...
+                    Memuat daftar container di stack <strong>{config?.stackName}</strong>...
                   </Text>
                 </Group>
               ) : containers.length === 0 ? (
-                <Alert
-                  color="orange"
-                  icon={<TbAlertTriangle size={14} />}
-                  p="sm"
-                >
+                <Alert color="orange" icon={<TbAlertTriangle size={14} />} p="sm">
                   <Text size="xs">
-                    Tidak ada container ditemukan di stack{" "}
-                    <strong>{config?.stackName}</strong>.
+                    Tidak ada container ditemukan di stack <strong>{config?.stackName}</strong>.
                   </Text>
                 </Alert>
               ) : (
@@ -1653,20 +1443,15 @@ export function PortainerSync({
                       key={c.id}
                       p="sm"
                       style={{
-                        borderRadius: "var(--mantine-radius-md)",
-                        border: "1px solid var(--mantine-color-default-border)",
-                        cursor: "pointer",
+                        borderRadius: 'var(--mantine-radius-md)',
+                        border: '1px solid var(--mantine-color-default-border)',
+                        cursor: 'pointer',
                       }}
                       onClick={() => setSelectedContainerId(c.id)}
                     >
                       <Group justify="space-between" wrap="nowrap">
                         <Group gap="sm" style={{ minWidth: 0 }}>
-                          <ThemeIcon
-                            size={32}
-                            radius="md"
-                            variant="light"
-                            color={stateColor[c.state] ?? "gray"}
-                          >
+                          <ThemeIcon size={32} radius="md" variant="light" color={stateColor[c.state] ?? 'gray'}>
                             <TbFileText size={16} />
                           </ThemeIcon>
                           <Box style={{ minWidth: 0 }}>
@@ -1674,9 +1459,9 @@ export function PortainerSync({
                               size="sm"
                               fw={600}
                               style={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
                               }}
                             >
                               {c.names[0]}
@@ -1689,31 +1474,22 @@ export function PortainerSync({
                                 fz={10}
                                 c="dimmed"
                                 style={{
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
                                 }}
                               >
-                                {c.image.split("/").pop()}
+                                {c.image.split('/').pop()}
                               </Text>
                             </Group>
                           </Box>
                         </Group>
                         <Group gap="xs" wrap="nowrap">
-                          <Badge
-                            size="sm"
-                            color={stateColor[c.state] ?? "gray"}
-                            variant="light"
-                          >
+                          <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">
                             {c.state}
                           </Badge>
-                          {c.ports.length > 0 && (
-                            <Code fz={10}>{c.ports[0]}</Code>
-                          )}
-                          <TbChevronRight
-                            size={14}
-                            color="var(--mantine-color-dimmed)"
-                          />
+                          {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
+                          <TbChevronRight size={14} color="var(--mantine-color-dimmed)" />
                         </Group>
                       </Group>
                     </Box>
@@ -1726,21 +1502,17 @@ export function PortainerSync({
             <>
               {/* Info container yang dipilih */}
               {(() => {
-                const c = containers.find((x) => x.id === selectedContainerId);
+                const c = containers.find((x) => x.id === selectedContainerId)
                 return c ? (
                   <Box
                     p="xs"
                     style={{
-                      borderRadius: "var(--mantine-radius-md)",
-                      background: "var(--mantine-color-default-hover)",
+                      borderRadius: 'var(--mantine-radius-md)',
+                      background: 'var(--mantine-color-default-hover)',
                     }}
                   >
                     <Group gap="sm" wrap="nowrap">
-                      <Badge
-                        size="sm"
-                        color={stateColor[c.state] ?? "gray"}
-                        variant="light"
-                      >
+                      <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">
                         {c.state}
                       </Badge>
                       <Text size="xs" fw={600}>
@@ -1754,16 +1526,16 @@ export function PortainerSync({
                         c="dimmed"
                         style={{
                           flex: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        {c.image.split("/").pop()}
+                        {c.image.split('/').pop()}
                       </Text>
                     </Group>
                   </Box>
-                ) : null;
+                ) : null
               })()}
 
               {/* Controls */}
@@ -1826,10 +1598,10 @@ export function PortainerSync({
                         const text = logLines
                           .map(
                             (l) =>
-                              `[${l.stream}] ${l.timestamp ? `${new Date(l.timestamp).toLocaleTimeString("id-ID")} ` : ""}${l.message}`,
+                              `[${l.stream}] ${l.timestamp ? `${new Date(l.timestamp).toLocaleTimeString('id-ID')} ` : ''}${l.message}`,
                           )
-                          .join("\n");
-                        navigator.clipboard.writeText(text);
+                          .join('\n')
+                        navigator.clipboard.writeText(text)
                       }}
                     >
                       <TbCopy size={13} />
@@ -1843,18 +1615,15 @@ export function PortainerSync({
                       disabled={logLines.length === 0}
                       onClick={() => {
                         const text = logLines
-                          .map(
-                            (l) =>
-                              `[${l.stream.toUpperCase()}] ${l.timestamp ?? ""} ${l.message}`,
-                          )
-                          .join("\n");
-                        const blob = new Blob([text], { type: "text/plain" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `${config?.stackName ?? "stack"}-${selectedContainerId?.slice(0, 8) ?? "logs"}.log`;
-                        a.click();
-                        URL.revokeObjectURL(url);
+                          .map((l) => `[${l.stream.toUpperCase()}] ${l.timestamp ?? ''} ${l.message}`)
+                          .join('\n')
+                        const blob = new Blob([text], { type: 'text/plain' })
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `${config?.stackName ?? 'stack'}-${selectedContainerId?.slice(0, 8) ?? 'logs'}.log`
+                        a.click()
+                        URL.revokeObjectURL(url)
                       }}
                     >
                       <TbDownload size={13} />
@@ -1871,9 +1640,9 @@ export function PortainerSync({
               ) : (
                 <Box
                   style={{
-                    borderRadius: "var(--mantine-radius-sm)",
-                    border: "1px solid var(--mantine-color-default-border)",
-                    overflow: "hidden",
+                    borderRadius: 'var(--mantine-radius-sm)',
+                    border: '1px solid var(--mantine-color-default-border)',
+                    overflow: 'hidden',
                   }}
                 >
                   <Group
@@ -1881,8 +1650,8 @@ export function PortainerSync({
                     py={4}
                     justify="space-between"
                     style={{
-                      background: "#161b22",
-                      borderBottom: "1px solid #30363d",
+                      background: '#161b22',
+                      borderBottom: '1px solid #30363d',
                     }}
                   >
                     <Group gap="xs">
@@ -1905,17 +1674,16 @@ export function PortainerSync({
                     viewportRef={logViewportRef}
                     onScrollPositionChange={({ y }) => {
                       if (logViewportRef.current) {
-                        const { scrollHeight, clientHeight } =
-                          logViewportRef.current;
-                        setAutoScroll(y + clientHeight >= scrollHeight - 20);
+                        const { scrollHeight, clientHeight } = logViewportRef.current
+                        setAutoScroll(y + clientHeight >= scrollHeight - 20)
                       }
                     }}
                   >
                     <Box
                       p="xs"
                       style={{
-                        background: "#0d1117",
-                        fontFamily: "monospace",
+                        background: '#0d1117',
+                        fontFamily: 'monospace',
                         fontSize: 12,
                         lineHeight: 1.6,
                         minHeight: 120,
@@ -1928,35 +1696,25 @@ export function PortainerSync({
                       ) : (
                         logLines.map((line, i) => (
                           // biome-ignore lint/suspicious/noArrayIndexKey: log lines have no stable id
-                          <Box
-                            key={i}
-                            style={{
-                              display: "flex",
-                              gap: 8,
-                              alignItems: "flex-start",
-                            }}
-                          >
+                          <Box key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                             {line.timestamp && (
                               <Text
                                 span
                                 fz={10}
                                 ff="monospace"
                                 style={{
-                                  color: "#8b949e",
+                                  color: '#8b949e',
                                   flexShrink: 0,
-                                  userSelect: "none",
+                                  userSelect: 'none',
                                   paddingTop: 1,
                                 }}
                               >
-                                {new Date(line.timestamp).toLocaleTimeString(
-                                  "id-ID",
-                                  {
-                                    hour12: false,
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    second: "2-digit",
-                                  },
-                                )}
+                                {new Date(line.timestamp).toLocaleTimeString('id-ID', {
+                                  hour12: false,
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                })}
                               </Text>
                             )}
                             <Text
@@ -1964,28 +1722,22 @@ export function PortainerSync({
                               fz={9}
                               ff="monospace"
                               style={{
-                                color:
-                                  line.stream === "stderr"
-                                    ? "#ff7b72"
-                                    : "#7ee787",
+                                color: line.stream === 'stderr' ? '#ff7b72' : '#7ee787',
                                 flexShrink: 0,
                                 paddingTop: 2,
-                                userSelect: "none",
+                                userSelect: 'none',
                               }}
                             >
-                              {line.stream === "stderr" ? "ERR" : "OUT"}
+                              {line.stream === 'stderr' ? 'ERR' : 'OUT'}
                             </Text>
                             <Text
                               span
                               fz={12}
                               ff="monospace"
                               style={{
-                                color:
-                                  line.stream === "stderr"
-                                    ? "#ff7b72"
-                                    : "#e6edf3",
-                                wordBreak: "break-all",
-                                whiteSpace: "pre-wrap",
+                                color: line.stream === 'stderr' ? '#ff7b72' : '#e6edf3',
+                                wordBreak: 'break-all',
+                                whiteSpace: 'pre-wrap',
                               }}
                             >
                               {line.message}
@@ -2006,9 +1758,9 @@ export function PortainerSync({
       <Modal
         opened={execOpen}
         onClose={() => {
-          closeExec();
-          setExecCommand("");
-          execHistoryIdxRef.current = -1;
+          closeExec()
+          setExecCommand('')
+          execHistoryIdxRef.current = -1
         }}
         size="xl"
         title={
@@ -2029,32 +1781,25 @@ export function PortainerSync({
         styles={{
           body: {
             padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            height: "70vh",
-            overflow: "hidden",
+            display: 'flex',
+            flexDirection: 'column',
+            height: '70vh',
+            overflow: 'hidden',
           },
         }}
       >
         {/* Quick commands */}
         <Box
           style={{
-            background: "var(--mantine-color-default-hover)",
-            borderBottom: "1px solid var(--mantine-color-default-border)",
+            background: 'var(--mantine-color-default-hover)',
+            borderBottom: '1px solid var(--mantine-color-default-border)',
             flexShrink: 0,
           }}
         >
           <Box px="sm" pt="sm" pb="sm">
-            <Group
-              gap="xs"
-              justify="space-between"
-              mb={execQuickCommands.length > 0 || execShowQuickAdd ? "xs" : 0}
-            >
+            <Group gap="xs" justify="space-between" mb={execQuickCommands.length > 0 || execShowQuickAdd ? 'xs' : 0}>
               <Group gap={6} align="center">
-                <TbBookmark
-                  size={12}
-                  style={{ color: "var(--mantine-color-teal-6)" }}
-                />
+                <TbBookmark size={12} style={{ color: 'var(--mantine-color-teal-6)' }} />
                 <Text size="xs" fw={600}>
                   Quick Commands
                 </Text>
@@ -2070,8 +1815,8 @@ export function PortainerSync({
                       variant="subtle"
                       color="red"
                       onClick={() => {
-                        setExecHistory([]);
-                        execHistoryIdxRef.current = -1;
+                        setExecHistory([])
+                        execHistoryIdxRef.current = -1
                       }}
                     >
                       <TbEraser size={12} />
@@ -2079,24 +1824,18 @@ export function PortainerSync({
                   </Tooltip>
                 )}
                 {isSuperAdmin && (
-                  <Tooltip
-                    label={execShowQuickAdd ? "Batal" : "Tambah quick command"}
-                  >
+                  <Tooltip label={execShowQuickAdd ? 'Batal' : 'Tambah quick command'}>
                     <ActionIcon
                       size="xs"
-                      variant={execShowQuickAdd ? "light" : "subtle"}
-                      color={execShowQuickAdd ? "red" : "teal"}
+                      variant={execShowQuickAdd ? 'light' : 'subtle'}
+                      color={execShowQuickAdd ? 'red' : 'teal'}
                       onClick={() => {
-                        setExecShowQuickAdd((v) => !v);
-                        setExecNewQuickLabel("");
-                        setExecNewQuickCommand("");
+                        setExecShowQuickAdd((v) => !v)
+                        setExecNewQuickLabel('')
+                        setExecNewQuickCommand('')
                       }}
                     >
-                      {execShowQuickAdd ? (
-                        <TbX size={12} />
-                      ) : (
-                        <TbPlus size={12} />
-                      )}
+                      {execShowQuickAdd ? <TbX size={12} /> : <TbPlus size={12} />}
                     </ActionIcon>
                   </Tooltip>
                 )}
@@ -2107,9 +1846,9 @@ export function PortainerSync({
                 p="xs"
                 mb="xs"
                 style={{
-                  borderRadius: "var(--mantine-radius-sm)",
-                  border: "1px solid var(--mantine-color-default-border)",
-                  background: "var(--mantine-color-body)",
+                  borderRadius: 'var(--mantine-radius-sm)',
+                  border: '1px solid var(--mantine-color-default-border)',
+                  background: 'var(--mantine-color-body)',
                 }}
               >
                 <Group gap="xs" align="flex-end">
@@ -2129,11 +1868,7 @@ export function PortainerSync({
                     onChange={(e) => setExecNewQuickCommand(e.target.value)}
                     style={{ flex: 1 }}
                     onKeyDown={(e) => {
-                      if (
-                        e.key === "Enter" &&
-                        execNewQuickLabel.trim() &&
-                        execNewQuickCommand.trim()
-                      ) {
+                      if (e.key === 'Enter' && execNewQuickLabel.trim() && execNewQuickCommand.trim()) {
                         setExecQuickCommands((prev) => [
                           ...prev,
                           {
@@ -2141,10 +1876,10 @@ export function PortainerSync({
                             label: execNewQuickLabel.trim(),
                             command: execNewQuickCommand.trim(),
                           },
-                        ]);
-                        setExecNewQuickLabel("");
-                        setExecNewQuickCommand("");
-                        setExecShowQuickAdd(false);
+                        ])
+                        setExecNewQuickLabel('')
+                        setExecNewQuickCommand('')
+                        setExecShowQuickAdd(false)
                       }
                     }}
                   />
@@ -2153,9 +1888,7 @@ export function PortainerSync({
                     variant="filled"
                     color="teal"
                     mb={1}
-                    disabled={
-                      !execNewQuickLabel.trim() || !execNewQuickCommand.trim()
-                    }
+                    disabled={!execNewQuickLabel.trim() || !execNewQuickCommand.trim()}
                     onClick={() => {
                       setExecQuickCommands((prev) => [
                         ...prev,
@@ -2164,10 +1897,10 @@ export function PortainerSync({
                           label: execNewQuickLabel.trim(),
                           command: execNewQuickCommand.trim(),
                         },
-                      ]);
-                      setExecNewQuickLabel("");
-                      setExecNewQuickCommand("");
-                      setExecShowQuickAdd(false);
+                      ])
+                      setExecNewQuickLabel('')
+                      setExecNewQuickCommand('')
+                      setExecShowQuickAdd(false)
                     }}
                   >
                     <TbCheck size={12} />
@@ -2193,22 +1926,22 @@ export function PortainerSync({
                       <Box
                         component="button"
                         onClick={() => {
-                          setExecCommand(qc.command);
-                          execHistoryIdxRef.current = -1;
+                          setExecCommand(qc.command)
+                          execHistoryIdxRef.current = -1
                         }}
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
+                          display: 'inline-flex',
+                          alignItems: 'center',
                           gap: 4,
-                          background: "var(--mantine-color-teal-light)",
-                          color: "var(--mantine-color-teal-text)",
-                          border: "none",
-                          borderRadius: isSuperAdmin ? "4px 0 0 4px" : "4px",
-                          padding: "2px 7px",
+                          background: 'var(--mantine-color-teal-light)',
+                          color: 'var(--mantine-color-teal-text)',
+                          border: 'none',
+                          borderRadius: isSuperAdmin ? '4px 0 0 4px' : '4px',
+                          padding: '2px 7px',
                           fontSize: 11,
                           fontWeight: 600,
-                          cursor: "pointer",
-                          userSelect: "none",
+                          cursor: 'pointer',
+                          userSelect: 'none',
                           lineHeight: 1.6,
                         }}
                       >
@@ -2218,26 +1951,21 @@ export function PortainerSync({
                       {isSuperAdmin && (
                         <Box
                           component="button"
-                          onClick={() =>
-                            setExecQuickCommands((prev) =>
-                              prev.filter((x) => x.id !== qc.id),
-                            )
-                          }
+                          onClick={() => setExecQuickCommands((prev) => prev.filter((x) => x.id !== qc.id))}
                           style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             width: 18,
-                            background: "var(--mantine-color-teal-light)",
-                            border: "none",
-                            borderLeft:
-                              "1px solid var(--mantine-color-teal-light-hover)",
-                            borderRadius: "0 4px 4px 0",
-                            cursor: "pointer",
-                            color: "var(--mantine-color-teal-text)",
+                            background: 'var(--mantine-color-teal-light)',
+                            border: 'none',
+                            borderLeft: '1px solid var(--mantine-color-teal-light-hover)',
+                            borderRadius: '0 4px 4px 0',
+                            cursor: 'pointer',
+                            color: 'var(--mantine-color-teal-text)',
                             fontSize: 13,
                             padding: 0,
-                            alignSelf: "stretch",
+                            alignSelf: 'stretch',
                           }}
                         >
                           ×
@@ -2252,61 +1980,48 @@ export function PortainerSync({
         </Box>
 
         {/* Terminal output */}
-        <Box
-          ref={execOutputRef}
-          style={{ flex: 1, overflowY: "auto", background: "#0d1117" }}
-        >
+        <Box ref={execOutputRef} style={{ flex: 1, overflowY: 'auto', background: '#0d1117' }}>
           {execHistory.length === 0 && !execMutation.isPending ? (
             <Box p="md">
-              <Text fz={12} ff="monospace" style={{ color: "#8b949e" }}>
-                Connected to{" "}
-                <Text span ff="monospace" style={{ color: "#79c0ff" }}>
+              <Text fz={12} ff="monospace" style={{ color: '#8b949e' }}>
+                Connected to{' '}
+                <Text span ff="monospace" style={{ color: '#79c0ff' }}>
                   {execContainer?.containerName}
                 </Text>
               </Text>
-              <Text fz={11} ff="monospace" mt={6} style={{ color: "#636e7b" }}>
-                Ketik command lalu tekan{" "}
+              <Text fz={11} ff="monospace" mt={6} style={{ color: '#636e7b' }}>
+                Ketik command lalu tekan{' '}
                 <Text
                   span
                   style={{
-                    color: "#e6edf3",
-                    background: "#21262d",
-                    padding: "1px 5px",
+                    color: '#e6edf3',
+                    background: '#21262d',
+                    padding: '1px 5px',
                     borderRadius: 3,
                   }}
                 >
                   Enter
-                </Text>{" "}
-                untuk eksekusi. Gunakan{" "}
+                </Text>{' '}
+                untuk eksekusi. Gunakan{' '}
                 <Text
                   span
                   style={{
-                    color: "#e6edf3",
-                    background: "#21262d",
-                    padding: "1px 5px",
+                    color: '#e6edf3',
+                    background: '#21262d',
+                    padding: '1px 5px',
                     borderRadius: 3,
                   }}
                 >
                   ↑↓
-                </Text>{" "}
+                </Text>{' '}
                 untuk navigasi riwayat.
               </Text>
             </Box>
           ) : (
-            <Box
-              p="sm"
-              style={{ display: "flex", flexDirection: "column", gap: 8 }}
-            >
+            <Box p="sm" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[...execHistory].reverse().map((entry, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: exec history has no stable id after reverse
-                <Box
-                  key={i}
-                  style={{
-                    borderRadius: 6,
-                    border: "1px solid #21262d",
-                    overflow: "hidden",
-                  }}
-                >
+                <Box key={i} style={{ borderRadius: 6, border: '1px solid #21262d', overflow: 'hidden' }}>
                   <Group
                     px="sm"
                     py={5}
@@ -2314,53 +2029,31 @@ export function PortainerSync({
                     wrap="nowrap"
                     justify="space-between"
                     style={{
-                      background: "#161b22",
+                      background: '#161b22',
                       borderBottom:
-                        entry.stdout.length > 0 || entry.stderr.length > 0
-                          ? "1px solid #21262d"
-                          : undefined,
+                        entry.stdout.length > 0 || entry.stderr.length > 0 ? '1px solid #21262d' : undefined,
                     }}
                   >
-                    <Group
-                      gap={6}
-                      wrap="nowrap"
-                      style={{ flex: 1, minWidth: 0 }}
-                    >
-                      <Text
-                        span
-                        fz={12}
-                        ff="monospace"
-                        style={{ color: "#3fb950", flexShrink: 0 }}
-                      >
+                    <Group gap={6} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+                      <Text span fz={12} ff="monospace" style={{ color: '#3fb950', flexShrink: 0 }}>
                         ❯
                       </Text>
-                      <Text
-                        span
-                        fz={12}
-                        ff="monospace"
-                        style={{ color: "#79c0ff", wordBreak: "break-all" }}
-                      >
+                      <Text span fz={12} ff="monospace" style={{ color: '#79c0ff', wordBreak: 'break-all' }}>
                         {entry.command}
                       </Text>
                     </Group>
                     <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
-                      <Text fz={10} style={{ color: "#636e7b" }}>
-                        {new Date(entry.timestamp).toLocaleTimeString("id-ID", {
+                      <Text fz={10} style={{ color: '#636e7b' }}>
+                        {new Date(entry.timestamp).toLocaleTimeString('id-ID', {
                           hour12: false,
                         })}
                       </Text>
                       <Badge
                         size="xs"
                         variant="dot"
-                        color={
-                          entry.exitCode === 0
-                            ? "teal"
-                            : entry.exitCode === null
-                              ? "gray"
-                              : "red"
-                        }
+                        color={entry.exitCode === 0 ? 'teal' : entry.exitCode === null ? 'gray' : 'red'}
                       >
-                        {entry.exitCode ?? "?"}
+                        {entry.exitCode ?? '?'}
                       </Badge>
                       <Tooltip label="Copy output" openDelay={400}>
                         <ActionIcon
@@ -2368,11 +2061,7 @@ export function PortainerSync({
                           variant="subtle"
                           color="gray"
                           onClick={() =>
-                            navigator.clipboard
-                              .writeText(
-                                [...entry.stdout, ...entry.stderr].join("\n"),
-                              )
-                              .catch(() => {})
+                            navigator.clipboard.writeText([...entry.stdout, ...entry.stderr].join('\n')).catch(() => {})
                           }
                         >
                           <TbClipboard size={11} />
@@ -2382,11 +2071,7 @@ export function PortainerSync({
                   </Group>
                   {entry.stdout.length === 0 && entry.stderr.length === 0 ? (
                     <Box px="sm" py={6}>
-                      <Text
-                        fz={11}
-                        ff="monospace"
-                        style={{ color: "#636e7b", fontStyle: "italic" }}
-                      >
+                      <Text fz={11} ff="monospace" style={{ color: '#636e7b', fontStyle: 'italic' }}>
                         (no output)
                       </Text>
                     </Box>
@@ -2398,9 +2083,9 @@ export function PortainerSync({
                           fz={11}
                           ff="monospace"
                           style={{
-                            color: "#e6edf3",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-all",
+                            color: '#e6edf3',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-all',
                             lineHeight: 1.6,
                           }}
                         >
@@ -2413,9 +2098,9 @@ export function PortainerSync({
                           fz={11}
                           ff="monospace"
                           style={{
-                            color: "#ff7b72",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-all",
+                            color: '#ff7b72',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-all',
                             lineHeight: 1.6,
                           }}
                         >
@@ -2435,17 +2120,17 @@ export function PortainerSync({
                 px="sm"
                 py={8}
                 style={{
-                  background: "#161b22",
+                  background: '#161b22',
                   borderRadius: 6,
-                  border: "1px solid #21262d",
+                  border: '1px solid #21262d',
                 }}
               >
                 <Loader size="xs" color="teal" />
-                <Text fz={11} ff="monospace" style={{ color: "#636e7b" }}>
-                  running{" "}
-                  <Text span ff="monospace" style={{ color: "#79c0ff" }}>
+                <Text fz={11} ff="monospace" style={{ color: '#636e7b' }}>
+                  running{' '}
+                  <Text span ff="monospace" style={{ color: '#79c0ff' }}>
                     {execCommand}
-                  </Text>{" "}
+                  </Text>{' '}
                   ...
                 </Text>
               </Group>
@@ -2456,70 +2141,55 @@ export function PortainerSync({
         {/* Command input */}
         <Box
           style={{
-            borderTop: "1px solid #21262d",
-            background: "#010409",
+            borderTop: '1px solid #21262d',
+            background: '#010409',
             flexShrink: 0,
-            padding: "10px 12px 8px",
+            padding: '10px 12px 8px',
           }}
         >
           <Group gap="xs" wrap="nowrap" align="center">
-            <Text
-              fz={14}
-              ff="monospace"
-              style={{ color: "#3fb950", flexShrink: 0, userSelect: "none" }}
-            >
+            <Text fz={14} ff="monospace" style={{ color: '#3fb950', flexShrink: 0, userSelect: 'none' }}>
               ❯
             </Text>
             <TextInput
               style={{ flex: 1 }}
               size="sm"
-              placeholder={execMutation.isPending ? "waiting..." : "command..."}
+              placeholder={execMutation.isPending ? 'waiting...' : 'command...'}
               value={execCommand}
               onChange={(e) => {
-                execHistoryIdxRef.current = -1;
-                setExecCommand(e.target.value);
+                execHistoryIdxRef.current = -1
+                setExecCommand(e.target.value)
               }}
               onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  execCommand.trim() &&
-                  !execMutation.isPending &&
-                  execContainer
-                ) {
+                if (e.key === 'Enter' && execCommand.trim() && !execMutation.isPending && execContainer) {
                   execMutation.mutate({
                     containerId: execContainer.containerId,
                     endpointId: execContainer.endpointId,
                     command: execCommand.trim(),
-                  });
-                  return;
+                  })
+                  return
                 }
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  const newIdx = Math.min(
-                    execHistoryIdxRef.current + 1,
-                    execHistory.length - 1,
-                  );
-                  execHistoryIdxRef.current = newIdx;
-                  if (execHistory[newIdx])
-                    setExecCommand(execHistory[newIdx].command);
-                  return;
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  const newIdx = Math.min(execHistoryIdxRef.current + 1, execHistory.length - 1)
+                  execHistoryIdxRef.current = newIdx
+                  if (execHistory[newIdx]) setExecCommand(execHistory[newIdx].command)
+                  return
                 }
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  const newIdx = Math.max(execHistoryIdxRef.current - 1, -1);
-                  execHistoryIdxRef.current = newIdx;
-                  setExecCommand(
-                    newIdx === -1 ? "" : (execHistory[newIdx]?.command ?? ""),
-                  );
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  const newIdx = Math.max(execHistoryIdxRef.current - 1, -1)
+                  execHistoryIdxRef.current = newIdx
+                  setExecCommand(newIdx === -1 ? '' : (execHistory[newIdx]?.command ?? ''))
                 }
               }}
               styles={{
                 input: {
-                  fontFamily: "monospace",
+                  fontFamily: 'monospace',
                   fontSize: 13,
-                  background: "#0d1117",
-                  border: "1px solid #30363d",
-                  color: "#e6edf3",
+                  background: '#0d1117',
+                  border: '1px solid #30363d',
+                  color: '#e6edf3',
                 },
               }}
               disabled={execMutation.isPending}
@@ -2530,9 +2200,7 @@ export function PortainerSync({
               variant="filled"
               color="teal"
               loading={execMutation.isPending}
-              disabled={
-                !execCommand.trim() || execMutation.isPending || !execContainer
-              }
+              disabled={!execCommand.trim() || execMutation.isPending || !execContainer}
               onClick={() =>
                 execContainer &&
                 execMutation.mutate({
@@ -2546,11 +2214,11 @@ export function PortainerSync({
             </ActionIcon>
           </Group>
           <Group mt={5} justify="space-between">
-            <Text fz={10} style={{ color: "#636e7b" }}>
+            <Text fz={10} style={{ color: '#636e7b' }}>
               ↑↓ history · Enter jalankan
             </Text>
             {execHistory.length > 0 && (
-              <Text fz={10} style={{ color: "#636e7b" }}>
+              <Text fz={10} style={{ color: '#636e7b' }}>
                 {execHistory.length} command dijalankan
               </Text>
             )}
@@ -2582,19 +2250,14 @@ export function PortainerSync({
         ) : (
           <CodeEditor
             value={composeContent}
-            onChange={(v) => setComposeContent(v ?? "")}
+            onChange={(v) => setComposeContent(v ?? '')}
             filename="docker-compose.yml"
             height={450}
             noMinimap
           />
         )}
         <Group justify="flex-end" gap="xs" mt="md">
-          <Button
-            variant="subtle"
-            color="gray"
-            onClick={closeCompose}
-            disabled={saveCompose.isPending}
-          >
+          <Button variant="subtle" color="gray" onClick={closeCompose} disabled={saveCompose.isPending}>
             Batal
           </Button>
           <Button
@@ -2604,17 +2267,16 @@ export function PortainerSync({
             disabled={composeQuery.isLoading || !composeContent}
             onClick={() => {
               modals.openConfirmModal({
-                title: "Apply & Redeploy?",
+                title: 'Apply & Redeploy?',
                 children: (
                   <Text size="sm">
-                    Stack <strong>{config?.stackName}</strong> akan di-redeploy
-                    dengan compose file baru.
+                    Stack <strong>{config?.stackName}</strong> akan di-redeploy dengan compose file baru.
                   </Text>
                 ),
-                labels: { confirm: "Apply & Redeploy", cancel: "Batal" },
-                confirmProps: { color: "violet" },
+                labels: { confirm: 'Apply & Redeploy', cancel: 'Batal' },
+                confirmProps: { color: 'violet' },
                 onConfirm: () => saveCompose.mutate(composeContent),
-              });
+              })
             }}
           >
             Apply & Redeploy
@@ -2622,5 +2284,5 @@ export function PortainerSync({
         </Group>
       </Modal>
     </>
-  );
+  )
 }

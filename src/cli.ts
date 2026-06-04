@@ -550,23 +550,19 @@ function fmtSpeed(bps: number): string {
 }
 
 function fmtEta(secs: number): string {
-  if (!isFinite(secs) || secs <= 0) return '...'
+  if (!Number.isFinite(secs) || secs <= 0) return '...'
   if (secs < 60) return `${Math.ceil(secs)}s`
   const m = Math.floor(secs / 60)
   const s = Math.ceil(secs % 60)
   return `${m}m ${s}s`
 }
 
-function renderProgress(received: number, total: number, speed: number, elapsed: number): string {
+function renderProgress(received: number, total: number, speed: number, _elapsed: number): string {
   const BAR = 20
   const pct = total > 0 ? Math.min(received / total, 1) : -1
-  const bar = pct >= 0
-    ? '[' + '█'.repeat(Math.floor(pct * BAR)) + '░'.repeat(BAR - Math.floor(pct * BAR)) + ']'
-    : ''
+  const bar = pct >= 0 ? `[${'█'.repeat(Math.floor(pct * BAR))}${'░'.repeat(BAR - Math.floor(pct * BAR))}]` : ''
   const pctStr = pct >= 0 ? ` ${(pct * 100).toFixed(0).padStart(3)}%` : ''
-  const sizeStr = total > 0
-    ? `  ${fmtBytes(received)} / ${fmtBytes(total)}`
-    : `  ${fmtBytes(received)}`
+  const sizeStr = total > 0 ? `  ${fmtBytes(received)} / ${fmtBytes(total)}` : `  ${fmtBytes(received)}`
   const speedStr = speed > 0 ? `  ${fmtSpeed(speed)}` : ''
   const eta = speed > 0 && total > 0 ? `  ETA ${fmtEta((total - received) / speed)}` : ''
   return `  ${bar}${pctStr}${sizeStr}${speedStr}${eta}`
@@ -586,7 +582,7 @@ async function downloadBinary(url: string, timeoutMs = 10 * 60 * 1000, showProgr
     }
 
     // Content-Length = compressed size (server serves gzip); decompressed total ~2.5-3x
-    const compressedLen = parseInt(res.headers.get('content-length') ?? '0') || 0
+    const compressedLen = parseInt(res.headers.get('content-length') ?? '0', 10) || 0
     // Estimate decompressed total: gzip ratio for Bun binaries is ~2.7x
     const estimatedTotal = compressedLen > 0 ? Math.round(compressedLen * 2.7) : 0
 
@@ -618,9 +614,7 @@ async function downloadBinary(url: string, timeoutMs = 10 * 60 * 1000, showProgr
     if (showProgress) {
       const elapsed = (Date.now() - startTime) / 1000
       const speed = elapsed > 0 ? received / elapsed : 0
-      process.stdout.write(
-        `\r\x1b[K  ✓ ${fmtBytes(received)}  ${fmtSpeed(speed)}  ${elapsed.toFixed(1)}s\n`
-      )
+      process.stdout.write(`\r\x1b[K  ✓ ${fmtBytes(received)}  ${fmtSpeed(speed)}  ${elapsed.toFixed(1)}s\n`)
     }
     return Buffer.concat(chunks)
   } catch (e) {

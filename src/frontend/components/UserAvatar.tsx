@@ -1,5 +1,5 @@
-import { Avatar } from '@mantine/core'
 import type { AvatarProps } from '@mantine/core'
+import { Avatar } from '@mantine/core'
 
 interface UserAvatarUser {
   id: string

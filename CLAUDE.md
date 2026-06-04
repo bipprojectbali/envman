@@ -44,6 +44,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`
 - `ProjectFile` (id, projectId, authorId, title, description, prefix?, files Json, tags[], timestamps) — unique(projectId, prefix)
 - `PortainerConnection` (id, name, portainerUrl, apiToken, createdById, timestamps) — global
 - `PortainerConfig` (id, projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?, timestamps)
+- `AppSetting` (key PK, value, updatedAt, updatedById?) — konfigurasi global runtime, diubah via Dev > Settings
 
 ### Enums
 
@@ -219,6 +220,8 @@ Auth: session cookie atau `Authorization: Bearer <token>`. `requireEnvAuth()` di
 **Aliases:** `GET|POST /api/envman/projects/:slug/aliases` · `PATCH|DELETE .../aliases/:name` · `GET /api/envman/aliases/resolve/:ref`
 
 **Tokens:** `GET|POST /api/envman/tokens` · `PATCH|DELETE /api/envman/tokens/:id` · `PATCH .../toggle` · `GET .../reveal` · `POST .../rotate` · `GET /api/envman/whoami`
+
+**Settings:** `GET /api/envman/settings` (public, semua setting sebagai key-value map) · `PUT /api/envman/settings` (SUPER_ADMIN, body: `[{key, value}]`) — key yang valid: `user_token_creation` (boolean string), `user_token_max_days` (number string)
 
 ### Auth Endpoints
 

@@ -59,7 +59,6 @@ function BlockedPage() {
           </Alert>
 
           <Button
-            
             color="red"
             variant="light"
             leftSection={<TbLogout size={18} />}

@@ -97,7 +97,7 @@ const HOVER_STYLES = `
 `
 
 function ConnectionsPage() {
-  const isMobile = useMediaQuery('(max-width: 48em)')
+  const _isMobile = useMediaQuery('(max-width: 48em)')
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: sessionData } = useSession()
@@ -150,9 +150,8 @@ function ConnectionsPage() {
   }, [connections, debouncedSearch])
 
   const isFormOpen = !!connectionFormId
-  const editTarget = connectionFormId && connectionFormId !== 'new'
-    ? (connections.find((c) => c.id === connectionFormId) ?? null)
-    : null
+  const editTarget =
+    connectionFormId && connectionFormId !== 'new' ? (connections.find((c) => c.id === connectionFormId) ?? null) : null
 
   // Sync form state saat masuk edit mode (setelah connections dimuat)
   useEffect(() => {
@@ -163,10 +162,9 @@ function ConnectionsPage() {
       setForm({ name: editTarget.name, portainerUrl: editTarget.portainerUrl, apiToken: '' })
       setTestResult(null)
     }
-  }, [connectionFormId, editTarget?.id])
+  }, [connectionFormId, editTarget?.id, editTarget?.portainerUrl, editTarget?.name, editTarget])
 
-  const openCreate = () =>
-    navigate({ to: '.', search: (prev) => ({ ...prev, connectionForm: 'new' }), replace: true })
+  const openCreate = () => navigate({ to: '.', search: (prev) => ({ ...prev, connectionForm: 'new' }), replace: true })
   const openEdit = (c: Connection) =>
     navigate({ to: '.', search: (prev) => ({ ...prev, connectionForm: c.id }), replace: true })
   const handleClose = () =>
@@ -276,7 +274,9 @@ function ConnectionsPage() {
             <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={handleClose}>
               Connections
             </Anchor>
-            <Text size="sm" c="dimmed">/</Text>
+            <Text size="sm" c="dimmed">
+              /
+            </Text>
             <Text size="sm" fw={600}>
               {editTarget ? `Edit: ${editTarget.name}` : 'Tambah Connection'}
             </Text>
@@ -341,7 +341,9 @@ function ConnectionsPage() {
           </Group>
           <Divider />
           <Group justify="flex-end" gap="xs">
-            <Button variant="subtle" color="gray" onClick={handleClose}>Batal</Button>
+            <Button variant="subtle" color="gray" onClick={handleClose}>
+              Batal
+            </Button>
             <Button
               leftSection={editTarget ? <TbCheck size={14} /> : <TbPlus size={14} />}
               color="primary"
@@ -364,9 +366,16 @@ function ConnectionsPage() {
 
       <Tabs
         value={tab}
-        variant='outline'
+        variant="outline"
         onChange={(v) =>
-          navigate({ to: '/envmanager/connections', search: (prev) => ({ ...prev, tab: (v ?? 'connections') as 'connections' | 'backup', connectionForm: undefined }) })
+          navigate({
+            to: '/envmanager/connections',
+            search: (prev) => ({
+              ...prev,
+              tab: (v ?? 'connections') as 'connections' | 'backup',
+              connectionForm: undefined,
+            }),
+          })
         }
       >
         <Tabs.List mb="md">
@@ -428,11 +437,7 @@ function ConnectionsPage() {
 
           {/* ─── Toolbar ────────────────────────── */}
           {!isError && connections.length > 0 && (
-            <Box
-              py={8}
-              mb="md"
-              maw={580}
-            >
+            <Box py={8} mb="md" maw={580}>
               <TextInput
                 ref={searchRef}
                 size="sm"
@@ -570,7 +575,6 @@ function ConnectionsPage() {
               ))}
             </Stack>
           ) : null}
-
         </Tabs.Panel>
 
         <Tabs.Panel value="backup" pt="xs">
@@ -722,7 +726,7 @@ function ConnectionListCard({ connection: c, health, canManage, onOpen, onEdit, 
           onOpen()
         }
       }}
-     >
+    >
       <Group justify="space-between" wrap="nowrap">
         <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
           <ThemeIcon size={36} radius="md" variant="light" color="primary">

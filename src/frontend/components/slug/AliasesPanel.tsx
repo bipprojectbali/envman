@@ -9,7 +9,6 @@ import {
   CopyButton,
   Divider,
   Group,
-  Paper,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -225,31 +224,86 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
     navigate({
       to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: false, viewAliasId: id, noteId, noteNew, viewNoteId },
+      search: {
+        tab,
+        fileId,
+        fileNew,
+        viewFileId,
+        aliasId: undefined,
+        aliasNew: false,
+        viewAliasId: id,
+        noteId,
+        noteNew,
+        viewNoteId,
+      },
     })
   const closeView = () =>
     navigate({
       to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: false, viewAliasId: undefined, noteId, noteNew, viewNoteId },
+      search: {
+        tab,
+        fileId,
+        fileNew,
+        viewFileId,
+        aliasId: undefined,
+        aliasNew: false,
+        viewAliasId: undefined,
+        noteId,
+        noteNew,
+        viewNoteId,
+      },
     })
   const openEdit = (alias: Alias) =>
     navigate({
       to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId, fileNew, viewFileId, aliasId: alias.id, aliasNew: false, viewAliasId: undefined, noteId, noteNew, viewNoteId },
+      search: {
+        tab,
+        fileId,
+        fileNew,
+        viewFileId,
+        aliasId: alias.id,
+        aliasNew: false,
+        viewAliasId: undefined,
+        noteId,
+        noteNew,
+        viewNoteId,
+      },
     })
   const openCreate = () =>
     navigate({
       to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: true, viewAliasId: undefined, noteId, noteNew, viewNoteId },
+      search: {
+        tab,
+        fileId,
+        fileNew,
+        viewFileId,
+        aliasId: undefined,
+        aliasNew: true,
+        viewAliasId: undefined,
+        noteId,
+        noteNew,
+        viewNoteId,
+      },
     })
   const closeForm = () =>
     navigate({
       to: '/envmanager/$slug',
       params: { slug },
-      search: { tab, fileId, fileNew, viewFileId, aliasId: undefined, aliasNew: false, viewAliasId: undefined, noteId, noteNew, viewNoteId },
+      search: {
+        tab,
+        fileId,
+        fileNew,
+        viewFileId,
+        aliasId: undefined,
+        aliasNew: false,
+        viewAliasId: undefined,
+        noteId,
+        noteNew,
+        viewNoteId,
+      },
     })
 
   const confirmDelete = (alias: Alias) => {
@@ -282,13 +336,17 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
             Aliases
           </Anchor>
           <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
-          <Code fz="sm" fw={700}>{alias.name}</Code>
+          <Code fz="sm" fw={700}>
+            {alias.name}
+          </Code>
         </Group>
         <Divider />
 
         <Stack gap="xs">
           {/* Command */}
-          <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Perintah</Text>
+          <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+            Perintah
+          </Text>
           <Group gap="xs" align="flex-start">
             <Code block fz="sm" style={{ flex: 1, wordBreak: 'break-all' }}>
               envman {alias.args}
@@ -305,7 +363,9 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
           </Group>
 
           {/* Run command */}
-          <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>Jalankan via CLI</Text>
+          <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>
+            Jalankan via CLI
+          </Text>
           <Group gap="xs" align="flex-start">
             <Code block fz="sm" style={{ flex: 1 }}>
               envman run {slug}:{alias.name}
@@ -324,7 +384,9 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
           {/* Description */}
           {alias.description && (
             <>
-              <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>Deskripsi</Text>
+              <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>
+                Deskripsi
+              </Text>
               <Text size="sm">{alias.description}</Text>
             </>
           )}
@@ -332,10 +394,14 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
           {/* Tags */}
           {alias.tags.length > 0 && (
             <>
-              <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>Tags</Text>
+              <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>
+                Tags
+              </Text>
               <Group gap={4}>
                 {alias.tags.map((t) => (
-                  <Badge key={t} size="sm" variant="light" color="blue">{t}</Badge>
+                  <Badge key={t} size="sm" variant="light" color="blue">
+                    {t}
+                  </Badge>
                 ))}
               </Group>
             </>
@@ -344,10 +410,18 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
           {/* Meta */}
           <Divider mt="xs" />
           <Group gap="xs" wrap="wrap">
-            <Text size="xs" c="dimmed">Dibuat oleh <strong>{alias.creator.name}</strong></Text>
-            <Text size="xs" c="dimmed">·</Text>
             <Text size="xs" c="dimmed">
-              {new Date(alias.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+              Dibuat oleh <strong>{alias.creator.name}</strong>
+            </Text>
+            <Text size="xs" c="dimmed">
+              ·
+            </Text>
+            <Text size="xs" c="dimmed">
+              {new Date(alias.createdAt).toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
             </Text>
           </Group>
 
@@ -357,7 +431,13 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
               <Button size="xs" variant="default" leftSection={<TbPencil size={13} />} onClick={() => openEdit(alias)}>
                 Edit
               </Button>
-              <Button size="xs" variant="subtle" color="red" leftSection={<TbTrash size={13} />} onClick={() => confirmDelete(alias)}>
+              <Button
+                size="xs"
+                variant="subtle"
+                color="red"
+                leftSection={<TbTrash size={13} />}
+                onClick={() => confirmDelete(alias)}
+              >
                 Hapus
               </Button>
             </Group>
@@ -532,7 +612,9 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                 cursor: 'pointer',
               }}
               onClick={() => openView(alias.id)}
-              onKeyDown={(e) => { if (e.key === 'Enter') openView(alias.id) }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') openView(alias.id)
+              }}
             >
               <Group justify="space-between" wrap="nowrap" align="flex-start">
                 <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
@@ -616,7 +698,10 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
             const grouped = new Map<string, typeof filtered>()
             const untagged: typeof filtered = []
             for (const a of filtered) {
-              if (a.tags.length === 0) { untagged.push(a); continue }
+              if (a.tags.length === 0) {
+                untagged.push(a)
+                continue
+              }
               const tag = a.tags[0]
               if (!grouped.has(tag)) grouped.set(tag, [])
               grouped.get(tag)!.push(a)
@@ -629,14 +714,16 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                   {items.map((a) => cardsByName.get(a.name))}
                 </SimpleGrid>
               ) : (
-                <>{items.map((a) => cardsByName.get(a.name))}</>
+                items.map((a) => cardsByName.get(a.name))
               )
             return (
               <Stack gap="md">
                 {groups.map(([tag, items]) => (
                   <Stack key={tag} gap="xs">
                     <Group gap={6} align="center">
-                      <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
+                      <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>
+                        {tag}
+                      </Badge>
                       <Divider style={{ flex: 1 }} />
                     </Group>
                     {renderGroup(items)}
@@ -645,7 +732,9 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                 {untagged.length > 0 && (
                   <Stack gap="xs">
                     <Group gap={6} align="center">
-                      <Text size="xs" c="dimmed" fw={500}>Tanpa tag</Text>
+                      <Text size="xs" c="dimmed" fw={500}>
+                        Tanpa tag
+                      </Text>
                       <Divider style={{ flex: 1 }} />
                     </Group>
                     {renderGroup(untagged)}

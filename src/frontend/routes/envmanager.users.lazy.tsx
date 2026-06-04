@@ -18,10 +18,10 @@ import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { TbBan, TbCheck, TbChevronLeft, TbSearch, TbShieldCheck, TbUsers, TbX } from 'react-icons/tb'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
 import type { GlobalRole, UserSummary } from '@/frontend/components/users/types'
 import { GLOBAL_ROLE_COLOR } from '@/frontend/components/users/types'
 import { UserDrawerContent } from '@/frontend/components/users/UserDrawerContent'
-import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 
 export const Route = createLazyFileRoute('/envmanager/users')({
