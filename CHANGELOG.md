@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.11.29] - 2026-06-05
+
+### Added
+- Token Control panel di Dev Console: lihat semua token lintas user, disable/enable/set-expiry/revoke, warning stale/expiring/wide-access, group by user, card/table view, pagination.
+- Token activity log: catat setiap aksi CLI per token (vars_fetch, var_set, var_delete, alias_resolve, file_exec) — klik token di Token Control untuk lihat history lengkap.
+- Dev > Settings — section Token Activity Log: master switch, toggle vars_fetch, retensi (hari), cap per token, stats live, tombol cleanup manual dan hapus semua.
+- Self-service token creation: user non-QC bisa buat token dari Profile dengan tag, filter, grouping, list/grid view.
+- Profile page: AppShell sidebar (Account, Projects, API Tokens, Panduan).
+- File Health Panel di Dev Console.
+- AppSetting: konfigurasi runtime yang bisa diubah dari UI (GET/PUT /api/envman/settings).
+- Endpoint admin: GET /api/admin/tokens, PATCH/DELETE /api/admin/tokens/:id, GET /api/admin/tokens/:id/activity, POST /api/admin/token-activity/cleanup, DELETE /api/admin/token-activity.
+
+### Changed
+- Members panel: hapus toggle List/Matrix, default langsung matrix view. Cell env access diganti button group inline `[~][V][E][O][✕]` — satu klik langsung apply tanpa dropdown.
+- App.tsx: pindah QueryClientProvider ke atas ModalsProvider agar modal yang dibuka via modals.open() bisa menggunakan useQuery/useMutation.
+- Saat user di-block: semua token otomatis di-disable (sebelumnya hanya sessions yang dihapus).
+- Token tracking: setiap pemakaian token catat useCount++ dan lastIp.
+
+### Fixed
+- Modal BulkRoleModal dan BulkEnvAccessModal menampilkan layar hitam — akibat QueryClientProvider di bawah ModalsProvider.
+
 ## [0.11.28] - 2026-06-05
 
 ### Added

@@ -30,6 +30,7 @@ export const cacheKeys = {
   tokenList: (userId: string) => `tokens:user:${userId}`,
   projectAliases: (slug: string) => `project:${slug}:aliases`,
   projectFiles: (slug: string) => `project:${slug}:files`,
+  projectAccessMatrix: (slug: string) => `project:${slug}:access-matrix`,
 }
 
 /**
@@ -68,6 +69,7 @@ export async function invalidateProjectCaches(slug: string, extraUserIds: string
     await invalidateCache(
       ...Array.from(userIds).map((uid) => cacheKeys.projectList(uid)),
       cacheKeys.projectDetail(slug),
+      cacheKeys.projectAccessMatrix(slug),
     )
   } catch {
     // Best-effort. Cache TTL (60s) jadi safety net jika query gagal.

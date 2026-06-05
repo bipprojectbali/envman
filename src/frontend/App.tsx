@@ -46,11 +46,11 @@ export function App() {
       <ColorSchemeScript defaultColorScheme="auto" />
       <MantineProvider theme={theme} defaultColorScheme="auto">
         <Notifications position="top-right" zIndex={1000} maw={320} />
-        <ModalsProvider>
-          <QueryClientProvider client={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <ModalsProvider>
             <RouterProvider router={router} />
-          </QueryClientProvider>
-        </ModalsProvider>
+          </ModalsProvider>
+        </QueryClientProvider>
       </MantineProvider>
     </>
   )

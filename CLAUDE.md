@@ -273,6 +273,8 @@ Auth: session cookie atau `Authorization: Bearer <token>`. `requireEnvAuth()` di
 
 **Env Members (OWNER only):** `GET /api/envman/projects/:slug/environments/:envName/members` — list project members + env override (envRole: `inherit`/`denied`/role) + `effectiveRole` · `PUT .../members/:userId` body `{role: 'inherit'|'denied'|'OWNER'|'EDITOR'|'VIEWER'}` · `DELETE .../members/:userId` reset to inherit. Last-owner-of-env protection: tidak bisa demote/deny OWNER terakhir.
 
+**Access Matrix (OWNER only):** `GET /api/envman/projects/:slug/access-matrix` — single fetch berisi `{project, environments[], members[{userId, user, projectRole, envAccess: {[envName]: {envRole, effectiveRole}}}]}`. Cached 60s (`cacheKeys.projectAccessMatrix`), auto-invalidate via `invalidateProjectCaches()`. Bulk action di FE pakai fan-out `Promise.allSettled` atas endpoint PATCH/PUT existing — last-owner protection berlaku per-item, partial failure di-aggregate ke notification (`src/frontend/lib/bulk.ts`).
+
 **Portainer:** `GET|POST /api/envman/portainer/connections` · `PUT|DELETE .../connections/:id` · `POST .../connections/:id/probe` · per-env: `GET|PUT|DELETE|POST .../portainer[/sync]`
 
 **Files:** `GET|POST /api/envman/projects/:slug/files` · `GET .../files/resolve?prefix=<p>[&filename=<f>]` · `PUT|DELETE .../files/:id`
