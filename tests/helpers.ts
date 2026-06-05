@@ -100,6 +100,7 @@ export async function cleanupTestData() {
   await prisma.portainerConfig.deleteMany()
   await prisma.portainerConnection.deleteMany()
   await prisma.apiToken.deleteMany()
+  await prisma.environmentMember.deleteMany()
   await prisma.projectMember.deleteMany()
   await prisma.envVar.deleteMany()
   await prisma.environment.deleteMany()

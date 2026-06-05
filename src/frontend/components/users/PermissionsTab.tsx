@@ -13,9 +13,11 @@ import {
   Text,
   ThemeIcon,
 } from '@mantine/core'
+import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import {
+  TbAlertTriangle,
   TbCheck,
   TbChevronDown,
   TbInfoCircle,
@@ -28,6 +30,8 @@ import {
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import type { UserDetail } from './types'
+
+const DESTRUCTIVE_CAPABILITIES = ['stack:prune'] as const
 
 interface CapabilityItem {
   value: string
@@ -181,6 +185,51 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
     }
   }
 
+  const handleSave = () => {
+    const newlyGrantedDestructive = DESTRUCTIVE_CAPABILITIES.filter(
+      (cap) => selected.includes(cap) && !user.permissions.includes(cap),
+    )
+    if (newlyGrantedDestructive.length > 0) {
+      modals.openConfirmModal({
+        title: (
+          <Group gap="xs">
+            <ThemeIcon size={22} radius="md" color="red" variant="light">
+              <TbAlertTriangle size={13} />
+            </ThemeIcon>
+            <Text fw={700}>Grant capability destruktif</Text>
+          </Group>
+        ),
+        children: (
+          <Stack gap="xs">
+            <Text size="sm">
+              Anda akan memberi <b>{user.name}</b> capability berikut yang bisa <b>menghapus resource</b>:
+            </Text>
+            <Stack gap={4} pl="sm">
+              {newlyGrantedDestructive.map((cap) => (
+                <Group key={cap} gap="xs">
+                  <Code fz={11} c="red">
+                    {cap}
+                  </Code>
+                  <Text size="xs" c="dimmed">
+                    {cap === 'stack:prune' ? 'Hapus images/volumes/networks/containers tidak terpakai' : ''}
+                  </Text>
+                </Group>
+              ))}
+            </Stack>
+            <Text size="xs" c="dimmed" mt="xs">
+              Operasi ini tidak bisa di-undo. Pastikan user benar-benar perlu.
+            </Text>
+          </Stack>
+        ),
+        labels: { confirm: 'Ya, grant', cancel: 'Batal' },
+        confirmProps: { color: 'red' },
+        onConfirm: () => mutation.mutate(selected),
+      })
+      return
+    }
+    mutation.mutate(selected)
+  }
+
   return (
     <Stack gap="md">
       {/* Summary */}
@@ -220,7 +269,6 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
             const groupSelected = groupValues.filter((v) => selected.includes(v)).length
             const groupTotal = groupValues.length
             const allSelected = groupSelected === groupTotal
-            const someSelected = groupSelected > 0 && groupSelected < groupTotal
             return (
               <Box
                 key={group.label}
@@ -237,26 +285,26 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
                     borderBottom: '1px solid var(--mantine-color-default-border)',
                   }}
                 >
-                  <Group justify="space-between" wrap="nowrap">
-                    <Group gap="xs" wrap="nowrap">
-                      <ThemeIcon size={26} radius="md" variant="white" color={group.color}>
+                  <Group justify="space-between" wrap="nowrap" gap="xs">
+                    <Group gap="xs" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <ThemeIcon size={26} radius="md" variant="white" color={group.color} style={{ flexShrink: 0 }}>
                         <group.icon size={14} />
                       </ThemeIcon>
-                      <Box>
-                        <Text size="sm" fw={700} c={group.color}>
+                      <Box style={{ minWidth: 0, flex: 1 }}>
+                        <Text size="sm" fw={700} c={group.color} truncate>
                           {group.label}
                         </Text>
-                        <Text size="xs" c="dimmed">
+                        <Text size="xs" c="dimmed" truncate>
                           {group.description}
                         </Text>
                       </Box>
                     </Group>
-                    <Group gap="xs" wrap="nowrap">
+                    <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                       <Badge size="sm" color={group.color} variant="filled">
                         {groupSelected}/{groupTotal}
                       </Badge>
                       <Button size="xs" variant="subtle" color={group.color} onClick={() => toggleGroupAll(group)}>
-                        {allSelected ? 'Uncheck all' : someSelected ? 'Check all' : 'Check all'}
+                        {allSelected ? 'Uncheck all' : 'Check all'}
                       </Button>
                     </Group>
                   </Group>
@@ -374,7 +422,7 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
               size="sm"
               color="violet"
               leftSection={<TbCheck size={14} />}
-              onClick={() => mutation.mutate(selected)}
+              onClick={handleSave}
               loading={mutation.isPending}
               disabled={!hasChanges}
             >

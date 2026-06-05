@@ -1,9 +1,14 @@
 import { Elysia } from 'elysia'
 import type { ProjectRole } from '../../lib/access'
+import { audit } from '../../lib/audit'
 import { requireSuperAdmin } from '../../lib/auth-middleware'
 import { cacheKeys, invalidateCache, invalidateProjectCaches } from '../../lib/cache'
 import { prisma } from '../../lib/db'
 import { isValidCapability } from '../../lib/permissions'
+
+function getIp(request: Request): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown'
+}
 
 // Project-level role input: 'OWNER' | 'EDITOR' | 'VIEWER' | null (null = remove member)
 type ProjectRoleInput = ProjectRole | null
@@ -200,24 +205,51 @@ export const adminUsersRouter = new Elysia()
       return { error: 'Environment not found' }
     }
 
+    // Target user must already be a project member — env override hanya berlaku di atas membership.
+    const targetMember = await prisma.projectMember.findUnique({
+      where: { userId_projectId: { userId: params.userId, projectId: project.id } },
+    })
+    if (!targetMember) {
+      set.status = 400
+      return { error: 'User belum jadi member project. Tambah ke project dulu sebelum atur akses env.' }
+    }
+
+    // Last-owner-of-env protection: tolak demote/deny OWNER terakhir efektif di env ini.
+    if (body.role !== 'OWNER' && body.role !== 'inherit') {
+      const projectOwners = await prisma.projectMember.findMany({
+        where: { projectId: project.id, role: 'OWNER' },
+        select: { userId: true },
+      })
+      const envOverrides = await prisma.environmentMember.findMany({
+        where: { environmentId: env.id },
+      })
+      const overrideByUser = new Map(envOverrides.map((m) => [m.userId, m.role]))
+      const effectiveOwners = projectOwners.filter((po) => {
+        const override = overrideByUser.get(po.userId)
+        if (override === undefined) return true
+        return override === 'OWNER'
+      })
+      const isLastOwner =
+        effectiveOwners.length === 1 && effectiveOwners[0]!.userId === params.userId && targetMember.role === 'OWNER'
+      if (isLastOwner) {
+        set.status = 400
+        return { error: 'Tidak bisa menurunkan/menolak OWNER terakhir di env ini. Angkat OWNER lain dulu.' }
+      }
+    }
+
     const existing = await prisma.environmentMember.findUnique({
       where: { userId_environmentId: { userId: params.userId, environmentId: env.id } },
     })
 
     if (body.role === 'inherit') {
-      // Delete record → effective role mengikuti projectRole
-      if (existing) {
-        await prisma.environmentMember.delete({ where: { id: existing.id } })
-      }
+      if (existing) await prisma.environmentMember.delete({ where: { id: existing.id } })
     } else if (body.role === 'denied') {
-      // Upsert dengan role=null → explicit deny
       await prisma.environmentMember.upsert({
         where: { userId_environmentId: { userId: params.userId, environmentId: env.id } },
         update: { role: null },
         create: { userId: params.userId, environmentId: env.id, role: null },
       })
     } else {
-      // Upsert dengan role spesifik (OWNER/EDITOR/VIEWER)
       await prisma.environmentMember.upsert({
         where: { userId_environmentId: { userId: params.userId, environmentId: env.id } },
         update: { role: body.role },
@@ -225,7 +257,15 @@ export const adminUsersRouter = new Elysia()
       })
     }
 
+    const auditAction = body.role === 'inherit' ? 'ENV_MEMBER_CLEARED' : 'ENV_MEMBER_SET'
+    const detail =
+      body.role === 'inherit'
+        ? `${params.slug}/${params.envName} user=${params.userId} (admin)`
+        : `${params.slug}/${params.envName} user=${params.userId} role=${body.role} (admin)`
+    audit(caller.userId, auditAction, detail, getIp(request))
+
     await invalidateCache(cacheKeys.projectAccess(params.userId, params.slug), cacheKeys.projectDetail(params.slug))
+    await invalidateProjectCaches(params.slug, [params.userId])
     return { ok: true, role: body.role }
   })
 

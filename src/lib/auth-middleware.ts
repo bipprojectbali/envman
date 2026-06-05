@@ -5,6 +5,7 @@ export type AuthCaller = { userId: string; role: string; email: string; permissi
 export type EnvAuthCaller = {
   userId: string
   role: string
+  tokenId?: string
   tokenName?: string
   canWrite: boolean
   scopes: string[]
@@ -66,10 +67,15 @@ export async function requireEnvAuth(request: Request): Promise<EnvAuthCaller | 
     if (!apiToken || apiToken.user.blocked) return null
     if (apiToken.isDisabled) return null
     if (apiToken.expiresAt && apiToken.expiresAt < new Date()) return null
-    prisma.apiToken.update({ where: { id: apiToken.id }, data: { lastUsedAt: new Date() } }).catch(() => {})
+    const lastIp =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? undefined
+    prisma.apiToken
+      .update({ where: { id: apiToken.id }, data: { lastUsedAt: new Date(), useCount: { increment: 1 }, lastIp } })
+      .catch(() => {})
     return {
       userId: apiToken.userId,
       role: apiToken.user.role,
+      tokenId: apiToken.id,
       tokenName: apiToken.name,
       canWrite: apiToken.canWrite,
       scopes: apiToken.scopes,

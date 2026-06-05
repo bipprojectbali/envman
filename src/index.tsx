@@ -185,6 +185,24 @@ async function cleanupAuditLogs() {
 cleanupAuditLogs().catch(console.error)
 setInterval(() => cleanupAuditLogs().catch(console.error), 24 * 60 * 60 * 1000)
 
+// ─── Token Activity Log Rotation ──────────────────────
+import { cleanupTokenActivity } from './lib/token-activity'
+
+cleanupTokenActivity()
+  .then(({ deleted }) => {
+    if (deleted > 0) console.log(`[TokenActivity] Cleaned up ${deleted} entries`)
+  })
+  .catch(console.error)
+setInterval(
+  () =>
+    cleanupTokenActivity()
+      .then(({ deleted }) => {
+        if (deleted > 0) console.log(`[TokenActivity] Cleaned up ${deleted} entries`)
+      })
+      .catch(console.error),
+  24 * 60 * 60 * 1000,
+)
+
 // ─── Elysia App ────────────────────────────────────────
 import { createApp } from './app'
 

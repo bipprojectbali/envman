@@ -14,6 +14,7 @@
 import { test, expect, describe, beforeEach, afterAll } from "bun:test";
 import { SQL } from "bun";
 import { createHash } from "node:crypto";
+import { readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -42,6 +43,15 @@ if (!DB_NAME.endsWith("_test")) {
 }
 
 const MIGRATIONS_DIR = "./prisma/migrations";
+
+function countMigrations(): number {
+  return readdirSync(MIGRATIONS_DIR).filter((name) => {
+    const full = join(MIGRATIONS_DIR, name);
+    return statSync(full).isDirectory();
+  }).length;
+}
+
+const TOTAL_MIGRATIONS = countMigrations();
 
 // Drop dan recreate public schema → state bersih seperti DB baru
 async function resetSchema(db: SQL): Promise<void> {
@@ -126,12 +136,12 @@ describe("scripts/migrate.ts", () => {
     const { exitCode, output } = await runMigrate();
 
     expect(exitCode).toBe(0);
-    expect(output).toContain("→ Applying 22 migration(s):");
+    expect(output).toContain(`→ Applying ${TOTAL_MIGRATIONS} migration(s):`);
     expect(output).toContain("✓ Done");
     expect(output).not.toContain("✗ Migration failed");
 
     const rows = await getMigrations(db);
-    expect(rows).toHaveLength(22);
+    expect(rows).toHaveLength(TOTAL_MIGRATIONS);
     expect(rows.every((r) => r.finished_at !== null)).toBe(true);
   });
 
@@ -150,14 +160,14 @@ describe("scripts/migrate.ts", () => {
     // Apply all migrations first
     await runMigrate();
 
-    // Delete the last migration record to simulate it not having been applied.
-    // We only undo the last migration (20260528070104_add_test_migrate) because
-    // it only adds new table+enum (easy to DROP, no ALTER TABLE needed).
+    // Delete one migration record to simulate it not having been applied.
+    // We pick `20260528070104_add_test_migrate` because it only adds new
+    // table+enum (easy to DROP, no ALTER TABLE needed).
     await db`
       DELETE FROM "_prisma_migrations"
       WHERE migration_name = '20260528070104_add_test_migrate'
     `;
-    // Drop everything the last migration created so re-apply succeeds
+    // Drop everything that migration created so re-apply succeeds
     await db.unsafe(
       'DROP TABLE IF EXISTS "test_migrate" CASCADE;' +
         ' DROP TYPE IF EXISTS "TestMigrateKind";'
@@ -170,7 +180,7 @@ describe("scripts/migrate.ts", () => {
     expect(output).toContain("✓ Done");
 
     const rows = await getMigrations(db);
-    expect(rows).toHaveLength(22);
+    expect(rows).toHaveLength(TOTAL_MIGRATIONS);
     expect(rows.every((r) => r.finished_at !== null)).toBe(true);
   });
 

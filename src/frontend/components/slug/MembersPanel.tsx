@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Collapse,
   Divider,
   Group,
   Paper,
@@ -17,10 +18,11 @@ import {
 import { modals } from '@mantine/modals'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { TbPlus, TbSearch, TbTrash } from 'react-icons/tb'
+import { TbChevronDown, TbChevronRight, TbPlus, TbSearch, TbTrash } from 'react-icons/tb'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { MemberEnvOverrides } from './MemberEnvOverrides'
 
 type ProjectRole = 'OWNER' | 'EDITOR' | 'VIEWER'
 
@@ -66,12 +68,14 @@ function toggle(set: Set<string>, id: string): Set<string> {
 export function MembersPanel({
   slug,
   members,
+  environments,
   isOwner,
   myUserId,
   onRefresh,
 }: {
   slug: string
   members: Member[]
+  environments: { name: string }[]
   isOwner: boolean
   myUserId: string
   onRefresh: () => void
@@ -82,6 +86,7 @@ export function MembersPanel({
   const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set())
   const [addRole, setAddRole] = useState<ProjectRole>('VIEWER')
   const [selectedToDelete, setSelectedToDelete] = useState<Set<string>>(new Set())
+  const [expandedMember, setExpandedMember] = useState<string | null>(null)
 
   const { data: availableData, isLoading: loadingAvailable } = useQuery({
     queryKey: ['envman', 'available-users', slug],
@@ -346,77 +351,100 @@ export function MembersPanel({
           members.map((m) => {
             const isSelf = m.user.id === myUserId
             const isLastOwner = m.role === 'OWNER' && ownerCount === 1
+            const expanded = expandedMember === m.user.id
             return (
-              <Group
+              <Box
                 key={m.id}
-                gap="sm"
-                wrap="nowrap"
-                align="center"
-                p="xs"
                 style={{
                   border: '1px solid var(--mantine-color-default-border)',
                   borderRadius: 'var(--mantine-radius-sm)',
                 }}
               >
-                {isOwner && (
-                  <Checkbox
-                    size="xs"
-                    checked={selectedToDelete.has(m.user.id)}
-                    disabled={isLastOwner}
-                    onChange={() => !isLastOwner && setSelectedToDelete((prev) => toggle(prev, m.user.id))}
-                  />
-                )}
-                <UserAvatar user={m.user} size={32} color={roleColor[m.role]} />
-                <Box style={{ flex: 1, minWidth: 0 }}>
-                  <Group gap={6} wrap="nowrap" align="center">
-                    <Text size="sm" fw={600} truncate>
-                      {m.user.name}
-                    </Text>
-                    {isSelf && (
-                      <Badge size="xs" variant="outline" color="gray">
-                        kamu
-                      </Badge>
-                    )}
-                  </Group>
-                  <Text size="xs" c="dimmed" truncate>
-                    {m.user.email}
-                  </Text>
-                </Box>
-                {isOwner ? (
-                  <Select
-                    size="xs"
-                    data={roleOptions}
-                    value={m.role}
-                    onChange={(v) => {
-                      if (v && v !== m.role)
-                        changeRoleMutation.mutate({
-                          userId: m.user.id,
-                          role: v as ProjectRole,
-                        })
-                    }}
-                    w={100}
-                    allowDeselect={false}
-                    disabled={isLastOwner}
-                  />
-                ) : (
-                  <Badge size="sm" variant="light" color={roleColor[m.role]}>
-                    {m.role}
-                  </Badge>
-                )}
-                {isOwner && (
-                  <Tooltip label={isLastOwner ? 'Owner terakhir tidak bisa dihapus' : 'Hapus anggota'} withArrow>
-                    <ActionIcon
-                      size="sm"
-                      variant="subtle"
-                      color="red"
+                <Group gap="sm" wrap="nowrap" align="center" p="xs">
+                  {isOwner && (
+                    <Checkbox
+                      size="xs"
+                      checked={selectedToDelete.has(m.user.id)}
                       disabled={isLastOwner}
-                      onClick={() => confirmSingleDelete(m)}
-                    >
-                      <TbTrash size={14} />
-                    </ActionIcon>
-                  </Tooltip>
+                      onChange={() => !isLastOwner && setSelectedToDelete((prev) => toggle(prev, m.user.id))}
+                    />
+                  )}
+                  <UserAvatar user={m.user} size={32} color={roleColor[m.role]} />
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Group gap={6} wrap="nowrap" align="center">
+                      <Text size="sm" fw={600} truncate>
+                        {m.user.name}
+                      </Text>
+                      {isSelf && (
+                        <Badge size="xs" variant="outline" color="gray">
+                          kamu
+                        </Badge>
+                      )}
+                    </Group>
+                    <Text size="xs" c="dimmed" truncate>
+                      {m.user.email}
+                    </Text>
+                  </Box>
+                  {isOwner ? (
+                    <Select
+                      size="xs"
+                      data={roleOptions}
+                      value={m.role}
+                      onChange={(v) => {
+                        if (v && v !== m.role)
+                          changeRoleMutation.mutate({
+                            userId: m.user.id,
+                            role: v as ProjectRole,
+                          })
+                      }}
+                      w={100}
+                      allowDeselect={false}
+                      disabled={isLastOwner}
+                    />
+                  ) : (
+                    <Badge size="sm" variant="light" color={roleColor[m.role]}>
+                      {m.role}
+                    </Badge>
+                  )}
+                  {isOwner && environments.length > 0 && (
+                    <Tooltip label={expanded ? 'Tutup' : 'Atur akses per environment'} withArrow>
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        onClick={() => setExpandedMember(expanded ? null : m.user.id)}
+                      >
+                        {expanded ? <TbChevronDown size={14} /> : <TbChevronRight size={14} />}
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                  {isOwner && (
+                    <Tooltip label={isLastOwner ? 'Owner terakhir tidak bisa dihapus' : 'Hapus anggota'} withArrow>
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color="red"
+                        disabled={isLastOwner}
+                        onClick={() => confirmSingleDelete(m)}
+                      >
+                        <TbTrash size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+                {isOwner && (
+                  <Collapse in={expanded}>
+                    <Box px="xs" pb="xs" pt={0}>
+                      <Divider mb="xs" />
+                      <MemberEnvOverrides
+                        slug={slug}
+                        userId={m.user.id}
+                        projectRole={m.role}
+                        environments={environments}
+                      />
+                    </Box>
+                  </Collapse>
                 )}
-              </Group>
+              </Box>
             )
           })
         )}

@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Box,
   CopyButton,
@@ -78,7 +79,10 @@ export function UserDrawerContent({ userId }: { userId: string }) {
   }
 
   const { user, projects } = data
-  const accessibleProjects = projects.filter((p) => p.projectRole !== null).length
+  // Count projects user can actually touch: punya project role, atau punya env-override non-deny.
+  const accessibleProjects = projects.filter(
+    (p) => p.projectRole !== null || p.environments.some((e) => e.envRole !== 'inherit' && e.envRole !== 'denied'),
+  ).length
   const envOverrides = projects.reduce(
     (sum, p) => sum + p.environments.filter((e) => e.envRole !== 'inherit').length,
     0,
@@ -86,6 +90,7 @@ export function UserDrawerContent({ userId }: { userId: string }) {
   const permissionCount = user.permissions.length
   const isSuperAdmin = user.role === 'SUPER_ADMIN'
   const isUserOnly = user.role === 'USER'
+  const isBlocked = user.blocked
   const roleColor = GLOBAL_ROLE_COLOR[user.role]
 
   return (
@@ -166,22 +171,22 @@ export function UserDrawerContent({ userId }: { userId: string }) {
         </Box>
 
         <Divider />
-        <Group grow p="sm" gap="xs">
+        <Group grow p="sm" gap="xs" style={isBlocked ? { opacity: 0.55, filter: 'grayscale(0.4)' } : undefined}>
           {[
             {
               value: accessibleProjects,
               label: 'Projects',
-              color: accessibleProjects > 0 ? 'violet' : 'gray',
+              color: isBlocked ? 'gray' : accessibleProjects > 0 ? 'violet' : 'gray',
             },
             {
               value: envOverrides,
               label: 'Overrides',
-              color: envOverrides > 0 ? 'orange' : 'gray',
+              color: isBlocked ? 'gray' : envOverrides > 0 ? 'orange' : 'gray',
             },
             {
               value: isSuperAdmin ? '∞' : permissionCount,
               label: 'Capabilities',
-              color: isSuperAdmin ? 'violet' : permissionCount > 0 ? 'teal' : 'gray',
+              color: isBlocked ? 'gray' : isSuperAdmin ? 'violet' : permissionCount > 0 ? 'teal' : 'gray',
             },
           ].map((s) => (
             <Stack key={s.label} gap={2} align="center">
@@ -233,11 +238,22 @@ export function UserDrawerContent({ userId }: { userId: string }) {
         </Tabs.Panel>
         {!isUserOnly && (
           <Tabs.Panel value="access" pt="md">
+            {isBlocked && (
+              <Alert color="red" variant="light" icon={<TbBan size={16} />} title="User diblokir" mb="sm">
+                Perubahan akses tetap tersimpan, tapi user ini tidak bisa login. Token aktifnya sudah di-disable saat
+                block.
+              </Alert>
+            )}
             <AccessMatrixTab userId={userId} projects={projects} />
           </Tabs.Panel>
         )}
         {!isUserOnly && (
           <Tabs.Panel value="permissions" pt="md">
+            {isBlocked && (
+              <Alert color="red" variant="light" icon={<TbBan size={16} />} title="User diblokir" mb="sm">
+                Permission tetap bisa di-grant, tapi tidak akan efektif sampai user di-unblock.
+              </Alert>
+            )}
             <PermissionsTab user={user} />
           </Tabs.Panel>
         )}

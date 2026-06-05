@@ -11,6 +11,7 @@ import { projectTools } from './tools/project'
 import { redisTools } from './tools/redis'
 import { ticketTools } from './tools/tickets'
 import { aliasReadonlyTools, aliasAdminTools } from './tools/aliases'
+import { envMemberAdminTools, envMemberReadonlyTools } from './tools/env-members'
 import { fileReadonlyTools, fileAdminTools } from './tools/files'
 import { pmReadonlyTools, pmAdminTools } from './tools/pm'
 import { mcpAuditTools } from './tools/mcp-audit'
@@ -26,6 +27,7 @@ const READONLY_MODULES: ToolModule[] = [
   projectTools,
   codeTools,
   aliasReadonlyTools,
+  envMemberReadonlyTools,
   fileReadonlyTools,
   pmReadonlyTools,
   mcpAuditTools,
@@ -39,6 +41,7 @@ const ADMIN_MODULES: ToolModule[] = [
   redisTools,
   ticketTools,
   aliasAdminTools,
+  envMemberAdminTools,
   fileAdminTools,
   pmAdminTools,
 ]

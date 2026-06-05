@@ -1,9 +1,11 @@
 import { Elysia } from 'elysia'
-import { getProjectAccess } from '../../lib/access'
+import { getEnvironmentAccess, getProjectAccess } from '../../lib/access'
+import { extractEnvRefs } from '../../lib/alias-parser'
 import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { cacheKeys, invalidateCache, withCache } from '../../lib/cache'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
+import { logTokenActivity } from '../../lib/token-activity'
 
 const ALIAS_NAME_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/
 
@@ -31,11 +33,23 @@ export const aliasesRouter = new Elysia()
       set.status = 404
       return { error: 'Project tidak ditemukan' }
     }
-    const aliases = await withCache(cacheKeys.projectAliases(params.slug), 60, () =>
+    const rawAliases = await withCache(cacheKeys.projectAliases(params.slug), 60, () =>
       prisma.projectAlias.findMany({
         where: { projectId: project.id },
         orderBy: { name: 'asc' },
         select: aliasSelect,
+      }),
+    )
+    // Compute requiresEnvs + deniedEnvs per-user (tidak boleh masuk cache karena akses per-user).
+    const aliases = await Promise.all(
+      rawAliases.map(async (a) => {
+        const refs = extractEnvRefs(a.args)
+        const deniedEnvs: { project: string; env: string }[] = []
+        for (const ref of refs) {
+          const access = await getEnvironmentAccess(authResult.userId, authResult.role, ref.project, ref.env)
+          if (!access) deniedEnvs.push(ref)
+        }
+        return { ...a, requiresEnvs: refs, deniedEnvs }
       }),
     )
     return { aliases }
@@ -190,6 +204,34 @@ export const aliasesRouter = new Elysia()
     if (!alias) {
       set.status = 404
       return { error: 'Alias tidak ditemukan' }
+    }
+    // Cek setiap env-ref di args — kalau ada yang denied, tolak resolve dengan pesan jelas.
+    const refs = extractEnvRefs(alias.args)
+    const denied: { project: string; env: string }[] = []
+    for (const ref of refs) {
+      const envAccess = await getEnvironmentAccess(authResult.userId, authResult.role, ref.project, ref.env)
+      if (!envAccess) denied.push(ref)
+    }
+    if (denied.length > 0) {
+      set.status = 403
+      return {
+        error: `Akses ditolak untuk env: ${denied.map((d) => `${d.project}:${d.env}`).join(', ')}. Hubungi project owner.`,
+        deniedEnvs: denied,
+      }
+    }
+    if (authResult.tokenId) {
+      logTokenActivity({
+        tokenId: authResult.tokenId,
+        userId: authResult.userId,
+        tokenName: authResult.tokenName,
+        action: 'alias_resolve',
+        projectSlug,
+        detail: aliasName,
+        ip:
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+          request.headers.get('x-real-ip') ??
+          undefined,
+      })
     }
     return { args: alias.args, project: projectSlug, alias: aliasName }
   })

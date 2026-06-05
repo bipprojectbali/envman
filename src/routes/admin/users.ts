@@ -61,11 +61,15 @@ export const adminUsersRouter = new Elysia()
       data: { blocked },
       select: { id: true, name: true, email: true, role: true, blocked: true, createdAt: true, image: true },
     })
-    // Atomic: block user + hapus semua sessions sekaligus
+    // Atomic: block user + hapus semua sessions + disable semua token
     if (blocked) {
       await prisma.$transaction([
         prisma.user.update({ where: { id: params.id }, data: { blocked: true } }),
         prisma.session.deleteMany({ where: { userId: params.id } }),
+        prisma.apiToken.updateMany({
+          where: { userId: params.id },
+          data: { isDisabled: true, disabledBy: caller.userId, disabledAt: new Date(), disabledReason: 'User blocked' },
+        }),
       ])
     }
     const action = blocked ? 'BLOCKED' : 'UNBLOCKED'

@@ -6,6 +6,7 @@ import { prisma } from '../../lib/db'
 import { adminUsersRouter } from './admin-users'
 import { aliasesRouter } from './aliases'
 import { databaseRouter } from './database'
+import { envMembersRouter } from './env-members'
 import { filesRouter } from './files'
 import { gistsRouter } from './gists'
 import { mcpAuditRouter } from './mcp-audit'
@@ -54,6 +55,7 @@ export const envmanRouter = new Elysia()
   .use(settingsRouter)
   .use(tokensRouter)
   .use(projectsRouter)
+  .use(envMembersRouter)
   .use(portainerRouter)
   .use(portainerBackupRouter)
   .use(notesRouter)

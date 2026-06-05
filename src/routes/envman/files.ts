@@ -4,6 +4,7 @@ import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middlewa
 import { cacheKeys, invalidateCache, withCache } from '../../lib/cache'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
+import { logTokenActivity } from '../../lib/token-activity'
 
 interface FileEntry {
   filename: string
@@ -105,6 +106,20 @@ export const filesRouter = new Elysia()
         }
       }
       resolved = fileList[0]
+    }
+    if (authResult.tokenId) {
+      logTokenActivity({
+        tokenId: authResult.tokenId,
+        userId: authResult.userId,
+        tokenName: authResult.tokenName,
+        action: 'file_exec',
+        projectSlug: params.slug,
+        detail: `${prefix}${filename ? `/${filename}` : ''}`,
+        ip:
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+          request.headers.get('x-real-ip') ??
+          undefined,
+      })
     }
     return {
       content: resolved.content,

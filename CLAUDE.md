@@ -39,7 +39,8 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`
 - `Environment` (id, name, tags[], projectId, createdAt) — unique(projectId, name)
 - `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
-- `ApiToken` (id, userId, name, token, scopes[], canWrite, lastUsedAt?, expiresAt?, createdAt)
+- `EnvironmentMember` (id, userId, environmentId, role?, createdAt) — unique(userId, environmentId). `role=null` = explicit DENY, role=OWNER/EDITOR/VIEWER = override, no record = inherit project role
+- `ApiToken` (id, userId, name, token, scopes[], tags[], canWrite, isDisabled, lastUsedAt?, expiresAt?, createdAt, useCount, lastIp?, disabledBy?, disabledAt?, disabledReason?)
 - `ProjectAlias` (id, projectId, name, args, description?, tags[], createdBy, timestamps) — unique(projectId, name)
 - `ProjectFile` (id, projectId, authorId, title, description, prefix?, files Json, tags[], timestamps) — unique(projectId, prefix)
 - `PortainerConnection` (id, name, portainerUrl, apiToken, createdById, timestamps) — global
@@ -179,17 +180,74 @@ Session-based (HttpOnly cookie + DB). `POST /api/auth/login` → bcrypt verify �
 
 ---
 
+## Permission Hierarchy (Per-Project + Per-Env)
+
+Akses ke resource project diatur dua lapis. Default: env, notes, aliases, dan files **inherit** dari `ProjectMember.role`. OWNER bisa **override** role per env atau set **DENY** explicit per env per user.
+
+### Resolver
+
+`getEnvironmentAccess(userId, role, slug, envName)` di `src/lib/access.ts`:
+
+1. SUPER_ADMIN → `OWNER` (selalu).
+2. Cek `EnvironmentMember` (userId, environmentId):
+   - `role = null` → `null` (DENIED — block all access ke env ini)
+   - `role = OWNER|EDITOR|VIEWER` → override
+   - tidak ada record → lanjut ke step 3
+3. Inherit `ProjectMember.role`. Tidak ada record → `null` (no access).
+
+### Defense-in-Depth
+
+Files & aliases tetap accessible di project level (bukan filtered out), tapi yang **reference env via `-e project:env`** akan tetap di-block di env layer:
+
+- **Vars endpoint** — semua handler vars panggil `getEnvironmentAccess()`. DENIED env → 403.
+- **Alias resolve** — `GET /api/envman/aliases/resolve/:ref` extract `-e project:env` refs dari `args` lewat `extractEnvRefs()` (`src/lib/alias-parser.ts`), cek akses caller di setiap env. Kalau ada yang denied → 403 dengan `{error, deniedEnvs: [{project, env}]}`. Alias list endpoint juga compute `requiresEnvs` + `deniedEnvs` per-alias per-user (di luar Redis cache, karena per-caller).
+- **Project detail** — `GET /api/envman/projects/:slug` filter env DENIED untuk non-OWNER; setiap env carry `accessRole` (effective role caller di env tsb).
+
+### CLI Behavior
+
+`apiFetch()` di `src/cli.ts` detect 403 dengan `deniedEnvs` array → cetak `[envman] Akses ditolak untuk env: <project:env>, ...` lalu exit 1. User di-arahkan kontak OWNER project.
+
+### UI
+
+- Project detail (`envmanager.$slug.index.lazy.tsx`): env card render badge `DENIED` (red filled) atau badge override `<role>` (grape, kalau berbeda dari project role caller).
+- MembersPanel: setiap member punya chevron expand → `MemberEnvOverrides` (`src/frontend/components/slug/MemberEnvOverrides.tsx`) render select per-env dengan opsi `inherit | OWNER | EDITOR | VIEWER | denied`, hanya OWNER yang bisa mutate.
+- AliasesPanel: alias yang punya `deniedEnvs.length > 0` render Badge merah "needs <env>" dan sembunyikan CopyButton (alias tidak bisa dipakai user ini).
+- Users Management (`envmanager.users.lazy.tsx` → `AccessMatrixTab`): tampilan **collapsible row** per project (`ProjectAccessRow`) — default tertutup, render badge counts (OWNER/EDITOR/VIEWER/denied/override) di header. Stats global di atas (`AccessStatsHeader`). Default filter `with-access`, sort by name/role/overrides, section "no access" collapsed default.
+
+### Admin Endpoint Parity
+
+`PUT /api/envman/admin/users/:userId/projects/:slug/envs/:envName` (SUPER_ADMIN) tunduk pada **kontrol yang sama** dengan OWNER endpoint:
+- Validasi target user harus project member (400 kalau belum).
+- Last-owner-of-env protection: tolak demote/deny OWNER terakhir efektif di env (400).
+- Emit audit event yang sama (`ENV_MEMBER_SET` / `ENV_MEMBER_CLEARED`) dengan suffix detail `(admin)`.
+- Invalidate `projectAccess`, `projectDetail`, dan `invalidateProjectCaches(slug, [userId])`.
+
+### Audit Events
+
+- `ENV_MEMBER_SET` — detail OWNER: `<slug>/<envName> user=<userId> role=<role>`, detail SUPER_ADMIN: `... role=<role> (admin)`
+- `ENV_MEMBER_CLEARED` — detail OWNER: `<slug>/<envName> user=<userId>`, detail SUPER_ADMIN: `... (admin)`
+
+### Cache Invalidation
+
+PUT/DELETE env-member invalidate `cacheKeys.projectAccess(userId, slug)` + `cacheKeys.projectDetail(slug)`, dan call `invalidateProjectCaches(slug, [userId])`.
+
+---
+
 ## API Reference
 
 ### Admin API (SUPER_ADMIN only)
 
 - `GET /api/admin/users` — list users
 - `PUT /api/admin/users/:id/role` — change role
-- `PUT /api/admin/users/:id/block` — block/unblock (delete sessions on block)
+- `PUT /api/admin/users/:id/block` — block/unblock (delete sessions + disable tokens on block)
 - `GET /api/admin/presence` — online user IDs
 - `GET /api/admin/logs/app` — app logs (filter: level, limit, afterId)
 - `GET /api/admin/logs/audit` — audit logs (filter: userId, action, limit)
 - `DELETE /api/admin/logs/app|audit` — clear logs
+- `GET /api/admin/tokens` — list semua token lintas user (filter: userId, status, canWrite, limit)
+- `PATCH /api/admin/tokens/:id` — admin action: disable/enable/set-expiry (body: `{action, reason?, expiresAt?}`)
+- `DELETE /api/admin/tokens/:id` — force revoke token (audit TOKEN_REVOKED_BY_ADMIN)
+- `GET /api/admin/file-health` — health check ukuran file source
 - `GET /api/admin/routes|project-structure|env-map|test-coverage|dependencies|migrations|sessions|schema`
 
 ### Tickets API
@@ -212,6 +270,8 @@ Auth: session cookie atau `Authorization: Bearer <token>`. `requireEnvAuth()` di
 **Environments:** `POST|DELETE|PATCH /api/envman/projects/:slug/environments[/:env]`
 
 **Members:** `PUT|DELETE /api/envman/projects/:slug/members/:userId/role|member`
+
+**Env Members (OWNER only):** `GET /api/envman/projects/:slug/environments/:envName/members` — list project members + env override (envRole: `inherit`/`denied`/role) + `effectiveRole` · `PUT .../members/:userId` body `{role: 'inherit'|'denied'|'OWNER'|'EDITOR'|'VIEWER'}` · `DELETE .../members/:userId` reset to inherit. Last-owner-of-env protection: tidak bisa demote/deny OWNER terakhir.
 
 **Portainer:** `GET|POST /api/envman/portainer/connections` · `PUT|DELETE .../connections/:id` · `POST .../connections/:id/probe` · per-env: `GET|PUT|DELETE|POST .../portainer[/sync]`
 

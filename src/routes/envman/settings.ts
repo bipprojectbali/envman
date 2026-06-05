@@ -3,7 +3,14 @@ import { invalidateSettingCache } from '../../lib/app-settings'
 import { forbidden, requireSuperAdmin } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 
-const ALLOWED_KEYS = ['user_token_creation', 'user_token_max_days'] as const
+const ALLOWED_KEYS = [
+  'user_token_creation',
+  'user_token_max_days',
+  'token_activity_enabled',
+  'token_activity_log_vars_fetch',
+  'token_activity_retention_days',
+  'token_activity_cap_per_token',
+] as const
 
 export const settingsRouter = new Elysia()
 

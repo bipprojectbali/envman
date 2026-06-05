@@ -790,7 +790,7 @@ echo "Run: envman login ${origin} --token <your-token>"
         return { version: pkg.version as string }
       })
 
-      .get('/download/cli/:platform', async ({ params, set }) => {
+      .get('/download/cli/:platform', async ({ params, request, set }) => {
         const platforms: Record<string, string> = {
           'linux-x64': 'envman-linux-x64',
           'linux-arm64': 'envman-linux-arm64',
@@ -804,16 +804,28 @@ echo "Run: envman login ${origin} --token <your-token>"
           return 'Unknown platform'
         }
 
-        // Serve dari volume lokal jika tersedia (lebih cepat dari GitHub CDN)
-        const localFile = Bun.file(`/data/cli/${filename}.gz`)
-        if (await localFile.exists()) {
-          set.headers['Content-Type'] = 'application/octet-stream'
-          set.headers['Content-Encoding'] = 'gzip'
-          set.headers['Content-Disposition'] = `attachment; filename="${filename}"`
-          return localFile
+        const cliDir = process.env.CLI_DATA_DIR ?? '/data/cli'
+        const acceptsGzip = (request.headers.get('accept-encoding') ?? '').toLowerCase().includes('gzip')
+
+        if (acceptsGzip) {
+          const gzFile = Bun.file(`${cliDir}/${filename}.gz`)
+          if (await gzFile.exists()) {
+            set.headers['Content-Type'] = 'application/octet-stream'
+            set.headers['Content-Encoding'] = 'gzip'
+            set.headers.Vary = 'Accept-Encoding'
+            set.headers['Content-Disposition'] = `attachment; filename="${filename}"`
+            return gzFile
+          }
         }
 
-        // Fallback ke GitHub Releases
+        const plainFile = Bun.file(`${cliDir}/${filename}`)
+        if (await plainFile.exists()) {
+          set.headers['Content-Type'] = 'application/octet-stream'
+          set.headers.Vary = 'Accept-Encoding'
+          set.headers['Content-Disposition'] = `attachment; filename="${filename}"`
+          return plainFile
+        }
+
         const repo = process.env.GITHUB_REPO ?? 'bipprojectbali/envman'
         const url = `https://github.com/${repo}/releases/latest/download/${filename}`
         set.status = 302
@@ -845,7 +857,8 @@ echo "Run: envman login ${origin} --token <your-token>"
           set.status = 400
           return { error: 'Empty body' }
         }
-        await Bun.write(`/data/cli/${filename}.gz`, body)
+        const cliDir = process.env.CLI_DATA_DIR ?? '/data/cli'
+        await Bun.write(`${cliDir}/${filename}.gz`, body)
         return { ok: true, platform: params.platform, size: body.byteLength }
       })
 

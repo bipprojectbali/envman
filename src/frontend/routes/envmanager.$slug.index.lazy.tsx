@@ -69,6 +69,7 @@ interface Environment {
   tags: string[]
   createdAt?: string
   _count: { vars: number }
+  accessRole?: 'OWNER' | 'EDITOR' | 'VIEWER' | null
 }
 
 const roleColor = { OWNER: 'blue', EDITOR: 'teal', VIEWER: 'gray' } as const
@@ -856,6 +857,20 @@ function ProjectDetailPage() {
                                     <Text fw={700} size="sm" truncate style={{ flex: 1, minWidth: 0 }}>
                                       {e.name}
                                     </Text>
+                                    {e.accessRole === null && (
+                                      <Tooltip label="Akses kamu di-deny untuk env ini" withArrow>
+                                        <Badge size="xs" color="red" variant="filled" style={{ flexShrink: 0 }}>
+                                          DENIED
+                                        </Badge>
+                                      </Tooltip>
+                                    )}
+                                    {e.accessRole && e.accessRole !== project?.myRole && (
+                                      <Tooltip label={`Akses kamu di env ini: ${e.accessRole}`} withArrow>
+                                        <Badge size="xs" color="grape" variant="light" style={{ flexShrink: 0 }}>
+                                          {e.accessRole}
+                                        </Badge>
+                                      </Tooltip>
+                                    )}
                                     <Badge size="xs" variant="light" color={color} style={{ flexShrink: 0 }}>
                                       {varCount} vars
                                     </Badge>
@@ -1220,6 +1235,7 @@ function ProjectDetailPage() {
               <MembersPanel
                 slug={slug}
                 members={project?.members ?? []}
+                environments={envs.map((e) => ({ name: e.name }))}
                 isOwner={isOwner}
                 myUserId={myUserId ?? ''}
                 onRefresh={refetch}

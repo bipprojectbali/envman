@@ -9,6 +9,7 @@ const validTabs = [
   'database',
   'project',
   'file-health',
+  'tokens-admin',
   'extensions',
   'settings',
 ] as const

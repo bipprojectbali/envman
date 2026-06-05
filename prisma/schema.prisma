@@ -364,10 +364,15 @@ model ApiToken {
   scopes     String[]  @default([])
   tags       String[]  @default([])
   canWrite   Boolean   @default(false)
-  isDisabled Boolean   @default(false)
-  lastUsedAt DateTime?
-  expiresAt  DateTime?
-  createdAt  DateTime  @default(now())
+  isDisabled     Boolean   @default(false)
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  useCount       Int       @default(0)
+  lastIp         String?
+  disabledBy     String?
+  disabledAt     DateTime?
+  disabledReason String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -537,4 +542,22 @@ model AppSetting {
   updatedById String?
 
   @@map("app_setting")
+}
+
+model TokenActivityLog {
+  id          String   @id @default(uuid())
+  tokenId     String
+  userId      String?
+  tokenName   String?
+  action      String
+  projectSlug String?
+  envName     String?
+  detail      String?
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@index([tokenId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("token_activity_log")
 }

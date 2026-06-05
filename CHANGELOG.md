@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.11.28] - 2026-06-05
+
+### Added
+- Env-level access overrides (`EnvironmentMember`): per-user override `inherit | denied | OWNER | EDITOR | VIEWER` per environment, di atas role project. OWNER UI di `MembersPanel` + `MemberEnvOverrides`; SUPER_ADMIN UI di Users Management → Access Matrix.
+- Alias resolve guard: alias yang mereferensikan `-e project:env` ke env yang di-deny dikembalikan 403 dengan `deniedEnvs[]`. CLI tangkap dan tampilkan pesan tolak.
+- MCP tools `env_member_list`, `env_member_get` (readonly), `env_member_set`, `env_member_clear` (admin) untuk inspect/manipulasi env-level overrides.
+- Users Management → Access Matrix UX baru: collapsible row per project (`ProjectAccessRow`), stats header global (`AccessStatsHeader`), sort by name/role/override-count, no-access section collapsed default. Scalable untuk 100+ project.
+- Users Management → tab Access & Permissions: banner peringatan saat user diblokir (perubahan tetap disimpan, tapi user tidak bisa login).
+- PermissionsTab: confirm modal saat grant capability destruktif (`stack:prune`).
+- Token activity log + admin tokens panel: tracking per-token (useCount, lastIp, disabledBy/At/Reason) + log aktivitas CLI per token.
+
+### Changed
+- SUPER_ADMIN endpoint env-override (`PUT /api/envman/admin/users/:userId/projects/:slug/envs/:envName`) sekarang punya kontrol yang sama dengan OWNER endpoint: validasi target user harus project member, last-owner-of-env protection, emit audit `ENV_MEMBER_SET`/`ENV_MEMBER_CLEARED`, cache invalidation lengkap.
+- UserDrawerContent stats: `Projects` count sekarang termasuk project yang user-nya tidak punya role tapi punya env-override non-deny.
+- UserDrawerContent stats card di-grayscale saat user diblokir agar lebih jelas secara visual.
+- PermissionsTab group header: title + description truncate supaya tidak overflow di drawer sempit.
+- Route `/download/cli/:platform`: refactor pakai env var `CLI_DATA_DIR` (default `/data/cli`), serve plain binary atau gzipped sesuai `Accept-Encoding`.
+
+### Fixed
+- Test suite: 4 test fail pre-existing (migrate × 2, cli-download × 2) diperbaiki — count migrations dinamis, route serve plain bin untuk request tanpa gzip.
+
 ## [0.11.27] - 2026-06-04
 
 ### Added

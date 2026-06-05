@@ -32,6 +32,7 @@ import {
   TbInfoCircle,
   TbLayoutGrid,
   TbLayoutList,
+  TbLock,
   TbPencil,
   TbPlus,
   TbSearch,
@@ -52,6 +53,8 @@ export interface Alias {
   createdAt: string
   updatedAt: string
   creator: { id: string; name: string }
+  requiresEnvs?: { project: string; env: string }[]
+  deniedEnvs?: { project: string; env: string }[]
 }
 
 interface FormState {
@@ -622,15 +625,29 @@ export function AliasesPanel({ slug, isOwner }: AliasesPanelProps) {
                     <Code fz="sm" fw={700}>
                       {alias.name}
                     </Code>
-                    <CopyButton value={`envman run ${slug}:${alias.name}`} timeout={2000}>
-                      {({ copied, copy }) => (
-                        <Tooltip label={copied ? 'Disalin!' : `Salin: envman run ${slug}:${alias.name}`} withArrow>
-                          <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
-                            {copied ? <TbCheck size={12} /> : <TbCopy size={12} />}
-                          </ActionIcon>
-                        </Tooltip>
-                      )}
-                    </CopyButton>
+                    {alias.deniedEnvs && alias.deniedEnvs.length > 0 && (
+                      <Tooltip
+                        label={`Butuh akses ke env: ${alias.deniedEnvs.map((d) => `${d.project}:${d.env}`).join(', ')}`}
+                        withArrow
+                        multiline
+                        w={240}
+                      >
+                        <Badge size="xs" color="red" variant="light" leftSection={<TbLock size={9} />}>
+                          needs {alias.deniedEnvs.map((d) => d.env).join(', ')}
+                        </Badge>
+                      </Tooltip>
+                    )}
+                    {!alias.deniedEnvs?.length && (
+                      <CopyButton value={`envman run ${slug}:${alias.name}`} timeout={2000}>
+                        {({ copied, copy }) => (
+                          <Tooltip label={copied ? 'Disalin!' : `Salin: envman run ${slug}:${alias.name}`} withArrow>
+                            <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                              {copied ? <TbCheck size={12} /> : <TbCopy size={12} />}
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                      </CopyButton>
+                    )}
                     {alias.tags.length > 0 && (
                       <Group gap={4} wrap="wrap" onClick={(e) => e.stopPropagation()}>
                         {alias.tags.map((tag) => (

@@ -7,6 +7,7 @@ import { prisma } from '../../lib/db'
 import { notDeleted, softDelete } from '../../lib/db-helpers'
 import { parsePagination } from '../../lib/pagination'
 import { hasCapability } from '../../lib/permissions'
+import { logTokenActivity } from '../../lib/token-activity'
 import { triggerAutoSync } from './portainer'
 
 export const projectsRouter = new Elysia()
@@ -85,7 +86,12 @@ export const projectsRouter = new Elysia()
       where: { slug: params.slug, ...notDeleted },
       include: {
         members: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
-        environments: { include: { _count: { select: { vars: true } } } },
+        environments: {
+          include: {
+            _count: { select: { vars: true } },
+            members: { where: { userId: caller.userId }, select: { role: true } },
+          },
+        },
       },
     })
     if (!project) {
@@ -97,7 +103,31 @@ export const projectsRouter = new Elysia()
       set.status = 403
       return { error: 'No access' }
     }
-    return { project: { ...project, myRole: access } }
+    const isSuperAdmin = caller.role === 'SUPER_ADMIN'
+    // Hitung effective env access untuk caller — sembunyikan env yang DENIED kecuali untuk OWNER (yang perlu lihat semua untuk manage).
+    const showAllEnvs = isSuperAdmin || access === 'OWNER'
+    const environmentsWithAccess = project.environments
+      .map((e: any) => {
+        const override = e.members[0]
+        let envEffectiveRole: 'OWNER' | 'EDITOR' | 'VIEWER' | null
+        if (isSuperAdmin) {
+          envEffectiveRole = 'OWNER'
+        } else if (override) {
+          envEffectiveRole = override.role as 'OWNER' | 'EDITOR' | 'VIEWER' | null
+        } else {
+          envEffectiveRole = access
+        }
+        const { members: _m, ...rest } = e
+        return { ...rest, accessRole: envEffectiveRole }
+      })
+      .filter((e: any) => showAllEnvs || e.accessRole !== null)
+    return {
+      project: {
+        ...project,
+        environments: environmentsWithAccess,
+        myRole: access,
+      },
+    }
   })
 
   .patch('/api/envman/projects/:slug', async ({ request, params, set }) => {
@@ -495,6 +525,20 @@ export const projectsRouter = new Elysia()
         .filter((v) => !v.isDisabled)
         .map((v) => [v.key, v.isSecret ? (canReadSecrets ? decryptSecret(v.value) : '***') : v.value]),
     )
+    if (caller.tokenId) {
+      logTokenActivity({
+        tokenId: caller.tokenId,
+        userId: caller.userId,
+        tokenName: caller.tokenName,
+        action: 'vars_fetch',
+        projectSlug: params.slug,
+        envName: params.envName,
+        ip:
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+          request.headers.get('x-real-ip') ??
+          undefined,
+      })
+    }
     return { vars }
   })
 
@@ -591,6 +635,21 @@ export const projectsRouter = new Elysia()
     })
     // Auto-sync to Portainer if enabled (fire-and-forget)
     triggerAutoSync(params.slug, params.envName, caller.userId).catch(() => {})
+    if (caller.tokenId) {
+      logTokenActivity({
+        tokenId: caller.tokenId,
+        userId: caller.userId,
+        tokenName: caller.tokenName,
+        action: 'var_set',
+        projectSlug: params.slug,
+        envName: params.envName,
+        detail: body.key,
+        ip:
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+          request.headers.get('x-real-ip') ??
+          undefined,
+      })
+    }
     return { var: { id: envVar.id, key: envVar.key, isSecret: envVar.isSecret } }
   })
 
@@ -629,6 +688,21 @@ export const projectsRouter = new Elysia()
       return { error: 'Variable not found' }
     }
     await prisma.envVar.delete({ where: { id: envVar.id } })
+    if (caller.tokenId) {
+      logTokenActivity({
+        tokenId: caller.tokenId,
+        userId: caller.userId,
+        tokenName: caller.tokenName,
+        action: 'var_delete',
+        projectSlug: params.slug,
+        envName: params.envName,
+        detail: params.key,
+        ip:
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+          request.headers.get('x-real-ip') ??
+          undefined,
+      })
+    }
     return { ok: true }
   })
 

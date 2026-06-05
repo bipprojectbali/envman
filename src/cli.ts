@@ -136,6 +136,12 @@ async function apiFetch(cfg: Config, path: string): Promise<any> {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${cfg.token}` } })
   const body = await res.json()
   if (!res.ok) {
+    if (res.status === 403 && Array.isArray(body?.deniedEnvs) && body.deniedEnvs.length > 0) {
+      const list = body.deniedEnvs.map((d: { project: string; env: string }) => `${d.project}:${d.env}`).join(', ')
+      console.error(`[envman] Akses ditolak untuk env: ${list}`)
+      console.error('         Hubungi project owner untuk mendapatkan akses.')
+      process.exit(1)
+    }
     console.error(`Error ${res.status}: ${body.error ?? JSON.stringify(body)}`)
     process.exit(1)
   }

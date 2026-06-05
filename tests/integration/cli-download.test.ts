@@ -1,35 +1,33 @@
 import { test, expect, describe, beforeAll, afterAll } from 'bun:test'
-import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'fs'
+import { mkdirSync, writeFileSync, existsSync, unlinkSync, rmdirSync } from 'fs'
 import { gzipSync } from 'zlib'
 import { createTestApp } from '../helpers'
 
-const app = createTestApp()
-
-const CLI_DIR = `${process.cwd()}/dist/cli`
+const CLI_DIR = `${process.cwd()}/dist/cli-test`
 const TEST_PLATFORM = 'darwin-arm64'
 const BIN_PATH = `${CLI_DIR}/envman-${TEST_PLATFORM}`
 const GZ_PATH = `${BIN_PATH}.gz`
 const TEST_BINARY = Buffer.from('FAKE_BINARY_CONTENT_FOR_TESTING_ONLY_NOT_AN_ACTUAL_ELF_BINARY'.repeat(50))
 
-// Track which files we created so we don't clobber real builds during cleanup
-let createdBin = false
-let createdGz = false
+const ORIGINAL_CLI_DATA_DIR = process.env.CLI_DATA_DIR
+process.env.CLI_DATA_DIR = CLI_DIR
+
+const app = createTestApp()
 
 beforeAll(() => {
   mkdirSync(CLI_DIR, { recursive: true })
-  if (!existsSync(BIN_PATH)) {
-    writeFileSync(BIN_PATH, TEST_BINARY)
-    createdBin = true
-  }
-  if (!existsSync(GZ_PATH)) {
-    writeFileSync(GZ_PATH, gzipSync(TEST_BINARY, { level: 9 }))
-    createdGz = true
-  }
+  writeFileSync(BIN_PATH, TEST_BINARY)
+  writeFileSync(GZ_PATH, gzipSync(TEST_BINARY, { level: 9 }))
 })
 
 afterAll(() => {
-  if (createdBin && existsSync(BIN_PATH)) unlinkSync(BIN_PATH)
-  if (createdGz && existsSync(GZ_PATH)) unlinkSync(GZ_PATH)
+  if (existsSync(BIN_PATH)) unlinkSync(BIN_PATH)
+  if (existsSync(GZ_PATH)) unlinkSync(GZ_PATH)
+  try {
+    rmdirSync(CLI_DIR)
+  } catch {}
+  if (ORIGINAL_CLI_DATA_DIR === undefined) delete process.env.CLI_DATA_DIR
+  else process.env.CLI_DATA_DIR = ORIGINAL_CLI_DATA_DIR
 })
 
 describe('GET /install', () => {
