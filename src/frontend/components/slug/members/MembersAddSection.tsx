@@ -1,7 +1,20 @@
-import { Box, Button, Checkbox, Divider, Group, Paper, ScrollArea, Select, Stack, Text, TextInput } from '@mantine/core'
+import {
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  Divider,
+  Group,
+  Paper,
+  ScrollArea,
+  Select,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { TbPlus, TbSearch } from 'react-icons/tb'
+import { TbInfoCircle, TbPlus, TbSearch } from 'react-icons/tb'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -145,16 +158,26 @@ export function MembersAddSection({ slug, onAdded }: { slug: string; onAdded: ()
           </ScrollArea.Autosize>
 
           {selectedToAdd.size > 0 && (
-            <Group justify="flex-end" mt="sm">
-              <Button
-                size="xs"
-                leftSection={<TbPlus size={12} />}
-                loading={addMutation.isPending}
-                onClick={() => addMutation.mutate()}
-              >
-                Tambah {selectedToAdd.size} anggota
-              </Button>
-            </Group>
+            <>
+              {addRole !== 'OWNER' && (
+                <Alert color="yellow" icon={<TbInfoCircle size={13} />} variant="light" mt="xs" p="xs">
+                  <Text size="xs">
+                    Anggota baru otomatis <strong>DENIED</strong> di semua environment. Buka tab Matrix atau expand row
+                    untuk grant akses per-env.
+                  </Text>
+                </Alert>
+              )}
+              <Group justify="flex-end" mt="sm">
+                <Button
+                  size="xs"
+                  leftSection={<TbPlus size={12} />}
+                  loading={addMutation.isPending}
+                  onClick={() => addMutation.mutate()}
+                >
+                  Tambah {selectedToAdd.size} anggota
+                </Button>
+              </Group>
+            </>
           )}
         </>
       )}

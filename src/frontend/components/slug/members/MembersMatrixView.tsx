@@ -114,6 +114,7 @@ export function MembersMatrixView({
                 padding: 8,
                 position: 'sticky',
                 left: 0,
+                zIndex: 2,
                 background: 'var(--mantine-color-body)',
               }}
             >
@@ -155,6 +156,7 @@ export function MembersMatrixView({
                   width: memberColWidth,
                   position: 'sticky',
                   left: 0,
+                  zIndex: 1,
                   background: 'var(--mantine-color-body)',
                   borderRight: '1px solid var(--mantine-color-default-border)',
                 }}
@@ -202,7 +204,7 @@ export function MembersMatrixView({
                       </Badge>
                       <Group gap={2} wrap="nowrap">
                         {ROLE_BTNS.map((btn) => {
-                          const current = cell?.envRole ?? 'inherit'
+                          const current = cell?.envRole ?? 'denied'
                           const isActive = current === btn.value
                           return (
                             <Tooltip key={btn.value} label={btn.label} withArrow fz="xs">
@@ -212,7 +214,7 @@ export function MembersMatrixView({
                                 color={isActive ? btn.color : 'gray'}
                                 disabled={setEnvRoleMutation.isPending}
                                 onClick={() => {
-                                  if (!isActive && cell)
+                                  if (!isActive)
                                     setEnvRoleMutation.mutate({ userId: m.userId, envName: env.name, role: btn.value })
                                 }}
                                 style={{ fontSize: 10, fontWeight: 700 }}

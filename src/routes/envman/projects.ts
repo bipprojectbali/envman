@@ -204,13 +204,37 @@ export const projectsRouter = new Elysia()
       set.status = 404
       return { error: 'Project not found' }
     }
-    const member = await prisma.projectMember.upsert({
+    const existing = await prisma.projectMember.findUnique({
       where: { userId_projectId: { userId: user.id, projectId: project.id } },
-      update: { role: body.role },
-      create: { userId: user.id, projectId: project.id, role: body.role },
     })
-    await invalidateProjectCaches(params.slug)
-    return { member }
+    const member = existing
+      ? await prisma.projectMember.update({
+          where: { userId_projectId: { userId: user.id, projectId: project.id } },
+          data: { role: body.role },
+        })
+      : await prisma.projectMember.create({
+          data: { userId: user.id, projectId: project.id, role: body.role },
+        })
+
+    const shouldDefaultDeny = !existing && body.role !== 'OWNER'
+    if (shouldDefaultDeny) {
+      const envs = await prisma.environment.findMany({
+        where: { projectId: project.id },
+        select: { id: true },
+      })
+      if (envs.length > 0) {
+        await prisma.environmentMember.createMany({
+          data: envs.map((e) => ({
+            userId: user.id,
+            environmentId: e.id,
+            role: null,
+          })),
+          skipDuplicates: true,
+        })
+      }
+    }
+    await invalidateProjectCaches(params.slug, [user.id])
+    return { member, defaultDenied: shouldDefaultDeny }
   })
 
   .patch('/api/envman/projects/:slug/members/:userId', async ({ request, params, set }) => {
@@ -359,7 +383,24 @@ export const projectsRouter = new Elysia()
     }
     const tags = Array.isArray(body.tags) ? body.tags.filter((t: unknown) => typeof t === 'string') : []
     const environment = await prisma.environment.create({ data: { name: envName, tags, projectId: project.id } })
-    await invalidateProjectCaches(params.slug)
+    const nonOwners = await prisma.projectMember.findMany({
+      where: { projectId: project.id, role: { not: 'OWNER' } },
+      select: { userId: true },
+    })
+    if (nonOwners.length > 0) {
+      await prisma.environmentMember.createMany({
+        data: nonOwners.map((m) => ({
+          userId: m.userId,
+          environmentId: environment.id,
+          role: null,
+        })),
+        skipDuplicates: true,
+      })
+    }
+    await invalidateProjectCaches(
+      params.slug,
+      nonOwners.map((m) => m.userId),
+    )
     return { environment }
   })
 

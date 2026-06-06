@@ -184,6 +184,16 @@ Session-based (HttpOnly cookie + DB). `POST /api/auth/login` → bcrypt verify �
 
 Akses ke resource project diatur dua lapis. Default: env, notes, aliases, dan files **inherit** dari `ProjectMember.role`. OWNER bisa **override** role per env atau set **DENY** explicit per env per user.
 
+### Secure-by-Default Member Onboarding
+
+Saat member ditambah dengan role **EDITOR/VIEWER** (POST `/api/envman/projects/:slug/members`), server otomatis insert `EnvironmentMember` dengan `role=null` (DENY explicit) untuk **semua env existing** di project. Konsekuensi: member baru **tidak punya akses apapun** sampai OWNER eksplisit grant per-env via matrix view atau env-members endpoint. Tujuannya mencegah kekeliruan tidak sengaja memberi akses penuh ke env produksi.
+
+Aturan:
+- Role **OWNER** baru → tidak default-deny (OWNER otomatis dapat akses semua env, sesuai semantik OWNER).
+- Update role member existing (re-POST dengan userId sama) → tidak touch env override; preserve override yang sudah ada.
+- Saat env baru dibuat (POST `/api/envman/projects/:slug/environments`), semua project member non-OWNER otomatis di-deny di env baru tsb. OWNER member tidak terpengaruh.
+- Response `POST /members` carry `defaultDenied: boolean` agar UI bisa konfirmasi behavior.
+
 ### Resolver
 
 `getEnvironmentAccess(userId, role, slug, envName)` di `src/lib/access.ts`:
