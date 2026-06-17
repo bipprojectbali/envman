@@ -515,6 +515,12 @@ function FileForm({ slug, file, onClose }: { slug: string; file?: ProjectFile; o
                         Monaco editor · syntax highlight
                       </Text>
                     </Group>
+                    {(f.language === 'typescript' || f.language === 'javascript') && (
+                      <Text size="xs" c="dimmed" mt={4} px={4}>
+                        Bun auto-install: npm imports langsung dipakai tanpa <Code fz="xs">bun install</Code>. Pin
+                        versi: <Code fz="xs">{'import { z } from "zod@^3.22"'}</Code>
+                      </Text>
+                    )}
                   </Box>
                 ) : (
                   <Box
@@ -1279,9 +1285,18 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
           body: { gap: 4 },
         }}
       >
-        Simpan scripts, snippets, dan config files per project. File dapat dieksekusi langsung dari CLI tanpa download.
-        Jalankan: <Code fz="xs">envman -- bash {slug}:scripts/deploy.sh</Code>. Mendukung multi-file per entry dan
-        preview Markdown.
+        <Stack gap={4}>
+          <Text size="xs">
+            Simpan scripts, snippets, dan config files per project. File dapat dieksekusi langsung dari CLI tanpa
+            download. Jalankan: <Code fz="xs">envman -- bash {slug}:scripts/deploy.sh</Code>. Mendukung multi-file per
+            entry dan preview Markdown.
+          </Text>
+          <Text size="xs">
+            Bun scripts (.ts / .js) otomatis install npm packages saat dijalankan — tidak perlu{' '}
+            <Code fz="xs">bun install</Code>. Pin versi inline:{' '}
+            <Code fz="xs">{'import { z } from "zod@^3.22"'}</Code>
+          </Text>
+        </Stack>
       </Alert>
 
       {/* Toolbar */}
