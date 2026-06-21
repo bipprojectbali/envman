@@ -5,6 +5,7 @@ import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middlewa
 import { cacheKeys, invalidateCache, withCache } from '../../lib/cache'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
+import { conditional, notModifiedResponse, weakEtag } from '../../lib/http-cache'
 import { logTokenActivity } from '../../lib/token-activity'
 
 const ALIAS_NAME_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/
@@ -233,5 +234,13 @@ export const aliasesRouter = new Elysia()
           undefined,
       })
     }
-    return { args: alias.args, project: projectSlug, alias: aliasName }
+    // Validator include userId: response per-caller (deniedEnvs/requiresEnvs) — cegah kebocoran cross-user.
+    const { notModified, headers } = conditional(request, {
+      etag: weakEtag(`${alias.id}:${alias.updatedAt.toISOString()}:${authResult.userId}`),
+      lastModified: alias.updatedAt,
+    })
+    if (notModified) return notModifiedResponse(headers)
+    return new Response(JSON.stringify({ args: alias.args, project: projectSlug, alias: aliasName }), {
+      headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' },
+    })
   })

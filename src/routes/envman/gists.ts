@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 import { requireAuth } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
+import { conditional, notModifiedResponse, strongEtag, weakEtag } from '../../lib/http-cache'
 import { hasCapability } from '../../lib/permissions'
 
 export const gistsRouter = new Elysia()
@@ -154,7 +155,12 @@ export const gistsRouter = new Elysia()
       set.status = 404
       return new Response('File tidak ditemukan', { status: 404 })
     }
-    return new Response(file.content, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    const { notModified, headers } = conditional(request, {
+      etag: strongEtag(file.content),
+      lastModified: gist.updatedAt,
+    })
+    if (notModified) return notModifiedResponse(headers)
+    return new Response(file.content, { headers: { ...headers, 'Content-Type': 'text/plain; charset=utf-8' } })
   })
 
   // ─── Public Gists (no auth) ───────────────────────────
@@ -194,7 +200,7 @@ export const gistsRouter = new Elysia()
   })
 
   // GET /api/public/gists/:id — single public gist
-  .get('/api/public/gists/:id', async ({ params, set }) => {
+  .get('/api/public/gists/:id', async ({ request, params, set }) => {
     const gist = await prisma.gist.findUnique({
       where: { id: params.id },
       include: { user: { select: { id: true, name: true } } },
@@ -207,11 +213,18 @@ export const gistsRouter = new Elysia()
       set.status = 403
       return { error: 'Gist ini bersifat private' }
     }
-    return { gist }
+    const { notModified, headers } = conditional(request, {
+      etag: weakEtag(`${gist.id}:${gist.updatedAt.toISOString()}`),
+      lastModified: gist.updatedAt,
+    })
+    if (notModified) return notModifiedResponse(headers)
+    return new Response(JSON.stringify({ gist }), {
+      headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' },
+    })
   })
 
   // GET /api/public/gists/:id/raw/:filename — raw file content (plaintext)
-  .get('/api/public/gists/:id/raw/:filename', async ({ params, set }) => {
+  .get('/api/public/gists/:id/raw/:filename', async ({ request, params, set }) => {
     const gist = await prisma.gist.findUnique({ where: { id: params.id } })
     if (!gist) {
       set.status = 404
@@ -227,5 +240,10 @@ export const gistsRouter = new Elysia()
       set.status = 404
       return new Response('File tidak ditemukan', { status: 404 })
     }
-    return new Response(file.content, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    const { notModified, headers } = conditional(request, {
+      etag: strongEtag(file.content),
+      lastModified: gist.updatedAt,
+    })
+    if (notModified) return notModifiedResponse(headers)
+    return new Response(file.content, { headers: { ...headers, 'Content-Type': 'text/plain; charset=utf-8' } })
   })

@@ -46,6 +46,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`
 - `PortainerConnection` (id, name, portainerUrl, apiToken, createdById, timestamps) — global
 - `PortainerConfig` (id, projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?, timestamps)
 - `AppSetting` (key PK, value, updatedAt, updatedById?) — konfigurasi global runtime, diubah via Dev > Settings
+- `Gist` (id, userId, title, description, files Json `[{filename, content, language}]`, isPublic, tags[], timestamps) — snippet multi-file. `isPublic=false` (default) = private milik owner; `isPublic=true` = terlihat user lain. Edit/delete: owner atau SUPER_ADMIN.
 
 ### Enums
 
@@ -293,6 +294,21 @@ Auth: session cookie atau `Authorization: Bearer <token>`. `requireEnvAuth()` di
 
 **Tokens:** `GET|POST /api/envman/tokens` · `PATCH|DELETE /api/envman/tokens/:id` · `PATCH .../toggle` · `GET .../reveal` · `POST .../rotate` · `GET /api/envman/whoami`
 
+**Gists:** `GET /api/envman/gists` (session — list milik sendiri + public milik user lain; `?limit&cursor&search&filter`) · `POST /api/envman/gists` (butuh capability `gist:create`; body `{title, description, files[], isPublic, tags[]}`) · `PUT|DELETE /api/envman/gists/:id` (owner atau SUPER_ADMIN) · `GET /api/envman/gists/:id/raw/:filename` (raw plaintext, owner/public). Menu di sidebar gated capability `menu:gists`.
+
+**Public Gists (no auth):** `GET /api/public/gists` (list semua public; `?limit&cursor&search&tags&sort`) · `GET /api/public/gists/:id` (single, 403 jika private) · `GET /api/public/gists/:id/raw/:filename` (raw plaintext).
+
+**Conditional caching (read-resource):** endpoint baca-resource mengirim `ETag` + `Cache-Control` (+ `Last-Modified` bila resource punya timestamp) dan mendukung `If-None-Match` / `If-Modified-Since` → `304 Not Modified` (If-None-Match diutamakan, RFC 9110). Helper reusable: `src/lib/http-cache.ts` (`strongEtag`, `weakEtag`, `conditional`, `notModifiedResponse`). `conditional(req, {etag, lastModified?, cacheControl?})` — `lastModified` opsional (resource statis-deterministik divalidasi via ETag saja), `cacheControl` default `private, no-cache`.
+
+Endpoint yang di-cover:
+- `GET .../gists/:id/raw/:filename` (auth & public) — strong ETag (hash konten file), Last-Modified `gist.updatedAt`.
+- `GET /api/public/gists/:id` — weak ETag (`W/"<hash id:updatedAt>"`).
+- `GET .../files/resolve?prefix=&filename=` — weak ETag (`hash entry.id:updatedAt:filename`), Last-Modified `entry.updatedAt`. Log `logTokenActivity` tetap jalan sebelum cek conditional (304 tetap dihitung akses). Bentuk JSON body tidak berubah.
+- `GET .../aliases/resolve/:ref` — weak ETag (`hash alias.id:updatedAt:userId`). **userId masuk hash** karena response per-caller (`deniedEnvs`/`requiresEnvs`) — cegah kebocoran cache cross-user. Cek akses + denied env dijalankan sebelum conditional.
+- `GET /api/docs.md` — strong ETag (hash markdown), `Cache-Control: public, max-age=300`, tanpa Last-Modified.
+
+**Tidak di-cover (sengaja):** endpoint vars (jangan cache env vars), session, list endpoint, dan binary download `/download/cli/:platform` (sudah version-gated via `/download/cli/version`).
+
 **Settings:** `GET /api/envman/settings` (public, semua setting sebagai key-value map) · `PUT /api/envman/settings` (SUPER_ADMIN, body: `[{key, value}]`) — key yang valid: `user_token_creation` (boolean string), `user_token_max_days` (number string)
 
 ### Auth Endpoints
@@ -417,6 +433,17 @@ Bun scripts bisa langsung import npm tanpa `node_modules` — CLI auto-pass `--i
 -e <file>            Load vars dari file lokal
 --server-wins        System env override merged vars (default: merged wins)
 ```
+
+### Response Caching
+
+`apiFetch(cfg, path, opts?)` di `src/cli.ts` punya conditional cache **opt-in** (`opts.cache=true`, default `false`). Saat aktif: baca cache `(server, path)` → kirim `If-None-Match: <etag>` → kalau server balas `304` sajikan body dari disk; kalau `200 + ETag` tulis cache. Implementasi disk cache: `src/cli/response-cache.ts`.
+
+- Cache dir: `~/.config/envman/cache/`, nama file `sha256(server+path).base64url.json`, ditulis atomik (tmp+rename) **mode 0600** (body bisa berisi konten file project).
+- `pruneIfNeeded()` batasi ≤200 entri (hapus tertua by mtime).
+- Diaktifkan HANYA di hot-path konten aman: `files/resolve` dan `aliases/resolve`. **`whoami`, vars, dan call lain tetap non-cache** (jaga env vars tidak ter-cache di disk).
+- Fallback: kalau `304` tapi cache hilang (race), re-fetch tanpa conditional.
+
+Efek: `envman -- bash myapp:scripts/x.sh` / `envman run myapp:deploy` berulang hanya transfer `304` saat konten tak berubah.
 
 ---
 
