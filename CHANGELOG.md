@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-06-21
+
 ### Added
 - **Gists** di landing page: kartu fitur snippet multi-file (private default / public, syntax highlight, tag & search).
 
