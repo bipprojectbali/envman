@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   TbBrandDocker,
+  TbBrandGithub,
   TbBrandWindows,
   TbCheck,
   TbCode,
@@ -81,6 +82,13 @@ const features = [
     color: 'grape',
     title: 'Notes & Docs',
     description: 'Dokumentasi runbook, deployment guide, atau apapun per project. Markdown support, tag, dan search.',
+  },
+  {
+    icon: TbBrandGithub,
+    color: 'dark',
+    title: 'Gists',
+    description:
+      'Simpan dan bagikan snippet multi-file dengan syntax highlight. Private secara default, atau set public agar terlihat anggota lain. Tag dan search.',
   },
   {
     icon: TbUsers,
