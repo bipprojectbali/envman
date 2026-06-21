@@ -133,6 +133,85 @@ describe('PUT /api/envman/gists/:id', () => {
   })
 })
 
+describe('Conditional caching (ETag / Last-Modified)', () => {
+  const filename = 'docker-compose.yml'
+  let etag: string
+  let lastModified: string
+
+  test('raw file: GET pertama kirim ETag + Last-Modified', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/gists/${gistId}/raw/${filename}`, { headers: json(token1) }),
+    )
+    expect(res.status).toBe(200)
+    etag = res.headers.get('etag') ?? ''
+    lastModified = res.headers.get('last-modified') ?? ''
+    expect(etag).not.toBe('')
+    expect(lastModified).not.toBe('')
+    expect(res.headers.get('cache-control')).toBe('private, no-cache')
+    expect(await res.text()).toBe('version: "3"')
+  })
+
+  test('raw file: If-None-Match cocok → 304 tanpa body', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/gists/${gistId}/raw/${filename}`, {
+        headers: { ...json(token1), 'If-None-Match': etag },
+      }),
+    )
+    expect(res.status).toBe(304)
+    expect(await res.text()).toBe('')
+    expect(res.headers.get('etag')).toBe(etag)
+  })
+
+  test('raw file: If-Modified-Since >= updatedAt → 304', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/gists/${gistId}/raw/${filename}`, {
+        headers: { ...json(token1), 'If-Modified-Since': lastModified },
+      }),
+    )
+    expect(res.status).toBe(304)
+  })
+
+  test('raw file public: 304 via If-None-Match', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/public/gists/${gistId}/raw/${filename}`, {
+        headers: { 'If-None-Match': etag },
+      }),
+    )
+    expect(res.status).toBe(304)
+  })
+
+  test('single public gist JSON: kirim ETag + 304 saat cocok', async () => {
+    const first = await app.handle(new Request(`http://localhost/api/public/gists/${gistId}`))
+    expect(first.status).toBe(200)
+    const jsonEtag = first.headers.get('etag') ?? ''
+    expect(jsonEtag).toStartWith('W/')
+    const body = await first.json()
+    expect(body.gist.id).toBe(gistId)
+
+    const second = await app.handle(
+      new Request(`http://localhost/api/public/gists/${gistId}`, { headers: { 'If-None-Match': jsonEtag } }),
+    )
+    expect(second.status).toBe(304)
+  })
+
+  test('ETag berubah setelah konten file di-update', async () => {
+    await app.handle(
+      new Request(`http://localhost/api/envman/gists/${gistId}`, {
+        method: 'PUT',
+        headers: json(token1),
+        body: JSON.stringify({ files: [{ filename, content: 'version: "4"', language: 'yaml' }] }),
+      }),
+    )
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/gists/${gistId}/raw/${filename}`, {
+        headers: { ...json(token1), 'If-None-Match': etag },
+      }),
+    )
+    expect(res.status).toBe(200)
+    expect(res.headers.get('etag')).not.toBe(etag)
+  })
+})
+
 describe('DELETE /api/envman/gists/:id', () => {
   test('non-owner cannot delete (403)', async () => {
     const res = await app.handle(new Request(`http://localhost/api/envman/gists/${gistId}`, {

@@ -10,6 +10,7 @@ import { auth } from './lib/auth'
 import { requireAuth } from './lib/auth-middleware'
 import { prisma } from './lib/db'
 import { env } from './lib/env'
+import { conditional, notModifiedResponse, strongEtag } from './lib/http-cache'
 import { addConnection, broadcastToAdmins, removeConnection } from './lib/presence'
 import { redis } from './lib/redis'
 import { getIp, getPublicOrigin } from './lib/request'
@@ -868,10 +869,15 @@ echo "Run: envman login ${origin} --token <your-token>"
         // Inline the full markdown here (same content as /docs page)
         // Duplicated from frontend to avoid a build-time import — server runs before Vite bundles.
         const md = buildDocsMd(origin)
+        const { notModified, headers } = conditional(request, {
+          etag: strongEtag(md),
+          cacheControl: 'public, max-age=300',
+        })
+        if (notModified) return notModifiedResponse(headers)
         return new Response(md, {
           headers: {
+            ...headers,
             'Content-Type': 'text/markdown; charset=utf-8',
-            'Cache-Control': 'public, max-age=300',
             'X-Content-Type-Options': 'nosniff',
           },
         })

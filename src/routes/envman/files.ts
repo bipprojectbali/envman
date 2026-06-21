@@ -4,6 +4,7 @@ import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middlewa
 import { cacheKeys, invalidateCache, withCache } from '../../lib/cache'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
+import { conditional, notModifiedResponse, weakEtag } from '../../lib/http-cache'
 import { logTokenActivity } from '../../lib/token-activity'
 
 interface FileEntry {
@@ -121,12 +122,20 @@ export const filesRouter = new Elysia()
           undefined,
       })
     }
-    return {
-      content: resolved.content,
-      filename: resolved.filename,
-      language: resolved.language,
-      entryTitle: entry.title,
-    }
+    const { notModified, headers } = conditional(request, {
+      etag: weakEtag(`${entry.id}:${entry.updatedAt.toISOString()}:${resolved.filename}`),
+      lastModified: entry.updatedAt,
+    })
+    if (notModified) return notModifiedResponse(headers)
+    return new Response(
+      JSON.stringify({
+        content: resolved.content,
+        filename: resolved.filename,
+        language: resolved.language,
+        entryTitle: entry.title,
+      }),
+      { headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } },
+    )
   })
 
   // POST /api/envman/projects/:slug/files — create file (EDITOR+)

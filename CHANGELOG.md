@@ -2,9 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+- **Gists** di landing page: kartu fitur snippet multi-file (private default / public, syntax highlight, tag & search).
+
 ### Changed
 - **Secure-by-default member onboarding**: anggota baru (role EDITOR/VIEWER) otomatis di-DENY di semua environment existing. OWNER harus eksplisit grant per-env via matrix view — mencegah kekeliruan memberi akses penuh ke env produksi. Anggota baru dengan role OWNER tetap dapat akses semua env (sesuai semantik OWNER).
 - Saat environment baru dibuat, semua project member non-OWNER otomatis di-DENY di env baru tsb.
+
+### Performance
+- **Conditional HTTP caching (end-to-end)**: endpoint baca-resource kirim `ETag`/`Last-Modified` dan dukung `If-None-Match`/`If-Modified-Since` → `304 Not Modified`. Di-cover: gist raw & public detail, `files/resolve`, `aliases/resolve` (ETag per-caller cegah kebocoran cross-user), dan `/api/docs.md`. CLI `apiFetch()` kini punya disk cache opt-in (mode 0600) yang mengirim conditional request dan menyajikan body dari cache saat `304` — `envman run`/eksekusi file berulang hanya transfer `304` saat konten tak berubah. Env vars & session sengaja tidak di-cache.
 
 ## [0.11.29] - 2026-06-05
 

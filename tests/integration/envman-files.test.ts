@@ -393,4 +393,41 @@ describe('GET /api/envman/projects/:slug/files/resolve', () => {
     ))
     expect(res.status).toBe(401)
   })
+
+  test('GET pertama kirim ETag + Last-Modified', async () => {
+    const res = await app.handle(new Request(
+      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=deploy`,
+      { headers: authHeader(ownerToken) }
+    ))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('etag')).not.toBe(null)
+    expect(res.headers.get('last-modified')).not.toBe(null)
+    expect(res.headers.get('cache-control')).toBe('private, no-cache')
+  })
+
+  test('If-None-Match cocok → 304 tanpa body', async () => {
+    const first = await app.handle(new Request(
+      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=deploy`,
+      { headers: authHeader(ownerToken) }
+    ))
+    const etag = first.headers.get('etag') ?? ''
+    const res = await app.handle(new Request(
+      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=deploy`,
+      { headers: { ...authHeader(ownerToken), 'If-None-Match': etag } }
+    ))
+    expect(res.status).toBe(304)
+    expect(await res.text()).toBe('')
+  })
+
+  test('ETag per-filename berbeda di entry multi-file', async () => {
+    const a = await app.handle(new Request(
+      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=scripts&filename=a.sh`,
+      { headers: authHeader(ownerToken) }
+    ))
+    const b = await app.handle(new Request(
+      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=scripts&filename=b.sh`,
+      { headers: authHeader(ownerToken) }
+    ))
+    expect(a.headers.get('etag')).not.toBe(b.headers.get('etag'))
+  })
 })

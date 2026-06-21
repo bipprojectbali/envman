@@ -303,3 +303,41 @@ describe('GET /api/envman/aliases/resolve/:ref', () => {
     expect(res.status).toBe(400)
   })
 })
+
+// ─── Conditional caching (ETag / 304) ────────────────────────────────────────
+
+describe('aliases/resolve conditional caching', () => {
+  const url = `http://localhost/api/envman/aliases/resolve/${encodeURIComponent(`${projectSlug}:deploy`)}`
+
+  test('GET pertama kirim ETag + Last-Modified', async () => {
+    const res = await app.handle(new Request(url, { headers: authHeader(ownerToken) }))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('etag')).not.toBe(null)
+    expect(res.headers.get('last-modified')).not.toBe(null)
+    expect(res.headers.get('cache-control')).toBe('private, no-cache')
+  })
+
+  test('If-None-Match cocok → 304 tanpa body', async () => {
+    const first = await app.handle(new Request(url, { headers: authHeader(ownerToken) }))
+    const etag = first.headers.get('etag') ?? ''
+    const res = await app.handle(
+      new Request(url, { headers: { ...authHeader(ownerToken), 'If-None-Match': etag } }),
+    )
+    expect(res.status).toBe(304)
+    expect(await res.text()).toBe('')
+  })
+
+  test('ETag berbeda antar user (hash include userId) — cegah kebocoran cache', async () => {
+    const ownerRes = await app.handle(new Request(url, { headers: authHeader(ownerToken) }))
+    const viewerRes = await app.handle(new Request(url, { headers: authHeader(viewerToken) }))
+    expect(ownerRes.headers.get('etag')).not.toBe(viewerRes.headers.get('etag'))
+  })
+
+  test('ETag user A tidak memicu 304 untuk user B', async () => {
+    const ownerEtag = (await app.handle(new Request(url, { headers: authHeader(ownerToken) }))).headers.get('etag') ?? ''
+    const res = await app.handle(
+      new Request(url, { headers: { ...authHeader(viewerToken), 'If-None-Match': ownerEtag } }),
+    )
+    expect(res.status).toBe(200)
+  })
+})
