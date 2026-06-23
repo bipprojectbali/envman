@@ -301,9 +301,31 @@ model Environment {
   vars    EnvVar[]
   members EnvironmentMember[]
 
+  importsInto EnvImport[] @relation("EnvImportTarget")
+  importedBy  EnvImport[] @relation("EnvImportSource")
+
   @@unique([projectId, name])
   @@index([projectId])
   @@map("environment")
+}
+
+// Live-link import: env target meminjam vars dari source env (lintas project).
+// Vars di-resolve live saat dibaca (bukan snapshot) untuk mencegah drift.
+model EnvImport {
+  id          String   @id @default(uuid())
+  targetEnvId String
+  sourceEnvId String
+  order       Int      @default(0)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  targetEnv Environment @relation("EnvImportTarget", fields: [targetEnvId], references: [id], onDelete: Cascade)
+  sourceEnv Environment @relation("EnvImportSource", fields: [sourceEnvId], references: [id], onDelete: Cascade)
+
+  @@unique([targetEnvId, sourceEnvId])
+  @@index([targetEnvId])
+  @@index([sourceEnvId])
+  @@map("env_import")
 }
 
 model EnvVar {
