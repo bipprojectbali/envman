@@ -533,6 +533,40 @@ server.registerTool(
   },
 )
 
+// ── Env Imports ───────────────────────────────────────────────────────────────
+
+server.registerTool(
+  'stg_envimport_list',
+  {
+    title: '[STG] List env import links',
+    description: 'List live-link imports for a target environment di stg (source envs whose vars it borrows)',
+    inputSchema: { slug: z.string().describe('Target project slug'), envName: z.string().describe('Target environment name') },
+  },
+  async (args) => {
+    try {
+      return ok(await stgCall('envimport_list', args))
+    } catch (e) {
+      return err(String(e))
+    }
+  },
+)
+
+server.registerTool(
+  'stg_envimport_get',
+  {
+    title: '[STG] Get one env import link',
+    description: 'Fetch a single env import link by id di stg, including source env keys (values masked)',
+    inputSchema: { id: z.string().describe('EnvImport id') },
+  },
+  async (args) => {
+    try {
+      return ok(await stgCall('envimport_get', args))
+    } catch (e) {
+      return err(String(e))
+    }
+  },
+)
+
 // ── Project Files ─────────────────────────────────────────────────────────────
 
 server.registerTool(

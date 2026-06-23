@@ -47,6 +47,7 @@ import {
   TbGitCompare,
   TbHistory,
   TbHome,
+  TbLink,
   TbLock,
   TbLockOpen,
   TbPencil,
@@ -66,6 +67,7 @@ import {
 } from 'react-icons/tb'
 import { CodeEditor } from '@/frontend/components/CodeEditor'
 import { CompareModal } from '@/frontend/components/env/CompareModal'
+import { ImportManagerModal } from '@/frontend/components/env/ImportManagerModal'
 import { PortainerSync } from '@/frontend/components/PortainerSync'
 import { PortainerSetupInline } from '@/frontend/components/portainer/PortainerSetupInline'
 import { useExtensions } from '@/frontend/hooks/useExtensions'
@@ -79,6 +81,7 @@ interface EnvSearch {
   editEnv?: boolean
   bulk?: boolean
   addVar?: boolean
+  importMgr?: boolean
 }
 
 const truthy = (v: unknown) => v === true || v === 'true' || v === '1'
@@ -95,6 +98,7 @@ export const Route = createFileRoute('/envmanager/$slug/$env')({
     editEnv: truthy(search.editEnv) ? true : undefined,
     bulk: truthy(search.bulk) ? true : undefined,
     addVar: truthy(search.addVar) ? true : undefined,
+    importMgr: truthy(search.importMgr) ? true : undefined,
   }),
 })
 
@@ -105,6 +109,8 @@ interface EnvVar {
   isSecret: boolean
   isDisabled: boolean
   updatedAt: string
+  imported?: boolean
+  source?: { project: string; env: string }
 }
 
 type FilterType = 'all' | 'plain' | 'secret'
@@ -140,7 +146,13 @@ function VarsPage() {
     editEnv: editEnvSearch,
     bulk: bulkSearch,
     addVar: addVarSearch,
+    importMgr: importMgrSearch,
   } = Route.useSearch()
+  const importMgrOpen = importMgrSearch === true
+  const openImportMgr = () =>
+    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, importMgr: true }), replace: true })
+  const closeImportMgr = () =>
+    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, importMgr: undefined }), replace: true })
   const compareOpen = compareSearch === true
   const openCompare = () =>
     navigate({
@@ -303,8 +315,26 @@ function VarsPage() {
 
   const myRole: string = projectData?.project?.myRole ?? 'VIEWER'
   const canEdit = myRole === 'OWNER' || myRole === 'EDITOR'
+  const isOwner = myRole === 'OWNER'
   const encryptionEnabled: boolean = statusData?.encryptionEnabled ?? false
+  // `vars` = HANYA var lokal — semua logika bulk/export/mutation existing bergantung padanya.
   const vars: EnvVar[] = data?.vars ?? []
+  // Imported vars (live-link) dari server: baris read-only ber-flag source. Key yang sudah
+  // ada lokal sudah di-suppress di server (local menang). Ditampilkan terpisah, di luar `vars`.
+  const importedRows: EnvVar[] = (data?.imported ?? []).map(
+    (v: { key: string; value: string; isSecret: boolean; sourceProject: string; sourceEnv: string }, i: number) => ({
+      id: `imported:${v.sourceProject}:${v.sourceEnv}:${v.key}:${i}`,
+      key: v.key,
+      value: v.value,
+      isSecret: v.isSecret,
+      isDisabled: false,
+      updatedAt: new Date(0).toISOString(),
+      imported: true,
+      source: { project: v.sourceProject, env: v.sourceEnv },
+    }),
+  )
+  const importedKeySet: Set<string> = new Set(data?.importedKeys ?? [])
+  const deniedImports: { project: string; env: string }[] = data?.deniedImports ?? []
   const varsTotal: number = data?.total ?? vars.length
   const varsTotalPages = Math.ceil(varsTotal / VARS_LIMIT)
 
@@ -321,6 +351,22 @@ function VarsPage() {
     if (sort === 'oldest') list.sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())
     return list
   }, [vars, filterType, filterDisabled, sort])
+
+  // Baris imported (read-only) untuk display — terkena filter tipe/search yang sama, tapi
+  // tidak masuk seleksi/bulk/export lokal. filterDisabled='disabled' menyembunyikannya (imported selalu aktif).
+  const importedDisplay: EnvVar[] = (() => {
+    let list = importedRows
+    if (search) {
+      const q = search.toLowerCase()
+      list = list.filter((v) => v.key.toLowerCase().includes(q) || v.value.toLowerCase().includes(q))
+    }
+    if (filterType === 'plain') list = list.filter((v) => !v.isSecret)
+    if (filterType === 'secret') list = list.filter((v) => v.isSecret)
+    if (filterDisabled === 'disabled') list = []
+    if (sort === 'key-asc') list = [...list].sort((a, b) => a.key.localeCompare(b.key))
+    if (sort === 'key-desc') list = [...list].sort((a, b) => b.key.localeCompare(a.key))
+    return list
+  })()
 
   const plainCount = vars.filter((v) => !v.isSecret).length
   const secretCount = vars.filter((v) => v.isSecret).length
@@ -1206,6 +1252,30 @@ function VarsPage() {
         </Alert>
       )}
 
+      {/* ─── Warning import tak terbaca ──────── */}
+      {deniedImports.length > 0 && (
+        <Alert
+          color="yellow"
+          icon={<TbAlertTriangle size={16} />}
+          mb="md"
+          title="Sebagian import tidak terbaca"
+          styles={{ title: { fontSize: 13 } }}
+        >
+          <Text size="xs">
+            Kamu tidak punya akses ke{' '}
+            {deniedImports.map((d, i) => (
+              <span key={`${d.project}:${d.env}`}>
+                <Code fz="xs">
+                  {d.project}:{d.env}
+                </Code>
+                {i < deniedImports.length - 1 ? ', ' : ''}
+              </span>
+            ))}
+            . Var dari sumber tersebut tidak ikut di-resolve. Hubungi OWNER project terkait.
+          </Text>
+        </Alert>
+      )}
+
       {/* ─── Stats inline (flat) ─────────────── */}
       {vars.length > 0 && (
         <Stack gap={4} mb="sm">
@@ -1447,6 +1517,15 @@ function VarsPage() {
           {/* Write actions */}
           {canEdit && (
             <Group gap={4} wrap="nowrap" w="fit-content">
+              {/* Import dari env lain — OWNER saja */}
+              {isOwner && (
+                <Tooltip label="Import vars dari env lain (live-link)">
+                  <ActionIcon size="sm" variant="subtle" color="grape" radius="md" onClick={openImportMgr}>
+                    <TbLink size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+
               {/* .env menu (utility) */}
               <Menu shadow="md" width={220} position="bottom-end">
                 <Menu.Target>
@@ -1571,7 +1650,7 @@ function VarsPage() {
       )}
 
       {/* ─── Empty state ────────────────────── */}
-      {vars.length === 0 ? (
+      {vars.length === 0 && importedRows.length === 0 ? (
         <Box
           p={{ base: 'lg', sm: 'xl' }}
           ta="center"
@@ -1600,7 +1679,7 @@ function VarsPage() {
             </Group>
           )}
         </Box>
-      ) : filteredVars.length === 0 ? (
+      ) : filteredVars.length === 0 && importedDisplay.length === 0 ? (
         <Box
           p="xl"
           ta="center"
@@ -1889,8 +1968,88 @@ function VarsPage() {
             )
           })}
 
+          {importedDisplay.map((v) => (
+            <Box
+              key={v.id}
+              p="sm"
+              style={{
+                borderRadius: 'var(--mantine-radius-md)',
+                border: '1px solid var(--mantine-color-grape-3)',
+                background: 'var(--mantine-color-grape-light)',
+              }}
+            >
+              <Group justify="space-between" mb={6} wrap="nowrap" gap={6}>
+                <Group gap={6} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+                  <Code
+                    fz="xs"
+                    fw={700}
+                    style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}
+                  >
+                    {v.key}
+                  </Code>
+                  {v.isSecret && (
+                    <Badge size="xs" color="red" variant="light" leftSection={<TbLock size={9} />} style={{ flexShrink: 0 }}>
+                      secret
+                    </Badge>
+                  )}
+                </Group>
+                <Badge size="xs" variant="light" color="grape" leftSection={<TbLink size={9} />} style={{ flexShrink: 0 }}>
+                  {v.source?.project}:{v.source?.env}
+                </Badge>
+              </Group>
+              <Box
+                mb="xs"
+                px="xs"
+                py={6}
+                style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 6, minHeight: 32 }}
+              >
+                {v.isSecret ? (
+                  <Group gap={6} justify="space-between" wrap="nowrap">
+                    <Text
+                      fz="xs"
+                      ff="monospace"
+                      c={revealed.has(v.id) ? undefined : 'dimmed'}
+                      style={{ letterSpacing: revealed.has(v.id) ? undefined : 3, userSelect: 'none', flex: 1 }}
+                    >
+                      {revealed.has(v.id) ? v.value : '••••••••••'}
+                    </Text>
+                    {v.value !== '***' && (
+                      <ActionIcon
+                        size={28}
+                        variant="subtle"
+                        color={revealed.has(v.id) ? 'blue' : 'gray'}
+                        onClick={() => toggleReveal(v.id)}
+                        style={{ flexShrink: 0 }}
+                      >
+                        {revealed.has(v.id) ? <TbEyeOff size={14} /> : <TbEye size={14} />}
+                      </ActionIcon>
+                    )}
+                  </Group>
+                ) : (
+                  <Text fz="xs" ff="monospace" style={{ wordBreak: 'break-all' }}>
+                    {v.value || (
+                      <Text span c="dimmed" fs="italic">
+                        (kosong)
+                      </Text>
+                    )}
+                  </Text>
+                )}
+              </Box>
+              <Group gap={4} justify="flex-end" wrap="nowrap">
+                <CopyButton value={toEnvLine(v)}>
+                  {({ copied, copy }) => (
+                    <ActionIcon size={32} variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                      {copied ? <TbCheck size={15} /> : <TbCopy size={15} />}
+                    </ActionIcon>
+                  )}
+                </CopyButton>
+              </Group>
+            </Box>
+          ))}
+
           <Text size="xs" c="dimmed" ta="center" py="xs">
             {filteredVars.length} dari {vars.length} variabel
+            {importedDisplay.length > 0 && ` · ${importedDisplay.length} imported`}
             {activeCount < vars.length && ` · ${disabledCount} disabled`}
           </Text>
         </Stack>
@@ -2109,6 +2268,13 @@ function VarsPage() {
                             off
                           </Badge>
                         )}
+                        {importedKeySet.has(v.key) && (
+                          <Tooltip label="Menimpa var dengan key sama dari env import" position="top">
+                            <Badge size="xs" variant="outline" color="grape" style={{ flexShrink: 0 }}>
+                              overrides
+                            </Badge>
+                          </Tooltip>
+                        )}
                         {canEdit ? (
                           <Tooltip label={v.isSecret ? 'Klik → plain' : 'Klik → secret'} position="right">
                             <Badge
@@ -2228,6 +2394,87 @@ function VarsPage() {
                   </Table.Tr>
                 )
               })}
+              {importedDisplay.map((v) => (
+                <Table.Tr key={v.id} style={{ background: 'var(--mantine-color-grape-light)' }}>
+                  <Table.Td />
+                  <Table.Td>
+                    <Group gap={6} wrap="nowrap">
+                      <Code fz="xs" fw={600} style={{ whiteSpace: 'nowrap' }}>
+                        {v.key}
+                      </Code>
+                      <Tooltip label={`Di-import live dari ${v.source?.project}:${v.source?.env}`} position="right">
+                        <Badge
+                          size="xs"
+                          variant="light"
+                          color="grape"
+                          leftSection={<TbLink size={9} />}
+                          style={{ flexShrink: 0 }}
+                        >
+                          from {v.source?.project}:{v.source?.env}
+                        </Badge>
+                      </Tooltip>
+                      {v.isSecret && (
+                        <Badge size="xs" color="red" variant="light" leftSection={<TbLock size={9} />}>
+                          secret
+                        </Badge>
+                      )}
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    {v.isSecret ? (
+                      <Group gap="xs" wrap="nowrap">
+                        <Text
+                          fz="xs"
+                          ff="monospace"
+                          c={revealed.has(v.id) ? undefined : 'dimmed'}
+                          style={{
+                            letterSpacing: revealed.has(v.id) ? undefined : 3,
+                            userSelect: revealed.has(v.id) ? undefined : 'none',
+                          }}
+                        >
+                          {revealed.has(v.id) ? v.value : '••••••••••'}
+                        </Text>
+                        {v.value !== '***' && (
+                          <Tooltip label={revealed.has(v.id) ? 'Sembunyikan' : 'Tampilkan'}>
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color={revealed.has(v.id) ? 'blue' : 'gray'}
+                              onClick={() => toggleReveal(v.id)}
+                            >
+                              {revealed.has(v.id) ? <TbEyeOff size={12} /> : <TbEye size={12} />}
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                      </Group>
+                    ) : (
+                      <Text fz="xs" ff="monospace" style={{ wordBreak: 'break-all' }}>
+                        {v.value || (
+                          <Text span c="dimmed" fz="xs" fs="italic">
+                            (kosong)
+                          </Text>
+                        )}
+                      </Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Text fz={10} c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                      —
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <CopyButton value={toEnvLine(v)}>
+                      {({ copied, copy }) => (
+                        <Tooltip label={copied ? 'Tersalin!' : 'Copy KEY=value'}>
+                          <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                            {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </CopyButton>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
             </Table.Tbody>
           </Table>
           {filteredVars.length > 0 && (
@@ -2260,6 +2507,9 @@ function VarsPage() {
 
       {/* Compare modal — VIEWER+ */}
       <CompareModal opened={compareOpen} onClose={closeCompare} slug={slug} env={env} canEdit={canEdit} />
+
+      {/* Import manager — OWNER saja */}
+      {isOwner && <ImportManagerModal opened={importMgrOpen} onClose={closeImportMgr} slug={slug} env={env} />}
     </Box>
   )
 }

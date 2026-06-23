@@ -47,6 +47,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`
 - `PortainerConfig` (id, projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?, timestamps)
 - `AppSetting` (key PK, value, updatedAt, updatedById?) — konfigurasi global runtime, diubah via Dev > Settings
 - `Gist` (id, userId, title, description, files Json `[{filename, content, language}]`, isPublic, tags[], timestamps) — snippet multi-file. `isPublic=false` (default) = private milik owner; `isPublic=true` = terlihat user lain. Edit/delete: owner atau SUPER_ADMIN.
+- `EnvImport` (id, targetEnvId, sourceEnvId, order, createdById, createdAt) — unique(targetEnvId, sourceEnvId), index keduanya. Live-link: env target meminjam vars dari source env (boleh lintas project) secara **referensi** (bukan salinan). FK `ON DELETE CASCADE` — source/target env dihapus → link ikut hilang. Lihat section [Env Import](#env-import-reference--live-link).
 
 ### Enums
 
@@ -244,6 +245,43 @@ PUT/DELETE env-member invalidate `cacheKeys.projectAccess(userId, slug)` + `cach
 
 ---
 
+## Env Import (Reference / Live-Link)
+
+Env target bisa **meminjam vars dari env lain** (boleh lintas project) secara **referensi live**, bukan salinan. Tujuan: base ditulis sekali, semua importer ikut otomatis — hindari drift saat key+value terduplikasi antar env/project. Model: `EnvImport` (lihat Schema Models). Resolver: `src/lib/env-import.ts`. CRUD: `src/routes/envman/env-imports.ts`.
+
+### Semantik Resolusi
+
+- **Layered merge**: `imports (urut order asc, order lebih besar menang) → local`. **Var lokal SELALU menang per-key** (sama seperti CLI `-e base -e prod`, stored/last wins). Imported yang key-nya sudah ada lokal di-suppress.
+- **Akses dicek saat resolve, bukan saat setup**. Tiap baca: untuk tiap source env, panggil `getEnvironmentAccess(callerUserId, callerRole, sourceSlug, sourceEnvName)`. `null` (denied) → var source di-skip + dicatat di `deniedImports[]` (warning eksplisit, tidak silent). Konsisten dengan gate alias resolve.
+- **Secret**: reveal/mask pakai akses caller di **SOURCE env** (OWNER/EDITOR reveal, VIEWER → `***`). MASTER_KEY global tunggal → decrypt lintas project valid; gate murni soal authorization.
+- **Cycle detection saat save** (`wouldCreateCycle`): tolak A→B→A (400).
+- **EnvVar `isDisabled` di source di-exclude** dari resolve.
+
+### Permission
+
+- **Buat/hapus link**: hanya **OWNER env target**. Saat membuat, caller juga wajib punya akses **≥VIEWER** ke source env (`getEnvironmentAccess` source ≠ null).
+- Self-import ditolak (400). Duplikat (target+source sama) ditolak (409). `order` = max+1.
+
+### Scope Resolusi (Runtime + UI)
+
+- **`GET vars/export`** (CLI/daemon/pm): merge imported sebagai base layer, local overwrite per-key. Response tambah `deniedImports` **hanya jika non-kosong** (additive; bentuk `vars` tidak berubah).
+- **`GET vars` list** (UI): response tambah field additive `imported[]` (`{key, value, isSecret, sourceProject, sourceEnv}`, sudah exclude key yang ada lokal), `importedKeys[]` (semua key dari import termasuk yang ter-override), `deniedImports[]`. Bentuk `vars`/`total` existing tidak berubah.
+
+### UI
+
+Halaman vars (`envmanager.$slug.$env.tsx`): baris imported render **read-only** (badge grape `from <proj>:<env>`, tanpa edit/delete/toggle, secret tetap bisa reveal sesuai akses). Var lokal yang key-nya ∈ `importedKeys` render badge `overrides`. `deniedImports` → Alert warning kuning. Tombol kelola link (`TbLink`, grape) hanya untuk OWNER → buka `ImportManagerModal` (`src/frontend/components/env/ImportManagerModal.tsx`, state via `?importMgr=true`).
+
+### Audit & Cache
+
+- Audit: `ENV_IMPORT_ADDED` / `ENV_IMPORT_REMOVED` detail `<slug>/<env> <- <srcSlug>/<srcEnv>`.
+- Invalidate `invalidateProjectCaches(slug)` + `cacheKeys.projectDetail(slug)`. **Hasil resolve vars TIDAK di-cache** (env vars tidak boleh di-cache).
+
+### MVP — Deferred (TODO eksplisit)
+
+Per-key filter, transitive import (multi-level), per-import override value — belum diimplementasi.
+
+---
+
 ## API Reference
 
 ### Admin API (SUPER_ADMIN only)
@@ -276,13 +314,15 @@ Auth: session cookie atau `Authorization: Bearer <token>`. `requireEnvAuth()` di
 
 **Projects:** `GET|POST /api/envman/projects`, `PATCH|GET /api/envman/projects/:slug`
 
-**Vars:** `GET /api/envman/projects/:slug/environments/:env/vars` (search, limit, offset) · `GET .../vars/export` (EDITOR+) · `POST|PUT|DELETE .../vars/:key`
+**Vars:** `GET /api/envman/projects/:slug/environments/:env/vars` (search, limit, offset) · `GET .../vars/export` (EDITOR+) · `POST|PUT|DELETE .../vars/:key`. Field additive (env import): `vars` list tambah `imported[]`/`importedKeys[]`/`deniedImports[]`; `vars/export` tambah `deniedImports` (hanya jika non-kosong). Bentuk `vars`/`total` existing tidak berubah — lihat [Env Import](#env-import-reference--live-link).
 
 **Environments:** `POST|DELETE|PATCH /api/envman/projects/:slug/environments[/:env]`
 
 **Members:** `PUT|DELETE /api/envman/projects/:slug/members/:userId/role|member`
 
 **Env Members (OWNER only):** `GET /api/envman/projects/:slug/environments/:envName/members` — list project members + env override (envRole: `inherit`/`denied`/role) + `effectiveRole` · `PUT .../members/:userId` body `{role: 'inherit'|'denied'|'OWNER'|'EDITOR'|'VIEWER'}` · `DELETE .../members/:userId` reset to inherit. Last-owner-of-env protection: tidak bisa demote/deny OWNER terakhir.
+
+**Env Imports (OWNER target only):** `GET /api/envman/projects/:slug/environments/:envName/imports` — list link aktif (`imports[{id, order, sourceProject, sourceProjectName, sourceEnv, createdAt}]`) · `POST .../imports` body `{sourceProject, sourceEnv}` → `{ok, id, order}` (403 non-OWNER target, 403 caller tanpa akses ≥VIEWER source, 400 self-import, 404 source/target tak ada, 409 duplikat, 400 cycle) · `DELETE .../imports/:id` reset link. Lihat section [Env Import](#env-import-reference--live-link). Audit `ENV_IMPORT_ADDED`/`ENV_IMPORT_REMOVED`.
 
 **Access Matrix (OWNER only):** `GET /api/envman/projects/:slug/access-matrix` — single fetch berisi `{project, environments[], members[{userId, user, projectRole, envAccess: {[envName]: {envRole, effectiveRole}}}]}`. Cached 60s (`cacheKeys.projectAccessMatrix`), auto-invalidate via `invalidateProjectCaches()`. Bulk action di FE pakai fan-out `Promise.allSettled` atas endpoint PATCH/PUT existing — last-owner protection berlaku per-item, partial failure di-aggregate ke notification (`src/frontend/lib/bulk.ts`).
 
@@ -495,6 +535,8 @@ Client singleton: `src/lib/redis.ts` → `REDIS_URL`. App logs: Redis List `app:
 ### Local MCP Server (dev tools)
 
 `.mcp.json` registers `app-mcp` (`scripts/mcp/server.ts`) + `playwright`. Tools: `scripts/mcp/tools/`. `MCP_SECRET` = readonly, `MCP_SECRET_ADMIN` = write + dev automation.
+
+Env import tools (`scripts/mcp/tools/env-imports.ts`): readonly `envimport_list`/`envimport_get`, admin `envimport_create`/`envimport_delete`. Stg readonly counterpart (`scripts/mcp/debug-stg.ts`): `stg_envimport_list`/`stg_envimport_get`.
 
 ### Dev Tools
 

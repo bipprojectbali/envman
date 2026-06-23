@@ -4,6 +4,7 @@ import { requireEnvAuth } from '../../lib/auth-middleware'
 import { cacheKeys, invalidateProjectCaches, withCache } from '../../lib/cache'
 import { decryptSecret, encryptSecret } from '../../lib/crypto'
 import { prisma } from '../../lib/db'
+import { resolveImportedVars } from '../../lib/env-import'
 import { notDeleted, softDelete } from '../../lib/db-helpers'
 import { parsePagination } from '../../lib/pagination'
 import { hasCapability } from '../../lib/permissions'
@@ -528,7 +529,15 @@ export const projectsRouter = new Elysia()
       updatedAt: v.updatedAt,
       value: v.isSecret ? (canReadSecrets ? decryptSecret(v.value) : '***') : v.value,
     }))
-    return { vars, total, limit, offset, hasMore: offset + limit < total }
+
+    // Resolve imported vars (live-link). Local var menang per-key: imported yang key-nya
+    // sudah ada lokal di-suppress. `importedKeys` (semua key dari import, termasuk yang
+    // overridden) dikirim agar FE bisa badge local var "overrides import".
+    const { vars: importedRaw, deniedImports } = await resolveImportedVars(caller.userId, caller.role, environment.id)
+    const localKeys = new Set((await prisma.envVar.findMany({ where: { environmentId: environment.id }, select: { key: true } })).map((v) => v.key))
+    const importedKeys = [...new Set(importedRaw.map((v) => v.key))]
+    const imported = importedRaw.filter((v) => !localKeys.has(v.key))
+    return { vars, total, limit, offset, hasMore: offset + limit < total, imported, importedKeys, deniedImports }
   })
 
   .get('/api/envman/projects/:slug/environments/:envName/vars/export', async ({ request, params, set }) => {
@@ -561,11 +570,14 @@ export const projectsRouter = new Elysia()
     }
     // Mask secret untuk VIEWER (konsisten dengan GET vars). Hanya EDITOR/OWNER yang bisa export secret plaintext.
     const canReadSecrets = access === 'OWNER' || access === 'EDITOR'
-    const vars = Object.fromEntries(
-      environment.vars
-        .filter((v) => !v.isDisabled)
-        .map((v) => [v.key, v.isSecret ? (canReadSecrets ? decryptSecret(v.value) : '***') : v.value]),
-    )
+    // Layered merge: imported (urut order, higher order menang) → local. Local SELALU menang per-key.
+    const { vars: importedVars, deniedImports } = await resolveImportedVars(caller.userId, caller.role, environment.id)
+    const vars: Record<string, string> = {}
+    for (const v of importedVars) vars[v.key] = v.value
+    for (const v of environment.vars) {
+      if (v.isDisabled) continue
+      vars[v.key] = v.isSecret ? (canReadSecrets ? decryptSecret(v.value) : '***') : v.value
+    }
     if (caller.tokenId) {
       logTokenActivity({
         tokenId: caller.tokenId,
@@ -580,7 +592,7 @@ export const projectsRouter = new Elysia()
           undefined,
       })
     }
-    return { vars }
+    return deniedImports.length > 0 ? { vars, deniedImports } : { vars }
   })
 
   .put('/api/envman/projects/:slug/environments/:envName/vars', async ({ request, params, set }) => {
