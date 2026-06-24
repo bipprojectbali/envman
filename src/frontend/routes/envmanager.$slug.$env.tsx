@@ -1937,15 +1937,18 @@ function VarsPage() {
                   </Text>
                 </Group>
 
-                {/* Baris 2: value box */}
+                {/* Baris 2: value box — double-click untuk edit (var lokal, canEdit) */}
                 <Box
                   mb="xs"
                   px="xs"
                   py={6}
+                  onDoubleClick={canEdit ? () => startEdit(v) : undefined}
+                  title={canEdit ? 'Double-click untuk edit' : undefined}
                   style={{
                     background: 'var(--mantine-color-default-hover)',
                     borderRadius: 6,
                     minHeight: 32,
+                    cursor: canEdit ? 'pointer' : undefined,
                   }}
                 >
                   {v.isSecret ? (
@@ -1967,6 +1970,7 @@ function VarsPage() {
                         variant="subtle"
                         color={revealed.has(v.id) ? 'blue' : 'gray'}
                         onClick={() => toggleReveal(v.id)}
+                        onDoubleClick={(e) => e.stopPropagation()}
                         style={{ flexShrink: 0 }}
                       >
                         {revealed.has(v.id) ? <TbEyeOff size={14} /> : <TbEye size={14} />}
@@ -2357,7 +2361,11 @@ function VarsPage() {
                         ) : null}
                       </Group>
                     </Table.Td>
-                    <Table.Td>
+                    <Table.Td
+                      onDoubleClick={canEdit ? () => startEdit(v) : undefined}
+                      title={canEdit ? 'Double-click untuk edit' : undefined}
+                      style={{ cursor: canEdit ? 'pointer' : undefined }}
+                    >
                       <Group gap="xs" wrap="nowrap">
                         {v.isSecret ? (
                           <>
@@ -2378,6 +2386,7 @@ function VarsPage() {
                                 variant="subtle"
                                 color={revealed.has(v.id) ? 'blue' : 'gray'}
                                 onClick={() => toggleReveal(v.id)}
+                                onDoubleClick={(e) => e.stopPropagation()}
                               >
                                 {revealed.has(v.id) ? <TbEyeOff size={12} /> : <TbEye size={12} />}
                               </ActionIcon>
