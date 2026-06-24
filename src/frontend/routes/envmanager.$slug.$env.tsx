@@ -47,6 +47,7 @@ import {
   TbGitCompare,
   TbHistory,
   TbHome,
+  TbKey,
   TbLink,
   TbLock,
   TbLockOpen,
@@ -72,6 +73,7 @@ import { PortainerSync } from '@/frontend/components/PortainerSync'
 import { PortainerSetupInline } from '@/frontend/components/portainer/PortainerSetupInline'
 import { useExtensions } from '@/frontend/hooks/useExtensions'
 import { apiFetch } from '@/frontend/lib/api'
+import { toEnvLine, toEnvText, toKeyTemplate } from '@/frontend/lib/env-clipboard'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 
 interface EnvSearch {
@@ -275,6 +277,7 @@ function VarsPage() {
   const VARS_LIMIT = 50
   const [copiedAll, setCopiedAll] = useState(false)
   const [copiedSelected, setCopiedSelected] = useState(false)
+  const [copiedKeys, setCopiedKeys] = useState(false)
 
   // queries
   const { data: projectData } = useQuery({
@@ -373,12 +376,6 @@ function VarsPage() {
   const disabledCount = vars.filter((v) => v.isDisabled).length
   const activeCount = vars.filter((v) => !v.isDisabled).length
 
-  const toEnvLine = (v: EnvVar) => {
-    const val = v.value === '***' ? '***' : v.value
-    const needsQuotes = val.includes(' ') || val.includes('#') || val.includes('"') || val.includes("'")
-    return needsQuotes ? `${v.key}="${val.replace(/"/g, '\\"')}"` : `${v.key}=${val}`
-  }
-  const toEnvText = (list: EnvVar[]) => list.map(toEnvLine).join('\n')
   const copyToClipboard = (text: string, setCopied: (v: boolean) => void) =>
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
@@ -1454,10 +1451,10 @@ function VarsPage() {
                       <ActionIcon
                         size="sm"
                         variant="subtle"
-                        color={copiedAll || copiedSelected ? 'teal' : 'gray'}
+                        color={copiedAll || copiedSelected || copiedKeys ? 'teal' : 'gray'}
                         radius="md"
                       >
-                        {copiedAll || copiedSelected ? <TbCheck size={14} /> : <TbCopy size={14} />}
+                        {copiedAll || copiedSelected || copiedKeys ? <TbCheck size={14} /> : <TbCopy size={14} />}
                       </ActionIcon>
                     </Tooltip>
                   </Menu.Target>
@@ -1500,6 +1497,46 @@ function VarsPage() {
                       }
                     >
                       Yang dipilih
+                    </Menu.Item>
+                    <Menu.Divider />
+                    <Menu.Label>Export hanya key (KEY=)</Menu.Label>
+                    <Menu.Item
+                      leftSection={<TbKey size={14} />}
+                      rightSection={
+                        <Badge size="xs" variant="light" color="grape">
+                          {vars.length}
+                        </Badge>
+                      }
+                      onClick={() => copyToClipboard(toKeyTemplate(vars), setCopiedKeys)}
+                    >
+                      Semua key
+                    </Menu.Item>
+                    {filteredVars.length < vars.length && (
+                      <Menu.Item
+                        leftSection={<TbKey size={14} />}
+                        rightSection={
+                          <Badge size="xs" variant="light" color="grape">
+                            {filteredVars.length}
+                          </Badge>
+                        }
+                        onClick={() => copyToClipboard(toKeyTemplate(filteredVars), setCopiedKeys)}
+                      >
+                        Key hasil filter
+                      </Menu.Item>
+                    )}
+                    <Menu.Item
+                      leftSection={<TbKey size={14} />}
+                      rightSection={
+                        <Badge size="xs" variant="light" color={selectedIds.size > 0 ? 'grape' : 'gray'}>
+                          {selectedIds.size}
+                        </Badge>
+                      }
+                      disabled={selectedIds.size === 0}
+                      onClick={() =>
+                        copyToClipboard(toKeyTemplate(vars.filter((v) => selectedIds.has(v.id))), setCopiedKeys)
+                      }
+                    >
+                      Key yang dipilih
                     </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
@@ -1642,6 +1679,17 @@ function VarsPage() {
             >
               {copiedSelected ? 'Tersalin!' : 'Copy .env'}
             </Button>
+            <Tooltip label="Salin hanya key (KEY=) — untuk dibagikan tanpa value">
+              <Button
+                size="xs"
+                variant="light"
+                color="grape"
+                leftSection={copiedKeys ? <TbCheck size={12} /> : <TbKey size={12} />}
+                onClick={() => copyToClipboard(toKeyTemplate(vars.filter((v) => selectedIds.has(v.id))), setCopiedKeys)}
+              >
+                {copiedKeys ? 'Tersalin!' : 'Copy keys'}
+              </Button>
+            </Tooltip>
             <Button size="xs" variant="subtle" color="gray" onClick={clearSelection} leftSection={<TbX size={11} />}>
               Batal
             </Button>
