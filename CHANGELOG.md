@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-06-24
+
+### Added
+- **Copy hanya key (`.env.example` template)**: salin daftar key tanpa value (format `KEY=`, paste-ready) untuk membagikan kebutuhan env tanpa membocorkan nilai. Tersedia di selection bar ("Copy keys") dan menu export (semua key / key hasil filter / key yang dipilih).
+- **Double-click value untuk edit**: klik-ganda pada kolom value sebuah var lokal langsung masuk mode edit (desktop & mobile), mempercepat penyuntingan. Hanya untuk EDITOR/OWNER dan var lokal — baris imported tetap read-only.
+
+## [0.13.0] - 2026-06-23
+
 ### Added
 - **Env Import (Reference / Live-Link)**: env target bisa meminjam vars dari env lain (boleh lintas project) secara **referensi live**, bukan salinan — base ditulis sekali, semua importer ikut otomatis (hindari drift). Resolusi berlapis `imports (order asc) → local`, **var lokal selalu menang per-key**. Akses source dicek **saat resolve** (denied → var di-skip + warning `deniedImports`, tidak silent); secret reveal/mask ikut akses caller di env source. Cycle detection saat save. Buat/hapus link hanya untuk **OWNER env target** yang juga punya akses ≥VIEWER ke source. UI: baris imported read-only berbadge `from <proj>:<env>`, badge `overrides` pada var lokal yang menimpa, modal kelola link (OWNER). MVP belum mencakup per-key filter / transitive import / per-import override.
 
