@@ -1293,8 +1293,7 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
           </Text>
           <Text size="xs">
             Bun scripts (.ts / .js) otomatis install npm packages saat dijalankan — tidak perlu{' '}
-            <Code fz="xs">bun install</Code>. Pin versi inline:{' '}
-            <Code fz="xs">{'import { z } from "zod@^3.22"'}</Code>
+            <Code fz="xs">bun install</Code>. Pin versi inline: <Code fz="xs">{'import { z } from "zod@^3.22"'}</Code>
           </Text>
         </Stack>
       </Alert>

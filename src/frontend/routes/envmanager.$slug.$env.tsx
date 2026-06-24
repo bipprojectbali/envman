@@ -2040,12 +2040,24 @@ function VarsPage() {
                     {v.key}
                   </Code>
                   {v.isSecret && (
-                    <Badge size="xs" color="red" variant="light" leftSection={<TbLock size={9} />} style={{ flexShrink: 0 }}>
+                    <Badge
+                      size="xs"
+                      color="red"
+                      variant="light"
+                      leftSection={<TbLock size={9} />}
+                      style={{ flexShrink: 0 }}
+                    >
                       secret
                     </Badge>
                   )}
                 </Group>
-                <Badge size="xs" variant="light" color="grape" leftSection={<TbLink size={9} />} style={{ flexShrink: 0 }}>
+                <Badge
+                  size="xs"
+                  variant="light"
+                  color="grape"
+                  leftSection={<TbLink size={9} />}
+                  style={{ flexShrink: 0 }}
+                >
                   {v.source?.project}:{v.source?.env}
                 </Badge>
               </Group>

@@ -4,8 +4,8 @@ import { requireEnvAuth } from '../../lib/auth-middleware'
 import { cacheKeys, invalidateProjectCaches, withCache } from '../../lib/cache'
 import { decryptSecret, encryptSecret } from '../../lib/crypto'
 import { prisma } from '../../lib/db'
-import { resolveImportedVars } from '../../lib/env-import'
 import { notDeleted, softDelete } from '../../lib/db-helpers'
+import { resolveImportedVars } from '../../lib/env-import'
 import { parsePagination } from '../../lib/pagination'
 import { hasCapability } from '../../lib/permissions'
 import { logTokenActivity } from '../../lib/token-activity'
@@ -534,7 +534,11 @@ export const projectsRouter = new Elysia()
     // sudah ada lokal di-suppress. `importedKeys` (semua key dari import, termasuk yang
     // overridden) dikirim agar FE bisa badge local var "overrides import".
     const { vars: importedRaw, deniedImports } = await resolveImportedVars(caller.userId, caller.role, environment.id)
-    const localKeys = new Set((await prisma.envVar.findMany({ where: { environmentId: environment.id }, select: { key: true } })).map((v) => v.key))
+    const localKeys = new Set(
+      (await prisma.envVar.findMany({ where: { environmentId: environment.id }, select: { key: true } })).map(
+        (v) => v.key,
+      ),
+    )
     const importedKeys = [...new Set(importedRaw.map((v) => v.key))]
     const imported = importedRaw.filter((v) => !localKeys.has(v.key))
     return { vars, total, limit, offset, hasMore: offset + limit < total, imported, importedKeys, deniedImports }
