@@ -39,6 +39,24 @@ export function tagColor(tag: string): string {
   return TAG_COLORS[h % TAG_COLORS.length]
 }
 
+export const SLUG_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/
+
+export function groupByPrimaryTag<T extends { tags?: string[] | null }>(items: T[]): { tag: string | null; items: T[] }[] {
+  const map = new Map<string, T[]>()
+  const noTag: T[] = []
+  for (const item of items) {
+    const tag = item.tags?.[0] ?? null
+    if (tag === null) noTag.push(item)
+    else {
+      if (!map.has(tag)) map.set(tag, [])
+      map.get(tag)!.push(item)
+    }
+  }
+  const result: { tag: string | null; items: T[] }[] = [...map.entries()].map(([tag, items]) => ({ tag, items }))
+  if (noTag.length > 0) result.push({ tag: null, items: noTag })
+  return result
+}
+
 export function relativeDate(iso?: string): string {
   if (!iso) return ''
   const ms = Date.now() - new Date(iso).getTime()
