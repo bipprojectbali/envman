@@ -9,26 +9,14 @@ export const connectionsStacksRouter = new Elysia()
 
   .get('/api/envman/portainer/connections/:id/stacks', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
-    if (!caller) {
-      set.status = 401
-      return { error: 'Unauthorized' }
-    }
-    if (!hasCapability(caller, 'stack:operate')) {
-      set.status = 403
-      return { error: 'Tidak punya izin operate stack.' }
-    }
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin operate stack.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-    if (!conn) {
-      set.status = 404
-      return { error: 'Connection not found' }
-    }
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
     try {
       const res = await fetch(`${url}/api/stacks`, { headers: { 'X-API-Key': conn.apiToken } })
-      if (!res.ok) {
-        set.status = 400
-        return { error: `Portainer error ${res.status}: ${await res.text()}` }
-      }
+      if (!res.ok) { set.status = 400; return { error: `Portainer error ${res.status}: ${await res.text()}` } }
       const rawStacks = (await res.json()) as any[]
       const configs = await prisma.portainerConfig.findMany({
         where: { connectionId: params.id },
@@ -64,27 +52,15 @@ export const connectionsStacksRouter = new Elysia()
 
   .get('/api/envman/portainer/connections/:id/stacks/:stackId/status', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
-    if (!caller) {
-      set.status = 401
-      return { error: 'Unauthorized' }
-    }
-    if (!hasCapability(caller, 'stack:operate')) {
-      set.status = 403
-      return { error: 'Tidak punya izin operate stack.' }
-    }
+    if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+    if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin operate stack.' } }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-    if (!conn) {
-      set.status = 404
-      return { error: 'Connection not found' }
-    }
+    if (!conn) { set.status = 404; return { error: 'Connection not found' } }
     const url = conn.portainerUrl.replace(/\/$/, '')
     const stackId = Number(params.stackId)
     try {
       const stackRes = await fetch(`${url}/api/stacks/${stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
-      if (!stackRes.ok) {
-        set.status = 400
-        return { error: `Portainer error ${stackRes.status}` }
-      }
+      if (!stackRes.ok) { set.status = 400; return { error: `Portainer error ${stackRes.status}` } }
       const stack = (await stackRes.json()) as any
       appLog(
         'info',
@@ -139,25 +115,13 @@ export const connectionsStacksRouter = new Elysia()
     '/api/envman/portainer/connections/:id/stacks/:stackId/logs/:containerId',
     async ({ request, params, query, set }) => {
       const caller = await requireEnvAuth(request)
-      if (!caller) {
-        set.status = 401
-        return { error: 'Unauthorized' }
-      }
-      if (!hasCapability(caller, 'stack:operate')) {
-        set.status = 403
-        return { error: 'Tidak punya izin lihat logs.' }
-      }
+      if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+      if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin lihat logs.' } }
       const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-      if (!conn) {
-        set.status = 404
-        return { error: 'Connection not found' }
-      }
+      if (!conn) { set.status = 404; return { error: 'Connection not found' } }
       const url = conn.portainerUrl.replace(/\/$/, '')
       const stackRes = await fetch(`${url}/api/stacks/${params.stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
-      if (!stackRes.ok) {
-        set.status = 400
-        return { error: `Stack not found` }
-      }
+      if (!stackRes.ok) { set.status = 400; return { error: 'Stack not found' } }
       const stack = (await stackRes.json()) as any
       const tail = Math.min(Number((query as any).tail) || 200, 1000)
       const stdout = (query as any).stdout !== '0' ? 1 : 0
@@ -176,10 +140,7 @@ export const connectionsStacksRouter = new Elysia()
           `${url}/api/endpoints/${stack.EndpointId}/docker/containers/${params.containerId}/logs?${qs}`,
           { headers: { 'X-API-Key': conn.apiToken } },
         )
-        if (!res.ok) {
-          set.status = 400
-          return { error: `Logs error ${res.status}: ${await res.text()}` }
-        }
+        if (!res.ok) { set.status = 400; return { error: `Logs error ${res.status}: ${await res.text()}` } }
         const buf = Buffer.from(await res.arrayBuffer())
         const lines = parseDockerLogStream(buf, timestamps === 1)
         return { lines, total: lines.length }
@@ -190,114 +151,24 @@ export const connectionsStacksRouter = new Elysia()
     },
   )
 
-  .get('/api/envman/portainer/connections/:id/stacks/:stackId/file', async ({ request, params, set }) => {
-    const caller = await requireEnvAuth(request)
-    if (!caller) {
-      set.status = 401
-      return { error: 'Unauthorized' }
-    }
-    if (!hasCapability(caller, 'stack:operate')) {
-      set.status = 403
-      return { error: 'Tidak punya izin lihat compose file.' }
-    }
-    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-    if (!conn) {
-      set.status = 404
-      return { error: 'Connection not found' }
-    }
-    const url = conn.portainerUrl.replace(/\/$/, '')
-    try {
-      const res = await fetch(`${url}/api/stacks/${params.stackId}/file`, { headers: { 'X-API-Key': conn.apiToken } })
-      if (!res.ok) {
-        set.status = 400
-        return { error: `Portainer error ${res.status}` }
-      }
-      const data = (await res.json()) as any
-      return { content: data.StackFileContent ?? '' }
-    } catch (e) {
-      set.status = 500
-      return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
-    }
-  })
-
-  .put('/api/envman/portainer/connections/:id/stacks/:stackId/file', async ({ request, params, set }) => {
-    const caller = await requireEnvAuth(request)
-    if (!caller) {
-      set.status = 401
-      return { error: 'Unauthorized' }
-    }
-    if (!hasCapability(caller, 'stack:mutate')) {
-      set.status = 403
-      return { error: 'Tidak punya izin edit compose file.' }
-    }
-    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-    if (!conn) {
-      set.status = 404
-      return { error: 'Connection not found' }
-    }
-    const url = conn.portainerUrl.replace(/\/$/, '')
-    const body = (await request.json().catch(() => null)) as any
-    if (!body?.content) {
-      set.status = 400
-      return { error: 'content required' }
-    }
-    try {
-      const stackRes = await fetch(`${url}/api/stacks/${params.stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
-      if (!stackRes.ok) {
-        set.status = 400
-        return { error: `Stack not found` }
-      }
-      const stack = (await stackRes.json()) as any
-      const res = await fetch(`${url}/api/stacks/${params.stackId}?endpointId=${stack.EndpointId}`, {
-        method: 'PUT',
-        headers: { 'X-API-Key': conn.apiToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ StackFileContent: body.content, Env: stack.Env ?? [], Prune: false, PullImage: false }),
-      })
-      if (!res.ok) {
-        set.status = 400
-        return { error: `Save failed: ${res.status} ${await res.text()}` }
-      }
-      appLog('info', `[portainer:compose-save] connection=${conn.name} stack=${params.stackId}`)
-      return { ok: true }
-    } catch (e) {
-      set.status = 500
-      return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
-    }
-  })
-
   .post(
     '/api/envman/portainer/connections/:id/stacks/:stackId/containers/:containerId/restart',
     async ({ request, params, set }) => {
       const caller = await requireEnvAuth(request)
-      if (!caller) {
-        set.status = 401
-        return { error: 'Unauthorized' }
-      }
-      if (!hasCapability(caller, 'stack:mutate')) {
-        set.status = 403
-        return { error: 'Tidak punya izin restart container.' }
-      }
+      if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+      if (!hasCapability(caller, 'stack:mutate')) { set.status = 403; return { error: 'Tidak punya izin restart container.' } }
       const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-      if (!conn) {
-        set.status = 404
-        return { error: 'Connection not found' }
-      }
+      if (!conn) { set.status = 404; return { error: 'Connection not found' } }
       const url = conn.portainerUrl.replace(/\/$/, '')
       try {
         const stackRes = await fetch(`${url}/api/stacks/${params.stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
-        if (!stackRes.ok) {
-          set.status = 400
-          return { error: `Stack not found` }
-        }
+        if (!stackRes.ok) { set.status = 400; return { error: 'Stack not found' } }
         const stack = (await stackRes.json()) as any
         const res = await fetch(
           `${url}/api/endpoints/${stack.EndpointId}/docker/containers/${params.containerId}/restart`,
           { method: 'POST', headers: { 'X-API-Key': conn.apiToken } },
         )
-        if (!res.ok) {
-          set.status = 400
-          return { error: `Restart failed: ${res.status}` }
-        }
+        if (!res.ok) { set.status = 400; return { error: `Restart failed: ${res.status}` } }
         appLog('info', `[portainer:restart] connection=${conn.name} container=${params.containerId.slice(0, 12)}`)
         return { ok: true }
       } catch (e) {
@@ -311,35 +182,20 @@ export const connectionsStacksRouter = new Elysia()
     '/api/envman/portainer/connections/:id/stacks/:stackId/containers/:containerId/stats',
     async ({ request, params, set }) => {
       const caller = await requireEnvAuth(request)
-      if (!caller) {
-        set.status = 401
-        return { error: 'Unauthorized' }
-      }
-      if (!hasCapability(caller, 'stack:operate')) {
-        set.status = 403
-        return { error: 'Tidak punya izin lihat container stats.' }
-      }
+      if (!caller) { set.status = 401; return { error: 'Unauthorized' } }
+      if (!hasCapability(caller, 'stack:operate')) { set.status = 403; return { error: 'Tidak punya izin lihat container stats.' } }
       const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-      if (!conn) {
-        set.status = 404
-        return { error: 'Connection not found' }
-      }
+      if (!conn) { set.status = 404; return { error: 'Connection not found' } }
       const url = conn.portainerUrl.replace(/\/$/, '')
       try {
         const stackRes = await fetch(`${url}/api/stacks/${params.stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
-        if (!stackRes.ok) {
-          set.status = 400
-          return { error: `Stack not found` }
-        }
+        if (!stackRes.ok) { set.status = 400; return { error: 'Stack not found' } }
         const stack = (await stackRes.json()) as any
         const res = await fetch(
           `${url}/api/endpoints/${stack.EndpointId}/docker/containers/${params.containerId}/stats?stream=false`,
           { headers: { 'X-API-Key': conn.apiToken } },
         )
-        if (!res.ok) {
-          set.status = 400
-          return { error: `Stats error ${res.status}` }
-        }
+        if (!res.ok) { set.status = 400; return { error: `Stats error ${res.status}` } }
         const s = (await res.json()) as any
         const cpuDelta = (s.cpu_stats?.cpu_usage?.total_usage ?? 0) - (s.precpu_stats?.cpu_usage?.total_usage ?? 0)
         const systemDelta = (s.cpu_stats?.system_cpu_usage ?? 0) - (s.precpu_stats?.system_cpu_usage ?? 0)
@@ -368,122 +224,3 @@ export const connectionsStacksRouter = new Elysia()
       }
     },
   )
-
-  .get('/api/envman/portainer/connections/:id/health', async ({ request, params, set }) => {
-    const caller = await requireEnvAuth(request)
-    if (!caller) {
-      set.status = 401
-      return { error: 'Unauthorized' }
-    }
-    if (!hasCapability(caller, 'connection:view')) {
-      set.status = 403
-      return { error: 'Tidak punya izin lihat connection health.' }
-    }
-    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-    if (!conn) {
-      set.status = 404
-      return { error: 'Connection not found' }
-    }
-    const url = conn.portainerUrl.replace(/\/$/, '')
-    try {
-      const res = await fetch(`${url}/api/stacks`, { headers: { 'X-API-Key': conn.apiToken } })
-      if (!res.ok) {
-        set.status = 400
-        return { error: `Portainer error ${res.status}` }
-      }
-      const stacks = (await res.json()) as any[]
-      const activeStacks = stacks.filter((s) => s.Status === 1).length
-      return { totalStacks: stacks.length, activeStacks, inactiveStacks: stacks.length - activeStacks }
-    } catch (e) {
-      set.status = 500
-      return { error: `Failed: ${e instanceof Error ? e.message : String(e)}` }
-    }
-  })
-
-  .post('/api/envman/portainer/connections/:id/stacks/:stackId/repull', async ({ request, params, set }) => {
-    const caller = await requireEnvAuth(request)
-    if (!caller) {
-      set.status = 401
-      return { error: 'Unauthorized' }
-    }
-    if (!hasCapability(caller, 'stack:mutate')) {
-      set.status = 403
-      return { error: 'Tidak punya izin repull image.' }
-    }
-    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-    if (!conn) {
-      set.status = 404
-      return { error: 'Connection not found' }
-    }
-    const url = conn.portainerUrl.replace(/\/$/, '')
-    const stackId = Number(params.stackId)
-    try {
-      const fileRes = await fetch(`${url}/api/stacks/${stackId}/file`, { headers: { 'X-API-Key': conn.apiToken } })
-      if (!fileRes.ok) {
-        set.status = 400
-        return { error: `Stack file error ${fileRes.status}` }
-      }
-      const { StackFileContent } = (await fileRes.json()) as { StackFileContent: string }
-      const stackRes = await fetch(`${url}/api/stacks/${stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
-      const stackData = stackRes.ok ? ((await stackRes.json()) as any) : { Env: [], EndpointId: 1 }
-      const res = await fetch(`${url}/api/stacks/${stackId}?endpointId=${stackData.EndpointId}`, {
-        method: 'PUT',
-        headers: { 'X-API-Key': conn.apiToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ StackFileContent, Env: stackData.Env ?? [], Prune: false, PullImage: true }),
-      })
-      if (!res.ok) {
-        set.status = 400
-        return { error: `Repull failed: ${res.status} ${await res.text()}` }
-      }
-      appLog('info', `Portainer repull via connection ${conn.name}: stack ${stackId}`)
-      return { ok: true, stackName: stackData.Name }
-    } catch (e) {
-      set.status = 500
-      return { error: `Repull failed: ${e instanceof Error ? e.message : String(e)}` }
-    }
-  })
-
-  .post('/api/envman/portainer/connections/:id/stacks/:stackId/recreate', async ({ request, params, set }) => {
-    const caller = await requireEnvAuth(request)
-    if (!caller) {
-      set.status = 401
-      return { error: 'Unauthorized' }
-    }
-    if (!hasCapability(caller, 'stack:mutate')) {
-      set.status = 403
-      return { error: 'Tidak punya izin recreate stack.' }
-    }
-    const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
-    if (!conn) {
-      set.status = 404
-      return { error: 'Connection not found' }
-    }
-    const url = conn.portainerUrl.replace(/\/$/, '')
-    const stackId = Number(params.stackId)
-    try {
-      const stackRes = await fetch(`${url}/api/stacks/${stackId}`, { headers: { 'X-API-Key': conn.apiToken } })
-      const stackData = stackRes.ok ? ((await stackRes.json()) as any) : { EndpointId: 1, Name: String(stackId) }
-      const endpointId = stackData.EndpointId ?? 1
-      const stopRes = await fetch(`${url}/api/stacks/${stackId}/stop?endpointId=${endpointId}`, {
-        method: 'POST',
-        headers: { 'X-API-Key': conn.apiToken },
-      })
-      if (!stopRes.ok) {
-        set.status = 400
-        return { error: `Stop failed: ${stopRes.status}` }
-      }
-      const startRes = await fetch(`${url}/api/stacks/${stackId}/start?endpointId=${endpointId}`, {
-        method: 'POST',
-        headers: { 'X-API-Key': conn.apiToken },
-      })
-      if (!startRes.ok) {
-        set.status = 400
-        return { error: `Start failed: ${startRes.status}` }
-      }
-      appLog('info', `Portainer recreate via connection ${conn.name}: stack ${stackId}`)
-      return { ok: true, stackName: stackData.Name }
-    } catch (e) {
-      set.status = 500
-      return { error: `Recreate failed: ${e instanceof Error ? e.message : String(e)}` }
-    }
-  })
