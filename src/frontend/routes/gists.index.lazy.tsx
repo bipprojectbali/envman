@@ -1,7 +1,6 @@
 import {
   ActionIcon,
   Box,
-  Button,
   Container,
   Group,
   Skeleton,
@@ -9,27 +8,18 @@ import {
   Text,
   TextInput,
   ThemeIcon,
-  Tooltip,
 } from '@mantine/core'
 import { useDebouncedValue } from '@mantine/hooks'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
-import {
-  TbBrandGithub,
-  TbLayoutDashboard,
-  TbLogin,
-  TbSearch,
-  TbX,
-} from 'react-icons/tb'
-import { ThemeToggle } from '@/frontend/components/ThemeToggle'
+import { TbBrandGithub, TbSearch, TbX } from 'react-icons/tb'
 import { type PublicGist, GistPublicCard } from '@/frontend/components/gists/GistPublicCard'
-import { getDefaultRoute, useSession } from '@/frontend/hooks/useAuth'
+import { GistPublicNavbar } from '@/frontend/components/gists/GistPublicNavbar'
 
 export const Route = createLazyFileRoute('/gists/')({ component: PublicGistsPage })
 
 function PublicGistsPage() {
-  const { data: session } = useSession()
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [debouncedQ] = useDebouncedValue(q, 300)
@@ -65,50 +55,9 @@ function PublicGistsPage() {
 
   const gists = data?.pages.flatMap((p) => p.gists) ?? []
 
-  const handleNav = () => {
-    if (session?.user) navigate({ to: getDefaultRoute(session.user.role) })
-    else navigate({ to: '/login' })
-  }
-
   return (
     <Box style={{ minHeight: '100vh', background: 'var(--mantine-color-body)' }}>
-      {/* Navbar */}
-      <Box
-        style={{
-          borderBottom: '1px solid var(--mantine-color-default-border)',
-          background: 'var(--mantine-color-body)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        <Container size="lg" py="xs">
-          <Group justify="space-between">
-            <Group gap="xs" style={{ cursor: 'pointer' }} onClick={() => navigate({ to: '/gists' })}>
-              <ThemeIcon size={28} variant="gradient" radius="md">
-                <TbBrandGithub size={14} />
-              </ThemeIcon>
-              <Text fw={800} size="sm">
-                Public Gists
-              </Text>
-            </Group>
-            <Group gap="xs">
-              <ThemeToggle size="sm" />
-              {session?.user ? (
-                <Tooltip label="Go to dashboard">
-                  <ActionIcon variant="subtle" color="gray" onClick={handleNav}>
-                    <TbLayoutDashboard size={16} />
-                  </ActionIcon>
-                </Tooltip>
-              ) : (
-                <Button size="xs" variant="subtle" leftSection={<TbLogin size={13} />} onClick={handleNav}>
-                  Login
-                </Button>
-              )}
-            </Group>
-          </Group>
-        </Container>
-      </Box>
+      <GistPublicNavbar />
 
       <Container size="lg" py="xl">
         <Stack gap="lg">
