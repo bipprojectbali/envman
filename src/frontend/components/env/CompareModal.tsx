@@ -7,25 +7,21 @@ import {
   Group,
   Loader,
   Modal,
-  Switch,
   Text,
-  Textarea,
   Tooltip,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
 import {
   TbArrowRight,
   TbCheck,
   TbCopy,
-  TbEye,
-  TbEyeOff,
   TbGitCompare,
   TbInfoCircle,
   TbPlus,
   TbRefresh,
 } from 'react-icons/tb'
+import { CompareTextInput } from './CompareTextInput'
 import { DiffList, EmptyState } from '@/frontend/components/env/CompareDiffList'
 import { apiFetch } from '@/frontend/lib/api'
 import type { Category, DiffRow } from '@/frontend/lib/compare-utils'
@@ -50,7 +46,6 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
   const qc = useQueryClient()
   const [localText, setLocalText] = useState('')
   const [filter, setFilter] = useState<'all' | Category>('all')
-  const [revealLocal, setRevealLocal] = useState(false)
   const [addAsSecret, setAddAsSecret] = useState(false)
 
   // Fetch ALL server vars when modal opens.
@@ -178,7 +173,6 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
   const handleClose = () => {
     setLocalText('')
     setFilter('all')
-    setRevealLocal(false)
     setAddAsSecret(false)
     onClose()
   }
@@ -279,66 +273,15 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
 
         {/* ─── Split: paste area | diff result ──────────────────────── */}
         <Box style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-          {/* LEFT: paste textarea */}
-          <Box
-            style={{
-              width: 380,
-              flexShrink: 0,
-              borderRight: '1px solid var(--mantine-color-default-border)',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <Group
-              justify="space-between"
-              px="md"
-              py="xs"
-              style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
-            >
-              <Text size="xs" fw={600} c="dimmed">PASTE .ENV LOCAL</Text>
-              <Group gap={4}>
-                {Object.keys(localVars).length > 0 && (
-                  <Badge size="xs" variant="light" color="blue">
-                    {Object.keys(localVars).length} keys
-                  </Badge>
-                )}
-                <Tooltip label={revealLocal ? 'Sembunyikan value' : 'Tampilkan value'}>
-                  <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setRevealLocal((v) => !v)}>
-                    {revealLocal ? <TbEyeOff size={12} /> : <TbEye size={12} />}
-                  </ActionIcon>
-                </Tooltip>
-              </Group>
-            </Group>
-            <Textarea
-              placeholder={`DATABASE_URL=postgres://...\nAPI_KEY=xxx\nPORT=3000\n\n# Komentar diabaikan`}
-              value={localText}
-              onChange={(e) => setLocalText(e.target.value)}
-              minRows={20}
-              autosize={false}
-              styles={{
-                wrapper: { flex: 1, display: 'flex', flexDirection: 'column', height: '100%' },
-                input: {
-                  flex: 1,
-                  border: 'none',
-                  borderRadius: 0,
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                  fontSize: 12,
-                  WebkitTextSecurity: revealLocal ? 'none' : 'disc',
-                } as CSSProperties,
-              }}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-            />
-            {canEdit && counts.onlyLocal > 0 && (
-              <Box px="md" py="xs" style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
-                <Switch
-                  size="xs"
-                  label={<Text size="xs">Tambah sebagai secret</Text>}
-                  checked={addAsSecret}
-                  onChange={(e) => setAddAsSecret(e.currentTarget.checked)}
-                />
-              </Box>
-            )}
-          </Box>
+          <CompareTextInput
+            localText={localText}
+            onChange={setLocalText}
+            localVarCount={Object.keys(localVars).length}
+            canEdit={canEdit}
+            onlyLocalCount={counts.onlyLocal}
+            addAsSecret={addAsSecret}
+            onAddAsSecretChange={setAddAsSecret}
+          />
 
           {/* RIGHT: diff result */}
           <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>

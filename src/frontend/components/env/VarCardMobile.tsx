@@ -1,46 +1,8 @@
-import {
-  ActionIcon,
-  Badge,
-  Box,
-  Button,
-  Code,
-  CopyButton,
-  Group,
-  PasswordInput,
-  Stack,
-  Text,
-  TextInput,
-  Tooltip,
-} from '@mantine/core'
-import {
-  TbCheck,
-  TbCopy,
-  TbEye,
-  TbEyeOff,
-  TbLink,
-  TbLock,
-  TbLockOpen,
-  TbPencil,
-  TbSquare,
-  TbSquareCheckFilled,
-  TbToggleLeft,
-  TbToggleRight,
-  TbTrash,
-  TbX,
-} from 'react-icons/tb'
+import { ActionIcon, Badge, Box, Code, CopyButton, Group, Stack, Text } from '@mantine/core'
+import { TbCheck, TbCopy, TbEye, TbEyeOff, TbLink, TbLock, TbSquare, TbSquareCheckFilled } from 'react-icons/tb'
 import { toEnvLine } from '@/frontend/lib/env-clipboard'
 import { type EnvVar, relTime } from '@/frontend/types/env'
-
-interface EditForm {
-  value: string
-  isSecret: boolean
-}
-
-interface UpdateVarInput {
-  key: string
-  value: string
-  isSecret: boolean
-}
+import { VarCardActionRow, VarCardEditForm, type EditForm, type UpdateVarInput } from './VarCardActions'
 
 interface Props {
   filteredVars: EnvVar[]
@@ -88,77 +50,14 @@ export function VarCardMobile({
       {filteredVars.map((v) => {
         if (editingId === v.id) {
           return (
-            <Box
+            <VarCardEditForm
               key={v.id}
-              p="sm"
-              style={{
-                borderRadius: 'var(--mantine-radius-md)',
-                border: '1px solid var(--mantine-color-primary)',
-                background: 'var(--mantine-color-violet-light)',
-              }}
-            >
-              <Group gap={6} mb="xs" wrap="nowrap">
-                <Code
-                  fz="xs"
-                  fw={700}
-                  style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}
-                >
-                  {v.key}
-                </Code>
-                <Badge
-                  size="xs"
-                  variant={editForm.isSecret ? 'filled' : 'outline'}
-                  color={editForm.isSecret ? 'red' : 'gray'}
-                  leftSection={editForm.isSecret ? <TbLock size={9} /> : <TbLockOpen size={9} />}
-                  style={{ cursor: 'pointer', flexShrink: 0 }}
-                  onClick={() => setEditForm((f) => ({ ...f, isSecret: !f.isSecret }))}
-                >
-                  {editForm.isSecret ? 'secret' : 'plain'}
-                </Badge>
-              </Group>
-
-              {editForm.isSecret ? (
-                <PasswordInput
-                  size="sm"
-                  value={editForm.value}
-                  placeholder="Nilai baru..."
-                  autoFocus
-                  onChange={(e) => setEditForm((f) => ({ ...f, value: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') updateVar.mutate({ key: v.key, value: editForm.value, isSecret: editForm.isSecret })
-                    if (e.key === 'Escape') cancelEdit()
-                  }}
-                />
-              ) : (
-                <TextInput
-                  size="sm"
-                  value={editForm.value}
-                  placeholder="Nilai baru..."
-                  autoFocus
-                  onChange={(e) => setEditForm((f) => ({ ...f, value: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') updateVar.mutate({ key: v.key, value: editForm.value, isSecret: editForm.isSecret })
-                    if (e.key === 'Escape') cancelEdit()
-                  }}
-                />
-              )}
-
-              <Group gap="xs" mt="xs" justify="flex-end">
-                <Button size="xs" variant="subtle" color="gray" onClick={cancelEdit} leftSection={<TbX size={12} />}>
-                  Batal
-                </Button>
-                <Button
-                  size="xs"
-                  variant="filled"
-                  color="primary"
-                  loading={updateVar.isPending}
-                  leftSection={<TbCheck size={12} />}
-                  onClick={() => updateVar.mutate({ key: v.key, value: editForm.value, isSecret: editForm.isSecret })}
-                >
-                  Simpan
-                </Button>
-              </Group>
-            </Box>
+              v={v}
+              editForm={editForm}
+              setEditForm={setEditForm}
+              updateVar={updateVar}
+              cancelEdit={cancelEdit}
+            />
           )
         }
 
@@ -261,34 +160,13 @@ export function VarCardMobile({
               )}
             </Box>
 
-            <Group gap={4} justify="flex-end" wrap="nowrap">
-              <CopyButton value={toEnvLine(v)}>
-                {({ copied, copy }) => (
-                  <ActionIcon size={32} variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
-                    {copied ? <TbCheck size={15} /> : <TbCopy size={15} />}
-                  </ActionIcon>
-                )}
-              </CopyButton>
-              {canEdit && (
-                <>
-                  <ActionIcon
-                    size={32}
-                    variant="subtle"
-                    color={v.isDisabled ? 'orange' : 'teal'}
-                    loading={toggleDisabled.isPending && toggleDisabled.variables === v.key}
-                    onClick={() => toggleDisabled.mutate(v.key)}
-                  >
-                    {v.isDisabled ? <TbToggleLeft size={17} /> : <TbToggleRight size={17} />}
-                  </ActionIcon>
-                  <ActionIcon size={32} variant="subtle" color="primary" onClick={() => startEdit(v)}>
-                    <TbPencil size={15} />
-                  </ActionIcon>
-                  <ActionIcon size={32} variant="subtle" color="red" onClick={() => deleteVar(v.key)}>
-                    <TbTrash size={15} />
-                  </ActionIcon>
-                </>
-              )}
-            </Group>
+            <VarCardActionRow
+              v={v}
+              canEdit={canEdit}
+              toggleDisabled={toggleDisabled}
+              startEdit={startEdit}
+              deleteVar={deleteVar}
+            />
           </Box>
         )
       })}
