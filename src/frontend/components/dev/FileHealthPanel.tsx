@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   Badge,
   Box,
   Button,
@@ -19,50 +18,13 @@ import { useClipboard } from '@mantine/hooks'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { TbActivity, TbAlertTriangle, TbCircleCheck, TbCircleX, TbCopy, TbCopyCheck } from 'react-icons/tb'
-
-type FileStatus = 'ok' | 'warning' | 'critical'
-
-interface FileEntry {
-  path: string
-  category: string
-  lines: number
-  chars: number
-  maxLines: number
-  maxChars: number
-  linePercent: number
-  charPercent: number
-  status: FileStatus
-}
-
-interface FileHealthData {
-  files: FileEntry[]
-  summary: { total: number; ok: number; warning: number; critical: number }
-}
+import { type FileHealthData, CopyRowIcon } from './FileHealthRow'
 
 const STATUS = {
   ok: { color: 'green', Icon: TbCircleCheck, label: 'OK' },
   warning: { color: 'yellow', Icon: TbAlertTriangle, label: 'Warning' },
   critical: { color: 'red', Icon: TbCircleX, label: 'Critical' },
 } as const
-
-function CopyRowIcon({ text }: { text: string }) {
-  const cb = useClipboard({ timeout: 1500 })
-  return (
-    <Tooltip label={cb.copied ? 'Copied!' : 'Copy path'} withArrow>
-      <ActionIcon
-        size="xs"
-        variant="subtle"
-        color={cb.copied ? 'green' : 'gray'}
-        onClick={(e) => {
-          e.stopPropagation()
-          cb.copy(text)
-        }}
-      >
-        {cb.copied ? <TbCopyCheck size={12} /> : <TbCopy size={12} />}
-      </ActionIcon>
-    </Tooltip>
-  )
-}
 
 export function FileHealthPanel() {
   const [filter, setFilter] = useState<string>('all')
