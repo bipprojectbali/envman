@@ -15,6 +15,8 @@ import {
 } from '@mantine/core'
 import { useState } from 'react'
 import { TbAlertTriangle, TbClock, TbExternalLink, TbPencil, TbPlugConnected, TbTrash } from 'react-icons/tb'
+import { relativeDate } from '@/frontend/lib/project-utils'
+import { HealthBadge } from './ConnectionHealthBadge'
 
 export interface Connection {
   id: string
@@ -50,37 +52,6 @@ export const HOVER_STYLES = `
 }
 `
 
-export function relativeDate(iso?: string): string {
-  if (!iso) return ''
-  const ms = Date.now() - new Date(iso).getTime()
-  if (ms < 0 || Number.isNaN(ms)) return ''
-  if (ms < 60_000) return 'baru saja'
-  const m = Math.floor(ms / 60_000)
-  if (m < 60) return `${m} mnt lalu`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h} jam lalu`
-  const d = Math.floor(h / 24)
-  if (d < 30) return `${d} hari lalu`
-  const mo = Math.floor(d / 30)
-  if (mo < 12) return `${mo} bln lalu`
-  return `${Math.floor(mo / 12)} thn lalu`
-}
-
-export function HealthBadge({
-  health,
-}: { health?: { totalStacks: number; activeStacks: number; inactiveStacks: number } }) {
-  if (!health) return null
-  const color = health.inactiveStacks === 0 ? 'teal' : health.activeStacks === 0 ? 'red' : 'orange'
-  return (
-    <Tooltip
-      label={`${health.activeStacks} aktif, ${health.inactiveStacks} tidak aktif, dari ${health.totalStacks} total stack`}
-    >
-      <Badge size="xs" variant="light" color={color}>
-        {health.activeStacks}/{health.totalStacks} active
-      </Badge>
-    </Tooltip>
-  )
-}
 
 export function ConnectionGridCard({ connection: c, health, canManage, onOpen, onEdit, onDelete }: CardProps) {
   return (

@@ -22,15 +22,11 @@ import {
   TbClock,
   TbCopy,
   TbKey,
-  TbPencil,
-  TbRefresh,
   TbShieldCheck,
-  TbToggleLeft,
-  TbToggleRight,
-  TbTrash,
 } from 'react-icons/tb'
 import type { ApiToken } from './token-utils'
 import { absoluteTime, daysUntil, expiryStatus, relativeTime } from './token-utils'
+import { TokenDetailActions } from './TokenDetailActions'
 
 interface TokenDetailViewProps {
   token: ApiToken
@@ -147,45 +143,18 @@ export function TokenDetailView({
             </Group>
 
             {/* Actions */}
-            <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-              <Tooltip label={token.isDisabled ? 'Aktifkan' : 'Nonaktifkan'} withArrow>
-                <ActionIcon
-                  variant="light"
-                  size="md"
-                  color={token.isDisabled ? 'gray' : 'teal'}
-                  loading={togglePending}
-                  onClick={onToggle}
-                >
-                  {token.isDisabled ? <TbToggleLeft size={16} /> : <TbToggleRight size={16} />}
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label={isCopied ? 'Tersalin!' : 'Copy token value'} withArrow>
-                <ActionIcon
-                  variant="light"
-                  size="md"
-                  color={isCopied ? 'teal' : 'blue'}
-                  loading={copyPending}
-                  onClick={onCopy}
-                >
-                  {isCopied ? <TbCheck size={15} /> : <TbCopy size={15} />}
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Edit" withArrow>
-                <ActionIcon variant="light" size="md" color="gray" onClick={onEdit}>
-                  <TbPencil size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Rotate token" withArrow>
-                <ActionIcon variant="light" size="md" color="yellow" loading={rotatePending} onClick={onRotate}>
-                  <TbRefresh size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Revoke token" withArrow>
-                <ActionIcon variant="light" size="md" color="red" onClick={onRevoke}>
-                  <TbTrash size={15} />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
+            <TokenDetailActions
+              isDisabled={token.isDisabled}
+              isCopied={isCopied}
+              togglePending={togglePending}
+              copyPending={copyPending}
+              rotatePending={rotatePending}
+              onToggle={onToggle}
+              onCopy={onCopy}
+              onRotate={onRotate}
+              onEdit={onEdit}
+              onRevoke={onRevoke}
+            />
           </Group>
 
           <Divider my="md" />
