@@ -6,7 +6,7 @@ import { CodeEditor } from '@/frontend/components/CodeEditor'
 import { MarkdownRenderer } from '@/frontend/components/MarkdownRenderer'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
-import type { Note } from './NotesPanel'
+import type { Note } from './NoteCard'
 
 export function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime()
