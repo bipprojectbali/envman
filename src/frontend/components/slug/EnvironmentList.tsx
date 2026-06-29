@@ -1,10 +1,8 @@
 import {
   Alert,
-  Badge,
   Box,
   Button,
   Code,
-  Divider,
   Group,
   SimpleGrid,
   Skeleton,
@@ -16,7 +14,8 @@ import { useDebouncedValue, useDisclosure, useHotkeys, useLocalStorage } from '@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
-import { TbInfoCircle, TbPlus, TbTag, TbVariable, TbX } from 'react-icons/tb'
+import { TbInfoCircle, TbPlus, TbVariable, TbX } from 'react-icons/tb'
+import { EnvironmentGroupedView } from '@/frontend/components/slug/EnvironmentGroupedView'
 import { CreateEnvModal } from '@/frontend/components/slug/CreateEnvModal'
 import { EditEnvModal } from '@/frontend/components/slug/EditEnvModal'
 import { EnvCard } from '@/frontend/components/slug/EnvCard'
@@ -163,48 +162,6 @@ export function EnvironmentList({ slug, envs, isLoading, isOwner, canEdit, myRol
       </Stack>
     )
 
-  const renderGrouped = () => {
-    const grouped = new Map<string, Environment[]>()
-    const untagged: Environment[] = []
-    for (const env of filteredEnvs) {
-      if ((env.tags ?? []).length === 0) {
-        untagged.push(env)
-        continue
-      }
-      for (const t of env.tags ?? []) {
-        if (!grouped.has(t)) grouped.set(t, [])
-        grouped.get(t)!.push(env)
-      }
-    }
-    const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
-    return (
-      <Stack gap="md">
-        {groups.map(([tag, tagEnvs]) => (
-          <Stack key={tag} gap="xs">
-            <Group gap={6} align="center">
-              <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>
-                {tag}
-              </Badge>
-              <Divider style={{ flex: 1 }} />
-            </Group>
-            {renderGrid(tagEnvs)}
-          </Stack>
-        ))}
-        {untagged.length > 0 && (
-          <Stack gap="xs">
-            <Group gap={6} align="center">
-              <Text size="xs" c="dimmed" fw={500}>
-                Lainnya
-              </Text>
-              <Divider style={{ flex: 1 }} />
-            </Group>
-            {renderGrid(untagged)}
-          </Stack>
-        )}
-      </Stack>
-    )
-  }
-
   return (
     <>
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
@@ -294,7 +251,7 @@ export function EnvironmentList({ slug, envs, isLoading, isOwner, canEdit, myRol
               </Button>
             </Box>
           ) : envGroupByTag && allEnvTags.length > 0 ? (
-            renderGrouped()
+            <EnvironmentGroupedView filteredEnvs={filteredEnvs} renderGrid={renderGrid} />
           ) : (
             renderGrid(filteredEnvs)
           )}
