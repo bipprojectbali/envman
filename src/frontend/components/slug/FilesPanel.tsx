@@ -2,7 +2,6 @@ import {
   ActionIcon,
   Alert,
   Anchor,
-  Badge,
   Box,
   Button,
   Code,
@@ -19,8 +18,7 @@ import {
   Tooltip,
 } from '@mantine/core'
 import { useDebouncedValue, useLocalStorage } from '@mantine/hooks'
-import { modals } from '@mantine/modals'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -34,15 +32,14 @@ import {
   TbSearch,
   TbSortAscending,
   TbTag,
-  TbTrash,
   TbX,
 } from 'react-icons/tb'
 import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
+import { useDeleteFile } from '@/frontend/hooks/useDeleteFile'
 import { apiFetch } from '@/frontend/lib/api'
-import { getLangColor } from '@/frontend/lib/languages'
-import { notifyErr, notifyOk } from '@/frontend/lib/notify'
-import { FileCard, HOVER_STYLES, absoluteTime } from './FileCard'
+import { FileCard, HOVER_STYLES } from './FileCard'
 import { FileForm, type ProjectFile } from './FileForm'
+import { FileGroupedView } from './FileGroupedView'
 import { FileViewPanel } from './FileViewPanel'
 
 export interface FilesPanelProps {
@@ -53,7 +50,7 @@ export interface FilesPanelProps {
 }
 
 export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps) {
-  const qc = useQueryClient()
+  const { deleteFile } = useDeleteFile(slug)
   const navigate = useNavigate()
   const searchRef = useRef<HTMLInputElement>(null)
   const { tab, fileId, fileNew, viewFileId } = useSearch({ from: '/envmanager/$slug/' })
@@ -114,40 +111,6 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
   const totalPages = Math.ceil(filtered.length / FILES_PER_PAGE)
   const paginated = filtered.slice((page - 1) * FILES_PER_PAGE, page * FILES_PER_PAGE)
   const canManageFile = (authorId: string) => isOwner || authorId === myUserId
-
-  const deleteFile = (f: ProjectFile) => {
-    const modalId = `delete-file-${f.id}`
-    modals.open({
-      modalId,
-      title: (
-        <Group gap="xs">
-          <ThemeIcon size="sm" variant="light" color="red" radius="md"><TbTrash size={13} /></ThemeIcon>
-          <Text fw={600} size="sm">Hapus file</Text>
-        </Group>
-      ),
-      children: (
-        <Stack gap="sm">
-          <Text size="sm">Hapus <strong>{f.title}</strong>?</Text>
-          <Box p="xs" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-default-hover)' }}>
-            <Group gap={4} mb={4}>
-              {f.files.map((e) => <Badge key={e.filename} size="xs" variant="dot" color={getLangColor(e.language)}>{e.filename}</Badge>)}
-            </Group>
-            <Text size="xs" c="dimmed">{f.files.length} file · dibuat {absoluteTime(f.createdAt)}</Text>
-          </Box>
-          <Text size="xs" c="dimmed">Tindakan ini tidak dapat dibatalkan.</Text>
-          <Group justify="flex-end" mt="xs">
-            <Button variant="subtle" color="gray" onClick={() => modals.close(modalId)}>Batal</Button>
-            <Button color="red" leftSection={<TbTrash size={13} />}
-              onClick={() => apiFetch(`/api/envman/projects/${slug}/files/${f.id}`, { method: 'DELETE' })
-                .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'files', slug] }); notifyOk('File dihapus'); modals.close(modalId) })
-                .catch(notifyErr)}>
-              Hapus Permanen
-            </Button>
-          </Group>
-        </Stack>
-      ),
-    })
-  }
 
   if (viewFileId) {
     const viewingFile = isLoading ? null : (files.find((f) => f.id === viewFileId) ?? null)
@@ -300,39 +263,9 @@ export function FilesPanel({ slug, isOwner, myUserId, canEdit }: FilesPanelProps
 
       {!isLoading && !isError && filtered.length > 0 && (
         <>
-          {groupByTag && allTags.length > 0 ? (() => {
-            const grouped = new Map<string, typeof filtered>()
-            const untagged: typeof filtered = []
-            for (const f of filtered) {
-              if (f.tags.length === 0) { untagged.push(f); continue }
-              const tag = f.tags[0]
-              if (!grouped.has(tag)) grouped.set(tag, [])
-              grouped.get(tag)!.push(f)
-            }
-            const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))
-            return (
-              <Stack gap="md">
-                {groups.map(([tag, items]) => (
-                  <Stack key={tag} gap="xs">
-                    <Group gap={6} align="center">
-                      <Badge size="xs" variant="filled" color="grape" leftSection={<TbTag size={9} />}>{tag}</Badge>
-                      <Divider style={{ flex: 1 }} />
-                    </Group>
-                    {renderCards(items)}
-                  </Stack>
-                ))}
-                {untagged.length > 0 && (
-                  <Stack gap="xs">
-                    <Group gap={6} align="center">
-                      <Text size="xs" c="dimmed" fw={500}>Tanpa tag</Text>
-                      <Divider style={{ flex: 1 }} />
-                    </Group>
-                    {renderCards(untagged)}
-                  </Stack>
-                )}
-              </Stack>
-            )
-          })() : renderCards(paginated)}
+          {groupByTag && allTags.length > 0 ? (
+            <FileGroupedView filtered={filtered} renderCards={renderCards} />
+          ) : renderCards(paginated)}
           {!groupByTag && totalPages > 1 && (
             <Group justify="center" mt="md"><Pagination value={page} onChange={setPage} total={totalPages} size="sm" /></Group>
           )}

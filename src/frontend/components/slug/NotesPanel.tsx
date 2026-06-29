@@ -15,8 +15,7 @@ import {
   ThemeIcon,
 } from '@mantine/core'
 import { useDebouncedValue, useHotkeys, useLocalStorage } from '@mantine/hooks'
-import { modals } from '@mantine/modals'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -27,15 +26,14 @@ import {
   TbNote,
   TbPlus,
   TbSearch,
-  TbTrash,
   TbX,
 } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
-import { notifyErr, notifyOk } from '@/frontend/lib/notify'
-import { NoteCardGrid, NoteCardList, HOVER_STYLES, stripMarkdown, type Note } from './NoteCard'
+import { useNoteActions } from '@/frontend/hooks/useNoteActions'
+import { NoteCardGrid, NoteCardList, HOVER_STYLES, type Note } from './NoteCard'
 import { NoteViewInline } from './NoteViewInline'
 import { NotesPanelToolbar } from './NotesPanelToolbar'
-import { absoluteTime, NoteForm } from './NoteModals'
+import { NoteForm } from './NoteModals'
 
 export interface NotesPanelProps {
   slug: string
@@ -46,7 +44,7 @@ export interface NotesPanelProps {
 }
 
 export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: NotesPanelProps) {
-  const qc = useQueryClient()
+  const { togglePin, deleteNote } = useNoteActions(slug)
   const navigate = useNavigate()
   const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId, noteId, noteNew, viewNoteId } = useSearch({
     from: '/envmanager/$slug/',
@@ -123,47 +121,6 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
     navigate({ to: '/envmanager/$slug', params: { slug }, search: { ...navBase, noteId: note === 'new' ? undefined : note.id, noteNew: note === 'new', viewNoteId: undefined } })
   const closeNote = () =>
     navigate({ to: '/envmanager/$slug', params: { slug }, search: { ...navBase, noteId: undefined, noteNew: false, viewNoteId: undefined } })
-
-  const togglePin = async (note: Note) => {
-    await qc.cancelQueries({ queryKey: ['envman', 'notes', slug] })
-    const previous = qc.getQueryData<{ notes: Note[] }>(['envman', 'notes', slug])
-    qc.setQueryData(['envman', 'notes', slug], (old: any) => ({
-      ...old,
-      notes: old?.notes?.map((n: Note) => (n.id === note.id ? { ...n, pinned: !n.pinned } : n)) ?? [],
-    }))
-    apiFetch(`/api/envman/projects/${slug}/notes/${note.id}`, { method: 'PUT', body: JSON.stringify({ pinned: !note.pinned }) })
-      .catch(() => { if (previous) qc.setQueryData(['envman', 'notes', slug], previous); notifyErr(new Error('Gagal mengubah pin')) })
-      .finally(() => qc.invalidateQueries({ queryKey: ['envman', 'notes', slug] }))
-  }
-
-  const deleteNote = (note: Note, onDeleted?: () => void) =>
-    modals.openConfirmModal({
-      title: (
-        <Group gap="xs">
-          <ThemeIcon size="sm" variant="light" color="red" radius="md"><TbTrash size={13} /></ThemeIcon>
-          <Text fw={600} size="sm">Hapus note</Text>
-        </Group>
-      ),
-      children: (
-        <Stack gap="xs">
-          <Text size="sm">Hapus note <strong>{note.title}</strong>?</Text>
-          {note.body && (
-            <Box p="xs" bg="var(--mantine-color-default-hover)" style={{ border: '1px solid var(--mantine-color-default-border)' }}>
-              <Text size="xs" c="dimmed" lineClamp={3}>{stripMarkdown(note.body, 200)}</Text>
-            </Box>
-          )}
-          <Text size="xs" c="dimmed">
-            Dibuat {absoluteTime(note.createdAt)} oleh {note.author.name}. Tindakan ini tidak dapat dibatalkan.
-          </Text>
-        </Stack>
-      ),
-      labels: { confirm: 'Hapus', cancel: 'Batal' },
-      confirmProps: { color: 'red', leftSection: <TbTrash size={13} /> },
-      onConfirm: () =>
-        apiFetch(`/api/envman/projects/${slug}/notes/${note.id}`, { method: 'DELETE' })
-          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'notes', slug] }); notifyOk('Note dihapus'); onDeleted?.() })
-          .catch(notifyErr),
-    })
 
   if (noteNew || noteId) {
     const editingNote = noteId ? notes.find((n) => n.id === noteId) : undefined
