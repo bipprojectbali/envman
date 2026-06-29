@@ -1,18 +1,18 @@
-import { ActionIcon, Alert, Badge, Box, Button, Group, Loader, Pagination, SimpleGrid, Stack, Tabs, Text, Tooltip } from '@mantine/core'
+import { Alert, Badge, Box, Button, Group, Loader, Tabs, Text } from '@mantine/core'
 import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { TbAlertTriangle, TbLayoutGrid, TbLayoutList, TbSearch, TbServer, TbTool, TbX } from 'react-icons/tb'
+import { useEffect, useMemo, useState } from 'react'
+import { TbAlertTriangle, TbServer, TbTool } from 'react-icons/tb'
 import { ConnectionHeader } from '@/frontend/components/connection-detail/ConnectionHeader'
 import { ComposeModal } from '@/frontend/components/connection-detail/ComposeModal'
 import { ExecDrawer } from '@/frontend/components/connection-detail/ExecDrawer'
 import { LogsModal } from '@/frontend/components/connection-detail/LogsModal'
 import { MaintenanceTab } from '@/frontend/components/connection-detail/MaintenanceTab'
-import { StackFilterToolbar } from '@/frontend/components/connection-detail/StackFilterToolbar'
-import { StackItem } from '@/frontend/components/connection-detail/StackItem'
+import { StacksTabContent } from '@/frontend/components/connection-detail/StacksTabContent'
 import { useCleanupMutations } from '@/frontend/hooks/useCleanupMutations'
 import { useConnectionDetail } from '@/frontend/hooks/useConnectionDetail'
+import { useConnectionLogs } from '@/frontend/hooks/useConnectionLogs'
 import { useExec } from '@/frontend/hooks/useExec'
 import { useStackMutations } from '@/frontend/hooks/useStackMutations'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
@@ -60,9 +60,6 @@ function ConnectionDetailPage() {
   const [showStderr, setShowStderr] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
-  const logViewportRef = useRef<HTMLDivElement>(null)
-  const [liveLines, setLiveLines] = useState<{ stream: 'stdout' | 'stderr'; timestamp: string | null; message: string }[]>([])
-  const lastLogTimestamp = useRef<string | null>(null)
 
   const { stacks, connection, isLoading, refetch, isFetching, endpointIds, stackStatusMap, containerStatsMap, cleanupEndpointId, setCleanupEndpointId, imagesData, imagesFetching, refetchImages, containersData, containersFetching, refetchContainers, volumesData, volumesFetching, refetchVolumes, networksData, networksFetching, refetchNetworks } = useConnectionDetail(id, { activeTab })
 
@@ -83,45 +80,9 @@ function ConnectionDetailPage() {
     if (composeData?.content !== undefined && !composeEditing) setComposeContent(composeData.content)
   }, [composeData, composeEditing])
 
-  // Logs query + incremental refresh
-  const { isFetching: logsFetching, refetch: refetchLogs } = useQuery({
-    queryKey: ['portainer', 'container-logs', id, logsStack?.id, selectedContainerId, logTail, showStdout, showStderr],
-    queryFn: async () => {
-      const qs = new URLSearchParams({ tail: String(logTail), stdout: showStdout ? '1' : '0', stderr: showStderr ? '1' : '0', timestamps: '1' })
-      const result = await apiFetch(`/api/envman/portainer/connections/${id}/stacks/${logsStack!.id}/logs/${selectedContainerId}?${qs}`)
-      setLiveLines(result.lines ?? [])
-      const last = (result.lines ?? []).findLast?.((l: any) => l.timestamp)
-      if (last?.timestamp) lastLogTimestamp.current = last.timestamp
-      return result
-    },
-    enabled: logsOpen && !!logsStack && !!selectedContainerId,
-    staleTime: 0,
-    refetchOnWindowFocus: false,
+  const { logViewportRef, liveLines, setLiveLines, lastLogTimestamp, logsFetching, refetchLogs } = useConnectionLogs({
+    id, logsOpen, logsStack, selectedContainerId, logTail, showStdout, showStderr, autoRefresh, autoScroll,
   })
-
-  useEffect(() => {
-    if (!autoRefresh || !logsOpen || !logsStack || !selectedContainerId) return
-    const interval = setInterval(async () => {
-      try {
-        const qs = new URLSearchParams({ stdout: showStdout ? '1' : '0', stderr: showStderr ? '1' : '0', timestamps: '1', tail: '100' })
-        if (lastLogTimestamp.current) qs.set('since', lastLogTimestamp.current)
-        const result = await apiFetch(`/api/envman/portainer/connections/${id}/stacks/${logsStack.id}/logs/${selectedContainerId}?${qs}`)
-        const newLines = (result.lines ?? []) as typeof liveLines
-        if (newLines.length > 0) {
-          setLiveLines((prev) => [...prev, ...newLines].slice(-2000))
-          const last = newLines.findLast?.((l: any) => l.timestamp)
-          if (last?.timestamp) lastLogTimestamp.current = last.timestamp
-        }
-      } catch {}
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [autoRefresh, logsOpen, logsStack, selectedContainerId, showStdout, showStderr, id])
-
-  useEffect(() => {
-    if (autoScroll && logViewportRef.current) {
-      logViewportRef.current.scrollTo({ top: logViewportRef.current.scrollHeight, behavior: 'smooth' })
-    }
-  }, [autoScroll, liveLines])
 
   const filteredStacks = useMemo(() => {
     let list = [...stacks]
@@ -136,7 +97,6 @@ function ConnectionDetailPage() {
   }, [stacks, search, filterStatus, filterType, filterLinked])
 
   const totalPages = Math.max(1, Math.ceil(filteredStacks.length / PAGE_SIZE))
-  const pagedStacks = filteredStacks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const hasFilter = !!search.trim() || !!filterStatus || !!filterType || !!filterLinked
 
   useEffect(() => { setPage(1) }, [search, filterStatus, filterType, filterLinked])
@@ -186,68 +146,21 @@ function ConnectionDetailPage() {
       </Tabs>
 
       {activeTab === 'stacks' && (
-        <>
-          <Group justify="space-between" mb="sm" wrap="wrap" gap="xs">
-            <Group gap="xs">
-              <Text fw={600} size="sm">Stacks</Text>
-              <Badge size="sm" variant="light" color="gray">{filteredStacks.length}{filteredStacks.length !== stacks.length ? `/${stacks.length}` : ''}</Badge>
-            </Group>
-            {stacks.length > 0 && (
-              <Tooltip label={stackView === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
-                <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setStackView((v) => (v === 'grid' ? 'list' : 'grid'))}>
-                  {stackView === 'grid' ? <TbLayoutList size={15} /> : <TbLayoutGrid size={15} />}
-                </ActionIcon>
-              </Tooltip>
-            )}
-          </Group>
-
-          {stacks.length > 0 && (
-            <StackFilterToolbar search={search} setSearch={setSearch} filterStatus={filterStatus} setFilterStatus={setFilterStatus} filterType={filterType} setFilterType={setFilterType} filterLinked={filterLinked} setFilterLinked={setFilterLinked} hasFilter={hasFilter} />
-          )}
-
-          {stacks.length === 0 ? (
-            <Alert color="gray" icon={<TbServer size={14} />} p="xs">
-              <Text size="xs">Tidak ada stack ditemukan di Portainer instance ini.</Text>
-            </Alert>
-          ) : filteredStacks.length === 0 ? (
-            <Box p="lg" ta="center" mb="xl" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)' }}>
-              <TbSearch size={28} style={{ opacity: 0.2, margin: '0 auto 8px' }} />
-              <Text size="sm" fw={500} mb={4}>Tidak ada stack yang cocok</Text>
-              <Text size="xs" c="dimmed" mb="sm">Coba ubah kata kunci atau reset filter.</Text>
-              <Button size="xs" variant="subtle" leftSection={<TbX size={12} />} onClick={() => { setSearch(''); setFilterStatus(null); setFilterType(null); setFilterLinked(null) }}>Reset filter</Button>
-            </Box>
-          ) : stackView === 'grid' ? (
-            <>
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb={totalPages > 1 ? 'sm' : 'xl'}>
-                {pagedStacks.map((stack) => {
-                  const { containers: stackContainers, isFetching: stackFetching } = stackStatusMap[stack.id] ?? { containers: [], isFetching: false }
-                  return (
-                    <StackItem key={stack.id} stack={stack} view="grid" stackContainers={stackContainers} stackFetching={stackFetching} containerStatsMap={containerStatsMap} canMutate={canMutate} canOperate={canOperate}
-                      repull={repull} recreate={recreate} restartContainer={restartContainer}
-                      onRepull={confirmRepull} onRecreate={confirmRecreate} onRestartContainer={confirmRestartContainer}
-                      onOpenCompose={handleOpenCompose} onOpenLogs={handleOpenLogs} onOpenExec={openExecForContainer} />
-                  )
-                })}
-              </SimpleGrid>
-              {totalPages > 1 && <Group justify="center" mb="xl"><Pagination total={totalPages} value={page} onChange={setPage} size="sm" /></Group>}
-            </>
-          ) : (
-            <>
-              <Stack gap="md" mb={totalPages > 1 ? 'sm' : 'xl'}>
-                {pagedStacks.map((stack) => {
-                  const { containers: stackContainers, isFetching: stackFetching } = stackStatusMap[stack.id] ?? { containers: [], isFetching: false }
-                  return (
-                    <StackItem key={stack.id} stack={stack} view="list" stackContainers={stackContainers} stackFetching={stackFetching} canMutate={canMutate} canOperate={canOperate}
-                      repull={repull} recreate={recreate} restartContainer={restartContainer}
-                      onRepull={confirmRepull} onRecreate={confirmRecreate} onRestartContainer={confirmRestartContainer}
-                      onOpenCompose={handleOpenCompose} onOpenLogs={handleOpenLogs} onOpenExec={openExecForContainer} />
-                  )
-                })}
-              </Stack>
-              {totalPages > 1 && <Group justify="center" mb="xl"><Pagination total={totalPages} value={page} onChange={setPage} size="sm" /></Group>}
-            </>
-          )}
-        </>
+        <StacksTabContent
+          stacks={stacks} filteredStacks={filteredStacks}
+          stackView={stackView} setStackView={setStackView}
+          totalPages={totalPages} page={page} setPage={setPage}
+          search={search} setSearch={setSearch}
+          filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+          filterType={filterType} setFilterType={setFilterType}
+          filterLinked={filterLinked} setFilterLinked={setFilterLinked}
+          hasFilter={hasFilter}
+          stackStatusMap={stackStatusMap} containerStatsMap={containerStatsMap}
+          canMutate={canMutate} canOperate={canOperate}
+          repull={repull} recreate={recreate} restartContainer={restartContainer}
+          confirmRepull={confirmRepull} confirmRecreate={confirmRecreate} confirmRestartContainer={confirmRestartContainer}
+          onOpenCompose={handleOpenCompose} onOpenLogs={handleOpenLogs} onOpenExec={openExecForContainer}
+        />
       )}
 
       {activeTab === 'maintenance' && (
