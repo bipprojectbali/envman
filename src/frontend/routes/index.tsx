@@ -2,8 +2,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
-  Code,
   Container,
   Group,
   SimpleGrid,
@@ -12,18 +10,30 @@ import {
   ThemeIcon,
   Title,
 } from '@mantine/core'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   TbBrandDocker,
+  TbBrandGithub,
   TbCode,
+  TbDownload,
+  TbFiles,
   TbKey,
+  TbLayoutDashboard,
   TbLogin,
+  TbNote,
+  TbRefresh,
+  TbRobot,
   TbServer,
   TbShield,
+  TbTerminal,
+  TbTerminal2,
   TbUsers,
   TbVariable,
 } from 'react-icons/tb'
+import { InstallAndGuide } from '@/frontend/components/home/InstallAndGuide'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
+import { getDefaultRoute, useSession } from '@/frontend/hooks/useAuth'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -45,6 +55,33 @@ const features = [
       'envman -e myapp:production -- bun start. Tidak ada perubahan di kode aplikasi, tidak ada library tambahan.',
   },
   {
+    icon: TbTerminal2,
+    color: 'indigo',
+    title: 'Aliases & Scripts',
+    description:
+      'Simpan perintah panjang sebagai alias. envman run myapp:deploy — expand dan eksekusi. Script bisa langsung dari project Files tanpa menyentuh disk.',
+  },
+  {
+    icon: TbFiles,
+    color: 'blue',
+    title: 'Project Files',
+    description:
+      'Simpan scripts, config, dan template per project. Eksekusi langsung: envman -- bash myapp:scripts/deploy.sh. Konten di-pipe via stdin, zero disk write.',
+  },
+  {
+    icon: TbNote,
+    color: 'grape',
+    title: 'Notes & Docs',
+    description: 'Dokumentasi runbook, deployment guide, atau apapun per project. Markdown support, tag, dan search.',
+  },
+  {
+    icon: TbBrandGithub,
+    color: 'dark',
+    title: 'Gists',
+    description:
+      'Simpan dan bagikan snippet multi-file dengan syntax highlight. Private secara default, atau set public agar terlihat anggota lain. Tag dan search.',
+  },
+  {
     icon: TbUsers,
     color: 'teal',
     title: 'Role-Based Access',
@@ -55,61 +92,52 @@ const features = [
     icon: TbBrandDocker,
     color: 'cyan',
     title: 'Portainer Integration',
-    description:
-      'Push semua vars ke Docker stack dalam satu klik. Sync otomatis menginject via env_file ke container.',
+    description: 'Push semua vars ke Docker stack dalam satu klik. Sync otomatis menginject via env_file ke container.',
   },
   {
     icon: TbKey,
     color: 'orange',
     title: 'API Tokens',
+    description: 'Token ter-scope per project:env atau global. Pilih read-only atau read-write, tambahkan expiry date.',
+  },
+  {
+    icon: TbRefresh,
+    color: 'teal',
+    title: 'Auto-Update CLI',
     description:
-      'Token ter-scope per project:env atau global. Pilih read-only atau read-write, tambahkan expiry date.',
+      'Binary CLI auto-update di background setiap ada versi baru. Tidak perlu reinstall manual — envman update jika butuh update paksa.',
+  },
+  {
+    icon: TbTerminal,
+    color: 'indigo',
+    title: 'Process Manager',
+    description:
+      'envman pm — supervisor process built-in, tanpa PM2. Start, stop, restart, logs, env sync, crash-loop quarantine. Daemon persisten di background.',
+  },
+  {
+    icon: TbRobot,
+    color: 'violet',
+    title: 'MCP untuk AI Agent',
+    description:
+      'envman mcp — stdio MCP server untuk Claude Code. Agent bisa introspect vars, files, aliases, dan kontrol pm process tanpa shell exec.',
   },
   {
     icon: TbServer,
     color: 'pink',
     title: 'Self-Hosted',
-    description:
-      'Data sepenuhnya ada di server kamu sendiri. Tidak ada pihak ketiga yang menyentuh secrets-mu.',
+    description: 'Data sepenuhnya ada di server kamu sendiri. Tidak ada pihak ketiga yang menyentuh secrets-mu.',
   },
 ]
-
-const steps = [
-  {
-    n: '1',
-    title: 'Tambah project & vars',
-    desc: 'Buat project, tambah environment (production, staging, dev), isi vars. Tandai yang sensitif sebagai secret.',
-  },
-  {
-    n: '2',
-    title: 'Generate API token',
-    desc: 'Buat token untuk CLI, CI/CD, atau tim. Bisa di-scope ke project:env tertentu dengan hak akses terpisah.',
-  },
-  {
-    n: '3',
-    title: 'Inject ke runtime',
-    desc: 'Jalankan envman -e project:env -- command. Vars ter-inject langsung tanpa menyentuh .env files.',
-  },
-]
-
-const CLI_DEMO = `# Login sekali, simpan ke ~/.config/envman/config.json
-envman login https://envman.example.com --token em_abc123
-
-# Inject vars lalu jalankan command
-envman -e myapp:production -- bun start
-
-# Gabungkan beberapa env (later overrides earlier)
-envman -e myapp:base -e myapp:production -- bun dev
-
-# Mix server + local file (local wins)
-envman -e myapp:production -e .env.local -- bun dev
-
-# CI/CD — auth dari env vars, tanpa login
-ENVMAN_SERVER=https://envman.example.com \\
-ENVMAN_TOKEN=em_xxx \\
-  envman -e myapp:production -- bun start`
 
 function HomePage() {
+  const { data: sessionData } = useSession()
+  const { data: versionData } = useQuery({
+    queryKey: ['cli-version'],
+    queryFn: () => fetch('/download/cli/version').then((r) => r.json()) as Promise<{ version: string }>,
+    staleTime: 5 * 60_000,
+  })
+  const user = sessionData?.user
+
   return (
     <Box>
       {/* ─── Navbar ─────────────────────────────────────────────────── */}
@@ -128,23 +156,33 @@ function HomePage() {
         <Container size="lg">
           <Group h={56} justify="space-between">
             <Group gap="xs">
-              <ThemeIcon size={32} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
+              <ThemeIcon size={32} variant="gradient" radius="md">
                 <TbVariable size={16} />
               </ThemeIcon>
-              <Text fw={700} size="sm" lh={1}>Env Manager</Text>
+              <Text fw={700} size="sm" lh={1}>
+                Env Manager
+              </Text>
             </Group>
             <Group gap="xs">
               <ThemeToggle />
-              <Button
-                component={Link}
-                to="/login"
-                size="sm"
-                variant="gradient"
-                gradient={{ from: 'violet', to: 'grape' }}
-                leftSection={<TbLogin size={14} />}
-              >
-                Login
+              <Button component={Link} to="/docs" size="sm" variant="subtle" color="gray">
+                Docs
               </Button>
+              {user ? (
+                <Button
+                  component={Link}
+                  to={getDefaultRoute(user.role)}
+                  size="sm"
+                  variant="gradient"
+                  leftSection={<TbLayoutDashboard size={14} />}
+                >
+                  Dashboard
+                </Button>
+              ) : (
+                <Button component={Link} to="/login" size="sm" variant="gradient" leftSection={<TbLogin size={14} />}>
+                  Login
+                </Button>
+              )}
             </Group>
           </Group>
         </Container>
@@ -153,7 +191,7 @@ function HomePage() {
       {/* ─── Hero ────────────────────────────────────────────────────── */}
       <Container size="md" py={{ base: 60, md: 100 }}>
         <Stack align="center" gap="xl">
-          <Badge variant="dot" color="violet" size="lg" radius="sm">
+          <Badge variant="dot" color="primary" size="lg" radius="sm">
             Self-Hosted · Open Source
           </Badge>
 
@@ -164,100 +202,45 @@ function HomePage() {
             style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', lineHeight: 1.1, letterSpacing: '-0.02em' }}
           >
             Environment variables,{' '}
-            <Text
-              component="span"
-              variant="gradient"
-              gradient={{ from: 'violet', to: 'grape' }}
-              inherit
-            >
+            <Text component="span" variant="gradient" inherit>
               terkelola dengan baik.
             </Text>
           </Title>
 
           <Text size="lg" c="dimmed" ta="center" maw={540} lh={1.7}>
-            Ganti .env files yang berserakan dengan satu sumber kebenaran yang terenkripsi.
-            Inject ke runtime tanpa mengubah kode aplikasi.
+            Ganti .env files yang berserakan dengan satu sumber kebenaran yang terenkripsi. Inject ke runtime tanpa
+            mengubah kode aplikasi.
           </Text>
 
           <Group gap="sm">
-            <Button
-              component={Link}
-              to="/login"
-              size="md"
-              variant="gradient"
-              gradient={{ from: 'violet', to: 'grape' }}
-              leftSection={<TbLogin size={17} />}
-            >
+            <Button component={Link} to="/login" size="md" variant="gradient" leftSection={<TbLogin size={17} />}>
               Masuk ke Dashboard
             </Button>
-            <Button
-              component="a"
-              href="#cli"
-              size="md"
-              variant="default"
-              leftSection={<TbCode size={17} />}
-            >
-              Lihat CLI
+            <Button component="a" href="#install" size="md" variant="default" leftSection={<TbDownload size={17} />}>
+              Install CLI
             </Button>
           </Group>
 
-          {/* Mini stats */}
           <Group gap="xl" mt="md">
             {[
               { label: 'AES-256-GCM', sub: 'enkripsi secret' },
               { label: 'Multi-env', sub: 'per project' },
-              { label: 'CLI binary', sub: 'tanpa npm' },
-            ].map(stat => (
+              { label: versionData?.version ? `v${versionData.version}` : '—', sub: 'CLI terbaru' },
+            ].map((stat) => (
               <Stack key={stat.label} align="center" gap={2}>
-                <Text fw={700} size="md">{stat.label}</Text>
-                <Text size="xs" c="dimmed">{stat.sub}</Text>
+                <Text fw={700} size="md">
+                  {stat.label}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {stat.sub}
+                </Text>
               </Stack>
             ))}
           </Group>
         </Stack>
       </Container>
 
-      {/* ─── CLI Demo ────────────────────────────────────────────────── */}
-      <Box
-        id="cli"
-        style={{
-          background: 'linear-gradient(180deg, var(--mantine-color-dark-7) 0%, var(--mantine-color-dark-8) 100%)',
-          borderTop: '1px solid var(--mantine-color-dark-5)',
-          borderBottom: '1px solid var(--mantine-color-dark-5)',
-        }}
-        py="xl"
-      >
-        <Container size="md">
-          <Stack gap="md">
-            <Group gap="xs">
-              <ThemeIcon size={22} variant="light" color="violet" radius="sm">
-                <TbCode size={12} />
-              </ThemeIcon>
-              <Text fw={600} size="sm" c="gray.3">CLI Usage</Text>
-            </Group>
-            <pre
-              style={{
-                fontSize: 13,
-                lineHeight: 1.75,
-                background: '#0d0d0d',
-                border: '1px solid #2a2a2a',
-                borderRadius: 8,
-                padding: '16px 20px',
-                margin: 0,
-                overflowX: 'auto',
-                color: '#c9d1d9',
-                fontFamily: "'Courier New', Courier, monospace",
-                whiteSpace: 'pre',
-              }}
-            >
-              {CLI_DEMO}
-            </pre>
-            <Text size="xs" c="dimmed">
-              Binary standalone — tidak perlu Node.js atau npm. Download untuk Linux, macOS, dan Windows.
-            </Text>
-          </Stack>
-        </Container>
-      </Box>
+      <InstallAndGuide versionData={versionData} />
 
       {/* ─── Features ────────────────────────────────────────────────── */}
       <Container size="lg" py={{ base: 60, md: 80 }}>
@@ -272,110 +255,91 @@ function HomePage() {
           </Stack>
 
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-            {features.map(f => (
-              <Card key={f.title} withBorder p="md" radius="md" style={{ transition: 'border-color 0.15s' }}>
+            {features.map((f) => (
+              <Box
+                key={f.title}
+                p="md"
+                style={{
+                  border: '1px solid var(--mantine-color-default-border)',
+                  borderRadius: 'var(--mantine-radius-md)',
+                }}
+              >
                 <Group gap="sm" mb="xs">
                   <ThemeIcon size={36} variant="light" color={f.color} radius="md">
                     <f.icon size={18} />
                   </ThemeIcon>
-                  <Text fw={600} size="sm">{f.title}</Text>
+                  <Text fw={600} size="sm">
+                    {f.title}
+                  </Text>
                 </Group>
-                <Text size="sm" c="dimmed" lh={1.65}>{f.description}</Text>
-              </Card>
+                <Text size="sm" c="dimmed" lh={1.65}>
+                  {f.description}
+                </Text>
+              </Box>
             ))}
           </SimpleGrid>
         </Stack>
       </Container>
 
-      {/* ─── How it works ────────────────────────────────────────────── */}
-      <Box
-        style={{
-          background: 'linear-gradient(135deg, var(--mantine-color-violet-light) 0%, var(--mantine-color-grape-light) 100%)',
-          borderTop: '1px solid var(--mantine-color-violet-light-hover)',
-          borderBottom: '1px solid var(--mantine-color-violet-light-hover)',
-        }}
-        py={{ base: 60, md: 80 }}
-      >
-        <Container size="md">
-          <Stack gap="xl" align="center">
-            <Stack align="center" gap="xs">
-              <Title order={2} ta="center" fw={700}>Cara kerjanya</Title>
-              <Text c="dimmed" ta="center">Mulai dalam 3 langkah.</Text>
-            </Stack>
-
-            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xl" w="100%">
-              {steps.map(step => (
-                <Stack key={step.n} align="center" gap="sm">
-                  <ThemeIcon
-                    size={52}
-                    variant="gradient"
-                    gradient={{ from: 'violet', to: 'grape' }}
-                    radius="xl"
-                    style={{ boxShadow: '0 4px 20px rgba(121, 80, 242, 0.3)' }}
-                  >
-                    <Text fw={800} size="xl" c="white">{step.n}</Text>
-                  </ThemeIcon>
-                  <Text fw={600} ta="center" size="sm">{step.title}</Text>
-                  <Text size="sm" c="dimmed" ta="center" lh={1.65}>{step.desc}</Text>
-                </Stack>
-              ))}
-            </SimpleGrid>
-          </Stack>
-        </Container>
-      </Box>
-
       {/* ─── CTA ─────────────────────────────────────────────────────── */}
       <Container size="sm" py={{ base: 60, md: 80 }}>
-        <Card
-          withBorder
+        <Box
           p={{ base: 'xl', md: 48 }}
-          radius="xl"
           ta="center"
           style={{
-            background: 'linear-gradient(135deg, var(--mantine-color-violet-light) 0%, var(--mantine-color-grape-light) 100%)',
-            borderColor: 'var(--mantine-color-violet-light-hover)',
+            background:
+              'linear-gradient(135deg, var(--mantine-color-violet-light) 0%, var(--mantine-color-grape-light) 100%)',
+            border: '1px solid var(--mantine-color-violet-light-hover)',
+            borderRadius: 'var(--mantine-radius-xl)',
           }}
         >
           <Stack gap="md" align="center">
             <ThemeIcon
               size={60}
               variant="gradient"
-              gradient={{ from: 'violet', to: 'grape' }}
               radius="xl"
               style={{ boxShadow: '0 8px 32px rgba(121, 80, 242, 0.35)' }}
             >
               <TbVariable size={30} />
             </ThemeIcon>
-            <Title order={2} fw={700}>Siap mulai?</Title>
+            <Title order={2} fw={700}>
+              Siap mulai?
+            </Title>
             <Text c="dimmed" maw={360}>
               Login dan mulai kelola environment variables-mu dengan aman sekarang juga.
             </Text>
-            <Button
-              component={Link}
-              to="/login"
-              size="md"
-              variant="gradient"
-              gradient={{ from: 'violet', to: 'grape' }}
-              leftSection={<TbLogin size={17} />}
-              mt="xs"
-            >
-              Masuk ke Dashboard
-            </Button>
+            <Group gap="sm" mt="xs">
+              <Button component={Link} to="/login" size="md" variant="gradient" leftSection={<TbLogin size={17} />}>
+                Masuk ke Dashboard
+              </Button>
+              <Button component="a" href="#install" size="md" variant="default" leftSection={<TbDownload size={17} />}>
+                Install CLI
+              </Button>
+            </Group>
           </Stack>
-        </Card>
+        </Box>
       </Container>
 
       {/* ─── Footer ──────────────────────────────────────────────────── */}
       <Box style={{ borderTop: '1px solid var(--mantine-color-default-border)' }} py="md">
         <Container size="lg">
-          <Group justify="space-between" wrap="nowrap">
+          <Group justify="space-between" wrap="wrap" gap="xs">
             <Group gap="xs">
-              <ThemeIcon size={22} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="sm">
+              <ThemeIcon size={22} variant="gradient" radius="sm">
                 <TbVariable size={11} />
               </ThemeIcon>
-              <Text size="xs" fw={600}>Env Manager</Text>
+              <Text size="xs" fw={600}>
+                Env Manager
+              </Text>
             </Group>
-            <Text size="xs" c="dimmed">Self-hosted. Data tetap milikmu.</Text>
+            <Group gap="md">
+              <Button component={Link} to="/docs" size="compact-xs" variant="subtle" color="gray">
+                Docs
+              </Button>
+              <Text size="xs" c="dimmed">
+                Self-hosted. Data tetap milikmu.
+              </Text>
+            </Group>
           </Group>
         </Container>
       </Box>

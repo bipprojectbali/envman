@@ -1,16 +1,13 @@
 import {
   ActionIcon,
   AppShell,
-  Avatar,
   Box,
   Burger,
-  Divider,
+  Container,
   Group,
-  NavLink,
-  Stack,
+  Menu,
   Text,
   ThemeIcon,
-  Tooltip,
 } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
@@ -18,19 +15,24 @@ import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from '
 import { useState } from 'react'
 import {
   TbBook,
-  TbChevronRight,
+  TbBrandGithub,
   TbCode,
+  TbDatabase,
+  TbHome,
   TbKey,
   TbLayoutDashboard,
-  TbLayoutSidebarLeftCollapse,
-  TbLayoutSidebarLeftExpand,
   TbLogout,
   TbPlugConnected,
   TbUser,
+  TbUsers,
   TbVariable,
 } from 'react-icons/tb'
+import { EnvManagerSidebar } from '@/frontend/components/layout/EnvManagerSidebar'
+import { MobileTabBar } from '@/frontend/components/layout/MobileTabBar'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
-import { useLogout, useSession } from '@/frontend/hooks/useAuth'
+import { UserAvatar } from '@/frontend/components/UserAvatar'
+import { hasCapability, useLogout, useSession } from '@/frontend/hooks/useAuth'
+import { useExtensions } from '@/frontend/hooks/useExtensions'
 
 export const Route = createFileRoute('/envmanager')({
   beforeLoad: async ({ context }) => {
@@ -42,7 +44,7 @@ export const Route = createFileRoute('/envmanager')({
       })
       if (!data?.user) throw redirect({ to: '/login' })
       if (data.user.blocked) throw redirect({ to: '/blocked' })
-      if (data.user.role === 'USER') throw redirect({ to: '/profile' })
+      if (data.user.role === 'QC') throw redirect({ to: '/dashboard', search: { tab: 'dashboard' } })
     } catch (e) {
       if (e instanceof Error) throw redirect({ to: '/login' })
       throw e
@@ -51,17 +53,12 @@ export const Route = createFileRoute('/envmanager')({
   component: EnvManagerLayout,
 })
 
-const roleLabel: Record<string, string> = {
-  SUPER_ADMIN: 'Super Admin',
-  ADMIN: 'Admin',
-  QC: 'QC',
-  USER: 'User',
-}
-
 function EnvManagerLayout() {
   const { data } = useSession()
   const logout = useLogout()
   const user = data?.user
+  const { data: extensions } = useExtensions()
+  const portainerEnabled = extensions?.portainer ?? true
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false)
   const isMobile = useMediaQuery('(max-width: 48em)')
   const navigate = useNavigate()
@@ -84,210 +81,176 @@ function EnvManagerLayout() {
       onConfirm: () => logout.mutate(),
     })
 
+  const isOverview = pathname === '/envmanager/overview'
   const isTokens = pathname.startsWith('/envmanager/tokens')
   const isConnections = pathname.startsWith('/envmanager/connections')
   const isReadme = pathname.startsWith('/envmanager/docs')
-  const isProjectsActive = !isTokens && !isConnections && !isReadme
+  const isGists = pathname.startsWith('/envmanager/gists')
+  const isDatabase = pathname.startsWith('/envmanager/database')
+  const isUsers = pathname.startsWith('/envmanager/users')
+  const isProjectsActive =
+    !isOverview && !isTokens && !isConnections && !isReadme && !isGists && !isDatabase && !isUsers
 
   const mainNav = [
+    ...(hasCapability(user, 'menu:overview')
+      ? [{ label: 'Overview', description: 'Ringkasan semua resources', icon: TbHome, href: '/envmanager/overview', active: isOverview }]
+      : []),
     { label: 'Projects', description: 'Kelola environment vars', icon: TbVariable, href: '/envmanager', active: isProjectsActive },
-    { label: 'Tokens', description: 'API token untuk CLI', icon: TbKey, href: '/envmanager/tokens', active: isTokens },
-    { label: 'Connections', description: 'Portainer instances', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections },
+    ...(hasCapability(user, 'menu:tokens')
+      ? [{ label: 'Tokens', description: 'API token untuk CLI', icon: TbKey, href: '/envmanager/tokens', active: isTokens }]
+      : []),
+    ...(hasCapability(user, 'menu:gists')
+      ? [{ label: 'Gists', description: 'Snippets & konfigurasi', icon: TbBrandGithub, href: '/envmanager/gists', active: isGists }]
+      : []),
+    ...(user?.role === 'SUPER_ADMIN'
+      ? [
+          { label: 'Database', description: 'Sync data dari remote', icon: TbDatabase, href: '/envmanager/database', active: isDatabase },
+          { label: 'Users', description: 'Kelola akses user', icon: TbUsers, href: '/envmanager/users', active: isUsers },
+        ]
+      : []),
   ]
 
   const otherNav = [
-    { label: 'Dashboard', icon: TbLayoutDashboard, href: '/dashboard', active: false },
+    // Dashboard hanya untuk QC + SUPER_ADMIN (ticket workflow). ADMIN tidak.
+    ...(user?.role === 'QC' || user?.role === 'SUPER_ADMIN'
+      ? [{ label: 'Dashboard', icon: TbLayoutDashboard, href: '/dashboard', active: false }]
+      : []),
     ...(user?.role === 'SUPER_ADMIN' ? [{ label: 'Dev Console', icon: TbCode, href: '/dev', active: false }] : []),
     { label: 'Docs', icon: TbBook, href: '/envmanager/docs', active: isReadme },
+  ]
+
+  const extensionsNav = [
+    ...(portainerEnabled && (user?.role === 'SUPER_ADMIN' || hasCapability(user, 'menu:connections'))
+      ? [{ label: 'Portainer', description: 'Connections & backup', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections }]
+      : []),
+  ]
+
+  const bottomTabs = [
+    ...(hasCapability(user, 'menu:overview') ? [{ label: 'Overview', icon: TbHome, href: '/envmanager/overview', active: isOverview }] : []),
+    { label: 'Projects', icon: TbVariable, href: '/envmanager', active: isProjectsActive },
+    ...(hasCapability(user, 'menu:tokens') ? [{ label: 'Tokens', icon: TbKey, href: '/envmanager/tokens', active: isTokens }] : []),
+    ...(hasCapability(user, 'menu:gists') ? [{ label: 'Gists', icon: TbBrandGithub, href: '/envmanager/gists', active: isGists }] : []),
+    { label: 'Profil', icon: TbUser, href: '/profile', active: false },
   ]
 
   return (
     <AppShell
       header={{ height: 56, collapsed: !isMobile }}
       navbar={{ width: collapsed ? 60 : 260, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }}
-      padding="md"
+      padding={{ base: 'sm', sm: 'md' }}
     >
       {/* ─── Mobile header ──────────────── */}
-      <AppShell.Header px="md" hiddenFrom="sm">
+      <AppShell.Header
+        px="sm"
+        hiddenFrom="sm"
+        style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
+      >
         <Group h="100%" justify="space-between">
           <Group gap="xs">
             <Burger opened={mobileOpened} onClick={toggleMobile} size="sm" />
-            <ThemeIcon size="md" variant="gradient" gradient={{ from: 'violet', to: 'grape' }}>
-              <TbVariable size={16} />
-            </ThemeIcon>
-            <Text fw={700} size="sm">Env Manager</Text>
+            <Group gap={6}>
+              <Box style={{ position: 'relative' }}>
+                <ThemeIcon size={28} variant="gradient" radius="md">
+                  <TbVariable size={14} />
+                </ThemeIcon>
+                <Box
+                  style={{
+                    position: 'absolute',
+                    bottom: -1,
+                    right: -1,
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: 'var(--mantine-color-teal-5)',
+                    border: '1.5px solid var(--mantine-color-body)',
+                  }}
+                />
+              </Box>
+              <Text fw={800} size="sm">
+                Env Manager
+              </Text>
+            </Group>
           </Group>
-          <Group gap="xs">
+          <Group gap={6}>
             <ThemeToggle size="sm" />
-            <Avatar color="violet" radius="xl" size="sm">
-              {user?.name?.charAt(0).toUpperCase()}
-            </Avatar>
+            <Menu position="bottom-end" withArrow shadow="md" width={200}>
+              <Menu.Target>
+                <Box style={{ position: 'relative', cursor: 'pointer' }}>
+                  <UserAvatar
+                    user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }}
+                    size="sm"
+                    color="primary"
+                    variant="gradient"
+                  />
+                  <Box
+                    style={{
+                      position: 'absolute',
+                      bottom: -1,
+                      right: -1,
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: 'var(--mantine-color-teal-5)',
+                      border: '1.5px solid var(--mantine-color-body)',
+                    }}
+                  />
+                </Box>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>
+                  <Text size="xs" fw={600}>
+                    {user?.name}
+                  </Text>
+                  <Text size="xs" c="dimmed" truncate>
+                    {user?.email}
+                  </Text>
+                </Menu.Label>
+                <Menu.Item
+                  leftSection={<TbUser size={14} />}
+                  onClick={() => navigate({ to: '/profile', search: { tab: 'account' } })}
+                >
+                  Profile
+                </Menu.Item>
+                <Menu.Divider />
+                <Menu.Item leftSection={<TbLogout size={14} />} color="red" onClick={confirmLogout}>
+                  Logout
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           </Group>
         </Group>
       </AppShell.Header>
 
-      {/* ─── Sidebar ───────────────────── */}
-      <AppShell.Navbar p={collapsed ? 'xs' : 'md'}>
-
-        {/* Logo section */}
-        <AppShell.Section mb="xs">
-          <Group gap="xs" justify={collapsed ? 'center' : 'space-between'}>
-            {collapsed ? (
-              <Tooltip label="Expand sidebar" position="right">
-                <ActionIcon variant="subtle" color="gray" size="lg" onClick={toggleSidebar}>
-                  <TbLayoutSidebarLeftExpand size={18} />
-                </ActionIcon>
-              </Tooltip>
-            ) : (
-              <>
-                <Group gap="xs">
-                  <ThemeIcon size={36} variant="gradient" gradient={{ from: 'violet', to: 'grape' }} radius="md">
-                    <TbVariable size={18} />
-                  </ThemeIcon>
-                  <Box>
-                    <Text fw={700} size="sm" lh={1.2}>Env Manager</Text>
-                    <Text size="xs" c="dimmed">Environment Variables</Text>
-                  </Box>
-                </Group>
-                <Tooltip label="Collapse sidebar">
-                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={toggleSidebar}>
-                    <TbLayoutSidebarLeftCollapse size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              </>
-            )}
-          </Group>
-        </AppShell.Section>
-
-        <Divider mb="xs" />
-
-        {/* Main nav */}
-        <AppShell.Section grow>
-          <Stack gap={2}>
-            {mainNav.map(item =>
-              collapsed ? (
-                <Tooltip key={item.href} label={item.label} position="right">
-                  <ActionIcon
-                    variant={item.active ? 'light' : 'subtle'}
-                    color={item.active ? 'violet' : 'gray'}
-                    size="lg"
-                    onClick={() => { navigate({ to: item.href }); closeMobile() }}
-                    style={{ width: '100%' }}
-                  >
-                    <item.icon size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              ) : (
-                <NavLink
-                  key={item.href}
-                  label={item.label}
-                  description={item.description}
-                  leftSection={
-                    <ThemeIcon size="sm" variant={item.active ? 'light' : 'subtle'} color={item.active ? 'violet' : 'gray'} radius="sm">
-                      <item.icon size={14} />
-                    </ThemeIcon>
-                  }
-                  rightSection={<TbChevronRight size={12} style={{ opacity: 0.4 }} />}
-                  active={item.active}
-                  onClick={() => { navigate({ to: item.href }); closeMobile() }}
-                  variant="light"
-                  color="violet"
-                />
-              )
-            )}
-
-
-            <Divider my="xs" label={collapsed ? undefined : 'Other'} labelPosition="left" />
-
-            {otherNav.map(item =>
-              collapsed ? (
-                <Tooltip key={item.href} label={item.label} position="right">
-                  <ActionIcon
-                    variant={item.active ? 'light' : 'subtle'}
-                    color={item.active ? 'violet' : 'gray'}
-                    size="lg"
-                    onClick={() => { navigate({ to: item.href }); closeMobile() }}
-                    style={{ width: '100%' }}
-                  >
-                    <item.icon size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              ) : (
-                <NavLink
-                  key={item.href}
-                  label={item.label}
-                  leftSection={
-                    <ThemeIcon size="sm" variant={item.active ? 'light' : 'subtle'} color={item.active ? 'violet' : 'gray'} radius="sm">
-                      <item.icon size={14} />
-                    </ThemeIcon>
-                  }
-                  rightSection={<TbChevronRight size={12} style={{ opacity: 0.4 }} />}
-                  active={item.active}
-                  onClick={() => { navigate({ to: item.href }); closeMobile() }}
-                  variant="subtle"
-                  color="gray"
-                />
-              )
-            )}
-          </Stack>
-        </AppShell.Section>
-
-        {/* User section */}
-        <AppShell.Section>
-          <Divider mb="xs" />
-          {collapsed ? (
-            <Stack align="center" gap={6}>
-              <Tooltip label={`${user?.name} · ${roleLabel[user?.role ?? ''] ?? user?.role}`} position="right">
-                <Avatar color="violet" radius="xl" size="sm" style={{ cursor: 'default' }}>
-                  {user?.name?.charAt(0).toUpperCase()}
-                </Avatar>
-              </Tooltip>
-              <ThemeToggle size="sm" />
-              <Tooltip label="Profile" position="right">
-                <ActionIcon variant="subtle" color="gray" size="sm" component="a" href="/profile">
-                  <TbUser size={14} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Logout" position="right">
-                <ActionIcon variant="subtle" color="red" size="sm" onClick={confirmLogout} loading={logout.isPending}>
-                  <TbLogout size={14} />
-                </ActionIcon>
-              </Tooltip>
-            </Stack>
-          ) : (
-            <Group justify="space-between" wrap="nowrap">
-              <Group gap="xs" style={{ minWidth: 0 }}>
-                <Avatar color="violet" radius="xl" size="sm">
-                  {user?.name?.charAt(0).toUpperCase()}
-                </Avatar>
-                <Box style={{ minWidth: 0 }}>
-                  <Text size="xs" fw={600} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {user?.name}
-                  </Text>
-                  <Text size="xs" c="dimmed">{roleLabel[user?.role ?? ''] ?? user?.role}</Text>
-                </Box>
-              </Group>
-              <Group gap={2} wrap="nowrap">
-                <ThemeToggle size="sm" />
-                <Tooltip label="Profile">
-                  <ActionIcon variant="subtle" color="gray" size="sm" component="a" href="/profile">
-                    <TbUser size={14} />
-                  </ActionIcon>
-                </Tooltip>
-                <Tooltip label="Logout">
-                  <ActionIcon variant="subtle" color="red" size="sm" onClick={confirmLogout} loading={logout.isPending}>
-                    <TbLogout size={14} />
-                  </ActionIcon>
-                </Tooltip>
-              </Group>
-            </Group>
-          )}
-        </AppShell.Section>
+      {/* ─── Sidebar (desktop only) ─────── */}
+      <AppShell.Navbar p={collapsed ? 'xs' : 'md'} style={{ overflow: 'hidden' }}>
+        <EnvManagerSidebar
+          collapsed={collapsed}
+          toggleSidebar={toggleSidebar}
+          closeMobile={closeMobile}
+          user={user}
+          mainNav={mainNav}
+          otherNav={otherNav}
+          extensionsNav={extensionsNav}
+          confirmLogout={confirmLogout}
+        />
       </AppShell.Navbar>
 
-      <AppShell.Main>
-        <Outlet />
+      <AppShell.Main style={{ paddingBottom: isMobile ? 'calc(64px + env(safe-area-inset-bottom))' : undefined }}>
+        <Container size="lg" px={0}>
+          <Outlet />
+        </Container>
       </AppShell.Main>
+
+      {/* ─── Mobile bottom tab bar ──────── */}
+      {isMobile && (
+        <MobileTabBar
+          tabs={bottomTabs}
+          navigate={(opts) => {
+            navigate({ to: opts.to })
+          }}
+          onClose={closeMobile}
+        />
+      )}
     </AppShell>
   )
 }

@@ -1,0 +1,67 @@
+services:
+  envman:
+    image: ghcr.io/bipprojectbali/envman:stg-latest
+    container_name: envman-stg
+    restart: unless-stopped
+    environment:
+      # Database
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
+      # Redis
+      - REDIS_URL=${REDIS_URL}
+      # Google OAuth
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      # Secret encryption (AES-256-GCM)
+      - MASTER_KEY=${MASTER_KEY}
+      # App
+      - PORT=${PORT:-3000}
+      - NODE_ENV=production
+      - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL}
+      - AUDIT_LOG_RETENTION_DAYS=${AUDIT_LOG_RETENTION_DAYS:-90}
+      # MCP
+      - MCP_SECRET=${MCP_SECRET}
+      - MCP_SECRET_ADMIN=${MCP_SECRET_ADMIN}
+      # CLI upload secret (dipakai CI untuk POST /api/admin/cli/upload/:platform)
+      - CLI_UPLOAD_SECRET=${CLI_UPLOAD_SECRET}
+      # Telegram
+      - TELEGRAM_NOTIFY_TOKEN=${TELEGRAM_NOTIFY_TOKEN}
+      - TELEGRAM_NOTIFY_CHAT_ID=${TELEGRAM_NOTIFY_CHAT_ID}
+      # Migration (runs at startup via src/lib/migrate.ts)
+      # MIGRATE_ON_STARTUP defaults to true — set to false to skip
+      - MIGRATE_ON_STARTUP=${MIGRATE_ON_STARTUP:-true}
+      # Use DIRECT_URL for migrations to bypass pooler (advisory lock requires direct connection)
+      - MIGRATE_DATABASE_URL=${DIRECT_URL}
+      # MIGRATE_DB_RETRIES defaults to 5 (2s delay each)
+    volumes:
+      - cli-dist:/data/cli
+    networks:
+      - public-net
+      - postgres-net-stg
+      - redis-net
+    mem_limit: 512m
+    cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=public-net"
+      - "traefik.http.routers.envman.rule=Host(`envman.wibudev.com`)"
+      - "traefik.http.routers.envman.entrypoints=websecure"
+      - "traefik.http.routers.envman.tls=true"
+      - "traefik.http.routers.envman.tls.certresolver=letsencrypt"
+      - "traefik.http.services.envman.loadbalancer.server.port=3000"
+
+volumes:
+  cli-dist:
+
+networks:
+  public-net:
+    external: true
+  postgres-net-stg:
+    external: true
+  redis-net:
+    external: true

@@ -1,327 +1,750 @@
-Default to using Bun instead of Node.js.
+# envman — CLAUDE.md
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+## Runtime
+
+Gunakan Bun di seluruh stack. `bun <file>` / `bun test` / `bun install` / `bunx <pkg>`. Bun auto-load `.env` — jangan pakai dotenv. Sebelum install npm package, cek apakah ada Bun native API.
+
+Bun APIs yang dipakai: `Bun.password.hash/verify` (bcrypt), `Bun.RedisClient` (native), `Bun.file()` (zero-copy), `crypto.randomUUID()` (session token).
+
+---
 
 ## Server
 
-Elysia.js as the HTTP framework, running on Bun. API routes are in `src/app.ts` (exported as `createApp()`), frontend serving and dev tools are in `src/index.tsx`.
+- `src/app.ts` — semua API routes (`createApp()`)
+- `src/index.tsx` — server entry + Vite middleware (dev)
+- `src/serve.ts` — dev entry: `bun --watch src/serve.ts`
+- `src/server.prod.ts` — production entry (tanpa Vite/Babel). **Jangan compile `src/index.tsx`** — pull `@babel/core`.
 
-- `src/app.ts` — Elysia app factory with all API routes (auth, admin, logs, presence, hello, health, Google OAuth). Testable via `app.handle(request)`.
-- `src/index.tsx` — Server entry. Adds Vite middleware (dev) or static file serving (prod), click-to-source editor integration, audit log rotation, and `.listen()`.
-- `src/serve.ts` — Dev entry (`bun --watch src/serve.ts`). Dynamic import workaround for Bun EADDRINUSE race.
+**Binary compile:** `bun build src/server.prod.ts --compile --target=bun-linux-x64 --outfile server`
+
+**Migration module:** `src/lib/migrate.ts` — zero npm dep, compatible `_prisma_migrations`. Jalan otomatis di startup (`MIGRATE_ON_STARTUP=true` default) sebelum `app.listen()`. `scripts/migrate.ts` = thin CLI wrapper.
+
+ENV vars migration: `MIGRATE_ON_STARTUP` (default true), `MIGRATE_DATABASE_URL` (default `DIRECT_URL ?? DATABASE_URL`), `MIGRATIONS_DIR` (default `./prisma/migrations`), `MIGRATE_DB_RETRIES` (default 5, 2s delay).
+
+---
 
 ## Database
 
-PostgreSQL via Prisma v6. Client generated to `./generated/prisma` (gitignored).
+PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`). Schema: `prisma/schema.prisma`. Client di-generate ke `./generated/prisma`.
 
-- Schema: `prisma/schema.prisma`
-  - `User` (id, name, email, password, role, blocked, timestamps)
-  - `Session` (id, token, userId, expiresAt)
-  - `AuditLog` (id, userId, action, detail, ip, createdAt)
-  - `Ticket` (id, title, description, status, priority, route, reporterId, assigneeId, timestamps, closedAt)
-  - `TicketComment` (id, ticketId, authorId, authorTag, body, createdAt)
-  - `TicketEvidence` (id, ticketId, kind, url, note, createdAt)
-- Enums: `Role` = `USER | QC | ADMIN | SUPER_ADMIN` (default `USER`); `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`; `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`; `ProjectMemberRole` = `OWNER | EDITOR | VIEWER`
-  - `Project` (id, slug, name, description, timestamps)
-  - `Environment` (id, name, projectId, createdAt) — unique(projectId, name)
-  - `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
-  - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
-  - `ApiToken` (id, userId, name, token, projectId?, envName?, canWrite, lastUsedAt?, expiresAt?, createdAt)
-  - `PortainerConnection` (id, userId, name, portainerUrl, apiToken, createdAt) — global, reusable across projects
-  - `PortainerConfig` (id, projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?, timestamps) — `connectionId` FK preferred; legacy `portainerUrl`/`apiToken` nullable for backward compat
-- Client singleton: `src/lib/db.ts` — import `{ prisma }` from here
-- Seed: `prisma/seed.ts` — demo users (superadmin, admin, user) with `Bun.password.hash` bcrypt
-- Commands: `bun run db:migrate`, `bun run db:seed`, `bun run db:generate`
+### Schema Models
 
-## Redis
+- `User` (id, name, email, password, role, blocked, timestamps)
+- `Session` (id, token, userId, expiresAt, createdAt)
+- `AuditLog` (id, userId, action, detail, ip, createdAt)
+- `Ticket` (id, title, description, status, priority, route, reporterId, assigneeId, timestamps, closedAt)
+- `TicketComment` (id, ticketId, authorId, authorTag, body, createdAt)
+- `TicketEvidence` (id, ticketId, kind, url, note, createdAt)
+- `Project` (id, slug, name, description, tags[], timestamps)
+- `Environment` (id, name, tags[], projectId, createdAt) — unique(projectId, name)
+- `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
+- `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
+- `EnvironmentMember` (id, userId, environmentId, role?, createdAt) — unique(userId, environmentId). `role=null` = explicit DENY, role=OWNER/EDITOR/VIEWER = override, no record = inherit project role
+- `ApiToken` (id, userId, name, token, scopes[], tags[], canWrite, isDisabled, lastUsedAt?, expiresAt?, createdAt, useCount, lastIp?, disabledBy?, disabledAt?, disabledReason?)
+- `ProjectAlias` (id, projectId, name, args, description?, tags[], createdBy, timestamps) — unique(projectId, name)
+- `ProjectFile` (id, projectId, authorId, title, description, prefix?, files Json, tags[], timestamps) — unique(projectId, prefix)
+- `PortainerConnection` (id, name, portainerUrl, apiToken, createdById, timestamps) — global
+- `PortainerConfig` (id, projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?, timestamps)
+- `AppSetting` (key PK, value, updatedAt, updatedById?) — konfigurasi global runtime, diubah via Dev > Settings
+- `Gist` (id, userId, title, description, files Json `[{filename, content, language}]`, isPublic, tags[], timestamps) — snippet multi-file. `isPublic=false` (default) = private milik owner; `isPublic=true` = terlihat user lain. Edit/delete: owner atau SUPER_ADMIN.
+- `EnvImport` (id, targetEnvId, sourceEnvId, order, createdById, createdAt) — unique(targetEnvId, sourceEnvId), index keduanya. Live-link: env target meminjam vars dari source env (boleh lintas project) secara **referensi** (bukan salinan). FK `ON DELETE CASCADE` — source/target env dihapus → link ikut hilang. Lihat section [Env Import](#env-import-reference--live-link).
 
-Bun native `Bun.RedisClient` — no external package needed.
+### Enums
 
-- Client singleton: `src/lib/redis.ts` — connects to `REDIS_URL`
-- App logs: stored as Redis List (`app:logs`), max 500 entries via `LTRIM`, persists across restart
-- App log module: `src/lib/applog.ts` — `appLog(level, message, detail?)`, `getAppLogs(options?)`, `clearAppLogs()`
+- `Role` = `USER | QC | ADMIN | SUPER_ADMIN`
+- `ProjectMemberRole` = `OWNER | EDITOR | VIEWER`
+- `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`
+- `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`
+
+### Commands
+
+```bash
+bun run db:migrate    # bunx prisma migrate dev
+bun run db:seed       # bun run prisma/seed-dev.ts (dev only)
+bun run db:generate   # bunx prisma generate
+bun run db:studio     # bunx prisma studio
+bun run db:push       # bunx prisma db push
+```
+
+### Aturan Migrasi Database (KETETAPAN MUTLAK)
+
+**Setiap perubahan `prisma/schema.prisma` WAJIB diikuti langkah berikut — tanpa terkecuali:**
+
+#### 1. Buat migration SQL manual
+
+Buat folder baru di `prisma/migrations/` dengan format `YYYYMMDDHHMMSS_deskripsi_singkat/migration.sql`.
+
+**Aturan penulisan SQL:**
+- Nama tabel pakai **lowercase** — semua tabel di project ini lowercase (contoh: `"environment"`, bukan `"Environment"`)
+- Selalu pakai `IF NOT EXISTS` / `IF EXISTS` agar idempotent (aman di-rerun di env yang sudah `db push` manual)
+- Kolom NOT NULL di tabel berisi data: wajib kasih `DEFAULT` atau `UPDATE` backfill dulu
+- Sertakan comment singkat: *kenapa* ditambah, bukan *apa*
+
+```sql
+-- Contoh kolom baru
+ALTER TABLE "environment" ADD COLUMN IF NOT EXISTS "tags" TEXT[] NOT NULL DEFAULT '{}';
+
+-- Contoh index baru
+CREATE INDEX IF NOT EXISTS "idx_environment_tags" ON "environment" USING GIN ("tags");
+
+-- Contoh hapus kolom
+ALTER TABLE "environment" DROP COLUMN IF EXISTS "deprecated_field";
+```
+
+#### 2. Jalankan migrasi di local dev — WAJIB sebelum commit
+
+```bash
+bun run db:migrate    # bunx prisma migrate dev — terapkan migration + regenerate client
+```
+
+Jangan commit schema change tanpa menjalankan `bun run db:migrate` terlebih dahulu. Migration yang belum dijalankan di local = migration yang belum terbukti valid.
+
+#### 3. Regenerate Prisma client
+
+`bun run db:migrate` sudah include generate. Jika hanya perlu generate tanpa migrate:
+```bash
+bun run db:generate   # bunx prisma generate
+```
+
+#### 4. Verifikasi
+
+Setelah migrasi berhasil, pastikan:
+- Tidak ada error di `bun run typecheck`
+- Server dev bisa start tanpa error
+- Migration file ada di `prisma/migrations/` dan sudah di-commit
+
+**Kenapa wajib:** Server production menjalankan migrasi otomatis saat startup (`MIGRATE_ON_STARTUP=true`). Jika migration file tidak ada atau SQL-nya salah, server crash saat deploy. Migration yang sudah diuji di local = deploy yang aman.
+
+**❌ Larangan:**
+- Schema change tanpa migration file
+- Commit migration file tanpa menjalankan `bun run db:migrate` di local
+- Pakai `bun run db:push` sebagai pengganti migration (db push tidak buat migration file)
+- Nama tabel PascalCase di SQL (harus lowercase sesuai konvensi project ini)
+
+---
+
+### Secret Encryption
+
+Vars dengan `isSecret=true` dienkripsi AES-256-GCM. `MASTER_KEY` = 64-char hex. Format: `enc:<iv>:<cipher>:<tag>`. Impl: `src/lib/crypto.ts`. VIEWER lihat `***`; EDITOR/OWNER bisa reveal.
+
+### Seed Users (dev only)
+
+| Email | Password | Role |
+|-------|----------|------|
+| `superadmin@example.com` | `superadmin123` | SUPER_ADMIN |
+| `admin@example.com` | `admin123` | ADMIN |
+| `user@example.com` | `user123` | USER |
+
+`prisma/seed-dev.ts` — gitignored, guard `NODE_ENV !== 'development'` → exit 1.
+
+---
 
 ## Auth
 
-Session-based auth with HttpOnly cookies stored in DB.
+Session-based (HttpOnly cookie + DB). `POST /api/auth/login` → bcrypt verify → Session record. Google OAuth: `/api/auth/google`. Blocked → 403, sessions dihapus. Dev: `GET /api/dev-auth/login-as/:email`.
 
-- Login: `POST /api/auth/login` — finds user by email, verifies password with `Bun.password.verify`, checks blocked status, creates Session record. Logs to audit trail.
-- Google OAuth: `GET /api/auth/google` → Google → `GET /api/auth/callback/google` — upserts user, creates session
-- Session: `GET /api/auth/session` — looks up session by cookie token, returns user (including role & blocked) or 401, auto-deletes expired
-- Logout: `POST /api/auth/logout` — deletes session from DB, clears cookie
-- Blocked users: login returns 403, existing sessions are invalidated on block, frontend redirects to `/blocked`
-- Dev-auth: `GET /api/dev-auth/login-as/:email?redirect=/path` — development only (`NODE_ENV=development`). Skips password/OAuth, creates session directly. For Playwright testing.
-
-## Admin API (SUPER_ADMIN only)
-
-- `GET /api/admin/users` — list all users with role, blocked status, createdAt
-- `PUT /api/admin/users/:id/role` — change role to USER or ADMIN (cannot change self or to SUPER_ADMIN)
-- `PUT /api/admin/users/:id/block` — block/unblock user (deletes all sessions on block)
-- `GET /api/admin/presence` — list online user IDs
-- `GET /api/admin/logs/app` — app logs from Redis (filter: level, limit, afterId)
-- `GET /api/admin/logs/audit` — audit logs from DB (filter: userId, action, limit)
-- `DELETE /api/admin/logs/app` — clear all app logs from Redis
-- `DELETE /api/admin/logs/audit` — clear all audit logs from DB
-- `GET /api/admin/routes` — all routes metadata (method, path, auth level, category, description) with summary stats
-- `GET /api/admin/project-structure` — scans `src/`, `prisma/`, `tests/` — returns files with line counts, exports, imports, categories + directory tree
-- `GET /api/admin/env-map` — environment variables with set/unset status, required/optional, default values, consuming files
-- `GET /api/admin/test-coverage` — source files + test files mapping, coverage status (covered/partial/uncovered)
-- `GET /api/admin/dependencies` — NPM packages from package.json with version, type (runtime/dev), category, importing files
-- `GET /api/admin/migrations` — Prisma migration timeline with parsed SQL changes and date info
-- `GET /api/admin/sessions` — all active sessions with user info, online status, expiry, role breakdown
-
-## Tickets API
-
-Role-gated ticket tracking. Status machine: `OPEN → IN_PROGRESS → READY_FOR_QC → CLOSED` with `REOPENED` branch. Allowed-transition helper enforces valid moves.
-
-- `GET /api/tickets` — list (QC users see only QC-scope tickets)
-- `POST /api/tickets` — create (any authed user reports)
-- `GET /api/tickets/:id` — detail with comments + evidence
-- `PATCH /api/tickets/:id` — update status/priority/assignee (role-gated)
-- `POST /api/tickets/:id/comments` — add comment
-- `POST /api/tickets/:id/evidence` — attach evidence (url + kind)
-
-Frontend: `src/frontend/components/TicketsPanel.tsx` — shared between `/dev` and `/dashboard`. Filtered to QC scope when user is QC.
-
-## Envman CLI
-
-Standalone CLI for injecting env vars at runtime. Built with `bun build --compile` into self-contained binaries.
-
-- Entry: `src/cli.ts`
-- Build: `bun run build:cli` → `dist/cli/envman-{platform}` (linux-x64, linux-arm64, darwin-x64, darwin-arm64, windows-x64)
-- Install: served at `/download/cli/<platform>` (future), or copy binary to PATH as `envman`
-
-### Auth resolution (priority: highest → lowest)
-1. `ENVMAN_SERVER` + `ENVMAN_TOKEN` in a local `-e` file
-2. `ENVMAN_SERVER` + `ENVMAN_TOKEN` as system env vars (process.env / ~/.bashrc / CI)
-3. Config file at `~/.config/envman/config.json` (saved by `envman login`)
-
-### Unified `-e` flag
-- `-e project:env` (contains `:`) → fetch vars from server
-- `-e .env.local` (no `:`) → parse local file
-
-`ENVMAN_SERVER` and `ENVMAN_TOKEN` are always stripped from the child process env to avoid leaking credentials.
-
-### Commands
-```
-envman login <server-url> --token <token>   # Save to ~/.config/envman/config.json
-envman logout                                # Remove config file
-envman whoami                                # Show authenticated user
-envman [options] -- <command>               # Inject vars and run command
-```
-
-### Options
-```
--e <project>:<env>   Fetch vars from server
--e <file>            Load vars from local file
---server-wins        System env overrides merged vars (default: merged wins)
-```
-
-### Multiple sources (later -e overrides earlier)
-```bash
-envman -e myapp:base -e myapp:production -- bun dev
-envman -e .env.local -e myapp:production -- bun dev     # local wins
-envman -e .env.local -e myapp:production -- bun dev     # auth from file if ENVMAN_SERVER/TOKEN in .env.local
-```
-
-## Secret Var Encryption
-
-Env vars marked as `isSecret` dienkripsi dengan **AES-256-GCM** sebelum disimpan ke DB.
-
-- `MASTER_KEY` — 64-char hex string (32 bytes). Generate: `openssl rand -hex 32`
-- Jika tidak di-set: secret tersimpan plaintext (backward compatible)
-- Format tersimpan di DB: `enc:<iv_hex>:<ciphertext_hex>:<auth_tag_hex>`
-- Enkripsi terjadi di: `src/lib/crypto.ts` (`encryptSecret`, `decryptSecret`)
-- VIEWER hanya bisa lihat `***` di UI, EDITOR/OWNER bisa reveal (decrypt server-side)
-- Export/CLI dan Portainer sync selalu decrypt otomatis
-
-## Envman API
-
-Auth: session cookie (browser) or `Authorization: Bearer <token>` (CLI). `requireEnvAuth()` middleware in `src/app.ts`.
-
-### Projects
-- `GET /api/envman/projects` — list projects (only ones you have access to)
-- `POST /api/envman/projects` — create project (ADMIN+)
-- `GET /api/envman/projects/:slug` — project detail + members + environments
-- `GET /api/envman/projects/:slug/environments/:env/vars` — list vars (VIEWER: secrets masked as `***`)
-- `GET /api/envman/projects/:slug/environments/:env/vars/export` — all vars decrypted (EDITOR+)
-- `POST /api/envman/projects/:slug/environments/:env/vars` — create/update var (EDITOR+)
-- `PUT /api/envman/projects/:slug/environments/:env/vars/:key` — update var (EDITOR+)
-- `DELETE /api/envman/projects/:slug/environments/:env/vars/:key` — delete var (EDITOR+)
-- `POST /api/envman/projects/:slug/environments` — add environment (EDITOR+)
-- `DELETE /api/envman/projects/:slug/environments/:env` — delete environment (OWNER+)
-- `PUT /api/envman/projects/:slug/members/:userId/role` — change member role (OWNER)
-- `DELETE /api/envman/projects/:slug/members/:userId` — remove member (OWNER)
-
-### Portainer
-- `GET /api/envman/portainer/connections` — list global connections
-- `POST /api/envman/portainer/connections` — create connection
-- `PUT /api/envman/portainer/connections/:id` — update connection
-- `DELETE /api/envman/portainer/connections/:id` — delete connection
-- `POST /api/envman/portainer/connections/:id/probe` — test + fetch stacks from Portainer
-- `GET /api/envman/projects/:slug/environments/:env/portainer` — get portainer config
-- `PUT /api/envman/projects/:slug/environments/:env/portainer` — save portainer config (connectionId + stackId)
-- `DELETE /api/envman/projects/:slug/environments/:env/portainer` — remove portainer config
-- `POST /api/envman/projects/:slug/environments/:env/portainer/sync` — push all vars to Portainer stack
-
-### Tokens
-- `GET /api/envman/tokens` — list your tokens
-- `POST /api/envman/tokens` — create token
-- `DELETE /api/envman/tokens/:id` — delete token
-- `GET /api/envman/whoami` — verify token, return user info
-
-## MCP Server
-
-Local MCP server lets Claude drive the app remotely. `.mcp.json` registers `app-mcp` (runs `scripts/mcp/server.ts`) alongside `playwright`. Requires `MCP_SECRET`; `MCP_SECRET_ADMIN` unlocks write/dev tools.
-
-- Entry: `scripts/mcp/server.ts` + `scripts/mcp/test-client.ts`
-- Tool modules (`scripts/mcp/tools/`): `admin`, `code`, `db`, `dev`, `health`, `logs`, `presence`, `project`, `redis`, `tickets`, `shared`
-- Ticket tools: `list`, `get`, `claim`, `comment`, `add_evidence`, `ready_for_qc`, `create`, `close`, `reopen`, `update`
-- HTTP fallback: `POST /mcp` — readonly with `MCP_SECRET`, full with `MCP_SECRET_ADMIN`
-
-## WebSocket
-
-- `WS /ws/presence` — real-time user presence. Authenticates via session cookie. Tracks connections in-memory (`src/lib/presence.ts`). Broadcasts online user list to admin subscribers on connect/disconnect.
-
-## Logging
-
-Two log systems:
-
-- **App Logs** (`src/lib/applog.ts`) — Redis-backed ring buffer (500 entries). Logs API requests (via `onAfterResponse` hook), errors, auth events. Auto-rotates via `LTRIM`. Can be cleared manually.
-- **Audit Logs** (DB `AuditLog` table) — Persistent user activity trail. Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`. Auto-cleanup of records older than `AUDIT_LOG_RETENTION_DAYS` (default 90) runs on startup + every 24h. Can be cleared manually.
-- **Pagination** — Dev Console App Logs and User Logs use client-side pagination (25 per page). Avoids rendering hundreds of rows while polling every 5s. Page resets on filter change.
+---
 
 ## Routing Rules (Ketetapan Mutlak)
 
-**Static routes wajib digunakan untuk semua navigasi yang merepresentasikan lokasi dalam hierarki data atau resource.** Ini adalah ketetapan tidak dapat dikecualikan.
+**Static routes wajib** untuk semua navigasi yang merepresentasikan lokasi dalam hierarki data.
 
-### Kapan pakai static route (`/path/:param`)
-- Navigasi antar resource yang berbeda (project → environment → vars)
-- URL yang harus bisa di-bookmark, di-share, dan di-reload tanpa kehilangan context
-- Setiap level hierarki data yang punya identitas sendiri
-- Section besar dengan sub-navigasi yang dalam
+- Static route `/path/:param` untuk: navigasi antar resource, URL yang bisa bookmark/share/reload
+- Search params `?key=value` **hanya** untuk view state satu halaman (tab aktif, filter, sort)
 
-### Kapan boleh pakai search params (`?key=value`)
-- **Hanya** untuk view state dalam satu halaman: tab aktif, filter, sort order
-- State yang sifatnya preferensi tampilan, bukan lokasi resource
-- Contoh yang benar: `?tab=environments` di `/envmanager/:slug` (dua view dari resource yang sama)
-- Contoh yang salah: `?em_project=myapp&em_env=production` (ini adalah lokasi, bukan view state)
+**Larangan keras:**
+- ❌ `useState` untuk navigasi antar halaman/resource
+- ❌ Search params sebagai pengganti path params untuk resource hierarchy
+- ❌ "Temporary routes" yang hilang saat reload
 
-### Larangan keras
-- **Dilarang** menggunakan `useState` untuk navigasi antar halaman/resource
-- **Dilarang** menggunakan search params sebagai pengganti path params untuk resource hierarchy
-- **Dilarang** membuat "temporary routes" yang hilang saat reload
+### Route Structure
 
-### Pattern yang benar (contoh dari project ini)
 ```
 /envmanager                    → project list
 /envmanager/tokens             → tokens page
 /envmanager/connections        → global Portainer connections
-/envmanager/:slug              → project detail (?tab=environments|members OK)
-/envmanager/:slug/:env         → vars page
+/envmanager/:slug              → project detail (?tab=environments|notes|aliases OK)
+/envmanager/:slug/:env         → vars page (?integrations=true, ?compare=true OK)
 ```
+
+---
 
 ## Role-Based Routing
 
-| Role | Default Route | Can Access |
-|------|--------------|------------|
+| Role | Default | Can Access |
+|------|---------|------------|
 | SUPER_ADMIN | `/dev` | `/dev`, `/dashboard`, `/envmanager`, `/profile` |
 | ADMIN | `/dashboard` | `/dashboard`, `/envmanager`, `/profile` |
-| QC | `/dashboard` | `/dashboard` (QC-scoped tickets only), `/profile` |
+| QC | `/dashboard` | `/dashboard` (QC tickets only), `/profile` |
 | USER | `/profile` | `/profile` |
 
-- `getDefaultRoute(role)` in `src/frontend/hooks/useAuth.ts` — centralized redirect logic
-- Blocked users are redirected to `/blocked` from all protected routes
-- Tab state persisted in URL search params (`?tab=`) for `/dev` and `/dashboard` (flat panels, not resource hierarchy)
+`getDefaultRoute(role)` di `src/frontend/hooks/useAuth.ts`. Blocked → `/blocked`.
+
+---
+
+## Permission Hierarchy (Per-Project + Per-Env)
+
+Akses ke resource project diatur dua lapis. Default: env, notes, aliases, dan files **inherit** dari `ProjectMember.role`. OWNER bisa **override** role per env atau set **DENY** explicit per env per user.
+
+### Secure-by-Default Member Onboarding
+
+Saat member ditambah dengan role **EDITOR/VIEWER** (POST `/api/envman/projects/:slug/members`), server otomatis insert `EnvironmentMember` dengan `role=null` (DENY explicit) untuk **semua env existing** di project. Konsekuensi: member baru **tidak punya akses apapun** sampai OWNER eksplisit grant per-env via matrix view atau env-members endpoint. Tujuannya mencegah kekeliruan tidak sengaja memberi akses penuh ke env produksi.
+
+Aturan:
+- Role **OWNER** baru → tidak default-deny (OWNER otomatis dapat akses semua env, sesuai semantik OWNER).
+- Update role member existing (re-POST dengan userId sama) → tidak touch env override; preserve override yang sudah ada.
+- Saat env baru dibuat (POST `/api/envman/projects/:slug/environments`), semua project member non-OWNER otomatis di-deny di env baru tsb. OWNER member tidak terpengaruh.
+- Response `POST /members` carry `defaultDenied: boolean` agar UI bisa konfirmasi behavior.
+
+### Resolver
+
+`getEnvironmentAccess(userId, role, slug, envName)` di `src/lib/access.ts`:
+
+1. SUPER_ADMIN → `OWNER` (selalu).
+2. Cek `EnvironmentMember` (userId, environmentId):
+   - `role = null` → `null` (DENIED — block all access ke env ini)
+   - `role = OWNER|EDITOR|VIEWER` → override
+   - tidak ada record → lanjut ke step 3
+3. Inherit `ProjectMember.role`. Tidak ada record → `null` (no access).
+
+### Defense-in-Depth
+
+Files & aliases tetap accessible di project level (bukan filtered out), tapi yang **reference env via `-e project:env`** akan tetap di-block di env layer:
+
+- **Vars endpoint** — semua handler vars panggil `getEnvironmentAccess()`. DENIED env → 403.
+- **Alias resolve** — `GET /api/envman/aliases/resolve/:ref` extract `-e project:env` refs dari `args` lewat `extractEnvRefs()` (`src/lib/alias-parser.ts`), cek akses caller di setiap env. Kalau ada yang denied → 403 dengan `{error, deniedEnvs: [{project, env}]}`. Alias list endpoint juga compute `requiresEnvs` + `deniedEnvs` per-alias per-user (di luar Redis cache, karena per-caller).
+- **Project detail** — `GET /api/envman/projects/:slug` filter env DENIED untuk non-OWNER; setiap env carry `accessRole` (effective role caller di env tsb).
+
+### CLI Behavior
+
+`apiFetch()` di `src/cli.ts` detect 403 dengan `deniedEnvs` array → cetak `[envman] Akses ditolak untuk env: <project:env>, ...` lalu exit 1. User di-arahkan kontak OWNER project.
+
+### UI
+
+- Project detail (`envmanager.$slug.index.lazy.tsx`): env card render badge `DENIED` (red filled) atau badge override `<role>` (grape, kalau berbeda dari project role caller).
+- MembersPanel: setiap member punya chevron expand → `MemberEnvOverrides` (`src/frontend/components/slug/MemberEnvOverrides.tsx`) render select per-env dengan opsi `inherit | OWNER | EDITOR | VIEWER | denied`, hanya OWNER yang bisa mutate.
+- AliasesPanel: alias yang punya `deniedEnvs.length > 0` render Badge merah "needs <env>" dan sembunyikan CopyButton (alias tidak bisa dipakai user ini).
+- Users Management (`envmanager.users.lazy.tsx` → `AccessMatrixTab`): tampilan **collapsible row** per project (`ProjectAccessRow`) — default tertutup, render badge counts (OWNER/EDITOR/VIEWER/denied/override) di header. Stats global di atas (`AccessStatsHeader`). Default filter `with-access`, sort by name/role/overrides, section "no access" collapsed default.
+
+### Admin Endpoint Parity
+
+`PUT /api/envman/admin/users/:userId/projects/:slug/envs/:envName` (SUPER_ADMIN) tunduk pada **kontrol yang sama** dengan OWNER endpoint:
+- Validasi target user harus project member (400 kalau belum).
+- Last-owner-of-env protection: tolak demote/deny OWNER terakhir efektif di env (400).
+- Emit audit event yang sama (`ENV_MEMBER_SET` / `ENV_MEMBER_CLEARED`) dengan suffix detail `(admin)`.
+- Invalidate `projectAccess`, `projectDetail`, dan `invalidateProjectCaches(slug, [userId])`.
+
+### Audit Events
+
+- `ENV_MEMBER_SET` — detail OWNER: `<slug>/<envName> user=<userId> role=<role>`, detail SUPER_ADMIN: `... role=<role> (admin)`
+- `ENV_MEMBER_CLEARED` — detail OWNER: `<slug>/<envName> user=<userId>`, detail SUPER_ADMIN: `... (admin)`
+
+### Cache Invalidation
+
+PUT/DELETE env-member invalidate `cacheKeys.projectAccess(userId, slug)` + `cacheKeys.projectDetail(slug)`, dan call `invalidateProjectCaches(slug, [userId])`.
+
+---
+
+## Env Import (Reference / Live-Link)
+
+Env target bisa **meminjam vars dari env lain** (boleh lintas project) secara **referensi live**, bukan salinan. Tujuan: base ditulis sekali, semua importer ikut otomatis — hindari drift saat key+value terduplikasi antar env/project. Model: `EnvImport` (lihat Schema Models). Resolver: `src/lib/env-import.ts`. CRUD: `src/routes/envman/env-imports.ts`.
+
+### Semantik Resolusi
+
+- **Layered merge**: `imports (urut order asc, order lebih besar menang) → local`. **Var lokal SELALU menang per-key** (sama seperti CLI `-e base -e prod`, stored/last wins). Imported yang key-nya sudah ada lokal di-suppress.
+- **Akses dicek saat resolve, bukan saat setup**. Tiap baca: untuk tiap source env, panggil `getEnvironmentAccess(callerUserId, callerRole, sourceSlug, sourceEnvName)`. `null` (denied) → var source di-skip + dicatat di `deniedImports[]` (warning eksplisit, tidak silent). Konsisten dengan gate alias resolve.
+- **Secret**: reveal/mask pakai akses caller di **SOURCE env** (OWNER/EDITOR reveal, VIEWER → `***`). MASTER_KEY global tunggal → decrypt lintas project valid; gate murni soal authorization.
+- **Cycle detection saat save** (`wouldCreateCycle`): tolak A→B→A (400).
+- **EnvVar `isDisabled` di source di-exclude** dari resolve.
+
+### Permission
+
+- **Buat/hapus link**: hanya **OWNER env target**. Saat membuat, caller juga wajib punya akses **≥VIEWER** ke source env (`getEnvironmentAccess` source ≠ null).
+- Self-import ditolak (400). Duplikat (target+source sama) ditolak (409). `order` = max+1.
+
+### Scope Resolusi (Runtime + UI)
+
+- **`GET vars/export`** (CLI/daemon/pm): merge imported sebagai base layer, local overwrite per-key. Response tambah `deniedImports` **hanya jika non-kosong** (additive; bentuk `vars` tidak berubah).
+- **`GET vars` list** (UI): response tambah field additive `imported[]` (`{key, value, isSecret, sourceProject, sourceEnv}`, sudah exclude key yang ada lokal), `importedKeys[]` (semua key dari import termasuk yang ter-override), `deniedImports[]`. Bentuk `vars`/`total` existing tidak berubah.
+
+### UI
+
+Halaman vars (`envmanager.$slug.$env.tsx`): baris imported render **read-only** (badge grape `from <proj>:<env>`, tanpa edit/delete/toggle, secret tetap bisa reveal sesuai akses). Var lokal yang key-nya ∈ `importedKeys` render badge `overrides`. `deniedImports` → Alert warning kuning. Tombol kelola link (`TbLink`, grape) hanya untuk OWNER → buka `ImportManagerModal` (`src/frontend/components/env/ImportManagerModal.tsx`, state via `?importMgr=true`).
+
+### Audit & Cache
+
+- Audit: `ENV_IMPORT_ADDED` / `ENV_IMPORT_REMOVED` detail `<slug>/<env> <- <srcSlug>/<srcEnv>`.
+- Invalidate `invalidateProjectCaches(slug)` + `cacheKeys.projectDetail(slug)`. **Hasil resolve vars TIDAK di-cache** (env vars tidak boleh di-cache).
+
+### MVP — Deferred (TODO eksplisit)
+
+Per-key filter, transitive import (multi-level), per-import override value — belum diimplementasi.
+
+---
+
+## API Reference
+
+### Admin API (SUPER_ADMIN only)
+
+- `GET /api/admin/users` — list users
+- `PUT /api/admin/users/:id/role` — change role
+- `PUT /api/admin/users/:id/block` — block/unblock (delete sessions + disable tokens on block)
+- `GET /api/admin/presence` — online user IDs
+- `GET /api/admin/logs/app` — app logs (filter: level, limit, afterId)
+- `GET /api/admin/logs/audit` — audit logs (filter: userId, action, limit)
+- `DELETE /api/admin/logs/app|audit` — clear logs
+- `GET /api/admin/tokens` — list semua token lintas user (filter: userId, status, canWrite, limit)
+- `PATCH /api/admin/tokens/:id` — admin action: disable/enable/set-expiry (body: `{action, reason?, expiresAt?}`)
+- `DELETE /api/admin/tokens/:id` — force revoke token (audit TOKEN_REVOKED_BY_ADMIN)
+- `GET /api/admin/file-health` — health check ukuran file source
+- `GET /api/admin/routes|project-structure|env-map|test-coverage|dependencies|migrations|sessions|schema`
+
+### Tickets API
+
+Status: `OPEN → IN_PROGRESS → READY_FOR_QC → CLOSED` (+ `REOPENED`).
+- `GET|POST /api/tickets` — list/create
+- `GET|PATCH /api/tickets/:id` — detail/update
+- `POST /api/tickets/:id/comments|evidence`
+
+Frontend: `src/frontend/components/TicketsPanel.tsx`
+
+### Envman API
+
+Auth: session cookie atau `Authorization: Bearer <token>`. `requireEnvAuth()` di `src/app.ts`.
+
+**Projects:** `GET|POST /api/envman/projects`, `PATCH|GET /api/envman/projects/:slug`
+
+**Vars:** `GET /api/envman/projects/:slug/environments/:env/vars` (search, limit, offset) · `GET .../vars/export` (EDITOR+) · `POST|PUT|DELETE .../vars/:key`. Field additive (env import): `vars` list tambah `imported[]`/`importedKeys[]`/`deniedImports[]`; `vars/export` tambah `deniedImports` (hanya jika non-kosong). Bentuk `vars`/`total` existing tidak berubah — lihat [Env Import](#env-import-reference--live-link).
+
+**Environments:** `POST|DELETE|PATCH /api/envman/projects/:slug/environments[/:env]`
+
+**Members:** `PUT|DELETE /api/envman/projects/:slug/members/:userId/role|member`
+
+**Env Members (OWNER only):** `GET /api/envman/projects/:slug/environments/:envName/members` — list project members + env override (envRole: `inherit`/`denied`/role) + `effectiveRole` · `PUT .../members/:userId` body `{role: 'inherit'|'denied'|'OWNER'|'EDITOR'|'VIEWER'}` · `DELETE .../members/:userId` reset to inherit. Last-owner-of-env protection: tidak bisa demote/deny OWNER terakhir.
+
+**Env Imports (OWNER target only):** `GET /api/envman/projects/:slug/environments/:envName/imports` — list link aktif (`imports[{id, order, sourceProject, sourceProjectName, sourceEnv, createdAt}]`) · `POST .../imports` body `{sourceProject, sourceEnv}` → `{ok, id, order}` (403 non-OWNER target, 403 caller tanpa akses ≥VIEWER source, 400 self-import, 404 source/target tak ada, 409 duplikat, 400 cycle) · `DELETE .../imports/:id` reset link. Lihat section [Env Import](#env-import-reference--live-link). Audit `ENV_IMPORT_ADDED`/`ENV_IMPORT_REMOVED`.
+
+**Access Matrix (OWNER only):** `GET /api/envman/projects/:slug/access-matrix` — single fetch berisi `{project, environments[], members[{userId, user, projectRole, envAccess: {[envName]: {envRole, effectiveRole}}}]}`. Cached 60s (`cacheKeys.projectAccessMatrix`), auto-invalidate via `invalidateProjectCaches()`. Bulk action di FE pakai fan-out `Promise.allSettled` atas endpoint PATCH/PUT existing — last-owner protection berlaku per-item, partial failure di-aggregate ke notification (`src/frontend/lib/bulk.ts`).
+
+**Portainer:** `GET|POST /api/envman/portainer/connections` · `PUT|DELETE .../connections/:id` · `POST .../connections/:id/probe` · per-env: `GET|PUT|DELETE|POST .../portainer[/sync]`
+
+**Files:** `GET|POST /api/envman/projects/:slug/files` · `GET .../files/resolve?prefix=<p>[&filename=<f>]` · `PUT|DELETE .../files/:id`
+
+**Aliases:** `GET|POST /api/envman/projects/:slug/aliases` · `PATCH|DELETE .../aliases/:name` · `GET /api/envman/aliases/resolve/:ref`
+
+**Tokens:** `GET|POST /api/envman/tokens` · `PATCH|DELETE /api/envman/tokens/:id` · `PATCH .../toggle` · `GET .../reveal` · `POST .../rotate` · `GET /api/envman/whoami`
+
+**Gists:** `GET /api/envman/gists` (session — list milik sendiri + public milik user lain; `?limit&cursor&search&filter`) · `POST /api/envman/gists` (butuh capability `gist:create`; body `{title, description, files[], isPublic, tags[]}`) · `PUT|DELETE /api/envman/gists/:id` (owner atau SUPER_ADMIN) · `GET /api/envman/gists/:id/raw/:filename` (raw plaintext, owner/public). Menu di sidebar gated capability `menu:gists`.
+
+**Public Gists (no auth):** `GET /api/public/gists` (list semua public; `?limit&cursor&search&tags&sort`) · `GET /api/public/gists/:id` (single, 403 jika private) · `GET /api/public/gists/:id/raw/:filename` (raw plaintext).
+
+**Conditional caching (read-resource):** endpoint baca-resource mengirim `ETag` + `Cache-Control` (+ `Last-Modified` bila resource punya timestamp) dan mendukung `If-None-Match` / `If-Modified-Since` → `304 Not Modified` (If-None-Match diutamakan, RFC 9110). Helper reusable: `src/lib/http-cache.ts` (`strongEtag`, `weakEtag`, `conditional`, `notModifiedResponse`). `conditional(req, {etag, lastModified?, cacheControl?})` — `lastModified` opsional (resource statis-deterministik divalidasi via ETag saja), `cacheControl` default `private, no-cache`.
+
+Endpoint yang di-cover:
+- `GET .../gists/:id/raw/:filename` (auth & public) — strong ETag (hash konten file), Last-Modified `gist.updatedAt`.
+- `GET /api/public/gists/:id` — weak ETag (`W/"<hash id:updatedAt>"`).
+- `GET .../files/resolve?prefix=&filename=` — weak ETag (`hash entry.id:updatedAt:filename`), Last-Modified `entry.updatedAt`. Log `logTokenActivity` tetap jalan sebelum cek conditional (304 tetap dihitung akses). Bentuk JSON body tidak berubah.
+- `GET .../aliases/resolve/:ref` — weak ETag (`hash alias.id:updatedAt:userId`). **userId masuk hash** karena response per-caller (`deniedEnvs`/`requiresEnvs`) — cegah kebocoran cache cross-user. Cek akses + denied env dijalankan sebelum conditional.
+- `GET /api/docs.md` — strong ETag (hash markdown), `Cache-Control: public, max-age=300`, tanpa Last-Modified.
+
+**Tidak di-cover (sengaja):** endpoint vars (jangan cache env vars), session, list endpoint, dan binary download `/download/cli/:platform` (sudah version-gated via `/download/cli/version`).
+
+**Settings:** `GET /api/envman/settings` (public, semua setting sebagai key-value map) · `PUT /api/envman/settings` (SUPER_ADMIN, body: `[{key, value}]`) — key yang valid: `user_token_creation` (boolean string), `user_token_max_days` (number string)
+
+### Auth Endpoints
+
+- `POST /api/auth/login` — email/password
+- `GET /api/auth/google` → `GET /api/auth/callback/google`
+- `GET /api/auth/session` — current user or 401
+- `POST /api/auth/logout`
+- `GET /api/dev-auth/login-as/:email` — dev only
+
+### WebSocket
+
+- `WS /ws/presence` — real-time presence (session cookie auth)
+
+---
 
 ## Frontend
 
-React 19 + Vite 8 (middleware mode in dev). File-based routing with TanStack Router.
+React 19 + Vite 8 (middleware mode dev). File-based routing: TanStack Router.
 
-- Entry: `src/frontend.tsx` — renders App, removes splash screen, DevInspector in dev
-- App: `src/frontend/App.tsx` — MantineProvider (auto color scheme), ModalsProvider (`@mantine/modals`), QueryClientProvider, RouterProvider
-- Routes: `src/frontend/routes/`
-  - `__root.tsx` — Root layout (renders Outlet only, no floating UI)
-  - `index.tsx` — Landing page (theme toggle top-right)
-  - `login.tsx` — Login page (email/password + Google OAuth, theme toggle top-right)
-  - `dev.tsx` — Dev console with AppShell sidebar: Overview, Users, App Logs, User Logs, Database (React Flow ER diagram), Project (10 sub-views — all React Flow with auto-save), Settings (SUPER_ADMIN only)
-  - `dashboard.tsx` — Admin dashboard with AppShell sidebar: Dashboard, Tickets, Analytics, Orders, Messages, Calendar, Settings (ADMIN+). Links to `/envmanager` and `/dev`.
-  - `envmanager.tsx` — Env Manager layout (AppShell sidebar, `<Outlet />`). Auth: ADMIN+
-  - `envmanager.index.tsx` — `/envmanager` project list
-  - `envmanager.tokens.tsx` — `/envmanager/tokens` API token management (read/write scope, expiry)
-  - `envmanager.connections.tsx` — `/envmanager/connections` global Portainer connection CRUD
-  - `envmanager.$slug.tsx` — `/envmanager/:slug` project detail (`?tab=environments|members`). Pure `<Outlet />` layout.
-  - `envmanager.$slug.index.tsx` — actual project detail content (environments + members tabs)
-  - `envmanager.$slug.$env.tsx` — `/envmanager/:slug/:env` env vars page
-  - `profile.tsx` — User profile (all authenticated users, theme toggle in header)
-  - `blocked.tsx` — Blocked user page with explanation (theme toggle top-right)
-- Components: `src/frontend/components/`
-  - `ThemeToggle.tsx` — Shared dark/light mode toggle button (used across all pages)
-  - `NotFound.tsx` — 404 page
-  - `ErrorPage.tsx` — Error boundary page
-- Auth hooks: `src/frontend/hooks/useAuth.ts` — `useSession()`, `useLogin()`, `useLogout()`, `getDefaultRoute()`
-- Presence hook: `src/frontend/hooks/usePresence.ts` — WebSocket auto-connect, exposes `onlineUserIds`
-- UI: Mantine v8 + `@mantine/modals` (dark/light, auto default from device), react-icons, AppShell layout for dashboard pages
-- Sidebar: Collapsible (260px expanded → 60px icon-only minimized with tooltips). State persisted in `localStorage`. Both dev and dashboard use same pattern.
-- Logout: Confirm modal via `@mantine/modals` (`modals.openConfirmModal`) on dev, dashboard, and profile pages. Blocked page logs out directly (no confirm).
-- Color scheme: `index.html` reads `localStorage` before first paint to prevent flash. Toggle integrated per-page (sidebar footer on AppShell pages, top-right on standalone pages). Persisted by Mantine in `localStorage`.
+- `src/frontend.tsx` — renders App, removes splash, DevInspector in dev
+- `src/frontend/App.tsx` — MantineProvider, ModalsProvider, QueryClientProvider, RouterProvider
 
-## Database Schema Visualization
+### Routes (`src/frontend/routes/`)
 
-- Dev Console Database tab renders an interactive ER diagram using `@xyflow/react` (React Flow)
-- `GET /api/admin/schema` parses `prisma/schema.prisma` into models/fields/relations/enums JSON via `parseSchema()` in `src/app.ts`
-- Custom node types: `ModelNode` (table fields with types/attributes) and `EnumNode` (enum values)
-- Auto-save to `localStorage`: node positions (`dev:schema:positions`) and viewport/zoom (`dev:schema:viewport`) — debounced 500ms
-- On reload, restores last positions and viewport. Falls back to grid layout + fitView if no saved state.
+- `__root.tsx` — root layout
+- `index.tsx` — landing page
+- `login.tsx` — email/password + Google OAuth
+- `dev.tsx` — dev console (SUPER_ADMIN)
+- `dashboard.tsx` — admin dashboard (ADMIN+)
+- `envmanager.tsx` — AppShell sidebar layout (ADMIN+)
+- `envmanager.index.tsx` — `/envmanager` project list; search+tag filter persist `localStorage`
+- `envmanager.tokens.lazy.tsx` — `/envmanager/tokens`
+- `envmanager.connections.tsx` — `/envmanager/connections`
+- `envmanager.$slug.tsx` — pure `<Outlet />`
+- `envmanager.$slug.index.tsx` — project detail (environments + notes + aliases tabs)
+- `envmanager.$slug.$env.tsx` — vars page; Portainer+History via Drawer (`?integrations=true`)
+- `profile.tsx` — all authenticated users
+- `blocked.tsx`
 
-## Project Structure Visualization
+### Components (`src/frontend/components/`)
 
-- Dev Console Project tab — 10 sub-views switchable via grouped Select dropdown:
-  - **Architecture group:**
-    - **API Routes**: `GET /api/admin/routes` — all HTTP + WS + frontend routes with method/auth/category badges. Edges show login→redirect flow.
-    - **File Structure**: `GET /api/admin/project-structure` — file nodes with import dependency edges. Filter by category. Double-click opens file in editor.
-    - **User Flow**: Static — role-based navigation: landing → login → auth → blocked check → role check → destination.
-    - **Data Flow**: Static — request lifecycle: client → Elysia → auth → handler → DB/Redis → response. WS + audit flows.
-  - **DevOps group:**
-    - **Env Variables**: `GET /api/admin/env-map` — env vars with set/unset status, required/optional badges, edges to consuming files.
-    - **Test Coverage**: `GET /api/admin/test-coverage` — source files (green/yellow/red coverage) with edges to test files. Filter by coverage status.
-    - **Dependencies**: `GET /api/admin/dependencies` — NPM packages by category/type with edges to importing files.
-    - **Migrations**: `GET /api/admin/migrations` — horizontal timeline of Prisma migrations with SQL preview and change type badges.
-  - **Live group:**
-    - **Sessions**: `GET /api/admin/sessions` — active user sessions with online indicator, role mapping. Auto-refresh 10s.
-    - **Live Requests**: Real-time API requests via WS broadcast. Hit counters, status color glow, avg response time. Pause/clear controls.
-- Each sub-view has independent auto-save (positions + viewport) via `useFlowAutoSave(key)` hook
-- All dynamic views have reload buttons. File nodes support double-click to open in editor.
-- Request broadcast: `onAfterResponse` hook sends `{ type: 'request', method, path, status, duration }` to admin WS subscribers via `broadcastToAdmins()` in `src/lib/presence.ts`
+- `CodeEditor.tsx` + `MonacoCodeEditor.tsx` — Monaco lazy-load (~1MB gzipped), Suspense, mobile fallback ke Textarea
+- `ThemeToggle.tsx` — dark/light toggle
+- `TicketsPanel.tsx` — shared `/dev` + `/dashboard`
+- `PortainerSync.tsx`
+- `slug/AliasesPanel.tsx` — aliases tab
+- `slug/FilesPanel.tsx` — files tab (multi-file, Markdown preview, search, tag filter, pagination)
+- `env/CompareModal.tsx` — bandingkan .env local vs envman vars
 
-## Dev Tools
+### Hooks
 
-- Click-to-source: `Ctrl+Shift+Cmd+C` toggles inspector. Custom Vite plugin (`inspectorPlugin` in `src/vite.ts`) injects `data-inspector-*` attributes. Reads original file from disk for accurate line numbers.
-- HMR: Vite 8 with `@vitejs/plugin-react` v6. `dedupeRefreshPlugin` fixes double React Refresh injection.
-- Editor: `REACT_EDITOR` env var. `zed` and `subl` use `file:line:col`, others use `--goto file:line:col`.
+- `src/frontend/hooks/useAuth.ts` — `useSession()`, `useLogin()`, `useLogout()`, `getDefaultRoute(role)`
+- `src/frontend/hooks/usePresence.ts` — WebSocket, `onlineUserIds`
 
-## Testing
+### UI Patterns
 
-Tests use `bun:test`. Three levels:
+- Sidebar: collapsible 260px → 60px, state `localStorage`
+- Dark/Light: auto device pref, flash-free via inline script di `<head>`
+- Tag colors: deterministik via hash (`tagColor(tag)` di `envmanager.index.tsx`), `variant="light"`
+
+---
+
+## CLI
+
+Standalone binary. Entry: `src/cli.ts`. Build: `bun run build:cli` → `dist/cli/envman-{platform}` + `.gz`.
+
+### Auth Resolution (priority: high → low)
+
+1. `ENVMAN_SERVER` + `ENVMAN_TOKEN` dari file `-e`
+2. `ENVMAN_SERVER` + `ENVMAN_TOKEN` sebagai system env
+3. `~/.config/envman/config.json` (dari `envman login`)
+
+`ENVMAN_SERVER` dan `ENVMAN_TOKEN` selalu di-strip dari child process env.
+
+### Commands
 
 ```bash
-bun run test              # All tests
-bun run test:unit         # tests/unit/ — env, db connection, bcrypt
-bun run test:integration  # tests/integration/ — API endpoints via app.handle()
+envman login <server-url> --token <token>
+envman logout
+envman whoami
+envman run [-e <source>]... <project>:<alias>
+envman [options] -- <command>
+envman pm daemon <start|stop|status>
+envman pm <subcommand>
+envman mcp [--write] [--debug]
 ```
 
-- `tests/helpers.ts` — `createTestApp()`, `seedTestUser()`, `createTestSession()`, `cleanupTestData()`
-- Integration tests use `createApp().handle(new Request(...))` — no server needed
+### Download
 
-## APIs
+`GET /download/cli/:platform` — content negotiation: `Accept-Encoding: gzip` → return `.gz` (~60% lebih kecil).
 
-- `Bun.password.hash()` / `Bun.password.verify()` for bcrypt
-- `Bun.RedisClient` for Redis (native, no package)
-- `Bun.file()` for static file serving in production
-- `Bun.which()` / `Bun.spawn()` for editor integration
-- `crypto.randomUUID()` for session tokens
+### File Execution
+
+Script di `ProjectFile` bisa di-execute langsung tanpa write ke disk — content di-pipe ke stdin.
+
+**Canonical syntax (WAJIB):**
+```bash
+envman -- bash myapp:scripts/deploy.sh       # slug:prefix/file.ext
+envman -- bun myapp:utils/seed.ts
+envman -e myapp:prod -- bash myapp:scripts/deploy.sh
+```
+
+**Disambiguasi:** Setelah colon: ada `/` ATAU ada extension → **file reference**. Sisanya → **environment name**.
+
+**Legacy syntax (`files:`) — JANGAN dipakai di code baru.** Server + CLI tetap support untuk backward compat.
+
+Interpreter stdin (zero disk write): `bash`, `sh`, `zsh`, `bun`, `node`, `python3`, `python`, `deno`. Lainnya → temp file 0600.
+
+Bun scripts bisa langsung import npm tanpa `node_modules` — CLI auto-pass `--install=fallback`. Pin versi inline: `import { z } from "zod@^3.22"`.
+
+**❌ Jangan tulis `files:X`** di MCP tool descriptions, alias args baru, atau docs baru.
+
+### Alias Expansion
+
+`envman run myapp:deploy` → fetch args via `GET /api/envman/aliases/resolve/myapp:deploy`, re-parse. Extra `-e` di-merge sebelum stored sources (stored wins).
+
+### Options
+
+```
+-e <project>:<env>   Fetch vars dari server
+-e <file>            Load vars dari file lokal
+--server-wins        System env override merged vars (default: merged wins)
+```
+
+### Response Caching
+
+`apiFetch(cfg, path, opts?)` di `src/cli.ts` punya conditional cache **opt-in** (`opts.cache=true`, default `false`). Saat aktif: baca cache `(server, path)` → kirim `If-None-Match: <etag>` → kalau server balas `304` sajikan body dari disk; kalau `200 + ETag` tulis cache. Implementasi disk cache: `src/cli/response-cache.ts`.
+
+- Cache dir: `~/.config/envman/cache/`, nama file `sha256(server+path).base64url.json`, ditulis atomik (tmp+rename) **mode 0600** (body bisa berisi konten file project).
+- `pruneIfNeeded()` batasi ≤200 entri (hapus tertua by mtime).
+- Diaktifkan HANYA di hot-path konten aman: `files/resolve` dan `aliases/resolve`. **`whoami`, vars, dan call lain tetap non-cache** (jaga env vars tidak ter-cache di disk).
+- Fallback: kalau `304` tapi cache hilang (race), re-fetch tanpa conditional.
+
+Efek: `envman -- bash myapp:scripts/x.sh` / `envman run myapp:deploy` berulang hanya transfer `304` saat konten tak berubah.
+
+---
+
+## Process Manager (`envman pm`)
+
+Native Bun process manager. File: `src/pm/{shared,daemon,cli}/`. Daemon socket: `~/.config/envman/run/daemon.sock` (chmod 0600 + header token auth).
+
+```bash
+envman pm daemon start|stop|status
+envman pm start --name X [-s project:env]... -- <cmd>
+envman pm ls|describe|stop|restart|delete|reset|save|sync|logs <name>
+```
+
+Supervisor: auto-restart, exponential backoff 1s→60s, quarantine setelah 5 restarts/60s. Log rotation 10MB×5. State: atomic tmp+rename + .bak.
+
+Audit events → `POST /api/envman/pm/audit`: `PM_DAEMON_*`, `PM_PROCESS_*`, `PM_SYNC_TRIGGERED`.
+
+---
+
+## MCP Server (`envman mcp`)
+
+Stdio MCP built into CLI binary. Auth: `ENVMAN_SERVER`/`ENVMAN_TOKEN` atau `~/.config/envman/config.json`.
+
+Setup `.mcp.json`:
+```json
+{ "mcpServers": { "envman": { "command": "envman", "args": ["mcp"] } } }
+```
+
+**Readonly (15 tools):** `whoami`, `server_info`, `projects_list`, `project_get`, `vars_list`, `vars_export`, `vars_diff`, `aliases_list`, `alias_resolve`, `files_list`, `file_resolve`, `pm_daemon_status`, `pm_list`, `pm_describe`, `pm_logs`
+
+**Write (13 tools, requires `--write` + token canWrite=true):** `var_set/delete`, `alias_create/update/delete`, `file_create`, `pm_start/stop/restart/reset/delete/sync`, `pm_daemon_start/stop`
+
+All write calls emit `MCP_*` audit events.
+
+---
+
+## Infrastructure
+
+### Redis
+
+Client singleton: `src/lib/redis.ts` → `REDIS_URL`. App logs: Redis List `app:logs` (max 500 via LTRIM). Module: `src/lib/applog.ts`.
+
+### Logging
+
+**App Logs** — Redis ring buffer 500 entries. Logs API requests, errors, auth events via `onAfterResponse`.
+
+**Audit Logs** (DB `AuditLog`) — persistent. Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`. Auto-cleanup > `AUDIT_LOG_RETENTION_DAYS` (default 90).
+
+### Local MCP Server (dev tools)
+
+`.mcp.json` registers `app-mcp` (`scripts/mcp/server.ts`) + `playwright`. Tools: `scripts/mcp/tools/`. `MCP_SECRET` = readonly, `MCP_SECRET_ADMIN` = write + dev automation.
+
+Env import tools (`scripts/mcp/tools/env-imports.ts`): readonly `envimport_list`/`envimport_get`, admin `envimport_create`/`envimport_delete`. Stg readonly counterpart (`scripts/mcp/debug-stg.ts`): `stg_envimport_list`/`stg_envimport_get`.
+
+### Dev Tools
+
+Click-to-source: `Ctrl+Shift+Cmd+C`. `REACT_EDITOR` env var. HMR: Vite 8 + `@vitejs/plugin-react` v6.
+
+---
+
+## File Health (Ketetapan Mutlak)
+
+| Tipe | Maks Baris | Maks Char |
+|------|-----------|-----------|
+| Route handler | 150 | 6k |
+| Service/use-case | 300 | 12k |
+| Repository/query | 250 | 10k |
+| Schema/validation | 200 | 8k |
+| Types/interfaces | 300 | 10k |
+| Utility/helper | 200 | 8k |
+| Config | 100 | 4k |
+| Test file | 400 | 16k |
+
+**Hard limit global: 500 baris / 20k char** (kecuali generated files).
+
+**AI wajib:**
+1. Tolak tambah kode ke file yang mendekati/melebihi batas (kecuali < 10 baris)
+2. Proaktif sarankan refactor sebelum tambah fitur ke file tidak sehat
+3. Jangan "helper dump" — setiap helper punya file sendiri yang spesifik
+4. Buat file baru jika implementasi baru tidak alami masuk ke file yang ada
+5. Periksa ukuran file sebelum edit — jika > 80% batas, sarankan pecah
+
+**Larangan:** God file (>1 route group/file), mix bisnis logik + transport, mix type + impl dalam file panjang.
+
+**Pengecualian:** `*.generated.ts`, `*.migration.ts`, `*.seed.ts`, `__fixtures__/`, `__mocks__/`.
+
+---
+
+## Scaling & Performance
+
+### Phase 1 — Fondasi
+
+- Pecah `app.ts` saat > 300 baris ke `src/routes/`
+- Centralize auth: `requireAuth()`, `unauthorized()`, `forbidden()` di `src/lib/auth-middleware.ts`
+- `prisma.$transaction([...])` untuk operasi multi-step
+- `parsePagination()` di semua `findMany` — tidak boleh ada `findMany` tanpa `take`
+- Limit: list 50, audit log 100, search 20
+
+### Phase 2 — Reliability
+
+- Setiap endpoint: minimal 3 test (happy path + unauthorized + invalid/not found)
+- Redis cache: `withCache(key, ttl, fetcher)`, `invalidateCache(...keys)`. TTL: project list 60s, access/role 120s, token 30s. **Jangan cache** env vars + session.
+- Soft delete (`deletedAt DateTime?`) untuk Project, User penting
+- `/api/v1/` untuk breaking changes; additive tidak perlu bump
+
+### Phase 3 — Performance (hanya jika ada data bottleneck)
+
+- Cache-Control: hashed assets → `max-age=31536000, immutable`; `index.html` → `must-revalidate`
+- TanStack Query staleTime per tipe: stable=5min, realtime=30s, static=Infinity
+- Optimistic updates dengan rollback di `onError`
+- Cursor-based pagination untuk list panjang
+
+### Frontend Bundle
+
+```typescript
+// vite.config.ts manualChunks
+if (id.includes('node_modules/react')) return 'react'
+if (id.includes('node_modules/@mantine')) return 'mantine'
+if (id.includes('node_modules/@tanstack')) return 'tanstack'
+if (id.includes('node_modules/react-icons')) return 'icons'
+if (id.includes('node_modules/')) return 'vendor'
+```
+
+Lazy routes (`createLazyFileRoute`) untuk halaman non-kritikal. `defaultPreload: 'intent'`.
+
+### Docker Multi-Stage
+
+3 stages: deps → builder (Prisma generate + Vite build + binary compile) → runner (binary only, no node_modules). Server ~300-370MB vs ~600-700MB.
+
+### Session & 401
+
+- `refetchInterval: 60_000` untuk `useSession`, redirect saat `user: null`
+- `UnauthorizedError` di `QueryCache.onError` → set session ke null
+
+### Anti-patterns
+
+| ❌ Jangan | ✅ Gantinya |
+|---|---|
+| `findMany` tanpa `take` | `parsePagination()` |
+| Auth copy-paste | `requireAuth()` |
+| Multi-step DB tanpa transaction | `prisma.$transaction` |
+| Hard delete data penting | soft delete `deletedAt` |
+| Catch error tanpa feedback | `notifyErr(e)` |
+| Optimistic update tanpa rollback | `onError` + context rollback |
+
+---
+
+## AI Contract (Wajib Dipatuhi)
+
+### Prinsip Dasar
+
+1. **Minimal diff, maximal pemahaman.** Baca sebelum ubah. Jangan refactor yang tidak diminta.
+2. **Fix akar, bukan gejala.** Penyebab di layer B → perbaiki B, bukan tambal di A.
+3. **Satu masalah = satu perubahan logis.** Jangan campur fix + refactor + fitur.
+4. **Tidak ada asumsi diam-diam.** Tanya atau baca kode — jangan tebak.
+5. **Setiap perubahan harus reversible.** Diff kecil, commit jelas.
+6. **Context adalah sumber daya.** Baca hemat — minimal token, maximal pemahaman.
+
+### Cara Membaca Kode
+
+1. Simbol dulu (signature, referensi) — bukan file utuh
+2. Range baris yang relevan — bukan dari baris 1
+3. Baca utuh **hanya jika** file < 300 baris, atau benar-benar perlu
+
+**❌ Larangan:** Baca file utuh refleks, baca ulang file yang sudah di context, telan file > 500 baris tanpa alasan.
+
+### Saat Fix Bug
+
+- Reproduksi di kepala dulu. Temukan akar sebenarnya.
+- Perbaiki sekecil mungkin. Jangan try/catch untuk sembunyikan error.
+- Jangan tambah fallback spekulatif. Jangan rename/reorder di sekitar fix.
+- Setelah fix: typecheck + test relevan.
+
+### Yang Dilarang
+
+- ❌ Silent catch (`catch (e) {}`)
+- ❌ Comment-out kode sebagai "backup"
+- ❌ Copy-paste antar file
+- ❌ Duplikasi util/helper/hook yang sudah ada
+- ❌ Destructive git (`reset --hard`, `push --force`, `clean -fdx`) tanpa instruksi eksplisit
+- ❌ Skip hook (`--no-verify`)
+- ❌ Ubah schema tanpa migration file
+- ❌ Tambah dependency tanpa izin
+- ❌ Hardcode credential/secret/URL prod
+
+### Kontrak Public API
+
+Freeze: nama endpoint/tool, nama+tipe parameter, required fields, enum values, format error response, bentuk output.
+
+Boleh additive: endpoint baru, optional param baru, output field baru, refactor internal.
+
+**❌ Jangan rename/hapus enum/naikkan optional→required/ubah format error** tanpa bump versi.
+
+### Eskalasi
+
+Stop dan tanya user jika: fix butuh > 5 file, ketemu bug lain di tengah jalan, perubahan menyentuh data produksi/session aktif, instruksi user bertentangan dengan docs.
+
+### Aturan Emas
+
+> Lebih baik tidak melakukan apa-apa daripada memperburuk kode.
+> Kalau setelah 2x percobaan fix masih muncul bug baru — **STOP**, lapor ke user.
+
+---
+
+## Aturan Penambahan Fitur (Ketetapan Mutlak)
+
+**Setiap fitur baru WAJIB disertai:**
+
+1. **Test** — minimal integration test: happy path + unauthorized + invalid/not found. Di `tests/integration/` atau `tests/unit/`.
+2. **MCP tool dev** — tambahkan tool di `scripts/mcp/tools/` untuk inspect/manipulasi data di development.
+3. **MCP tool stg** — readonly counterpart di MCP server staging untuk inspeksi data tanpa write access destruktif.
+
+**Skala MCP tool:** CRUD baru → min `list_<entity>` + `get_<entity>`; background job → inspect queue + cancel/retry (dev only mutate).
+
+**❌ Larangan:** Commit fitur tanpa test; MCP stg dengan write access; skip salah satu dari ketiganya.
+
+---
+
+## Aturan Update Dokumentasi (Ketetapan Mutlak)
+
+**Setiap perubahan business logic WAJIB update `CLAUDE.md` dalam commit yang sama.**
+
+Business logic = aturan auth/otorisasi, status machine, validasi domain, kontrak API publik, behavior CLI, enkripsi/keamanan, routing rules, skema DB.
+
+BUKAN business logic (boleh skip) = refactor internal, optimasi performa, logging/observability, styling murni, update dependency tanpa breaking change.
+
+**❌ Larangan:** Merge PR yang ubah business logic tanpa update doc; "update doc nanti di PR terpisah"; update doc tapi skip tabel/section yang ada.
+
+---
+
+## Testing (KETETAPAN MUTLAK — Test DB Safety)
+
+`tests/helpers.ts:cleanupTestData()` memanggil `deleteMany()` di **seluruh tabel**. Wajib dijalankan terhadap DB dengan nama diakhiri `_test`.
+
+Guard runtime di `tests/helpers.ts` (via `assertTestDb()`) — refuse-to-run jika `DATABASE_URL` menunjuk DB non-test. **Jangan disable guard ini.**
+
+```bash
+# Setup sekali
+createdb envman_test
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bunx prisma db push
+
+# Run test
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bun run test
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bun run test:unit
+DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bun run test:integration
+```
+
+**AI notes:**
+- Jangan jalankan `bun test` tanpa override DATABASE_URL ke `_test`
+- Jika user tidak punya DB test, tawarkan setup — JANGAN reuse DB dev
+- `bun run typecheck` aman kapan saja (tidak sentuh DB)
+
+Helpers: `createTestApp()`, `seedTestUser()`, `createTestSession()`, `cleanupTestData()`, `assertTestDb()`.
+
+Test pattern (Elysia tanpa server jalan):
+```typescript
+const app = createTestApp()
+const res = await app.handle(new Request('http://localhost/api/...', {
+  method: 'POST',
+  headers: { cookie: `session=${token}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ... }),
+}))
+expect(res.status).toBe(200)
+```

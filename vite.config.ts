@@ -22,9 +22,48 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: false,
     rollupOptions: {
       input: path.resolve(__dirname, 'index.html'),
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'react'
+          }
+          if (id.includes('node_modules/@mantine/')) {
+            return 'mantine'
+          }
+          if (id.includes('node_modules/@tanstack/')) {
+            return 'tanstack'
+          }
+          if (id.includes('node_modules/@xyflow/')) {
+            return 'xyflow'
+          }
+          if (
+            id.includes('node_modules/react-markdown') ||
+            id.includes('node_modules/remark') ||
+            id.includes('node_modules/rehype') ||
+            id.includes('node_modules/unified') ||
+            id.includes('node_modules/micromark') ||
+            id.includes('node_modules/mdast') ||
+            id.includes('node_modules/hast')
+          ) {
+            return 'markdown'
+          }
+          if (id.includes('node_modules/react-icons/')) {
+            return 'icons'
+          }
+          if (
+            id.includes('node_modules/monaco-editor/') ||
+            id.includes('node_modules/@monaco-editor/')
+          ) {
+            return 'monaco'
+          }
+          if (id.includes('node_modules/')) {
+            return 'vendor'
+          }
+        },
+      },
     },
   },
 })

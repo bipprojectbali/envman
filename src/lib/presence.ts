@@ -1,10 +1,13 @@
-import type { ServerWebSocket } from 'bun'
+// Minimal interface — works with both raw Bun ServerWebSocket and Elysia's ElysiaWS wrapper.
+interface SendableWS {
+  send(data: string): unknown
+}
 
 // userId → Set of WebSocket connections (one user can have multiple tabs)
-const connections = new Map<string, Set<ServerWebSocket<{ userId: string }>>>()
+const connections = new Map<string, Set<SendableWS>>()
 
 // Admin subscribers — get notified of all presence changes
-const adminSubs = new Set<ServerWebSocket<{ userId: string }>>()
+const adminSubs = new Set<SendableWS>()
 
 export function getOnlineUserIds(): string[] {
   return Array.from(connections.keys())
@@ -18,7 +21,7 @@ function broadcast() {
   }
 }
 
-export function addConnection(ws: ServerWebSocket<{ userId: string }>, userId: string, isAdmin: boolean) {
+export function addConnection(ws: SendableWS, userId: string, isAdmin: boolean) {
   let set = connections.get(userId)
   if (!set) {
     set = new Set()
@@ -28,7 +31,6 @@ export function addConnection(ws: ServerWebSocket<{ userId: string }>, userId: s
 
   if (isAdmin) {
     adminSubs.add(ws)
-    // Send current state immediately to new admin subscriber
     ws.send(JSON.stringify({ type: 'presence', online: getOnlineUserIds() }))
   }
 
@@ -42,8 +44,7 @@ export function broadcastToAdmins(message: object) {
   }
 }
 
-export function removeConnection(ws: ServerWebSocket<{ userId: string }>) {
-  const userId = ws.data.userId
+export function removeConnection(ws: SendableWS, userId: string) {
   const set = connections.get(userId)
   if (set) {
     set.delete(ws)

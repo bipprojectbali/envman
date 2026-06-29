@@ -27,4 +27,10 @@ export const env = {
   // Generate: openssl rand -hex 32
   // If unset, secret values are stored as plaintext (no at-rest protection).
   MASTER_KEY: optional('MASTER_KEY', ''),
+  // Better-auth — BETTER_AUTH_URL wajib diset di staging/production ke URL publik server
+  // (default localhost hanya valid untuk dev lokal)
+  BETTER_AUTH_SECRET: required('BETTER_AUTH_SECRET'),
+  BETTER_AUTH_URL: optional('BETTER_AUTH_URL', 'http://localhost:3000'),
+  // Explicit trusted origins — diisi jika ada domain tambahan (misal: preview URL)
+  BETTER_AUTH_TRUSTED_ORIGINS: optional('BETTER_AUTH_TRUSTED_ORIGINS', ''),
 } as const

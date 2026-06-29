@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { apiFetch } from '@/frontend/lib/api'
 
 export type Role = 'USER' | 'QC' | 'ADMIN' | 'SUPER_ADMIN'
 
@@ -9,28 +10,31 @@ export interface User {
   email: string
   role: Role
   blocked: boolean
+  permissions: string[]
+  image?: string | null
+}
+
+// SUPER_ADMIN bypass semua capability. Lainnya cek permissions array.
+export function hasCapability(user: User | null | undefined, cap: string): boolean {
+  if (!user) return false
+  if (user.role === 'SUPER_ADMIN') return true
+  return Array.isArray(user.permissions) && user.permissions.includes(cap)
 }
 
 export function getDefaultRoute(role: Role): string {
   switch (role) {
     case 'SUPER_ADMIN':
       return '/dev'
-    case 'ADMIN':
-      return '/dashboard'
     case 'QC':
       return '/dashboard'
+    case 'ADMIN':
+    case 'USER':
+      // ADMIN dan USER landing di envmanager.
+      // USER hanya melihat project yang dia di-assign sebagai member.
+      return '/envmanager'
     default:
       return '/profile'
   }
-}
-
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { credentials: 'include', ...init })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
 }
 
 export function useSession() {
@@ -39,6 +43,8 @@ export function useSession() {
     queryFn: () => apiFetch<{ user: User | null }>('/api/auth/session'),
     retry: false,
     staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   })
 }
 

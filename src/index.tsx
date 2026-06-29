@@ -7,10 +7,10 @@ import { env } from './lib/env'
 const isProduction = env.NODE_ENV === 'production'
 
 // ─── Route Classification ──────────────────────────────
-const API_PREFIXES = ['/api/', '/webhook/', '/ws/', '/health']
+const API_PREFIXES = ['/api/', '/webhook/', '/ws/', '/health', '/download/', '/install']
 
 function isApiRoute(pathname: string): boolean {
-  return API_PREFIXES.some((p) => pathname.startsWith(p)) || pathname === '/health'
+  return API_PREFIXES.some((p) => pathname.startsWith(p)) || pathname === '/health' || pathname === '/install'
 }
 
 // ─── Vite Dev Server (dev only) ────────────────────────
@@ -29,10 +29,13 @@ async function serveFrontend(request: Request): Promise<Response> {
     // === DEVELOPMENT: Vite Middleware Mode ===
 
     // SPA route → serve index.html via Vite transform
-    if (
+    // SPA prefixes — routes that contain dots (e.g. filenames in path params) but are still frontend routes
+    const spaPrefixes = ['/gists/', '/envmanager/', '/dashboard', '/dev', '/profile', '/login', '/blocked', '/docs']
+    const isSpaRoute =
       pathname === '/' ||
+      spaPrefixes.some((p) => pathname.startsWith(p)) ||
       (!pathname.includes('.') && !pathname.startsWith('/@') && !pathname.startsWith('/__open-stack-frame-in-editor'))
-    ) {
+    if (isSpaRoute) {
       const htmlPath = path.resolve('index.html')
       let htmlContent = fs.readFileSync(htmlPath, 'utf-8')
       htmlContent = await vite.transformIndexHtml(pathname, htmlContent)
@@ -143,11 +146,12 @@ async function serveFrontend(request: Request): Promise<Response> {
       '.png': 'image/png',
       '.ico': 'image/x-icon',
     }
+    // Vite puts content-hashed files in /assets/ — safe to cache 1 year
     const isHashed = pathname.startsWith('/assets/')
     return new Response(Bun.file(filePath), {
       headers: {
         'Content-Type': contentType[ext] ?? 'application/octet-stream',
-        'Cache-Control': isHashed ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+        'Cache-Control': isHashed ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate',
       },
     })
   }
@@ -163,6 +167,11 @@ async function serveFrontend(request: Request): Promise<Response> {
   return new Response('Not Found', { status: 404 })
 }
 
+// ─── Portainer Backup Crons ───────────────────────────
+import { syncBackupCrons } from './lib/portainer-cron'
+
+syncBackupCrons().catch(console.error)
+
 // ─── Audit Log Rotation ───────────────────────────────
 import { prisma } from './lib/db'
 
@@ -175,6 +184,24 @@ async function cleanupAuditLogs() {
 // Run on startup, then every 24 hours
 cleanupAuditLogs().catch(console.error)
 setInterval(() => cleanupAuditLogs().catch(console.error), 24 * 60 * 60 * 1000)
+
+// ─── Token Activity Log Rotation ──────────────────────
+import { cleanupTokenActivity } from './lib/token-activity'
+
+cleanupTokenActivity()
+  .then(({ deleted }) => {
+    if (deleted > 0) console.log(`[TokenActivity] Cleaned up ${deleted} entries`)
+  })
+  .catch(console.error)
+setInterval(
+  () =>
+    cleanupTokenActivity()
+      .then(({ deleted }) => {
+        if (deleted > 0) console.log(`[TokenActivity] Cleaned up ${deleted} entries`)
+      })
+      .catch(console.error),
+  24 * 60 * 60 * 1000,
+)
 
 // ─── Elysia App ────────────────────────────────────────
 import { createApp } from './app'

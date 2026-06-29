@@ -1,6 +1,6 @@
 {
   "name": "envman",
-  "version": "0.1.0",
+  "version": "0.14.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,11 +14,13 @@
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
     "db:migrate": "bunx prisma migrate dev",
-    "db:seed": "bun run prisma/seed.ts",
+    "db:seed": "bun run prisma/seed-dev.ts",
     "db:studio": "bunx prisma studio",
     "db:generate": "bunx prisma generate",
     "db:push": "bunx prisma db push",
     "build:cli": "bun run scripts/build-cli.ts",
+    "build:migrate": "bun build scripts/migrate.ts --compile --target=bun-linux-x64 --outfile migrate",
+    "build:server": "bun build src/server.prod.ts --compile --target=bun-linux-x64 --outfile server",
     "cli": "bun src/cli.ts"
   },
   "dependencies": {
@@ -27,15 +29,20 @@
     "@mantine/core": "^8.3.18",
     "@mantine/hooks": "^8.3.18",
     "@mantine/modals": "^8.3.18",
+    "@mantine/notifications": "^9.1.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@prisma/client": "6",
+    "@monaco-editor/react": "^4.7.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "7",
     "@tanstack/react-query": "^5.95.2",
     "@tanstack/react-router": "^1.168.10",
     "@types/bun": "^1.3.13",
     "@xyflow/react": "^12.10.2",
+    "better-auth": "^1.6.9",
     "elkjs": "^0.11.1",
     "elysia": "^1.4.28",
     "github-markdown-css": "^5.9.0",
+    "monaco-editor": "^0.55.1",
     "postcss": "^8.5.8",
     "postcss-preset-mantine": "^1.18.0",
     "postcss-simple-vars": "^7.0.1",
@@ -43,6 +50,8 @@
     "react-dom": "^19",
     "react-icons": "^5.6.0",
     "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1",
+    "rehype-slug": "^6.0.0",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
@@ -50,8 +59,9 @@
     "@tanstack/router-vite-plugin": "^1.166.27",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "@vitejs/plugin-react": "^6.0.1",
-    "prisma": "6",
+    "prisma": "7",
     "typescript": "^6.0.2",
     "vite": "^8.0.3"
   }
