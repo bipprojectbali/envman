@@ -1,20 +1,11 @@
-import { Alert, Box, Paper, Text } from '@mantine/core'
+import { Paper } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import { createFileRoute } from '@tanstack/react-router'
-import { TbAlertTriangle, TbPlugConnected } from 'react-icons/tb'
-import { CompareModal } from '@/frontend/components/env/CompareModal'
 import { AddVarPage } from '@/frontend/components/env/AddVarPage'
 import { BulkImportPage } from '@/frontend/components/env/BulkImportPage'
 import { EditEnvPage } from '@/frontend/components/env/EditEnvPage'
 import { IntegrationsPage } from '@/frontend/components/env/IntegrationsPage'
-import { SelectionBar } from '@/frontend/components/env/SelectionBar'
-import { VarCardMobile } from '@/frontend/components/env/VarCardMobile'
-import { VarsEmptyState } from '@/frontend/components/env/VarsEmptyState'
-import { VarsPageBreadcrumb } from '@/frontend/components/env/VarsPageBreadcrumb'
-import { VarsStats } from '@/frontend/components/env/VarsStats'
-import { VarsTableDesktop } from '@/frontend/components/env/VarsTableDesktop'
-import { VarsToolbar } from '@/frontend/components/env/VarsToolbar'
-import { ImportManagerModal } from '@/frontend/components/env/ImportManagerModal'
+import { VarsMainView } from '@/frontend/components/env/VarsMainView'
 import { PortainerSetupInline } from '@/frontend/components/portainer/PortainerSetupInline'
 import { useExtensions } from '@/frontend/hooks/useExtensions'
 import { useVarsMutations } from '@/frontend/hooks/useVarsMutations'
@@ -148,96 +139,33 @@ function VarsPage() {
 
   // ─── Main view ──────────────────────────────────────────────────────────────────
   return (
-    <Box>
-      <VarsPageBreadcrumb
-        slug={slug} env={env} isMobile={isMobile}
-        onNavToRoot={navToRoot} onNavToProject={navToProject}
-        portainerEnabled={portainerEnabled} portainerData={portainerData}
-        isFetching={isFetching} refetch={refetch}
-        openIntegrations={openIntegrations} encryptionEnabled={encryptionEnabled}
-      />
-
-      {!encryptionEnabled && (
-        <Alert icon={<TbAlertTriangle size={14} />} color="orange" mb="sm" py="xs">
-          <Text size="xs"><strong>MASTER_KEY</strong> belum di-set — secret vars disimpan plaintext.</Text>
-        </Alert>
-      )}
-      {deniedImports.length > 0 && (
-        <Alert icon={<TbPlugConnected size={14} />} color="yellow" mb="sm" py="xs">
-          <Text size="xs">
-            Tidak dapat memuat import dari:{' '}
-            {deniedImports.map((d, i) => (<span key={i}>{i > 0 && ', '}<strong>{d.project}:{d.env}</strong></span>))}
-          </Text>
-        </Alert>
-      )}
-
-      <VarsStats
-        varCount={vars.length} isMobile={isMobile} plainCount={plainCount}
-        secretCount={secretCount} disabledCount={disabledCount}
-        filterType={filterType} setFilterType={setFilterType}
-        filterDisabled={filterDisabled} setFilterDisabled={setFilterDisabled}
-        cliCommand={cliCommand}
-      />
-
-      <VarsToolbar
-        search={search} setSearch={setSearch} filterType={filterType}
-        filterDisabled={filterDisabled} setFilterType={setFilterType}
-        setFilterDisabled={setFilterDisabled} sort={sort} setSort={setSort}
-        vars={vars} filteredVars={filteredVars} selectedIds={selectedIds}
-        copiedAll={copiedAll} setCopiedAll={setCopiedAll}
-        copiedSelected={copiedSelected} setCopiedSelected={setCopiedSelected}
-        copiedKeys={copiedKeys} setCopiedKeys={setCopiedKeys}
-        copyToClipboard={copyToClipboard} canEdit={canEdit} isOwner={isOwner}
-        plainCount={plainCount} secretCount={secretCount}
-        openCompare={openCompare} openImportMgr={openImportMgr} openBulk={openBulk}
-        openAdd={openAdd} openEditEnvModal={openEditEnvModal}
-        confirmClearAll={confirmClearAll} confirmBulkToggle={confirmBulkToggle}
-      />
-
-      <SelectionBar
-        selectedIds={selectedIds} clearSelection={clearSelection}
-        copiedSelected={copiedSelected} setCopiedSelected={setCopiedSelected}
-        copiedKeys={copiedKeys} setCopiedKeys={setCopiedKeys}
-        vars={vars} copyToClipboard={copyToClipboard}
-      />
-
-      <VarsEmptyState
-        vars={vars} importedRows={importedRows} filteredVars={filteredVars}
-        importedDisplay={importedDisplay} canEdit={canEdit}
-        setSearch={setSearch} setFilterType={setFilterType} setFilterDisabled={setFilterDisabled}
-        openBulk={openBulk} openAdd={openAdd}
-      />
-
-      {isMobile ? (
-        <VarCardMobile
-          filteredVars={filteredVars} importedDisplay={importedDisplay}
-          vars={vars} activeCount={activeCount} disabledCount={disabledCount}
-          editingId={editingId} editForm={editForm} setEditForm={setEditForm}
-          updateVar={updateVar} cancelEdit={cancelEdit}
-          selectedIds={selectedIds} toggleSelect={toggleSelect}
-          canEdit={canEdit} startEdit={startEdit}
-          revealed={revealed} toggleReveal={toggleReveal}
-          toggleDisabled={toggleDisabled} deleteVar={deleteVar}
-        />
-      ) : (
-        <VarsTableDesktop
-          filteredVars={filteredVars} importedDisplay={importedDisplay}
-          vars={vars} varsTotal={varsTotal} activeCount={activeCount}
-          disabledCount={disabledCount} varsPage={varsPage}
-          setVarsPage={setVarsPage} varsTotalPages={varsTotalPages}
-          editingId={editingId} editForm={editForm} setEditForm={setEditForm}
-          updateVar={updateVar} cancelEdit={cancelEdit}
-          selectedIds={selectedIds} toggleSelect={toggleSelect}
-          allFilteredSelected={allFilteredSelected} toggleSelectAll={toggleSelectAll}
-          canEdit={canEdit} startEdit={startEdit}
-          revealed={revealed} toggleReveal={toggleReveal}
-          toggleDisabled={toggleDisabled} deleteVar={deleteVar}
-          importedKeySet={importedKeySet}
-        />
-      )}
-
-      <CompareModal opened={compareOpen} onClose={closeCompare} slug={slug} env={env} canEdit={canEdit} />
-      <ImportManagerModal opened={importMgrOpen} onClose={closeImportMgr} slug={slug} env={env} />
-    </Box>
+    <VarsMainView
+      slug={slug} env={env} isMobile={isMobile} portainerEnabled={portainerEnabled}
+      portainerData={portainerData} isFetching={isFetching} refetch={refetch}
+      openIntegrations={openIntegrations} encryptionEnabled={encryptionEnabled}
+      navToRoot={navToRoot} navToProject={navToProject}
+      deniedImports={deniedImports} vars={vars} importedRows={importedRows}
+      importedKeySet={importedKeySet} importedDisplay={importedDisplay} filteredVars={filteredVars}
+      plainCount={plainCount} secretCount={secretCount} disabledCount={disabledCount}
+      activeCount={activeCount} varsTotal={varsTotal} varsPage={varsPage}
+      setVarsPage={setVarsPage} varsTotalPages={varsTotalPages}
+      filterType={filterType} setFilterType={setFilterType}
+      filterDisabled={filterDisabled} setFilterDisabled={setFilterDisabled} cliCommand={cliCommand}
+      search={search} setSearch={setSearch} sort={sort} setSort={setSort}
+      selectedIds={selectedIds} allFilteredSelected={allFilteredSelected}
+      copiedAll={copiedAll} setCopiedAll={setCopiedAll}
+      copiedSelected={copiedSelected} setCopiedSelected={setCopiedSelected}
+      copiedKeys={copiedKeys} setCopiedKeys={setCopiedKeys}
+      copyToClipboard={copyToClipboard} canEdit={canEdit} isOwner={isOwner}
+      openCompare={openCompare} closeCompare={closeCompare} compareOpen={compareOpen}
+      openImportMgr={openImportMgr} closeImportMgr={closeImportMgr} importMgrOpen={importMgrOpen}
+      openBulk={openBulk} openAdd={openAdd} openEditEnvModal={openEditEnvModal}
+      confirmClearAll={confirmClearAll} confirmBulkToggle={confirmBulkToggle}
+      clearSelection={clearSelection} toggleSelect={toggleSelect} toggleSelectAll={toggleSelectAll}
+      editingId={editingId} editForm={editForm} setEditForm={setEditForm}
+      updateVar={updateVar} cancelEdit={cancelEdit} startEdit={startEdit}
+      revealed={revealed} toggleReveal={toggleReveal}
+      toggleDisabled={toggleDisabled} deleteVar={deleteVar}
+    />
   )
 }
