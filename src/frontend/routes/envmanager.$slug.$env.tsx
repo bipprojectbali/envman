@@ -1,7 +1,6 @@
-import { Alert, Box, Code, Paper, Text } from '@mantine/core'
+import { Alert, Box, Paper, Text } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
-import { modals } from '@mantine/modals'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { TbAlertTriangle, TbPlugConnected } from 'react-icons/tb'
@@ -20,9 +19,9 @@ import { VarsToolbar } from '@/frontend/components/env/VarsToolbar'
 import { ImportManagerModal } from '@/frontend/components/env/ImportManagerModal'
 import { PortainerSetupInline } from '@/frontend/components/portainer/PortainerSetupInline'
 import { useExtensions } from '@/frontend/hooks/useExtensions'
+import { useVarsMutations } from '@/frontend/hooks/useVarsMutations'
 import { apiFetch } from '@/frontend/lib/api'
-import { toEnvText } from '@/frontend/lib/env-clipboard'
-import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { notifyErr } from '@/frontend/lib/notify'
 import type { EnvVar, FilterType } from '@/frontend/types/env'
 
 interface EnvSearch {
@@ -56,7 +55,6 @@ export const Route = createFileRoute('/envmanager/$slug/$env')({
 function VarsPage() {
   const { slug, env } = Route.useParams()
   const navigate = useNavigate()
-  const qc = useQueryClient()
   const isMobile = useMediaQuery('(max-width: 48em)')
   const { data: extensions } = useExtensions()
   const portainerEnabled = extensions?.portainer ?? true
@@ -71,52 +69,33 @@ function VarsPage() {
     importMgr: importMgrSearch,
   } = Route.useSearch()
 
-  // URL-based modal state — reload/share safe
   const importMgrOpen = importMgrSearch === true
-  const openImportMgr = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, importMgr: true }), replace: true })
-  const closeImportMgr = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, importMgr: undefined }), replace: true })
+  const openImportMgr = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, importMgr: true }), replace: true })
+  const closeImportMgr = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, importMgr: undefined }), replace: true })
   const compareOpen = compareSearch === true
-  const openCompare = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, compare: true }), replace: true })
-  const closeCompare = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, compare: undefined }), replace: true })
+  const openCompare = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, compare: true }), replace: true })
+  const closeCompare = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, compare: undefined }), replace: true })
   const portainerSetupMode = portainerSetupSearch ?? null
   const openPortainerSetup = (mode: 'new' | 'edit') =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, integrations: true, portainerSetup: mode }), replace: true })
-  const closePortainerSetup = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, portainerSetup: undefined }), replace: true })
+    navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, integrations: true, portainerSetup: mode }), replace: true })
+  const closePortainerSetup = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, portainerSetup: undefined }), replace: true })
   const integrationsOpen = integrationsSearch === true
-  const openIntegrations = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, integrations: true }), replace: true })
-  const closeIntegrations = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, integrations: undefined }), replace: true })
+  const openIntegrations = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, integrations: true }), replace: true })
+  const closeIntegrations = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, integrations: undefined }), replace: true })
   const editEnvOpen = editEnvSearch === true
-  const openEditEnv = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, editEnv: true }), replace: true })
-  const closeEditEnv = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, editEnv: undefined }), replace: true })
+  const openEditEnv = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, editEnv: true }), replace: true })
+  const closeEditEnv = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, editEnv: undefined }), replace: true })
   const bulkOpen = bulkSearch === true
-  const openBulk = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, bulk: true }), replace: true })
-  const closeBulk = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, bulk: undefined }), replace: true })
+  const openBulk = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, bulk: true }), replace: true })
+  const closeBulk = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, bulk: undefined }), replace: true })
   const addVarOpen = addVarSearch === true
-  const openAdd = () =>
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, addVar: true }), replace: true })
-  const closeAdd = () => {
-    setForm({ key: '', value: '', isSecret: false })
-    navigate({ to: '.', params: { slug, env }, search: (prev) => ({ ...prev, addVar: undefined }), replace: true })
-  }
+  const openAdd = () => navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, addVar: true }), replace: true })
+  const closeAdd = () => { setForm({ key: '', value: '', isSecret: false }); navigate({ to: '.', params: { slug, env }, search: (p) => ({ ...p, addVar: undefined }), replace: true }) }
 
-  // form + bulk state
   const [form, setForm] = useState({ key: '', value: '', isSecret: false })
   const [bulkText, setBulkText] = useState('')
   const [bulkAllSecret, setBulkAllSecret] = useState(false)
   const [editEnvText, setEditEnvText] = useState('')
-
-  // table state
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ value: '', isSecret: false })
@@ -131,31 +110,17 @@ function VarsPage() {
   const [copiedSelected, setCopiedSelected] = useState(false)
   const [copiedKeys, setCopiedKeys] = useState(false)
 
-  const { data: projectData } = useQuery({
-    queryKey: ['envman', 'project', slug],
-    queryFn: () => apiFetch(`/api/envman/projects/${slug}`),
-  })
-  const { data: statusData } = useQuery({
-    queryKey: ['envman', 'status'],
-    queryFn: () => apiFetch('/api/envman/status'),
-    staleTime: 60000,
-  })
+  const { data: projectData } = useQuery({ queryKey: ['envman', 'project', slug], queryFn: () => apiFetch(`/api/envman/projects/${slug}`) })
+  const { data: statusData } = useQuery({ queryKey: ['envman', 'status'], queryFn: () => apiFetch('/api/envman/status'), staleTime: 60000 })
   useEffect(() => { setVarsPage(1) }, [])
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['envman', 'vars', slug, env, varsPage, search],
-    queryFn: () =>
-      apiFetch(
-        `/api/envman/projects/${slug}/environments/${env}/vars?limit=${VARS_LIMIT}&offset=${(varsPage - 1) * VARS_LIMIT}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
-      ),
+    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars?limit=${VARS_LIMIT}&offset=${(varsPage - 1) * VARS_LIMIT}${search ? `&search=${encodeURIComponent(search)}` : ''}`),
     refetchInterval: 15000,
     placeholderData: keepPreviousData,
   })
-  const { data: portainerData } = useQuery({
-    queryKey: ['portainer', slug, env],
-    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`),
-    staleTime: 30000,
-  })
+  const { data: portainerData } = useQuery({ queryKey: ['portainer', slug, env], queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer`), staleTime: 30000 })
   const { data: historyData } = useQuery({
     queryKey: ['portainer', 'history', slug, env],
     queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/portainer/history`),
@@ -228,130 +193,17 @@ function VarsPage() {
   }
   const cancelEdit = () => setEditingId(null)
 
-  // mutations
-  const addVar = useMutation({
-    mutationFn: (body: typeof form) =>
-      apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); closeAdd(); notifyOk('Variabel ditambahkan') },
-    onError: (e) => notifyErr(e),
+  const {
+    parsedBulk, parsedEditEnv, addVar, deleteVar, updateVar, toggleDisabled,
+    bulkImport, editEnvSave, openEditEnvModal, confirmClearAll, confirmBulkToggle,
+  } = useVarsMutations({
+    slug, env, vars, revealed, bulkText, editEnvText, bulkAllSecret,
+    plainCount, secretCount,
+    setBulkText, setBulkAllSecret,
+    closeAdd, closeBulk, closeEditEnv, openEditEnv, setEditEnvText, setEditingId,
   })
-  const deleteVar = (key: string) =>
-    modals.openConfirmModal({
-      title: 'Hapus variabel',
-      children: <Text size="sm">Hapus <Code>{key}</Code>?</Text>,
-      labels: { confirm: 'Hapus', cancel: 'Batal' },
-      confirmProps: { color: 'red' },
-      onConfirm: () =>
-        apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars/${key}`, { method: 'DELETE' })
-          .then(() => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); notifyOk(`${key} dihapus`) })
-          .catch(notifyErr),
-    })
-  const updateVar = useMutation({
-    mutationFn: ({ key, value, isSecret }: { key: string; value: string; isSecret: boolean }) =>
-      apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, { method: 'POST', body: JSON.stringify({ key, value, isSecret }) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); setEditingId(null); notifyOk('Variabel diperbarui') },
-    onError: (e) => notifyErr(e),
-  })
-  const toggleDisabled = useMutation({
-    mutationFn: (key: string) =>
-      apiFetch<{ isDisabled: boolean }>(`/api/envman/projects/${slug}/environments/${env}/vars/${key}/toggle`, { method: 'PATCH' }),
-    onMutate: async (key) => {
-      await qc.cancelQueries({ queryKey: ['envman', 'vars', slug, env] })
-      const previous = qc.getQueryData(['envman', 'vars', slug, env])
-      qc.setQueryData(['envman', 'vars', slug, env], (old: any) => ({
-        ...old, vars: old?.vars?.map((v: any) => (v.key === key ? { ...v, isDisabled: !v.isDisabled } : v)) ?? [],
-      }))
-      return { previous }
-    },
-    onError: (e, _key, context) => { if (context?.previous) qc.setQueryData(['envman', 'vars', slug, env], context.previous); notifyErr(e) },
-    onSuccess: (data) => notifyOk(data.isDisabled ? 'Variabel dinonaktifkan' : 'Variabel diaktifkan'),
-    onSettled: () => qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }),
-  })
-  const clearAll = useMutation({
-    mutationFn: () =>
-      Promise.all(vars.map((v) => apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars/${v.key}`, { method: 'DELETE' }))),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); notifyOk('Semua variabel dihapus') },
-    onError: (e) => notifyErr(e),
-  })
-  const bulkToggleType = useMutation({
-    mutationFn: (targetSecret: boolean) =>
-      Promise.all(vars.filter((v) => v.isSecret !== targetSecret && v.value !== '***').map((v) =>
-        apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, { method: 'POST', body: JSON.stringify({ key: v.key, value: v.value, isSecret: targetSecret }) }),
-      )),
-    onSuccess: (_: unknown, targetSecret: boolean) => {
-      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] })
-      notifyOk(targetSecret ? 'Semua variabel ditandai secret' : 'Semua variabel ditandai plain')
-    },
-    onError: (e) => notifyErr(e),
-  })
-  const parsedBulk = useMemo(() => {
-    const result: { key: string; value: string }[] = []
-    for (const raw of bulkText.split('\n')) {
-      const line = raw.trim(); if (!line || line.startsWith('#')) continue
-      const eq = line.indexOf('='); if (eq === -1) continue
-      const key = line.slice(0, eq).trim(); if (!key) continue
-      let value = line.slice(eq + 1)
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
-      result.push({ key, value })
-    }
-    return result
-  }, [bulkText])
-  const bulkImport = useMutation({
-    mutationFn: () =>
-      apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
-        method: 'PUT',
-        body: JSON.stringify({ vars: Object.fromEntries(parsedBulk.map(({ key, value }) => [key, value])), secrets: bulkAllSecret ? parsedBulk.map(({ key }) => key) : [] }),
-      }),
-    onSuccess: (data: { count: number }) => {
-      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); closeBulk(); setBulkText(''); setBulkAllSecret(false)
-      notifyOk(`${data.count} variabel berhasil diimpor`)
-    },
-    onError: (e) => notifyErr(e),
-  })
-  const parsedEditEnv = useMemo(() => {
-    const result: { key: string; value: string }[] = []
-    for (const raw of editEnvText.split('\n')) {
-      const line = raw.trim(); if (!line || line.startsWith('#')) continue
-      const eq = line.indexOf('='); if (eq === -1) continue
-      const key = line.slice(0, eq).trim(); if (!key) continue
-      let value = line.slice(eq + 1)
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
-      result.push({ key, value })
-    }
-    return result
-  }, [editEnvText])
-  const editEnvSave = useMutation({
-    mutationFn: () => {
-      const secretKeys = vars.filter((v) => v.isSecret).map((v) => v.key)
-      return apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
-        method: 'PUT',
-        body: JSON.stringify({ vars: Object.fromEntries(parsedEditEnv.map(({ key, value }) => [key, value])), secrets: secretKeys.filter((k) => parsedEditEnv.some((p) => p.key === k)) }),
-      })
-    },
-    onSuccess: (data: { count: number }) => {
-      qc.invalidateQueries({ queryKey: ['envman', 'vars', slug, env] }); closeEditEnv(); notifyOk(`${data.count} variabel disimpan`)
-    },
-    onError: (e) => notifyErr(e),
-  })
-  const openEditEnvModal = () => { setEditEnvText(toEnvText(vars.filter((v) => v.value !== '***'))); openEditEnv() }
-  const confirmClearAll = () =>
-    modals.openConfirmModal({
-      title: 'Hapus semua variabel',
-      children: <Text size="sm">Hapus semua <strong>{vars.length} variabel</strong> dari <strong>{slug}:{env}</strong>? Tidak bisa dibatalkan.</Text>,
-      labels: { confirm: 'Hapus Semua', cancel: 'Batal' },
-      confirmProps: { color: 'red' },
-      onConfirm: () => clearAll.mutate(),
-    })
-  const confirmBulkToggle = (targetSecret: boolean) =>
-    modals.openConfirmModal({
-      title: targetSecret ? 'Jadikan semua Secret' : 'Jadikan semua Plain',
-      children: <Text size="sm">{targetSecret ? <>Enkripsi <strong>{plainCount} plain var</strong> menjadi secret?</> : <>Dekripsi <strong>{secretCount} secret var</strong> menjadi plain?</>}</Text>,
-      labels: { confirm: targetSecret ? 'Jadikan Secret' : 'Jadikan Plain', cancel: 'Batal' },
-      confirmProps: { color: targetSecret ? 'red' : 'gray' },
-      onConfirm: () => bulkToggleType.mutate(targetSecret),
-    })
 
-  // ─── Conditional full-page views ───────────────────────────────────────────
+  // ─── Conditional full-page views ───────────────────────────────────────────────
   if (portainerSetupMode && portainerEnabled) {
     return (
       <Paper withBorder p="md" radius="md">
@@ -380,12 +232,7 @@ function VarsPage() {
     )
   }
   if (addVarOpen) {
-    return (
-      <AddVarPage
-        env={env} form={form} setForm={setForm}
-        addVar={addVar} closeAdd={closeAdd} isMobile={isMobile}
-      />
-    )
+    return <AddVarPage env={env} form={form} setForm={setForm} addVar={addVar} closeAdd={closeAdd} isMobile={isMobile} />
   }
   if (bulkOpen) {
     return (
@@ -399,19 +246,16 @@ function VarsPage() {
     )
   }
 
-  // ─── Main view ──────────────────────────────────────────────────────────────
+  // ─── Main view ──────────────────────────────────────────────────────────────────
   return (
     <Box>
       <VarsPageBreadcrumb
         slug={slug} env={env} isMobile={isMobile}
         onNavToRoot={() => navigate({ to: '/envmanager', search: { create: false, editSlug: undefined } })}
         onNavToProject={() => navigate({ to: '/envmanager/$slug', params: { slug }, search: { tab: 'environments', fileId: undefined, fileNew: false, viewFileId: undefined, aliasId: undefined, aliasNew: false, viewAliasId: undefined, noteId: undefined, noteNew: false, viewNoteId: undefined } })}
-        portainerEnabled={portainerEnabled}
-        portainerData={portainerData}
-        isFetching={isFetching}
-        refetch={refetch}
-        openIntegrations={openIntegrations}
-        encryptionEnabled={encryptionEnabled}
+        portainerEnabled={portainerEnabled} portainerData={portainerData}
+        isFetching={isFetching} refetch={refetch}
+        openIntegrations={openIntegrations} encryptionEnabled={encryptionEnabled}
       />
 
       {!encryptionEnabled && (
