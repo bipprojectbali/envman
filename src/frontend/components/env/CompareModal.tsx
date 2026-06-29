@@ -3,13 +3,10 @@ import {
   Badge,
   Box,
   Button,
-  Code,
   CopyButton,
   Group,
   Loader,
   Modal,
-  ScrollArea,
-  Stack,
   Switch,
   Text,
   Textarea,
@@ -17,22 +14,22 @@ import {
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
 import {
-  TbAlertTriangle,
   TbArrowRight,
   TbCheck,
-  TbChevronDown,
   TbCopy,
   TbEye,
   TbEyeOff,
   TbGitCompare,
   TbInfoCircle,
-  TbMinus,
   TbPlus,
   TbRefresh,
-  TbShieldLock,
 } from 'react-icons/tb'
+import { DiffList, EmptyState } from '@/frontend/components/env/CompareDiffList'
 import { apiFetch } from '@/frontend/lib/api'
+import type { Category, DiffRow } from '@/frontend/lib/compare-utils'
+import { CATEGORY_META } from '@/frontend/lib/compare-utils'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 
 interface CompareModalProps {
@@ -47,41 +44,6 @@ interface ServerVarNorm {
   value: string
   isSecret: boolean
   masked: boolean
-}
-
-type Category = 'diff' | 'onlyLocal' | 'onlySrv' | 'sync' | 'uncertain'
-
-interface DiffRow {
-  key: string
-  category: Category
-  localValue?: string
-  serverValue?: string
-  isSecret: boolean
-}
-
-function parseEnvText(text: string): Record<string, string> {
-  const result: Record<string, string> = {}
-  for (const raw of text.split('\n')) {
-    const line = raw.trim()
-    if (!line || line.startsWith('#')) continue
-    const eq = line.indexOf('=')
-    if (eq === -1) continue
-    const key = line.slice(0, eq).trim()
-    if (!key) continue
-    let value = line.slice(eq + 1)
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
-      value = value.slice(1, -1)
-    result[key] = value
-  }
-  return result
-}
-
-const CATEGORY_META: Record<Category, { label: string; color: string; icon: typeof TbGitCompare }> = {
-  diff: { label: 'Beda value', color: 'yellow', icon: TbAlertTriangle },
-  onlyLocal: { label: 'Hanya di local', color: 'blue', icon: TbPlus },
-  onlySrv: { label: 'Hanya di envman', color: 'orange', icon: TbMinus },
-  sync: { label: 'Sama', color: 'teal', icon: TbCheck },
-  uncertain: { label: 'Tidak bisa dibanding', color: 'gray', icon: TbShieldLock },
 }
 
 export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareModalProps) {
@@ -116,7 +78,22 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
 
   const serverVars: Record<string, ServerVarNorm> = data ?? {}
 
-  const localVars = useMemo(() => parseEnvText(localText), [localText])
+  const localVars = useMemo(() => {
+    const result: Record<string, string> = {}
+    for (const raw of localText.split('\n')) {
+      const line = raw.trim()
+      if (!line || line.startsWith('#')) continue
+      const eq = line.indexOf('=')
+      if (eq === -1) continue
+      const key = line.slice(0, eq).trim()
+      if (!key) continue
+      let value = line.slice(eq + 1)
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+        value = value.slice(1, -1)
+      result[key] = value
+    }
+    return result
+  }, [localText])
 
   const rows: DiffRow[] = useMemo(() => {
     const keys = new Set([...Object.keys(localVars), ...Object.keys(serverVars)])
@@ -128,7 +105,6 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
       const inSrv = srv !== undefined
       if (inLocal && inSrv) {
         if (srv.masked) {
-          // VIEWER pada secret — tidak bisa membandingkan
           out.push({ key, category: 'uncertain', localValue: local, isSecret: true })
         } else if (srv.value === local) {
           out.push({ key, category: 'sync', localValue: local, serverValue: srv.value, isSecret: srv.isSecret })
@@ -153,8 +129,6 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
 
   const filteredRows = filter === 'all' ? rows : rows.filter((r) => r.category === filter)
 
-  // ── Mutations ────────────────────────────────────────────────────────────
-  // Upsert via POST (existing var → update, new var → create).
   const upsertOne = (key: string, value: string, isSecret: boolean) =>
     apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars`, {
       method: 'POST',
@@ -209,7 +183,6 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
     onClose()
   }
 
-  // Build server-as-env text for "Copy envman → local"
   const serverAsEnvText = useMemo(() => {
     return Object.entries(serverVars)
       .filter(([, v]) => !v.masked)
@@ -322,9 +295,7 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
               py="xs"
               style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
             >
-              <Text size="xs" fw={600} c="dimmed">
-                PASTE .ENV LOCAL
-              </Text>
+              <Text size="xs" fw={600} c="dimmed">PASTE .ENV LOCAL</Text>
               <Group gap={4}>
                 {Object.keys(localVars).length > 0 && (
                   <Badge size="xs" variant="light" color="blue">
@@ -353,7 +324,7 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                   fontSize: 12,
                   WebkitTextSecurity: revealLocal ? 'none' : 'disc',
-                } as React.CSSProperties,
+                } as CSSProperties,
               }}
               style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
             />
@@ -409,409 +380,5 @@ export function CompareModal({ opened, onClose, slug, env, canEdit }: CompareMod
         )}
       </Box>
     </Modal>
-  )
-}
-
-// ─── Empty state ─────────────────────────────────────────────────────────
-function EmptyState() {
-  return (
-    <Stack align="center" justify="center" style={{ flex: 1 }} gap="md" p="xl">
-      <TbGitCompare size={48} opacity={0.3} />
-      <Stack gap={4} align="center">
-        <Text size="sm" fw={600}>
-          Paste .env local untuk mulai membandingkan
-        </Text>
-        <Text size="xs" c="dimmed" ta="center" maw={360}>
-          Hasil perbandingan akan tampil di sini: key yang sama, beda value, hanya di local, atau hanya di envman.
-        </Text>
-      </Stack>
-    </Stack>
-  )
-}
-
-// ─── Diff list rendered as table-like rows ───────────────────────────────
-function DiffList({
-  rows,
-  canEdit,
-  applySingle,
-  addAsSecret,
-}: {
-  rows: DiffRow[]
-  canEdit: boolean
-  applySingle: ReturnType<typeof useMutation<unknown, Error, DiffRow>>
-  addAsSecret: boolean
-}) {
-  const [revealValues, setRevealValues] = useState(false)
-  const [expandedAll, setExpandedAll] = useState(false)
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-
-  const toggleRow = (key: string) =>
-    setExpandedRows((prev) => {
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
-
-  if (rows.length === 0) {
-    return (
-      <Stack align="center" justify="center" style={{ flex: 1 }} gap="xs" p="xl">
-        <TbCheck size={32} opacity={0.4} />
-        <Text size="sm" c="dimmed">
-          Tidak ada perbedaan untuk filter ini.
-        </Text>
-      </Stack>
-    )
-  }
-  return (
-    <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <Group
-        justify="space-between"
-        px="md"
-        py={6}
-        style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
-      >
-        <Text size="xs" fw={600} c="dimmed">
-          HASIL ({rows.length})
-        </Text>
-        <Group gap={4}>
-          <Tooltip label={expandedAll ? 'Compact semua' : 'Expand semua untuk lihat full value'}>
-            <Button
-              size="compact-xs"
-              variant="subtle"
-              color="gray"
-              leftSection={
-                <TbChevronDown
-                  size={11}
-                  style={{ transform: expandedAll ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }}
-                />
-              }
-              onClick={() => {
-                setExpandedAll((v) => !v)
-                setExpandedRows(new Set())
-              }}
-            >
-              {expandedAll ? 'Compact' : 'Expand'}
-            </Button>
-          </Tooltip>
-          <Tooltip label={revealValues ? 'Sembunyikan value' : 'Tampilkan value'}>
-            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => setRevealValues((v) => !v)}>
-              {revealValues ? <TbEyeOff size={12} /> : <TbEye size={12} />}
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      </Group>
-      <ScrollArea style={{ flex: 1 }}>
-        <Stack gap={2} p="xs">
-          {rows.map((row) => (
-            <DiffRowItem
-              key={row.key}
-              row={row}
-              canEdit={canEdit}
-              applySingle={applySingle}
-              addAsSecret={addAsSecret}
-              revealValues={revealValues}
-              expanded={expandedAll || expandedRows.has(row.key)}
-              onToggle={() => toggleRow(row.key)}
-            />
-          ))}
-        </Stack>
-      </ScrollArea>
-    </Box>
-  )
-}
-
-function DiffRowItem({
-  row,
-  canEdit,
-  applySingle,
-  addAsSecret,
-  revealValues,
-  expanded,
-  onToggle,
-}: {
-  row: DiffRow
-  canEdit: boolean
-  applySingle: ReturnType<typeof useMutation<unknown, Error, DiffRow>>
-  addAsSecret: boolean
-  revealValues: boolean
-  expanded: boolean
-  onToggle: () => void
-}) {
-  const meta = CATEGORY_META[row.category]
-  const Icon = meta.icon
-  const showValue = (v: string | undefined) => {
-    if (v === undefined) return ''
-    if (revealValues) return v
-    return v.length > 0 ? '•'.repeat(Math.min(v.length, 12)) : ''
-  }
-  const showFullValue = (v: string | undefined) => {
-    if (v === undefined) return ''
-    if (revealValues) return v
-    return v.length > 0 ? '•'.repeat(v.length) : ''
-  }
-
-  const isPending = applySingle.isPending && applySingle.variables?.key === row.key
-  const expandable = row.category !== 'uncertain'
-
-  return (
-    <Box
-      style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-sm)' }}
-      p={0}
-    >
-      {/* ── Header row (compact, clickable) ─────────────── */}
-      <Group
-        gap="xs"
-        wrap="nowrap"
-        align="center"
-        px="sm"
-        py={6}
-        style={{ cursor: expandable ? 'pointer' : 'default' }}
-        onClick={expandable ? onToggle : undefined}
-      >
-        <Tooltip label={meta.label} withArrow>
-          <Badge
-            size="xs"
-            variant="light"
-            color={meta.color}
-            leftSection={<Icon size={10} />}
-            style={{ flexShrink: 0, minWidth: 22 }}
-          >
-            {''}
-          </Badge>
-        </Tooltip>
-        <Code fz={12} style={{ flexShrink: 0, fontWeight: 600 }}>
-          {row.key}
-        </Code>
-        {row.isSecret && (
-          <Tooltip label="Secret">
-            <TbShieldLock size={11} style={{ color: 'var(--mantine-color-red-5)', flexShrink: 0 }} />
-          </Tooltip>
-        )}
-
-        {/* Value preview (single-line, hidden when expanded) */}
-        {!expanded && (
-          <Box style={{ flex: 1, minWidth: 0, display: 'flex', gap: 6, alignItems: 'center', overflow: 'hidden' }}>
-            {row.category === 'diff' && (
-              <>
-                <ValuePill value={showValue(row.localValue)} label="local" color="blue" />
-                <TbArrowRight size={12} style={{ flexShrink: 0, opacity: 0.5 }} />
-                <ValuePill value={showValue(row.serverValue)} label="envman" color="orange" struck />
-              </>
-            )}
-            {row.category === 'sync' && <ValuePill value={showValue(row.localValue)} label="sama" color="teal" />}
-            {row.category === 'onlyLocal' && <ValuePill value={showValue(row.localValue)} label="local" color="blue" />}
-            {row.category === 'onlySrv' && (
-              <ValuePill value={showValue(row.serverValue)} label="envman" color="orange" />
-            )}
-            {row.category === 'uncertain' && (
-              <Text size="xs" c="dimmed">
-                Secret di envman — tidak bisa dibandingkan
-              </Text>
-            )}
-          </Box>
-        )}
-
-        {/* Spacer when expanded (push actions/chevron to right) */}
-        {expanded && <Box style={{ flex: 1 }} />}
-
-        {/* Per-row actions */}
-        <Group gap={4} style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-          {canEdit && row.category === 'diff' && (
-            <Tooltip label="Pakai value local, update ke envman">
-              <Button
-                size="compact-xs"
-                variant="light"
-                color="yellow"
-                leftSection={<TbArrowRight size={11} />}
-                loading={isPending}
-                onClick={() => applySingle.mutate(row)}
-              >
-                Update
-              </Button>
-            </Tooltip>
-          )}
-          {canEdit && row.category === 'onlyLocal' && (
-            <Tooltip label={addAsSecret ? 'Tambah sebagai secret ke envman' : 'Tambah ke envman'}>
-              <Button
-                size="compact-xs"
-                variant="light"
-                color="blue"
-                leftSection={<TbPlus size={11} />}
-                loading={isPending}
-                onClick={() => applySingle.mutate(row)}
-              >
-                Tambah
-              </Button>
-            </Tooltip>
-          )}
-          {row.category === 'onlySrv' && row.serverValue && (
-            <CopyButton value={`${row.key}=${row.serverValue}`} timeout={2000}>
-              {({ copied, copy }) => (
-                <Tooltip label="Copy line">
-                  <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
-                    {copied ? <TbCheck size={12} /> : <TbCopy size={12} />}
-                  </ActionIcon>
-                </Tooltip>
-              )}
-            </CopyButton>
-          )}
-        </Group>
-
-        {/* Expand chevron */}
-        {expandable && (
-          <TbChevronDown
-            size={14}
-            style={{
-              flexShrink: 0,
-              opacity: 0.5,
-              transition: 'transform 0.15s',
-              transform: expanded ? 'rotate(180deg)' : undefined,
-            }}
-          />
-        )}
-      </Group>
-
-      {/* ── Expanded body: full multi-line values ─────────── */}
-      {expanded && expandable && (
-        <Box px="sm" pb="sm" pt={4} style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
-          {row.category === 'diff' && (
-            <Stack gap={6} mt={6}>
-              <ValueBlock label="local" value={showFullValue(row.localValue)} rawValue={row.localValue} color="blue" />
-              <ValueBlock
-                label="envman (akan diganti)"
-                value={showFullValue(row.serverValue)}
-                rawValue={row.serverValue}
-                color="orange"
-                struck
-              />
-            </Stack>
-          )}
-          {row.category === 'sync' && (
-            <Box mt={6}>
-              <ValueBlock
-                label="sama di kedua sisi"
-                value={showFullValue(row.localValue)}
-                rawValue={row.localValue}
-                color="teal"
-              />
-            </Box>
-          )}
-          {row.category === 'onlyLocal' && (
-            <Box mt={6}>
-              <ValueBlock
-                label="local (akan ditambahkan)"
-                value={showFullValue(row.localValue)}
-                rawValue={row.localValue}
-                color="blue"
-              />
-            </Box>
-          )}
-          {row.category === 'onlySrv' && (
-            <Box mt={6}>
-              <ValueBlock
-                label="envman (belum di local)"
-                value={showFullValue(row.serverValue)}
-                rawValue={row.serverValue}
-                color="orange"
-              />
-            </Box>
-          )}
-        </Box>
-      )}
-    </Box>
-  )
-}
-
-// ─── Compact single-line preview pill ───────────────────────────────────
-function ValuePill({ value, label, color, struck }: { value: string; label: string; color: string; struck?: boolean }) {
-  return (
-    <Box style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, flex: 1 }}>
-      <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-        {label}:
-      </Text>
-      <Code
-        fz={11}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          color: `var(--mantine-color-${color}-${struck ? '5' : '7'})`,
-          textDecoration: struck ? 'line-through' : undefined,
-          opacity: struck ? 0.7 : 1,
-        }}
-        title={value}
-      >
-        {value || '(kosong)'}
-      </Code>
-    </Box>
-  )
-}
-
-// ─── Expanded multi-line block with copy button ─────────────────────────
-function ValueBlock({
-  label,
-  value,
-  rawValue,
-  color,
-  struck,
-}: {
-  label: string
-  value: string
-  rawValue: string | undefined
-  color: string
-  struck?: boolean
-}) {
-  const chars = rawValue?.length ?? 0
-  const lines = rawValue?.split('\n').length ?? 0
-  return (
-    <Box>
-      <Group gap={6} mb={3} justify="space-between">
-        <Group gap={6}>
-          <Badge size="xs" variant="filled" color={color}>
-            {label}
-          </Badge>
-          <Text size="xs" c="dimmed">
-            {chars} chars{lines > 1 && ` · ${lines} baris`}
-          </Text>
-        </Group>
-        {rawValue !== undefined && rawValue.length > 0 && (
-          <CopyButton value={rawValue} timeout={2000}>
-            {({ copied, copy }) => (
-              <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy} title="Copy value">
-                {copied ? <TbCheck size={11} /> : <TbCopy size={11} />}
-              </ActionIcon>
-            )}
-          </CopyButton>
-        )}
-      </Group>
-      <Box
-        component="pre"
-        style={{
-          margin: 0,
-          padding: '8px 10px',
-          background: 'var(--mantine-color-default-hover)',
-          border: `1px solid var(--mantine-color-${color}-light-color)`,
-          borderRadius: 4,
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-          fontSize: 12,
-          lineHeight: 1.5,
-          color: `var(--mantine-color-${color}-${struck ? '5' : '8'})`,
-          textDecoration: struck ? 'line-through' : undefined,
-          opacity: struck ? 0.75 : 1,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-all',
-          maxHeight: 240,
-          overflowY: 'auto',
-        }}
-      >
-        {value || (
-          <Text component="span" c="dimmed" fs="italic">
-            (kosong)
-          </Text>
-        )}
-      </Box>
-    </Box>
   )
 }
