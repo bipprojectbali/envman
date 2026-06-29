@@ -13,7 +13,7 @@ let editorToken: string
 let editor2Token: string
 let viewerToken: string
 let outsiderToken: string
-const projectSlug = 'files-test-proj'
+const projectSlug = 'files-crud-test-proj'
 
 const authHeader = (token: string) => ({ 'Content-Type': 'application/json', cookie: `session=${token}` })
 const sampleFiles = [{ filename: 'main.ts', content: 'console.log("hello")', language: 'typescript' }]
@@ -21,11 +21,11 @@ const sampleFiles = [{ filename: 'main.ts', content: 'console.log("hello")', lan
 beforeAll(async () => {
   await cleanupTestData()
 
-  const owner = await seedTestUser('files-owner@test.com', 'pass123', 'FilesOwner', 'ADMIN')
-  const editor = await seedTestUser('files-editor@test.com', 'pass123', 'FilesEditor', 'ADMIN')
-  const editor2 = await seedTestUser('files-editor2@test.com', 'pass123', 'FilesEditor2', 'ADMIN')
-  const viewer = await seedTestUser('files-viewer@test.com', 'pass123', 'FilesViewer', 'ADMIN')
-  const outsider = await seedTestUser('files-outsider@test.com', 'pass123', 'FilesOutsider', 'ADMIN')
+  const owner = await seedTestUser('files-crud-owner@test.com', 'pass123', 'FilesCrudOwner', 'ADMIN')
+  const editor = await seedTestUser('files-crud-editor@test.com', 'pass123', 'FilesCrudEditor', 'ADMIN')
+  const editor2 = await seedTestUser('files-crud-editor2@test.com', 'pass123', 'FilesCrudEditor2', 'ADMIN')
+  const viewer = await seedTestUser('files-crud-viewer@test.com', 'pass123', 'FilesCrudViewer', 'ADMIN')
+  const outsider = await seedTestUser('files-crud-outsider@test.com', 'pass123', 'FilesCrudOutsider', 'ADMIN')
   ownerId = owner.id
   editorId = editor.id
   editor2Id = editor2.id
@@ -40,7 +40,7 @@ beforeAll(async () => {
   await app.handle(new Request('http://localhost/api/envman/projects', {
     method: 'POST',
     headers: authHeader(ownerToken),
-    body: JSON.stringify({ slug: projectSlug, name: 'Files Test Project' }),
+    body: JSON.stringify({ slug: projectSlug, name: 'Files CRUD Test Project' }),
   }))
 
   const project = await prisma.project.findUnique({ where: { slug: projectSlug } })
@@ -58,7 +58,7 @@ afterAll(async () => {
   await prisma.$disconnect()
 })
 
-// ─── GET ────────────────────────────────────────────────────────────────────
+// ─── GET ─────────────────────────────────────────────────────────────────────
 
 describe('GET /api/envman/projects/:slug/files', () => {
   test('returns empty array for VIEWER', async () => {
@@ -83,7 +83,7 @@ describe('GET /api/envman/projects/:slug/files', () => {
   })
 })
 
-// ─── POST ───────────────────────────────────────────────────────────────────
+// ─── POST ────────────────────────────────────────────────────────────────────
 
 describe('POST /api/envman/projects/:slug/files', () => {
   test('EDITOR creates file successfully', async () => {
@@ -148,7 +148,7 @@ describe('POST /api/envman/projects/:slug/files', () => {
   })
 })
 
-// ─── PUT ────────────────────────────────────────────────────────────────────
+// ─── PUT ─────────────────────────────────────────────────────────────────────
 
 describe('PUT /api/envman/projects/:slug/files/:id', () => {
   let fileId: string
@@ -224,7 +224,7 @@ describe('PUT /api/envman/projects/:slug/files/:id', () => {
   })
 })
 
-// ─── DELETE ─────────────────────────────────────────────────────────────────
+// ─── DELETE ──────────────────────────────────────────────────────────────────
 
 describe('DELETE /api/envman/projects/:slug/files/:id', () => {
   let fileId: string
@@ -313,121 +313,5 @@ describe('POST /files with prefix', () => {
       body: JSON.stringify({ title: 'Another', prefix: 'deploy', files: sampleFiles }),
     }))
     expect(res.status).toBe(400)
-  })
-})
-
-// ─── RESOLVE ─────────────────────────────────────────────────────────────────
-
-describe('GET /api/envman/projects/:slug/files/resolve', () => {
-  const multiFiles = [
-    { filename: 'a.sh', content: 'echo a', language: 'bash' },
-    { filename: 'b.sh', content: 'echo b', language: 'bash' },
-  ]
-
-  beforeAll(async () => {
-    // create entry with prefix "scripts" and two files
-    await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/files`, {
-      method: 'POST',
-      headers: authHeader(ownerToken),
-      body: JSON.stringify({ title: 'Scripts', prefix: 'scripts', files: multiFiles }),
-    }))
-  })
-
-  test('resolves single-file entry by prefix only', async () => {
-    const res = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=deploy`,
-      { headers: authHeader(ownerToken) }
-    ))
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.content).toBe('echo hello')
-    expect(body.filename).toBe('deploy.sh')
-    expect(body.language).toBe('bash')
-  })
-
-  test('resolves multi-file entry by prefix + filename', async () => {
-    const res = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=scripts&filename=b.sh`,
-      { headers: authHeader(ownerToken) }
-    ))
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.content).toBe('echo b')
-  })
-
-  test('400 if multi-file entry and no filename given', async () => {
-    const res = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=scripts`,
-      { headers: authHeader(ownerToken) }
-    ))
-    expect(res.status).toBe(400)
-  })
-
-  test('404 for unknown prefix', async () => {
-    const res = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=notexist`,
-      { headers: authHeader(ownerToken) }
-    ))
-    expect(res.status).toBe(404)
-  })
-
-  test('404 for unknown filename', async () => {
-    const res = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=scripts&filename=nope.sh`,
-      { headers: authHeader(ownerToken) }
-    ))
-    expect(res.status).toBe(404)
-  })
-
-  test('403 for non-member', async () => {
-    const res = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=deploy`,
-      { headers: authHeader(outsiderToken) }
-    ))
-    expect(res.status).toBe(403)
-  })
-
-  test('401 without auth', async () => {
-    const res = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=deploy`
-    ))
-    expect(res.status).toBe(401)
-  })
-
-  test('GET pertama kirim ETag + Last-Modified', async () => {
-    const res = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=deploy`,
-      { headers: authHeader(ownerToken) }
-    ))
-    expect(res.status).toBe(200)
-    expect(res.headers.get('etag')).not.toBe(null)
-    expect(res.headers.get('last-modified')).not.toBe(null)
-    expect(res.headers.get('cache-control')).toBe('private, no-cache')
-  })
-
-  test('If-None-Match cocok → 304 tanpa body', async () => {
-    const first = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=deploy`,
-      { headers: authHeader(ownerToken) }
-    ))
-    const etag = first.headers.get('etag') ?? ''
-    const res = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=deploy`,
-      { headers: { ...authHeader(ownerToken), 'If-None-Match': etag } }
-    ))
-    expect(res.status).toBe(304)
-    expect(await res.text()).toBe('')
-  })
-
-  test('ETag per-filename berbeda di entry multi-file', async () => {
-    const a = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=scripts&filename=a.sh`,
-      { headers: authHeader(ownerToken) }
-    ))
-    const b = await app.handle(new Request(
-      `http://localhost/api/envman/projects/${projectSlug}/files/resolve?prefix=scripts&filename=b.sh`,
-      { headers: authHeader(ownerToken) }
-    ))
-    expect(a.headers.get('etag')).not.toBe(b.headers.get('etag'))
   })
 })

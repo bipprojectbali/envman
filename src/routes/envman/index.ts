@@ -3,12 +3,14 @@ import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { hasMasterKey } from '../../lib/crypto'
 // Misc envman routes (status, whoami, user lookup)
 import { prisma } from '../../lib/db'
+import { accessMatrixRouter } from './access-matrix'
 import { adminUsersQueryRouter } from './admin-users-query'
 import { adminUsersRouter } from './admin-users'
 import { aliasesRouter } from './aliases'
 import { databaseRouter } from './database'
 import { envImportsRouter } from './env-imports'
 import { envMembersRouter } from './env-members'
+import { filesResolveRouter } from './files-resolve'
 import { filesRouter } from './files'
 import { gistsRouter } from './gists'
 import { mcpAuditRouter } from './mcp-audit'
@@ -16,6 +18,7 @@ import { notesRouter } from './notes'
 import { pmAuditRouter } from './pm-audit'
 import { portainerRouter } from './portainer'
 import { portainerBackupRouter } from './portainer-backup'
+import { portainerProbeRouter } from './portainer-probe'
 import { projectsRouter } from './projects'
 import { settingsRouter } from './settings'
 import { tokensRouter } from './tokens'
@@ -57,12 +60,15 @@ export const envmanRouter = new Elysia()
   .use(settingsRouter)
   .use(tokensRouter)
   .use(projectsRouter)
+  .use(accessMatrixRouter)
   .use(envMembersRouter)
   .use(envImportsRouter)
   .use(portainerRouter)
   .use(portainerBackupRouter)
+  .use(portainerProbeRouter)
   .use(notesRouter)
   .use(aliasesRouter)
+  .use(filesResolveRouter)
   .use(filesRouter)
   .use(gistsRouter)
   .use(databaseRouter)
