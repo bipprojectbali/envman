@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   Alert,
   Badge,
   Box,
@@ -7,34 +6,21 @@ import {
   Code,
   Divider,
   Group,
-  Kbd,
-  Select,
   SimpleGrid,
   Skeleton,
   Stack,
   Text,
-  TextInput,
   ThemeIcon,
-  Tooltip,
 } from '@mantine/core'
 import { useDebouncedValue, useDisclosure, useHotkeys, useLocalStorage } from '@mantine/hooks'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
-import {
-  TbInfoCircle,
-  TbLayoutGrid,
-  TbLayoutList,
-  TbPlus,
-  TbSearch,
-  TbSortAscending,
-  TbTag,
-  TbVariable,
-  TbX,
-} from 'react-icons/tb'
+import { TbInfoCircle, TbPlus, TbTag, TbVariable, TbX } from 'react-icons/tb'
 import { CreateEnvModal } from '@/frontend/components/slug/CreateEnvModal'
 import { EditEnvModal } from '@/frontend/components/slug/EditEnvModal'
 import { EnvCard } from '@/frontend/components/slug/EnvCard'
+import { EnvListControls } from '@/frontend/components/slug/EnvListControls'
 import { ENV_PRESETS, getEnvColor } from '@/frontend/lib/project-utils'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -280,93 +266,23 @@ export function EnvironmentList({ slug, envs, isLoading, isOwner, canEdit, myRol
         </Box>
       ) : (
         <>
-          <Stack gap="xs" mb="sm">
-            {envs.length > 2 && (
-              <TextInput
-                ref={searchRef}
-                size="sm"
-                placeholder="Cari environment..."
-                leftSection={<TbSearch size={14} />}
-                value={envSearch}
-                onChange={(e) => setEnvSearch(e.target.value)}
-                maw={540}
-                rightSection={
-                  envSearch ? (
-                    <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setEnvSearch('')}>
-                      <TbX size={12} />
-                    </ActionIcon>
-                  ) : (
-                    <Tooltip label="Tekan / untuk focus">
-                      <Kbd size="xs">/</Kbd>
-                    </Tooltip>
-                  )
-                }
-                rightSectionWidth={36}
-                radius="md"
-              />
-            )}
-            <Group gap="xs" wrap="wrap" justify="space-between">
-              <Group gap="xs" wrap="wrap">
-                {envs.length > 2 && (
-                  <Select
-                    size="sm"
-                    w={155}
-                    radius="md"
-                    leftSection={<TbSortAscending size={14} />}
-                    value={envSort}
-                    onChange={(v) => setEnvSort((v ?? 'name') as typeof envSort)}
-                    data={[
-                      { label: 'Nama A→Z', value: 'name' },
-                      { label: 'Terbanyak vars', value: 'vars' },
-                      { label: 'Terbaru', value: 'recent' },
-                    ]}
-                    allowDeselect={false}
-                  />
-                )}
-                <Group gap={4} wrap="nowrap">
-                  <Tooltip label="List view" withArrow>
-                    <ActionIcon size="sm" variant={envView === 'list' ? 'filled' : 'subtle'} color="blue" onClick={() => setEnvView('list')}>
-                      <TbLayoutList size={14} />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Grid view" withArrow>
-                    <ActionIcon size="sm" variant={envView === 'grid' ? 'filled' : 'subtle'} color="blue" onClick={() => setEnvView('grid')}>
-                      <TbLayoutGrid size={14} />
-                    </ActionIcon>
-                  </Tooltip>
-                  {allEnvTags.length > 0 && (
-                    <Tooltip label={envGroupByTag ? 'Nonaktifkan grouping' : 'Group by tag'} withArrow>
-                      <ActionIcon size="sm" variant={envGroupByTag ? 'filled' : 'subtle'} color="grape" onClick={() => setEnvGroupByTag((v) => !v)}>
-                        <TbTag size={14} />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </Group>
-              </Group>
-              {canEdit && (
-                <Button size="xs" leftSection={<TbPlus size={13} />} onClick={openCreate}>
-                  Buat environment
-                </Button>
-              )}
-            </Group>
-            {allEnvTags.length > 0 && (
-              <Group gap={6} wrap="wrap">
-                {allEnvTags.map((t) => (
-                  <Badge
-                    key={t}
-                    size="sm"
-                    variant={envTagFilter === t ? 'filled' : 'outline'}
-                    color="grape"
-                    leftSection={<TbTag size={9} />}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setEnvTagFilter((f) => (f === t ? '' : t))}
-                  >
-                    {t}
-                  </Badge>
-                ))}
-              </Group>
-            )}
-          </Stack>
+          <EnvListControls
+            searchRef={searchRef}
+            envSearch={envSearch}
+            onSearch={setEnvSearch}
+            envSort={envSort}
+            onSort={setEnvSort}
+            envView={envView}
+            onView={setEnvView}
+            envGroupByTag={envGroupByTag}
+            onGroupByTag={setEnvGroupByTag}
+            envTagFilter={envTagFilter}
+            onTagFilter={setEnvTagFilter}
+            allEnvTags={allEnvTags}
+            canEdit={canEdit}
+            envCount={envs.length}
+            onOpenCreate={openCreate}
+          />
 
           {filteredEnvs.length === 0 ? (
             <Box p="md" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
