@@ -2,53 +2,35 @@ import {
   ActionIcon,
   Alert,
   Anchor,
-  Badge,
   Box,
   Button,
   Code,
   Divider,
   Group,
   Kbd,
-  Pagination,
   Paper,
-  SegmentedControl,
-  Select,
   SimpleGrid,
   Skeleton,
   Stack,
   Text,
-  TextInput,
   ThemeIcon,
-  Tooltip,
 } from '@mantine/core'
-import { modals } from '@mantine/modals'
-import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   TbAlertTriangle,
-  TbArrowsSort,
   TbChevronLeft,
   TbChevronRight,
   TbFolders,
-  TbLayoutGrid,
-  TbLayoutList,
   TbPlus,
-  TbPower,
   TbSearch,
-  TbTag,
-  TbTrash,
   TbX,
 } from 'react-icons/tb'
-import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { CreateProjectForm } from '@/frontend/components/projects/CreateProjectForm'
-import { DeleteProjectConfirm } from '@/frontend/components/projects/DeleteProjectConfirm'
 import { EditProjectForm } from '@/frontend/components/projects/EditProjectForm'
-import { ProjectGridCard } from '@/frontend/components/projects/ProjectGridCard'
-import { ProjectListCard } from '@/frontend/components/projects/ProjectListCard'
-import { useProjectList, SORT_OPTIONS } from '@/frontend/hooks/useProjectList'
-import { apiFetch } from '@/frontend/lib/api'
-import { groupByPrimaryTag, tagColor } from '@/frontend/lib/project-utils'
-import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { ProjectsGrid } from '@/frontend/components/projects/ProjectsGrid'
+import { ProjectsToolbar } from '@/frontend/components/projects/ProjectsToolbar'
+import { useProjectList } from '@/frontend/hooks/useProjectList'
+import { useProjectModals } from '@/frontend/hooks/useProjectModals'
 
 export const Route = createFileRoute('/envmanager/')({
   component: ProjectListPage,
@@ -82,7 +64,6 @@ const HOVER_STYLES = `
 `
 
 function ProjectListPage() {
-  const qc = useQueryClient()
   const {
     create, editSlug,
     form, setForm, slugManual, setSlugManual,
@@ -97,72 +78,7 @@ function ProjectListPage() {
     openProject, openCreatePage, openEditPage, closeFormPage,
   } = useProjectList()
 
-  const confirmToggleActive = (slug: string, name: string, currentActive: boolean) => {
-    modals.openConfirmModal({
-      title: (
-        <Group gap="xs">
-          <ThemeIcon size="sm" variant="light" color={currentActive ? 'orange' : 'teal'} radius="md">
-            <TbPower size={13} />
-          </ThemeIcon>
-          <Text fw={600} size="sm">
-            {currentActive ? 'Nonaktifkan project' : 'Aktifkan project'}
-          </Text>
-        </Group>
-      ),
-      children: (
-        <Text size="sm">
-          {currentActive ? (
-            <>
-              Project <strong>{name}</strong> akan dinonaktifkan. Environment dan variabelnya tetap tersimpan, tapi
-              project tidak akan muncul di filter "Aktif".
-            </>
-          ) : (
-            <>
-              Project <strong>{name}</strong> akan diaktifkan kembali.
-            </>
-          )}
-        </Text>
-      ),
-      labels: { confirm: currentActive ? 'Nonaktifkan' : 'Aktifkan', cancel: 'Batal' },
-      confirmProps: { color: currentActive ? 'orange' : 'teal' },
-      onConfirm: () => toggleActive.mutate({ slug, isActive: !currentActive }),
-    })
-  }
-
-  const deleteProject = (slug: string, name: string) => {
-    const id = `delete-project-${slug}`
-    modals.open({
-      modalId: id,
-      title: (
-        <Group gap="xs">
-          <ThemeIcon size="sm" variant="light" color="red" radius="md">
-            <TbTrash size={13} />
-          </ThemeIcon>
-          <Text fw={600} size="sm">
-            Hapus project
-          </Text>
-        </Group>
-      ),
-      children: (
-        <DeleteProjectConfirm
-          name={name}
-          slug={slug}
-          onCancel={() => modals.close(id)}
-          onConfirm={async () => {
-            try {
-              await apiFetch(`/api/envman/projects/${slug}`, { method: 'DELETE' })
-              qc.invalidateQueries({ queryKey: ['envman', 'projects'] })
-              setPinned((prev) => prev.filter((s) => s !== slug))
-              notifyOk(`Project "${name}" dihapus`)
-              modals.close(id)
-            } catch (e) {
-              notifyErr(e)
-            }
-          }}
-        />
-      ),
-    })
-  }
+  const { confirmToggleActive, deleteProject } = useProjectModals({ toggleActive, setPinned })
 
   if (create) {
     return (
@@ -279,63 +195,16 @@ function ProjectListPage() {
       )}
 
       {!isLoading && !isError && projects.length > 0 && (
-        <Stack gap="xs" mb="md">
-          <TextInput
-            ref={searchRef}
-            size="sm"
-            placeholder="Cari project, slug, deskripsi, atau tag..."
-            leftSection={<TbSearch size={14} />}
-            maw={540}
-            rightSection={
-              search ? (
-                <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Hapus pencarian" onClick={() => setSearch('')}>
-                  <TbX size={12} />
-                </ActionIcon>
-              ) : (
-                <Tooltip label="Tekan / untuk focus"><Kbd size="xs">/</Kbd></Tooltip>
-              )
-            }
-            rightSectionWidth={36}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            radius="md"
-          />
-          <Group gap="xs" wrap="wrap">
-            <Tooltip label={view === 'grid' ? 'Tampilan list' : 'Tampilan grid'}>
-              <ActionIcon size="md" variant="default" radius="md" aria-label="Ganti tampilan" onClick={() => setView((v) => (v === 'grid' ? 'list' : 'grid'))}>
-                {view === 'grid' ? <TbLayoutList size={15} /> : <TbLayoutGrid size={15} />}
-              </ActionIcon>
-            </Tooltip>
-            {allTags.length > 0 && (
-              <Tooltip label={groupByTag ? 'Nonaktifkan group by tag' : 'Group by tag'}>
-                <ActionIcon size="md" variant={groupByTag ? 'filled' : 'default'} radius="md" color={groupByTag ? 'grape' : undefined} onClick={() => setGroupByTag((v) => !v)}>
-                  <TbTag size={15} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-            {allTags.length > 0 && (
-              <MultiSelectChips size="sm" label="Tag" icon={<TbTag size={14} />} width={130} options={allTags} value={tagFilter} onChange={setTagFilter} />
-            )}
-            <Select size="sm" data={SORT_OPTIONS} value={sort} onChange={(v) => v && setSort(v as typeof sort)} leftSection={<TbArrowsSort size={14} />} allowDeselect={false} w={155} radius="md" />
-            <SegmentedControl size="xs" value={statusFilter} onChange={(v) => setStatusFilter(v as 'all' | 'active' | 'inactive')}
-              data={[{ value: 'all', label: 'Semua' }, { value: 'active', label: 'Aktif' }, { value: 'inactive', label: 'Nonaktif' }]} radius="md" />
-          </Group>
-          {tagFilter.length > 0 && (
-            <Group gap={6} wrap="wrap" align="center">
-              <MultiSelectChipsRow value={tagFilter} onChange={setTagFilter} getColor={tagColor} />
-            </Group>
-          )}
-          {hasFilter && (
-            <Group justify="space-between" gap="xs" wrap="nowrap">
-              <Text size="xs" c="dimmed">
-                {filtered.length === projects.length ? `${projects.length} project` : `${filtered.length} dari ${projects.length} project`}
-              </Text>
-              <Button size="compact-xs" variant="subtle" color="gray" leftSection={<TbX size={11} />} onClick={resetFilter}>
-                Reset filter
-              </Button>
-            </Group>
-          )}
-        </Stack>
+        <ProjectsToolbar
+          search={search} setSearch={setSearch} searchRef={searchRef}
+          view={view} setView={setView}
+          allTags={allTags} tagFilter={tagFilter} setTagFilter={setTagFilter}
+          sort={sort} setSort={setSort}
+          groupByTag={groupByTag} setGroupByTag={setGroupByTag}
+          statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+          filtered={filtered} projects={projects}
+          hasFilter={hasFilter} resetFilter={resetFilter}
+        />
       )}
 
       {isError && (
@@ -388,74 +257,13 @@ function ProjectListPage() {
       )}
 
       {!isError && filtered.length > 0 && (
-        <>
-          <Stack gap="md">
-            {paginatedGroups.map((group, gi) => (
-              <Box key={group.key}>
-                {group.label && (
-                  <Group gap="xs" mb="xs" mt={gi > 0 ? 4 : 0} align="center">
-                    <Text size="xs" fw={700} tt="uppercase" c={group.key === 'pinned' ? 'violet.6' : 'dimmed'} style={{ letterSpacing: '0.06em' }}>
-                      {group.label}
-                    </Text>
-                    <Badge size="xs" variant="light" radius="sm" color={group.key === 'pinned' ? 'violet' : group.key === 'inactive' ? 'gray' : 'teal'}>
-                      {group.items.length}
-                    </Badge>
-                    <Box style={{ flex: 1, height: 1, background: 'var(--mantine-color-default-border)' }} />
-                  </Group>
-                )}
-                {(() => {
-                  const tagGroups = groupByTag ? groupByPrimaryTag(group.items) : [{ tag: null, items: group.items }]
-                  const hasSubGroups = groupByTag && tagGroups.length > 1
-                  return (
-                    <Stack gap={hasSubGroups ? 'sm' : 'xs'}>
-                      {tagGroups.map((tg) => (
-                        <Box key={tg.tag ?? '__no_tag__'}>
-                          {hasSubGroups && (
-                            <Group gap="xs" mb="xs" align="center">
-                              {tg.tag ? (
-                                <Badge size="xs" variant="dot" color={tagColor(tg.tag)}>{tg.tag}</Badge>
-                              ) : (
-                                <Text size="xs" c="dimmed" fs="italic">no tag</Text>
-                              )}
-                              <Badge size="xs" variant="outline" radius="sm" color="gray">{tg.items.length}</Badge>
-                              <Box style={{ flex: 1, height: 1, background: 'var(--mantine-color-default-border)', opacity: 0.5 }} />
-                            </Group>
-                          )}
-                          {view === 'list' ? (
-                            <Stack gap="xs">
-                              {tg.items.map((p) => (
-                                <ProjectListCard key={p.slug} project={p} isPinned={pinned.includes(p.slug)}
-                                  onPin={() => togglePin(p.slug)} onEdit={() => openEditPage(p.slug)}
-                                  onDelete={() => deleteProject(p.slug, p.name)}
-                                  onToggleActive={() => confirmToggleActive(p.slug, p.name, p.isActive)}
-                                  onTagClick={addTagFilter} onClick={() => openProject(p.slug)} />
-                              ))}
-                            </Stack>
-                          ) : (
-                            <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing={{ base: 'xs', sm: 'sm' }}>
-                              {tg.items.map((p) => (
-                                <ProjectGridCard key={p.slug} project={p} isPinned={pinned.includes(p.slug)}
-                                  onPin={() => togglePin(p.slug)} onEdit={() => openEditPage(p.slug)}
-                                  onDelete={() => deleteProject(p.slug, p.name)}
-                                  onToggleActive={() => confirmToggleActive(p.slug, p.name, p.isActive)}
-                                  onTagClick={addTagFilter} onClick={() => openProject(p.slug)} />
-                              ))}
-                            </SimpleGrid>
-                          )}
-                        </Box>
-                      ))}
-                    </Stack>
-                  )
-                })()}
-              </Box>
-            ))}
-          </Stack>
-          {totalPages > 1 && (
-            <Group justify="center" mt="lg">
-              <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
-            </Group>
-          )}
-        </>
+        <ProjectsGrid
+          paginatedGroups={paginatedGroups} view={view} pinned={pinned} groupByTag={groupByTag}
+          togglePin={togglePin} openEditPage={openEditPage}
+          deleteProject={deleteProject} confirmToggleActive={confirmToggleActive}
+          addTagFilter={addTagFilter} openProject={openProject}
+          page={page} setPage={setPage} totalPages={totalPages}
+        />
       )}
     </Box>
   )
