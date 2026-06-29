@@ -3,6 +3,7 @@ import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { hasMasterKey } from '../../lib/crypto'
 // Misc envman routes (status, whoami, user lookup)
 import { prisma } from '../../lib/db'
+import { adminUsersQueryRouter } from './admin-users-query'
 import { adminUsersRouter } from './admin-users'
 import { aliasesRouter } from './aliases'
 import { databaseRouter } from './database'
@@ -65,6 +66,7 @@ export const envmanRouter = new Elysia()
   .use(filesRouter)
   .use(gistsRouter)
   .use(databaseRouter)
+  .use(adminUsersQueryRouter)
   .use(adminUsersRouter)
   .use(pmAuditRouter)
   .use(mcpAuditRouter)

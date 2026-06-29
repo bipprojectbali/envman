@@ -10,17 +10,12 @@ function getIp(request: Request): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown'
 }
 
-// Project-level role input: 'OWNER' | 'EDITOR' | 'VIEWER' | null (null = remove member)
 type ProjectRoleInput = ProjectRole | null
 
 function isValidProjectRole(value: unknown): value is ProjectRoleInput {
   return value === null || value === 'OWNER' || value === 'EDITOR' || value === 'VIEWER'
 }
 
-// Env-level role input: 'inherit' | 'denied' | 'OWNER' | 'EDITOR' | 'VIEWER'
-//   'inherit' → delete record (use project default)
-//   'denied'  → record with role=null (explicit deny)
-//   role      → record with that role (override)
 type EnvRoleInput = 'inherit' | 'denied' | ProjectRole
 
 function isValidEnvRole(value: unknown): value is EnvRoleInput {
@@ -28,105 +23,6 @@ function isValidEnvRole(value: unknown): value is EnvRoleInput {
 }
 
 export const adminUsersRouter = new Elysia()
-
-  // ─── List all users with access summary ──────────────────────────────────────
-  .get('/api/envman/admin/users', async ({ request, set }) => {
-    const caller = await requireSuperAdmin(request)
-    if (!caller) {
-      set.status = 403
-      return { error: 'SUPER_ADMIN required' }
-    }
-    const users = await prisma.user.findMany({
-      where: { deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        blocked: true,
-        permissions: true,
-        createdAt: true,
-        image: true,
-        _count: { select: { projectMembers: true, envMemberships: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-    return {
-      users: users.map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        blocked: u.blocked,
-        permissions: u.permissions,
-        createdAt: u.createdAt,
-        image: u.image,
-        projectCount: u._count.projectMembers,
-        envOverrideCount: u._count.envMemberships,
-      })),
-    }
-  })
-
-  // ─── User access detail: full project × env matrix ───────────────────────────
-  .get('/api/envman/admin/users/:userId/access', async ({ request, params, set }) => {
-    const caller = await requireSuperAdmin(request)
-    if (!caller) {
-      set.status = 403
-      return { error: 'SUPER_ADMIN required' }
-    }
-    const user = await prisma.user.findUnique({
-      where: { id: params.userId },
-      select: { id: true, name: true, email: true, role: true, blocked: true, permissions: true, image: true },
-    })
-    if (!user) {
-      set.status = 404
-      return { error: 'User not found' }
-    }
-
-    const projects = await prisma.project.findMany({
-      where: { deletedAt: null },
-      select: {
-        slug: true,
-        name: true,
-        members: { where: { userId: params.userId }, select: { role: true } },
-        environments: {
-          select: {
-            name: true,
-            members: { where: { userId: params.userId }, select: { role: true } },
-          },
-          orderBy: { name: 'asc' },
-        },
-      },
-      orderBy: { name: 'asc' },
-    })
-
-    const matrix = projects.map((p) => {
-      const projectRole = (p.members[0]?.role ?? null) as ProjectRole | null
-      return {
-        slug: p.slug,
-        name: p.name,
-        projectRole,
-        environments: p.environments.map((e) => {
-          const envMember = e.members[0]
-          // envRole: 'inherit' (no record) | 'denied' (record, role=null) | role string
-          let envRole: EnvRoleInput = 'inherit'
-          let effectiveRole: ProjectRole | null = projectRole
-          if (envMember) {
-            if (envMember.role === null) {
-              envRole = 'denied'
-              effectiveRole = null
-            } else {
-              envRole = envMember.role as ProjectRole
-              effectiveRole = envMember.role as ProjectRole
-            }
-          }
-          return { name: e.name, envRole, effectiveRole }
-        }),
-      }
-    })
-
-    return { user, projects: matrix }
-  })
 
   // ─── Set project-level role (or remove membership) ───────────────────────────
   .put('/api/envman/admin/users/:userId/projects/:slug', async ({ request, params, set }) => {
@@ -151,7 +47,6 @@ export const adminUsersRouter = new Elysia()
       where: { userId_projectId: { userId: params.userId, projectId: project.id } },
     })
 
-    // Last-owner protection
     if (targetMember?.role === 'OWNER' && body.role !== 'OWNER') {
       const ownerCount = await prisma.projectMember.count({
         where: { projectId: project.id, role: 'OWNER' },
@@ -174,7 +69,6 @@ export const adminUsersRouter = new Elysia()
       })
     }
 
-    // extraUserIds: target user may be added/removed; include them to cover both cases.
     await invalidateProjectCaches(params.slug, [params.userId])
     return { ok: true, role: body.role }
   })
@@ -205,7 +99,6 @@ export const adminUsersRouter = new Elysia()
       return { error: 'Environment not found' }
     }
 
-    // Target user must already be a project member — env override hanya berlaku di atas membership.
     const targetMember = await prisma.projectMember.findUnique({
       where: { userId_projectId: { userId: params.userId, projectId: project.id } },
     })
@@ -214,7 +107,6 @@ export const adminUsersRouter = new Elysia()
       return { error: 'User belum jadi member project. Tambah ke project dulu sebelum atur akses env.' }
     }
 
-    // Last-owner-of-env protection: tolak demote/deny OWNER terakhir efektif di env ini.
     if (body.role !== 'OWNER' && body.role !== 'inherit') {
       const projectOwners = await prisma.projectMember.findMany({
         where: { projectId: project.id, role: 'OWNER' },
