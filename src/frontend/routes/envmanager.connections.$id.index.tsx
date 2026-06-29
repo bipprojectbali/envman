@@ -1,33 +1,28 @@
 import { Alert, Badge, Box, Button, Group, Loader, Tabs, Text } from '@mantine/core'
-import { useDisclosure, useLocalStorage, useMediaQuery } from '@mantine/hooks'
+import { useLocalStorage } from '@mantine/hooks'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect } from 'react'
 import { TbAlertTriangle, TbServer, TbTool } from 'react-icons/tb'
 import { ConnectionHeader } from '@/frontend/components/connection-detail/ConnectionHeader'
-import { ComposeModal } from '@/frontend/components/connection-detail/ComposeModal'
-import { ExecDrawer } from '@/frontend/components/connection-detail/ExecDrawer'
-import { LogsModal } from '@/frontend/components/connection-detail/LogsModal'
+import { ConnectionModals } from '@/frontend/components/connection-detail/ConnectionModals'
 import { MaintenanceTab } from '@/frontend/components/connection-detail/MaintenanceTab'
 import { StacksTabContent } from '@/frontend/components/connection-detail/StacksTabContent'
 import { useCleanupMutations } from '@/frontend/hooks/useCleanupMutations'
 import { useConnectionDetail } from '@/frontend/hooks/useConnectionDetail'
 import { useConnectionLogs } from '@/frontend/hooks/useConnectionLogs'
+import { useConnectionPageState } from '@/frontend/hooks/useConnectionPageState'
 import { useExec } from '@/frontend/hooks/useExec'
 import { useStackMutations } from '@/frontend/hooks/useStackMutations'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/api'
-import type { StackInfo } from '@/frontend/types/portainer'
 
 export const Route = createFileRoute('/envmanager/connections/$id/')({
   component: ConnectionDetailPage,
 })
 
-const PAGE_SIZE = 10
-
 function ConnectionDetailPage() {
   const { id } = Route.useParams()
-  const isMobile = useMediaQuery('(max-width: 48em)')
   const { data: sessionData } = useSession()
   const user = sessionData?.user
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
@@ -36,32 +31,26 @@ function ConnectionDetailPage() {
   const canMutate = isSuperAdmin || hasCapability(user, 'stack:mutate')
   const canPrune = isSuperAdmin || hasCapability(user, 'stack:prune')
 
+  // activeTab drives useConnectionDetail fetch behavior — must come before it
   const [activeTab, setActiveTab] = useLocalStorage<string>({ key: `envman:connection-detail:${id}:tab`, defaultValue: 'stacks' })
   const [stackView, setStackView] = useLocalStorage<'grid' | 'list'>({ key: `envman:connection-detail:${id}:view`, defaultValue: 'list' })
 
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<string | null>(null)
-  const [filterType, setFilterType] = useState<string | null>(null)
-  const [filterLinked, setFilterLinked] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-
-  // Compose modal state
-  const [composeStack, setComposeStack] = useState<StackInfo | null>(null)
-  const [composeOpen, { open: openCompose, close: closeCompose }] = useDisclosure(false)
-  const [composeEditing, setComposeEditing] = useState(false)
-  const [composeContent, setComposeContent] = useState('')
-
-  // Logs modal state
-  const [logsStack, setLogsStack] = useState<StackInfo | null>(null)
-  const [logsOpen, { open: openLogs, close: closeLogs }] = useDisclosure(false)
-  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null)
-  const [logTail, setLogTail] = useState(200)
-  const [showStdout, setShowStdout] = useState(true)
-  const [showStderr, setShowStderr] = useState(true)
-  const [autoRefresh, setAutoRefresh] = useState(false)
-  const [autoScroll, setAutoScroll] = useState(true)
-
   const { stacks, connection, isLoading, refetch, isFetching, endpointIds, stackStatusMap, containerStatsMap, cleanupEndpointId, setCleanupEndpointId, imagesData, imagesFetching, refetchImages, containersData, containersFetching, refetchContainers, volumesData, volumesFetching, refetchVolumes, networksData, networksFetching, refetchNetworks } = useConnectionDetail(id, { activeTab })
+
+  const {
+    search, setSearch, filterStatus, setFilterStatus,
+    filterType, setFilterType, filterLinked, setFilterLinked,
+    page, setPage,
+    composeStack, composeOpen, closeCompose,
+    composeEditing, setComposeEditing, composeContent, setComposeContent,
+    logsStack, logsOpen, closeLogs,
+    selectedContainerId, setSelectedContainerId,
+    logTail, setLogTail, showStdout, setShowStdout,
+    showStderr, setShowStderr, autoRefresh, setAutoRefresh,
+    autoScroll, setAutoScroll,
+    filteredStacks, totalPages, hasFilter,
+    handleOpenLogs, handleOpenCompose,
+  } = useConnectionPageState(stacks)
 
   const { saveCompose, confirmSaveCompose, restartContainer, confirmRestartContainer, repull, confirmRepull, recreate, confirmRecreate } = useStackMutations({ id, composeStack, composeContent, setComposeEditing })
 
@@ -83,30 +72,6 @@ function ConnectionDetailPage() {
   const { logViewportRef, liveLines, setLiveLines, lastLogTimestamp, logsFetching, refetchLogs } = useConnectionLogs({
     id, logsOpen, logsStack, selectedContainerId, logTail, showStdout, showStderr, autoRefresh, autoScroll,
   })
-
-  const filteredStacks = useMemo(() => {
-    let list = [...stacks]
-    if (search.trim()) list = list.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()))
-    if (filterStatus === 'active') list = list.filter((s) => s.status === 1)
-    if (filterStatus === 'inactive') list = list.filter((s) => s.status !== 1)
-    if (filterType === 'compose') list = list.filter((s) => s.type === 2)
-    if (filterType === 'swarm') list = list.filter((s) => s.type !== 2)
-    if (filterLinked === 'linked') list = list.filter((s) => s.linkedEnvs.length > 0)
-    if (filterLinked === 'unlinked') list = list.filter((s) => s.linkedEnvs.length === 0)
-    return list
-  }, [stacks, search, filterStatus, filterType, filterLinked])
-
-  const totalPages = Math.max(1, Math.ceil(filteredStacks.length / PAGE_SIZE))
-  const hasFilter = !!search.trim() || !!filterStatus || !!filterType || !!filterLinked
-
-  useEffect(() => { setPage(1) }, [search, filterStatus, filterType, filterLinked])
-
-  const handleOpenLogs = (stack: StackInfo, containerId: string) => {
-    setLogsStack(stack)
-    setSelectedContainerId(containerId)
-    openLogs()
-  }
-  const handleOpenCompose = (stack: StackInfo) => { setComposeStack(stack); setComposeEditing(false); openCompose() }
 
   if (!canView) {
     return (
@@ -178,66 +143,10 @@ function ConnectionDetailPage() {
         />
       )}
 
-      <ComposeModal
-        opened={composeOpen}
-        onClose={closeCompose}
-        composeStack={composeStack}
-        composeContent={composeContent}
-        setComposeContent={setComposeContent}
-        composeEditing={composeEditing}
-        setComposeEditing={setComposeEditing}
-        composeFetching={composeFetching}
-        composeData={composeData}
-        canMutate={canMutate}
-        saveCompose={saveCompose}
-        onConfirmSave={confirmSaveCompose}
-      />
-
-      <LogsModal
-        opened={logsOpen}
-        onClose={closeLogs}
-        isMobile={isMobile}
-        logsStack={logsStack}
-        selectedContainerId={selectedContainerId}
-        setSelectedContainerId={setSelectedContainerId}
-        logLines={liveLines}
-        logsFetching={logsFetching}
-        refetchLogs={refetchLogs}
-        logTail={logTail}
-        setLogTail={setLogTail}
-        showStdout={showStdout}
-        setShowStdout={setShowStdout}
-        showStderr={showStderr}
-        setShowStderr={setShowStderr}
-        autoRefresh={autoRefresh}
-        setAutoRefresh={setAutoRefresh}
-        autoScroll={autoScroll}
-        setAutoScroll={setAutoScroll}
-        logViewportRef={logViewportRef}
-        stackStatusMap={stackStatusMap}
-        setLiveLines={setLiveLines}
-        lastLogTimestamp={lastLogTimestamp}
-      />
-
-      <ExecDrawer
-        opened={execOpen}
-        onClose={closeExec}
-        execContainer={execContainer}
-        execCommand={execCommand}
-        setExecCommand={setExecCommand}
-        execHistory={execHistory}
-        setExecHistory={setExecHistory}
-        execQuickCommands={execQuickCommands}
-        setExecQuickCommands={setExecQuickCommands}
-        execShowQuickAdd={execShowQuickAdd}
-        setExecShowQuickAdd={setExecShowQuickAdd}
-        execNewQuickLabel={execNewQuickLabel}
-        setExecNewQuickLabel={setExecNewQuickLabel}
-        execNewQuickCommand={execNewQuickCommand}
-        setExecNewQuickCommand={setExecNewQuickCommand}
-        execHistoryIdxRef={execHistoryIdxRef}
-        execOutputRef={execOutputRef}
-        execMutation={execMutation}
+      <ConnectionModals
+        compose={{ opened: composeOpen, onClose: closeCompose, composeStack, composeContent, setComposeContent, composeEditing, setComposeEditing, composeFetching, composeData, canMutate, saveCompose, onConfirmSave: confirmSaveCompose }}
+        logs={{ opened: logsOpen, onClose: closeLogs, logsStack, selectedContainerId, setSelectedContainerId, logLines: liveLines, logsFetching, refetchLogs, logTail, setLogTail, showStdout, setShowStdout, showStderr, setShowStderr, autoRefresh, setAutoRefresh, autoScroll, setAutoScroll, logViewportRef, stackStatusMap, setLiveLines, lastLogTimestamp }}
+        exec={{ opened: execOpen, onClose: closeExec, execContainer, execCommand, setExecCommand, execHistory, setExecHistory, execQuickCommands, setExecQuickCommands, execShowQuickAdd, setExecShowQuickAdd, execNewQuickLabel, setExecNewQuickLabel, execNewQuickCommand, setExecNewQuickCommand, execHistoryIdxRef, execOutputRef, execMutation }}
       />
     </Box>
   )
