@@ -8,6 +8,7 @@ import {
   Divider,
   Group,
   Kbd,
+  Modal,
   MultiSelect,
   Paper,
   SegmentedControl,
@@ -27,6 +28,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 import {
+  TbArrowsMaximize,
   TbBrandGithub,
   TbCheck,
   TbChevronLeft,
@@ -861,7 +863,11 @@ function GistDetailView({
   onEdit: () => void
 }) {
   const [activeFile, setActiveFile] = useState(0)
+  const [fullscreen, setFullscreen] = useState(false)
   const file = gist.files[activeFile] ?? gist.files[0]
+
+  const renderContent = (f: GistFile) =>
+    f.language === 'markdown' ? f.content || '_Kosong_' : `\`\`\`${f.language}\n${f.content || ''}\n\`\`\``
 
   return (
     <Paper withBorder p="md" radius="md">
@@ -924,6 +930,11 @@ function GistDetailView({
           {gist.files.map((f, i) => (
             <Tabs.Panel key={f.filename} value={String(i)} pt="xs">
               <Group justify="flex-end" gap={4} mb={4}>
+                <Tooltip label="Preview layar penuh">
+                  <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setFullscreen(true)}>
+                    <TbArrowsMaximize size={11} />
+                  </ActionIcon>
+                </Tooltip>
                 <CopyButton value={f.content} timeout={2000}>
                   {({ copied, copy }) => (
                     <Tooltip label={copied ? 'Tersalin!' : 'Salin konten'}>
@@ -952,11 +963,7 @@ function GistDetailView({
                 </Tooltip>
               </Group>
               <Box style={{ maxHeight: 400, overflowY: 'auto' }}>
-                <MarkdownRenderer fontSize={13}>
-                  {f.language === 'markdown'
-                    ? f.content || '_Kosong_'
-                    : `\`\`\`${f.language}\n${f.content || ''}\n\`\`\``}
-                </MarkdownRenderer>
+                <MarkdownRenderer fontSize={13}>{renderContent(f)}</MarkdownRenderer>
               </Box>
             </Tabs.Panel>
           ))}
@@ -1018,6 +1025,29 @@ function GistDetailView({
           )}
         </Group>
       </Stack>
+
+      <Modal
+        opened={fullscreen}
+        onClose={() => setFullscreen(false)}
+        fullScreen
+        radius={0}
+        title={
+          <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+            <TbFileCode size={14} style={{ flexShrink: 0 }} />
+            <Text size="sm" fw={600} lineClamp={1}>
+              {file?.filename}
+            </Text>
+            {file && (
+              <Badge size="xs" variant="dot" color={getLangColor(file.language)} style={{ flexShrink: 0 }}>
+                {file.language}
+              </Badge>
+            )}
+          </Group>
+        }
+        styles={{ body: { paddingTop: 'var(--mantine-spacing-md)' } }}
+      >
+        {file && <MarkdownRenderer fontSize={13}>{renderContent(file)}</MarkdownRenderer>}
+      </Modal>
     </Paper>
   )
 }

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **Preview gist layar penuh**: tombol maximize di tiap tab file pada detail gist membuka konten dalam modal full-screen (tanpa batas tinggi 400px), memudahkan membaca file panjang. Tetap dengan syntax highlight yang sama.
+
 ## [0.14.0] - 2026-06-24
 
 ### Added
