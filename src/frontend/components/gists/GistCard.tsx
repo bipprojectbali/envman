@@ -140,7 +140,7 @@ export function GistCard({ gist, isOwner, onEdit, onDelete, onView, onTagClick }
       </Group>
 
       {firstFile && (
-        <Text lineClamp={4} style={{ fontSize: 11, fontFamily: 'monospace', marginBottom: 6, whiteSpace: 'pre-wrap' }}>
+        <Text p={"md"} lineClamp={4} style={{ fontSize: 11, fontFamily: 'monospace', marginBottom: 6, whiteSpace: 'pre-wrap' }}>
           {firstFile.content || '(kosong)'}
         </Text>
       )}
