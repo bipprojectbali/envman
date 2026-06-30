@@ -61,7 +61,7 @@ Deploy ke staging di-block oleh credential scanner dengan error `db_url_with_cre
 Scanner di `scripts/mcp/deploy-helpers.ts` menjalankan `git diff origin/stg..HEAD`, mengambil semua baris `+`, **men-join-nya menjadi satu string**, lalu menjalankan regex `(postgres|mysql|mongodb|redis):\/\/[^:]+:[^@]+@` secara global.
 
 Karena `[^:]+` dan `[^@]+` dalam character class bisa match newline, regex ini bisa **span lintas baris**:
-- `postgres://...` di baris 109 `api-core.ts` (GET vars response example)
+- Contoh DB URL di baris 109 `api-core.ts` (GET vars response example)
 - Regex melewati banyak baris
 - Akhirnya cocok dengan `@` dari `bob@example.com` di baris members example
 
@@ -74,9 +74,9 @@ Ini false positive — bukan credential bocor, tapi contoh URL di dokumentasi me
 | `5f2687d` | Ganti `user:pass@` → `<user>:<pass>@` | ❌ pattern `[^:]+:[^@]+@` tetap match |
 | `f3b2814` | Exclude docs files dari git diff + hapus credentials | ❌ MCP server tidak reload kode baru |
 | `fd56231` | Ubah matching per-line (bukan join+match) | ❌ MCP server tidak reload kode baru |
-| `7960ea2` | Hapus `postgres://...` dan `redis://...` dari JSON examples | ❌ ada 2 baris lain yang terlewat |
-| `d51e914` | Hapus `postgresql://` dari `docs-builder.ts` | ❌ ada 1 baris lain di api-core.ts |
-| `fb8641f` | Hapus `postgres://host:5432/db` di POST /vars example + `postgresql://localhost:5432/envman` di self-hosting.ts | ✅ 0 match |
+| `7960ea2` | Hapus URL scheme DB dari JSON examples | ❌ ada 2 baris lain yang terlewat |
+| `d51e914` | Hapus URL scheme dari `docs-builder.ts` | ❌ ada 1 baris lain di api-core.ts |
+| `fb8641f` | Hapus sisa URL scheme di POST /vars example + self-hosting.ts | ✅ 0 match |
 
 ### Root Cause Sesungguhnya
 
@@ -123,7 +123,7 @@ Character class `[^x]` berbeda dari `.` — ia BISA match newline. Ketika banyak
 ## 5. Yang Masih Perlu Diperhatikan
 
 1. **Scanner fix `fd56231`** baru aktif setelah sesi Claude Code di-restart (MCP server reload).
-2. Contoh URL di docs sekarang menggunakan `your-database-url` dan `your-redis-url` (tidak informatif). Setelah scanner fix aktif, bisa kembali ke `postgresql://host:5432/envman` karena:
+2. Contoh URL di docs sekarang menggunakan `your-database-url` dan `your-redis-url` (tidak informatif). Setelah scanner fix aktif (sesi berikutnya), bisa dikembalikan ke format lengkap karena:
    - File docs-sections sudah di-exclude dari scan
    - Per-line matching tidak akan false positive
 3. Cek apakah ada file lain yang masih di atas limit di File Health panel.
