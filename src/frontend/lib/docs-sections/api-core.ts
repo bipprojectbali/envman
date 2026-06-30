@@ -106,7 +106,7 @@ curl -H "Authorization: Bearer ptr_abc123" \\
     {
       "id": "...",
       "key": "DATABASE_URL",
-      "value": "postgres://...",
+      "value": "...",
       "isSecret": false,
       "isDisabled": false,
       "updatedAt": "2024-01-15T10:00:00.000Z"
@@ -138,8 +138,8 @@ curl -H "Authorization: Bearer ptr_abc123" \\
 \`\`\`json
 {
   "vars": {
-    "DATABASE_URL": "postgres://...",
-    "REDIS_URL": "redis://...",
+    "DATABASE_URL": "...",
+    "REDIS_URL": "...",
     "API_KEY": "secret-value"
   },
   "secrets": ["API_KEY"]

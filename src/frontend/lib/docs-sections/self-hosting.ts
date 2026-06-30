@@ -20,7 +20,7 @@ GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxx
 
 # ─── Redis (untuk app logs + presence)
-REDIS_URL=redis://localhost:6379
+REDIS_URL=your-redis-url
 
 # ─── MCP server (opsional, untuk Claude integration)
 MCP_SECRET=<hex>
