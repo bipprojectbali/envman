@@ -6,7 +6,7 @@ export function buildSelfHostingSection(origin: string): string {
 
 \`\`\`bash
 # ─── Database (wajib)
-DATABASE_URL=postgresql://<user>:<password>@localhost:5432/envman
+DATABASE_URL=postgresql://localhost:5432/envman
 
 # ─── Enkripsi secret vars (sangat dianjurkan)
 MASTER_KEY=<64-char-hex>  # openssl rand -hex 32

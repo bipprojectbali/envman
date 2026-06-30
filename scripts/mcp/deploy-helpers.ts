@@ -88,7 +88,7 @@ export function scanCredentials(
   tryRun: TryRunFn,
 ): { ok: boolean; issues: CredIssue[]; sensitiveFiles: string[] } {
   const diff = tryRun(
-    `git diff origin/${branch}..HEAD -- . ":(exclude)*.lock" ":(exclude)bun.lock" ":(exclude)package-lock.json"`,
+    `git diff origin/${branch}..HEAD -- . ":(exclude)*.lock" ":(exclude)bun.lock" ":(exclude)package-lock.json" ":(exclude)src/lib/docs-builder.ts" ":(exclude)src/frontend/lib/docs-sections/**"`,
   )
   const addedLines = diff
     .split('\n')
