@@ -249,7 +249,7 @@ Status machine: \`OPEN → IN_PROGRESS → READY_FOR_QC → CLOSED\` + \`REOPENE
 ## Self-Hosting — Environment Variables
 
 \`\`\`bash
-DATABASE_URL=postgresql://host:5432/envman
+DATABASE_URL=your-database-url
 MASTER_KEY=<64-hex>          # openssl rand -hex 32
 PORT=3000
 NODE_ENV=production
