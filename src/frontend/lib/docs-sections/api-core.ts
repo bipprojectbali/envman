@@ -128,7 +128,7 @@ curl -H "Authorization: Bearer ptr_abc123" \\
 \`\`\`json
 {
   "key": "DATABASE_URL",
-  "value": "postgres://user:pass@host:5432/db",
+  "value": "postgres://<user>:<pass>@host:5432/db",
   "isSecret": false
 }
 \`\`\`
