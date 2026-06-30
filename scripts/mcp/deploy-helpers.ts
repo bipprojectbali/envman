@@ -93,14 +93,17 @@ export function scanCredentials(
   const addedLines = diff
     .split('\n')
     .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
-    .join('\n')
 
   const issues: CredIssue[] = []
   for (const { name, re } of CREDENTIAL_PATTERNS) {
-    const matches = addedLines.match(new RegExp(re.source, 'g')) ?? []
-    if (matches.length > 0) {
-      const sample = (matches[0] ?? '').slice(0, 20) + '***'
-      issues.push({ type: name, sample, count: matches.length })
+    const allMatches: string[] = []
+    for (const line of addedLines) {
+      const m = line.match(new RegExp(re.source, 'g')) ?? []
+      allMatches.push(...m)
+    }
+    if (allMatches.length > 0) {
+      const sample = (allMatches[0] ?? '').slice(0, 20) + '***'
+      issues.push({ type: name, sample, count: allMatches.length })
     }
   }
 
