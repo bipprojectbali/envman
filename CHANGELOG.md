@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+## [0.14.4] - 2026-06-30
+
 ### Added
 - **Preview gist layar penuh**: tombol maximize di tiap tab file pada detail gist membuka konten dalam modal full-screen (tanpa batas tinggi 400px), memudahkan membaca file panjang. Tetap dengan syntax highlight yang sama.
+
+### Fixed
+- **Tema code block ikut dark mode**: blok kode di preview Markdown (detail gist, dll.) tadinya selalu tampil background terang saat color scheme `auto` mengikuti preferensi sistem dark. Kini meresolusi `auto` → `light`/`dark` nyata sehingga syntax highlight memakai tema gelap dengan benar.
 
 ## [0.14.0] - 2026-06-24
 
