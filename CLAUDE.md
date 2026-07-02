@@ -716,12 +716,10 @@ Stop dan tanya user jika: fix butuh > 5 file, ketemu bug lain di tengah jalan, p
 **Setiap fitur baru WAJIB disertai:**
 
 1. **Test** — minimal integration test: happy path + unauthorized + invalid/not found. Di `tests/integration/` atau `tests/unit/`.
-2. **MCP tool dev** — tambahkan tool di `scripts/mcp/tools/` untuk inspect/manipulasi data di development.
-3. **MCP tool stg** — readonly counterpart di MCP server staging untuk inspeksi data tanpa write access destruktif.
 
-**Skala MCP tool:** CRUD baru → min `list_<entity>` + `get_<entity>`; background job → inspect queue + cancel/retry (dev only mutate).
+**MCP tool (opsional, tidak wajib):** boleh tambah tool inspeksi di `scripts/mcp/tools/` (dev) dan readonly counterpart di stg (`scripts/mcp/debug-stg.ts`) bila membantu debugging — tapi bukan syarat merge. Jika ditambah, MCP stg tetap **readonly** (jangan beri write access destruktif).
 
-**❌ Larangan:** Commit fitur tanpa test; MCP stg dengan write access; skip salah satu dari ketiganya.
+**❌ Larangan:** Commit fitur tanpa test.
 
 ---
 
