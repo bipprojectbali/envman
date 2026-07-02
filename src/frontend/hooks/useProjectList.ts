@@ -13,6 +13,9 @@ export interface Project {
   description?: string
   tags: string[]
   isActive: boolean
+  icon?: string | null
+  color?: string | null
+  cardColor?: string | null
   createdAt?: string
   myRole: 'OWNER' | 'EDITOR' | 'VIEWER'
   _count: { environments: number }
@@ -73,8 +76,27 @@ export function useProjectList() {
   })
 
   const editProject = useMutation({
-    mutationFn: ({ slug, name, description, tags }: { slug: string; name: string; description: string; tags: string[] }) =>
-      apiFetch(`/api/envman/projects/${slug}`, { method: 'PATCH', body: JSON.stringify({ name, description, tags }) }),
+    mutationFn: ({
+      slug,
+      name,
+      description,
+      tags,
+      icon,
+      color,
+      cardColor,
+    }: {
+      slug: string
+      name: string
+      description: string
+      tags: string[]
+      icon?: string | null
+      color?: string | null
+      cardColor?: string | null
+    }) =>
+      apiFetch(`/api/envman/projects/${slug}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name, description, tags, icon, color, cardColor }),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['envman', 'projects'] })
       notifyOk('Project diperbarui')
@@ -96,13 +118,43 @@ export function useProjectList() {
   const projects: Project[] = data?.projects ?? []
 
   const filters = useProjectFilters(projects)
-  const { view, setView, search, setSearch, tagFilter, setTagFilter, sort, setSort,
-    pinned, setPinned, groupByTag, setGroupByTag, statusFilter, setStatusFilter,
-    page, setPage, searchRef,
-    allTags, filtered, paginatedGroups, totalPages, hasFilter,
-    togglePin, addTagFilter, resetFilter } = filters
+  const {
+    view,
+    setView,
+    search,
+    setSearch,
+    tagFilter,
+    setTagFilter,
+    sort,
+    setSort,
+    pinned,
+    setPinned,
+    groupByTag,
+    setGroupByTag,
+    statusFilter,
+    setStatusFilter,
+    page,
+    setPage,
+    searchRef,
+    allTags,
+    filtered,
+    paginatedGroups,
+    totalPages,
+    hasFilter,
+    togglePin,
+    addTagFilter,
+    resetFilter,
+  } = filters
 
-  useHotkeys([['/', () => { searchRef.current?.focus(); searchRef.current?.select() }]])
+  useHotkeys([
+    [
+      '/',
+      () => {
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      },
+    ],
+  ])
   useEffect(() => setPage(1), [])
 
   const ownerCount = projects.filter((p) => p.myRole === 'OWNER').length
@@ -136,22 +188,57 @@ export function useProjectList() {
 
   return {
     // Route search
-    create, editSlug,
+    create,
+    editSlug,
     // Form
-    form, setForm, slugManual, setSlugManual,
+    form,
+    setForm,
+    slugManual,
+    setSlugManual,
     // List state
-    view, setView, search, setSearch, tagFilter, setTagFilter, sort, setSort,
-    pinned, setPinned, groupByTag, setGroupByTag, statusFilter, setStatusFilter,
-    page, setPage, searchRef,
+    view,
+    setView,
+    search,
+    setSearch,
+    tagFilter,
+    setTagFilter,
+    sort,
+    setSort,
+    pinned,
+    setPinned,
+    groupByTag,
+    setGroupByTag,
+    statusFilter,
+    setStatusFilter,
+    page,
+    setPage,
+    searchRef,
     // Query
-    projects, isLoading, isError, error, refetch,
+    projects,
+    isLoading,
+    isError,
+    error,
+    refetch,
     // Mutations
-    createProject, editProject, toggleActive,
+    createProject,
+    editProject,
+    toggleActive,
     // Computed
-    allTags, filtered, paginatedGroups, totalPages,
-    ownerCount, totalEnvs, hasFilter, canCreateProject,
+    allTags,
+    filtered,
+    paginatedGroups,
+    totalPages,
+    ownerCount,
+    totalEnvs,
+    hasFilter,
+    canCreateProject,
     // Helpers
-    togglePin, addTagFilter, resetFilter,
-    openProject, openCreatePage, openEditPage, closeFormPage,
+    togglePin,
+    addTagFilter,
+    resetFilter,
+    openProject,
+    openCreatePage,
+    openEditPage,
+    closeFormPage,
   }
 }

@@ -1,23 +1,7 @@
-import {
-  ActionIcon,
-  Badge,
-  Group,
-  Paper,
-  Stack,
-  Text,
-  Tooltip,
-} from '@mantine/core'
-import {
-  TbClock,
-  TbPencil,
-  TbPin,
-  TbPinFilled,
-  TbPower,
-  TbTrash,
-  TbUsers,
-  TbVariable,
-} from 'react-icons/tb'
+import { ActionIcon, Badge, Group, Paper, Stack, Text, Tooltip } from '@mantine/core'
+import { TbClock, TbPencil, TbPin, TbPinFilled, TbPower, TbTrash, TbUsers, TbVariable } from 'react-icons/tb'
 import { ProjectAvatar } from '@/frontend/components/projects/ProjectAvatar'
+import { cardTintStyle } from '@/frontend/lib/project-avatar'
 import { relativeDate, roleColor, tagColor } from '@/frontend/lib/project-utils'
 
 interface Project {
@@ -26,6 +10,9 @@ interface Project {
   description?: string
   tags: string[]
   isActive: boolean
+  icon?: string | null
+  color?: string | null
+  cardColor?: string | null
   createdAt?: string
   myRole: 'OWNER' | 'EDITOR' | 'VIEWER'
   _count: { environments: number }
@@ -43,7 +30,16 @@ interface Props {
   onClick: () => void
 }
 
-export function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete, onToggleActive, onTagClick, onClick }: Props) {
+export function ProjectGridCard({
+  project: p,
+  isPinned,
+  onPin,
+  onEdit,
+  onDelete,
+  onToggleActive,
+  onTagClick,
+  onClick,
+}: Props) {
   const color = roleColor[p.myRole]
   return (
     <Paper
@@ -61,11 +57,11 @@ export function ProjectGridCard({ project: p, isPinned, onPin, onEdit, onDelete,
           onClick()
         }
       }}
-      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+      style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', ...cardTintStyle(p.cardColor) }}
     >
       <Group justify="space-between" mb="sm" wrap="nowrap" align="flex-start">
         <Group gap="sm" wrap="nowrap" align="center">
-          <ProjectAvatar name={p.name} role={p.myRole} size={38} />
+          <ProjectAvatar name={p.name} role={p.myRole} size={38} icon={p.icon} color={p.color} />
           <Stack gap={3}>
             <Badge size="xs" variant="light" color={color}>
               {p.myRole}

@@ -274,6 +274,9 @@ model Project {
   name        String
   description String?
   tags        String[]  @default([])
+  icon        String?   // nama Tabler icon (mis. "TbCloud") untuk avatar; null = inisial nama
+  color       String?   // nama warna Mantine (mis. "grape") untuk bg avatar; null = warna-by-role
+  cardColor   String?   // nama warna Mantine untuk tint background card; null = tanpa tint
   isActive    Boolean   @default(true)
   deletedAt   DateTime?
   createdAt   DateTime  @default(now())
