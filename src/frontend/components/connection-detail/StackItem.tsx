@@ -36,8 +36,9 @@ interface Props {
   stackContainers: ContainerInfo[]
   stackFetching: boolean
   containerStatsMap?: Record<string, ContainerStats | undefined>
-  canMutate: boolean
-  canOperate: boolean
+  canExec: boolean
+  canPower: boolean
+  canDeploy: boolean
   repull: { isPending: boolean; variables?: unknown }
   recreate: { isPending: boolean; variables?: unknown }
   restartContainer: { isPending: boolean; variables?: any }
@@ -49,11 +50,22 @@ interface Props {
   onOpenExec: (container: ContainerInfo, stack: StackInfo) => void
 }
 
-function ContainerRow({ c, stack, canMutate, canOperate, restartContainer, onRestartContainer, onOpenLogs, onOpenExec, stats, maxImageWidth }: {
+function ContainerRow({
+  c,
+  stack,
+  canExec,
+  canPower,
+  restartContainer,
+  onRestartContainer,
+  onOpenLogs,
+  onOpenExec,
+  stats,
+  maxImageWidth,
+}: {
   c: ContainerInfo
   stack: StackInfo
-  canMutate: boolean
-  canOperate: boolean
+  canExec: boolean
+  canPower: boolean
   restartContainer: { isPending: boolean; variables?: any }
   onRestartContainer: (stack: StackInfo, containerId: string, containerName: string) => void
   onOpenLogs: (stack: StackInfo, containerId: string) => void
@@ -72,17 +84,31 @@ function ContainerRow({ c, stack, canMutate, canOperate, restartContainer, onRes
             {c.names[0]}
           </Text>
           <Group gap="xs" mt={2} wrap="nowrap">
-            <Code fz={10} c="dimmed">{c.shortId}</Code>
-            <Text fz={10} c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: maxImageWidth }}>
+            <Code fz={10} c="dimmed">
+              {c.shortId}
+            </Code>
+            <Text
+              fz={10}
+              c="dimmed"
+              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: maxImageWidth }}
+            >
               {c.image.split('/').pop()}
             </Text>
           </Group>
           {stats && (
             <Group gap={6} mt={2} wrap="nowrap">
-              <Badge size="xs" variant="dot" color={stats.cpuPercent > 80 ? 'red' : stats.cpuPercent > 50 ? 'orange' : 'teal'}>
+              <Badge
+                size="xs"
+                variant="dot"
+                color={stats.cpuPercent > 80 ? 'red' : stats.cpuPercent > 50 ? 'orange' : 'teal'}
+              >
                 CPU {stats.cpuPercent.toFixed(1)}%
               </Badge>
-              <Badge size="xs" variant="dot" color={stats.memPercent > 80 ? 'red' : stats.memPercent > 50 ? 'orange' : 'blue'}>
+              <Badge
+                size="xs"
+                variant="dot"
+                color={stats.memPercent > 80 ? 'red' : stats.memPercent > 50 ? 'orange' : 'blue'}
+              >
                 {stats.memUsageMB}MB
               </Badge>
             </Group>
@@ -90,27 +116,50 @@ function ContainerRow({ c, stack, canMutate, canOperate, restartContainer, onRes
         </Box>
       </Group>
       <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-        <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">{c.state}</Badge>
+        <Badge size="sm" color={stateColor[c.state] ?? 'gray'} variant="light">
+          {c.state}
+        </Badge>
         {c.ports.length > 0 && <Code fz={10}>{c.ports[0]}</Code>}
-        {canMutate && (
+        {canPower && (
           <Tooltip label="Restart container">
             <ActionIcon
-              size="sm" variant="subtle" color="orange"
+              size="sm"
+              variant="subtle"
+              color="orange"
               loading={restartContainer.isPending && restartContainer.variables?.containerId === c.id}
-              onClick={(e) => { e.stopPropagation(); onRestartContainer(stack, c.id, c.names[0]) }}
+              onClick={(e) => {
+                e.stopPropagation()
+                onRestartContainer(stack, c.id, c.names[0])
+              }}
             >
               <TbRefresh size={13} />
             </ActionIcon>
           </Tooltip>
         )}
         <Tooltip label="Lihat logs">
-          <ActionIcon size="sm" variant="subtle" color="gray" onClick={(e) => { e.stopPropagation(); onOpenLogs(stack, c.id) }}>
+          <ActionIcon
+            size="sm"
+            variant="subtle"
+            color="gray"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenLogs(stack, c.id)
+            }}
+          >
             <TbFileText size={13} />
           </ActionIcon>
         </Tooltip>
-        {canOperate && (
+        {canExec && (
           <Tooltip label="Exec command">
-            <ActionIcon size="sm" variant="subtle" color="teal" onClick={(e) => { e.stopPropagation(); onOpenExec(c, stack) }}>
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              color="teal"
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenExec(c, stack)
+              }}
+            >
               <TbTerminal2 size={13} />
             </ActionIcon>
           </Tooltip>
@@ -124,14 +173,31 @@ function LinkedEnvBadges({ linkedEnvs }: { linkedEnvs: StackInfo['linkedEnvs'] }
   if (!linkedEnvs.length) return null
   return (
     <>
-      <Divider mt="xs" label={<Text size="xs" c="dimmed" fw={500}>Terhubung ke envman</Text>} labelPosition="left" />
+      <Divider
+        mt="xs"
+        label={
+          <Text size="xs" c="dimmed" fw={500}>
+            Terhubung ke envman
+          </Text>
+        }
+        labelPosition="left"
+      />
       <Group gap="xs" wrap="wrap">
         {linkedEnvs.map((env) => (
-          <Anchor key={`${env.slug}:${env.envName}`} size="xs" component={Link} to="/envmanager/$slug/$env" params={{ slug: env.slug, env: env.envName } as any}>
+          <Anchor
+            key={`${env.slug}:${env.envName}`}
+            size="xs"
+            component={Link}
+            to="/envmanager/$slug/$env"
+            params={{ slug: env.slug, env: env.envName } as any}
+          >
             <Badge
-              size="sm" variant="light"
+              size="sm"
+              variant="light"
               color={env.lastSyncOk === true ? 'teal' : env.lastSyncOk === false ? 'red' : 'gray'}
-              leftSection={env.lastSyncOk === true ? <TbCheck size={9} /> : env.lastSyncOk === false ? <TbX size={9} /> : undefined}
+              leftSection={
+                env.lastSyncOk === true ? <TbCheck size={9} /> : env.lastSyncOk === false ? <TbX size={9} /> : undefined
+              }
               rightSection={<TbChevronRight size={9} />}
               style={{ cursor: 'pointer' }}
             >
@@ -144,7 +210,25 @@ function LinkedEnvBadges({ linkedEnvs }: { linkedEnvs: StackInfo['linkedEnvs'] }
   )
 }
 
-export function StackItem({ stack, view, stackContainers, stackFetching, containerStatsMap, canMutate, canOperate, repull, recreate, restartContainer, onRepull, onRecreate, onRestartContainer, onOpenCompose, onOpenLogs, onOpenExec }: Props) {
+export function StackItem({
+  stack,
+  view,
+  stackContainers,
+  stackFetching,
+  containerStatsMap,
+  canExec,
+  canPower,
+  canDeploy,
+  repull,
+  recreate,
+  restartContainer,
+  onRepull,
+  onRecreate,
+  onRestartContainer,
+  onOpenCompose,
+  onOpenLogs,
+  onOpenExec,
+}: Props) {
   const runningCount = stackContainers.filter((c) => c.state === 'running').length
   const totalCount = stackContainers.length
 
@@ -162,13 +246,23 @@ export function StackItem({ stack, view, stackContainers, stackFetching, contain
             <Badge size="xs" color={stack.status === 1 ? 'teal' : 'red'} variant="light">
               {stack.status === 1 ? 'active' : 'inactive'}
             </Badge>
-            <Badge size="xs" variant="outline" color="gray">{stack.type === 2 ? 'compose' : 'swarm'}</Badge>
-            <Badge size="xs" variant="dot" color="gray">ep#{stack.endpointId}</Badge>
+            <Badge size="xs" variant="outline" color="gray">
+              {stack.type === 2 ? 'compose' : 'swarm'}
+            </Badge>
+            <Badge size="xs" variant="dot" color="gray">
+              ep#{stack.endpointId}
+            </Badge>
           </Group>
           <Group gap="xs">
-            <Text size="xs" c="dimmed">Diperbarui {relTime(stack.updatedAt)}</Text>
+            <Text size="xs" c="dimmed">
+              Diperbarui {relTime(stack.updatedAt)}
+            </Text>
             {!stackFetching && totalCount > 0 && (
-              <Badge size="xs" variant="light" color={runningCount === totalCount ? 'teal' : runningCount > 0 ? 'yellow' : 'red'}>
+              <Badge
+                size="xs"
+                variant="light"
+                color={runningCount === totalCount ? 'teal' : runningCount > 0 ? 'yellow' : 'red'}
+              >
                 {runningCount}/{totalCount} running
               </Badge>
             )}
@@ -179,24 +273,40 @@ export function StackItem({ stack, view, stackContainers, stackFetching, contain
       <Group gap="xs" wrap="nowrap">
         {view === 'grid' && (
           <Tooltip label="Lihat & edit compose file">
-            <Button size="xs" variant="subtle" color="gray" leftSection={<TbFileCode size={13} />} onClick={() => onOpenCompose(stack)}>
+            <Button
+              size="xs"
+              variant="subtle"
+              color="gray"
+              leftSection={<TbFileCode size={13} />}
+              onClick={() => onOpenCompose(stack)}
+            >
               Compose
             </Button>
           </Tooltip>
         )}
-        {canMutate && (
+        {canDeploy && (
           <>
             <Tooltip label="Pull image terbaru & restart">
-              <Button size="xs" variant="light" color="blue" leftSection={<TbRefreshDot size={13} />}
+              <Button
+                size="xs"
+                variant="light"
+                color="blue"
+                leftSection={<TbRefreshDot size={13} />}
                 loading={repull.isPending && repull.variables === stack.id}
-                onClick={() => onRepull(stack)}>
+                onClick={() => onRepull(stack)}
+              >
                 Repull
               </Button>
             </Tooltip>
             <Tooltip label="Force recreate (stop→start)">
-              <Button size="xs" variant="light" color="orange" leftSection={<TbRefresh size={13} />}
+              <Button
+                size="xs"
+                variant="light"
+                color="orange"
+                leftSection={<TbRefresh size={13} />}
                 loading={recreate.isPending && recreate.variables === stack.id}
-                onClick={() => onRecreate(stack)}>
+                onClick={() => onRecreate(stack)}
+              >
                 Recreate
               </Button>
             </Tooltip>
@@ -209,27 +319,52 @@ export function StackItem({ stack, view, stackContainers, stackFetching, contain
   const containersList = (
     <Stack gap="xs">
       {stackFetching && stackContainers.length === 0 ? (
-        <Group gap="xs" py="xs"><Loader size="xs" /><Text size="xs" c="dimmed">Memuat containers...</Text></Group>
+        <Group gap="xs" py="xs">
+          <Loader size="xs" />
+          <Text size="xs" c="dimmed">
+            Memuat containers...
+          </Text>
+        </Group>
       ) : stackContainers.length === 0 ? (
-        <Text size="xs" c="dimmed" py="xs">Tidak ada container di stack ini.</Text>
+        <Text size="xs" c="dimmed" py="xs">
+          Tidak ada container di stack ini.
+        </Text>
       ) : (
         stackContainers.map((c) => {
           const rowContent = (
             <ContainerRow
-              c={c} stack={stack} canMutate={canMutate} canOperate={canOperate}
+              c={c}
+              stack={stack}
+              canExec={canExec}
+              canPower={canPower}
               restartContainer={restartContainer}
               onRestartContainer={onRestartContainer}
-              onOpenLogs={onOpenLogs} onOpenExec={onOpenExec}
+              onOpenLogs={onOpenLogs}
+              onOpenExec={onOpenExec}
               stats={view === 'grid' ? containerStatsMap?.[c.id] : undefined}
               maxImageWidth={view === 'grid' ? 160 : 200}
             />
           )
           return view === 'grid' ? (
-            <Card key={c.id} p="sm" style={{ borderRadius: 'var(--mantine-radius-md)', cursor: 'pointer' }} onClick={() => onOpenLogs(stack, c.id)}>
+            <Card
+              key={c.id}
+              p="sm"
+              style={{ borderRadius: 'var(--mantine-radius-md)', cursor: 'pointer' }}
+              onClick={() => onOpenLogs(stack, c.id)}
+            >
               {rowContent}
             </Card>
           ) : (
-            <Box key={c.id} p="sm" style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }} onClick={() => onOpenLogs(stack, c.id)}>
+            <Box
+              key={c.id}
+              p="sm"
+              style={{
+                borderRadius: 'var(--mantine-radius-md)',
+                border: '1px solid var(--mantine-color-default-border)',
+                cursor: 'pointer',
+              }}
+              onClick={() => onOpenLogs(stack, c.id)}
+            >
               {rowContent}
             </Box>
           )
@@ -241,7 +376,13 @@ export function StackItem({ stack, view, stackContainers, stackFetching, contain
 
   if (view === 'grid') {
     return (
-      <Paper style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
+      <Paper
+        style={{
+          borderRadius: 'var(--mantine-radius-md)',
+          border: '1px solid var(--mantine-color-default-border)',
+          overflow: 'hidden',
+        }}
+      >
         <Box p="md">{stackHeader}</Box>
         <Box p="md">{containersList}</Box>
       </Paper>
@@ -249,7 +390,13 @@ export function StackItem({ stack, view, stackContainers, stackFetching, contain
   }
 
   return (
-    <Box style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', overflow: 'hidden' }}>
+    <Box
+      style={{
+        borderRadius: 'var(--mantine-radius-md)',
+        border: '1px solid var(--mantine-color-default-border)',
+        overflow: 'hidden',
+      }}
+    >
       <Box p="md">{stackHeader}</Box>
       <Box p="md">{containersList}</Box>
     </Box>

@@ -3,10 +3,10 @@ import { useHotkeys } from '@mantine/hooks'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { TbAlertTriangle, TbDatabaseExport, TbPlugConnected } from 'react-icons/tb'
-import { BackupPanelContent } from '@/frontend/components/dev/PortainerBackupPanel'
-import { type Connection } from '@/frontend/components/connection/ConnectionCard'
+import type { Connection } from '@/frontend/components/connection/ConnectionCard'
 import { ConnectionForm } from '@/frontend/components/connection/ConnectionForm'
 import { ConnectionListView } from '@/frontend/components/connection/ConnectionListView'
+import { BackupPanelContent } from '@/frontend/components/dev/PortainerBackupPanel'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { useConnectionsPage } from '@/frontend/hooks/useConnectionsPage'
 import { apiFetch } from '@/frontend/lib/api'
@@ -22,8 +22,10 @@ export const Route = createFileRoute('/envmanager/connections/')({
 function ConnectionsPage() {
   const navigate = useNavigate()
   const { data: sessionData } = useSession()
-  const canViewConnections = hasCapability(sessionData?.user, 'connection:view')
-  const canManageConnections = sessionData?.user?.role === 'SUPER_ADMIN'
+  const isSuperAdmin = sessionData?.user?.role === 'SUPER_ADMIN'
+  const canViewConnections = isSuperAdmin || hasCapability(sessionData?.user, 'connection:view')
+  const canManageConnections = isSuperAdmin || hasCapability(sessionData?.user, 'connection:manage')
+  const canViewBackup = isSuperAdmin || hasCapability(sessionData?.user, 'backup:view')
   const { tab, connectionForm: connectionFormId } = Route.useSearch()
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -43,15 +45,41 @@ function ConnectionsPage() {
     navigate({ to: '.', search: (prev) => ({ ...prev, connectionForm: undefined }), replace: true })
 
   const page = useConnectionsPage({ connections, editTarget, connectionFormId, handleClose })
-  const { form, setForm, testResult, setTestResult, search, setSearch, view, setView, debouncedSearch, searchRef, healthMap, filteredConnections, testConnection, saveConnection, deleteConnection } = page
+  const {
+    form,
+    setForm,
+    testResult,
+    setTestResult,
+    search,
+    setSearch,
+    view,
+    setView,
+    debouncedSearch,
+    searchRef,
+    healthMap,
+    filteredConnections,
+    testConnection,
+    saveConnection,
+    deleteConnection,
+  } = page
 
-  useHotkeys([['/', () => { searchRef.current?.focus(); searchRef.current?.select() }]])
+  useHotkeys([
+    [
+      '/',
+      () => {
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      },
+    ],
+  ])
 
   if (!canViewConnections && !canManageConnections) {
     return (
       <Box p="md">
         <Alert color="yellow" icon={<TbAlertTriangle size={16} />} variant="light">
-          <Text size="sm" fw={600} mb={4}>Tidak punya izin melihat Portainer connections</Text>
+          <Text size="sm" fw={600} mb={4}>
+            Tidak punya izin melihat Portainer connections
+          </Text>
           <Text size="xs">
             Connection adalah infrastruktur global. Minta SUPER_ADMIN untuk grant capability{' '}
             <Code fz="xs">connection:view</Code>.
@@ -66,9 +94,14 @@ function ConnectionsPage() {
   if (isFormOpen) {
     return (
       <ConnectionForm
-        form={form} setForm={setForm} editTarget={editTarget}
-        testResult={testResult} setTestResult={setTestResult}
-        testConnection={testConnection} saveConnection={saveConnection} handleClose={handleClose}
+        form={form}
+        setForm={setForm}
+        editTarget={editTarget}
+        testResult={testResult}
+        setTestResult={setTestResult}
+        testConnection={testConnection}
+        saveConnection={saveConnection}
+        handleClose={handleClose}
       />
     )
   }
@@ -79,12 +112,25 @@ function ConnectionsPage() {
         value={tab}
         variant="outline"
         onChange={(v) =>
-          navigate({ to: '/envmanager/connections', search: (prev) => ({ ...prev, tab: (v ?? 'connections') as 'connections' | 'backup', connectionForm: undefined }) })
+          navigate({
+            to: '/envmanager/connections',
+            search: (prev) => ({
+              ...prev,
+              tab: (v ?? 'connections') as 'connections' | 'backup',
+              connectionForm: undefined,
+            }),
+          })
         }
       >
         <Tabs.List mb="md">
-          <Tabs.Tab value="connections" leftSection={<TbPlugConnected size={14} />}>Connections</Tabs.Tab>
-          <Tabs.Tab value="backup" leftSection={<TbDatabaseExport size={14} />}>Backup</Tabs.Tab>
+          <Tabs.Tab value="connections" leftSection={<TbPlugConnected size={14} />}>
+            Connections
+          </Tabs.Tab>
+          {canViewBackup && (
+            <Tabs.Tab value="backup" leftSection={<TbDatabaseExport size={14} />}>
+              Backup
+            </Tabs.Tab>
+          )}
         </Tabs.List>
 
         <Tabs.Panel value="connections">
@@ -95,19 +141,33 @@ function ConnectionsPage() {
             </Text>
           </Alert>
           <ConnectionListView
-            connections={connections} filteredConnections={filteredConnections}
-            isLoading={isLoading} isError={isError} error={error} refetch={refetch}
-            view={view} setView={setView} search={search} setSearch={setSearch}
-            searchRef={searchRef} debouncedSearch={debouncedSearch}
-            healthMap={healthMap} canManageConnections={canManageConnections}
-            totalEnvs={totalEnvs} openCreate={openCreate} openEdit={openEdit}
-            deleteConnection={deleteConnection} navigate={navigate}
+            connections={connections}
+            filteredConnections={filteredConnections}
+            isLoading={isLoading}
+            isError={isError}
+            error={error}
+            refetch={refetch}
+            view={view}
+            setView={setView}
+            search={search}
+            setSearch={setSearch}
+            searchRef={searchRef}
+            debouncedSearch={debouncedSearch}
+            healthMap={healthMap}
+            canManageConnections={canManageConnections}
+            totalEnvs={totalEnvs}
+            openCreate={openCreate}
+            openEdit={openEdit}
+            deleteConnection={deleteConnection}
+            navigate={navigate}
           />
         </Tabs.Panel>
 
-        <Tabs.Panel value="backup" pt="xs">
-          <BackupPanelContent />
-        </Tabs.Panel>
+        {canViewBackup && (
+          <Tabs.Panel value="backup" pt="xs">
+            <BackupPanelContent />
+          </Tabs.Panel>
+        )}
       </Tabs>
     </Box>
   )
