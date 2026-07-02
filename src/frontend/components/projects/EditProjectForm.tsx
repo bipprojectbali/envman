@@ -1,6 +1,7 @@
 import { Badge, Button, Divider, Group, Stack, TagsInput, Text, TextInput } from '@mantine/core'
 import { useState } from 'react'
 import { TbCheck } from 'react-icons/tb'
+import { ProjectAvatarPicker } from '@/frontend/components/projects/ProjectAvatarPicker'
 import { tagColor } from '@/frontend/lib/project-utils'
 
 interface Project {
@@ -8,6 +9,9 @@ interface Project {
   name: string
   description?: string
   tags: string[]
+  icon?: string | null
+  color?: string | null
+  myRole?: string
 }
 
 interface Props {
@@ -15,19 +19,31 @@ interface Props {
   allTagValues: string[]
   isPending: boolean
   onClose: () => void
-  onSubmit: (data: { slug: string; name: string; description: string; tags: string[] }) => void
+  onSubmit: (data: {
+    slug: string
+    name: string
+    description: string
+    tags: string[]
+    icon: string | null
+    color: string | null
+  }) => void
 }
 
 export function EditProjectForm({ project, allTagValues, isPending, onClose, onSubmit }: Props) {
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description ?? '')
   const [tags, setTags] = useState<string[]>(project.tags ?? [])
+  const [icon, setIcon] = useState<string | null>(project.icon ?? null)
+  const [color, setColor] = useState<string | null>(project.color ?? null)
 
   const dirty =
     name !== project.name ||
     description !== (project.description ?? '') ||
-    JSON.stringify(tags) !== JSON.stringify(project.tags ?? [])
+    JSON.stringify(tags) !== JSON.stringify(project.tags ?? []) ||
+    icon !== (project.icon ?? null) ||
+    color !== (project.color ?? null)
   const canSubmit = !!name.trim() && dirty && !isPending
+  const submit = () => onSubmit({ slug: project.slug, name, description, tags, icon, color })
 
   return (
     <Stack gap="lg">
@@ -43,7 +59,7 @@ export function EditProjectForm({ project, allTagValues, isPending, onClose, onS
           data-autofocus
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && canSubmit) onSubmit({ slug: project.slug, name, description, tags })
+            if (e.key === 'Enter' && canSubmit) submit()
           }}
         />
         <TextInput
@@ -57,6 +73,20 @@ export function EditProjectForm({ project, allTagValues, isPending, onClose, onS
           placeholder="Opsional — penjelasan singkat project ini"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+        />
+      </Stack>
+
+      <Stack gap="xs">
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+          Tampilan
+        </Text>
+        <ProjectAvatarPicker
+          name={name}
+          role={project.myRole ?? 'OWNER'}
+          icon={icon}
+          color={color}
+          onIconChange={setIcon}
+          onColorChange={setColor}
         />
       </Stack>
 
@@ -92,7 +122,7 @@ export function EditProjectForm({ project, allTagValues, isPending, onClose, onS
         <Button
           leftSection={<TbCheck size={14} />}
           color="blue"
-          onClick={() => onSubmit({ slug: project.slug, name, description, tags })}
+          onClick={submit}
           loading={isPending}
           disabled={!canSubmit}
         >
