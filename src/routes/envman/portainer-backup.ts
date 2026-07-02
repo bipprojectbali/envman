@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
+import { hasCapability } from '../../lib/permissions'
 import { runBackup, syncBackupCrons } from '../../lib/portainer-cron'
 
 const BACKUP_TYPE_LABEL: Record<string, string> = {
@@ -14,9 +15,9 @@ export const portainerBackupRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/backups', async ({ request, params, set, query }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) return unauthorized(set)
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'backup:view')) {
       set.status = 403
-      return { error: 'Hanya SUPER_ADMIN yang boleh akses backup.' }
+      return { error: 'Butuh capability: backup:view' }
     }
 
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
@@ -62,9 +63,9 @@ export const portainerBackupRouter = new Elysia()
   .post('/api/envman/portainer/connections/:id/backups', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) return unauthorized(set)
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'backup:manage')) {
       set.status = 403
-      return { error: 'Hanya SUPER_ADMIN yang boleh trigger backup.' }
+      return { error: 'Butuh capability: backup:manage' }
     }
 
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
@@ -92,9 +93,9 @@ export const portainerBackupRouter = new Elysia()
   .delete('/api/envman/portainer/connections/:id/backups', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) return unauthorized(set)
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'backup:manage')) {
       set.status = 403
-      return { error: 'Hanya SUPER_ADMIN yang boleh hapus backup.' }
+      return { error: 'Butuh capability: backup:manage' }
     }
 
     const body = (await request.json().catch(() => null)) as { ids?: string[] } | null
@@ -113,9 +114,9 @@ export const portainerBackupRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/backups/:backupId/download', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) return unauthorized(set)
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'backup:view')) {
       set.status = 403
-      return { error: 'Forbidden' }
+      return { error: 'Butuh capability: backup:view' }
     }
 
     const backup = await prisma.portainerBackup.findUnique({
@@ -146,9 +147,9 @@ export const portainerBackupRouter = new Elysia()
   .get('/api/envman/portainer/connections/:id/backup-schedule', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) return unauthorized(set)
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'backup:view')) {
       set.status = 403
-      return { error: 'Forbidden' }
+      return { error: 'Butuh capability: backup:view' }
     }
 
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
@@ -165,9 +166,9 @@ export const portainerBackupRouter = new Elysia()
   .put('/api/envman/portainer/connections/:id/backup-schedule', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) return unauthorized(set)
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'backup:manage')) {
       set.status = 403
-      return { error: 'Hanya SUPER_ADMIN yang boleh set jadwal backup.' }
+      return { error: 'Butuh capability: backup:manage' }
     }
 
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
@@ -215,9 +216,9 @@ export const portainerBackupRouter = new Elysia()
   .delete('/api/envman/portainer/connections/:id/backup-schedule', async ({ request, params, set }) => {
     const caller = await requireEnvAuth(request)
     if (!caller) return unauthorized(set)
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'backup:manage')) {
       set.status = 403
-      return { error: 'Forbidden' }
+      return { error: 'Butuh capability: backup:manage' }
     }
 
     await prisma.portainerBackupSchedule.deleteMany({ where: { connectionId: params.id } })

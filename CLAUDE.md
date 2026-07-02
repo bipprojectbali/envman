@@ -298,6 +298,7 @@ Per-key filter, transitive import (multi-level), per-import override value — b
 - `DELETE /api/admin/tokens/:id` — force revoke token (audit TOKEN_REVOKED_BY_ADMIN)
 - `GET /api/admin/file-health` — health check ukuran file source
 - `GET /api/admin/routes|project-structure|env-map|test-coverage|dependencies|migrations|sessions|schema`
+- `PUT /api/envman/admin/users/:userId/permissions` — set capability array user (validasi `isValidCapability`, 400 jika tak dikenal). Katalog capability + enforcement Portainer: lihat **Portainer Capabilities** di Envman API.
 
 ### Tickets API
 
@@ -327,6 +328,28 @@ Auth: session cookie atau `Authorization: Bearer <token>`. `requireEnvAuth()` di
 **Access Matrix (OWNER only):** `GET /api/envman/projects/:slug/access-matrix` — single fetch berisi `{project, environments[], members[{userId, user, projectRole, envAccess: {[envName]: {envRole, effectiveRole}}}]}`. Cached 60s (`cacheKeys.projectAccessMatrix`), auto-invalidate via `invalidateProjectCaches()`. Bulk action di FE pakai fan-out `Promise.allSettled` atas endpoint PATCH/PUT existing — last-owner protection berlaku per-item, partial failure di-aggregate ke notification (`src/frontend/lib/bulk.ts`).
 
 **Portainer:** `GET|POST /api/envman/portainer/connections` · `PUT|DELETE .../connections/:id` · `POST .../connections/:id/probe` · per-env: `GET|PUT|DELETE|POST .../portainer[/sync]`
+
+**Portainer Capabilities (delegasi granular tanpa SUPER_ADMIN):** Operasi Portainer di-gate per-capability (`src/lib/permissions.ts`), bukan lagi role SUPER_ADMIN. Assign via `PUT /api/envman/admin/users/:userId/permissions` (SUPER_ADMIN, body `{permissions: string[]}`, tolak capability tak dikenal via `isValidCapability` → 400). SUPER_ADMIN bypass semua. Helper guard: `src/routes/envman/portainer-auth.ts` (`requireCap`, `editorOrCap`, `envAccessOrCap`).
+
+| Capability | Mengizinkan |
+|---|---|
+| `connection:view` | list & detail connection, health, probe |
+| `connection:manage` | create/edit/delete connection (dulu SUPER_ADMIN-only) |
+| `stack:operate` | read: view stacks, logs, status, stats, compose file, dangling (**bukan** exec) |
+| `stack:exec` | exec masuk container (setara shell — dipisah dari operate, **tanpa backfill**) |
+| `stack:sync` | push env vars → stack (sync, sync-preview) |
+| `stack:power` | start/stop/restart container/stack |
+| `stack:deploy` | repull image, recreate stack, sync-repull |
+| `stack:mutate` | edit compose/stack file |
+| `stack:prune` | prune images/volumes/networks/containers (destructive) |
+| `backup:view` | list & download backup |
+| `backup:manage` | create/delete backup + kelola schedule |
+
+**Dua keluarga endpoint:**
+- **Connection-scoped** (`/portainer/connections/...`) — murni capability via `requireCap`.
+- **Env-scoped** (`/projects/:slug/environments/:env/portainer/...`) — **role ATAU capability** via `editorOrCap`: lolos jika EDITOR/OWNER di env tsb **atau** punya capability (`stack:sync`/`stack:deploy`/`stack:prune`). Backward-compatible dengan workflow EDITOR existing. Exec env-level tetap panggil endpoint connection-scoped → butuh `stack:exec`.
+
+**Security:** `POST /portainer/probe` yang memakai apiToken tersimpan via `slug`+`envName` wajib punya akses env tsb (cegah pinjam kredensial project lain). Migration `20260702000000_portainer_caps_backfill` grant `stack:power`+`stack:deploy` ke pemilik `stack:mutate` existing (data-only, idempotent).
 
 **Files:** `GET|POST /api/envman/projects/:slug/files` · `GET .../files/resolve?prefix=<p>[&filename=<f>]` · `PUT|DELETE .../files/:id`
 
@@ -693,12 +716,10 @@ Stop dan tanya user jika: fix butuh > 5 file, ketemu bug lain di tengah jalan, p
 **Setiap fitur baru WAJIB disertai:**
 
 1. **Test** — minimal integration test: happy path + unauthorized + invalid/not found. Di `tests/integration/` atau `tests/unit/`.
-2. **MCP tool dev** — tambahkan tool di `scripts/mcp/tools/` untuk inspect/manipulasi data di development.
-3. **MCP tool stg** — readonly counterpart di MCP server staging untuk inspeksi data tanpa write access destruktif.
 
-**Skala MCP tool:** CRUD baru → min `list_<entity>` + `get_<entity>`; background job → inspect queue + cancel/retry (dev only mutate).
+**MCP tool (opsional, tidak wajib):** boleh tambah tool inspeksi di `scripts/mcp/tools/` (dev) dan readonly counterpart di stg (`scripts/mcp/debug-stg.ts`) bila membantu debugging — tapi bukan syarat merge. Jika ditambah, MCP stg tetap **readonly** (jangan beri write access destruktif).
 
-**❌ Larangan:** Commit fitur tanpa test; MCP stg dengan write access; skip salah satu dari ketiganya.
+**❌ Larangan:** Commit fitur tanpa test.
 
 ---
 

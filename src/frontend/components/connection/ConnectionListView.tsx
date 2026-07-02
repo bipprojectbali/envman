@@ -2,7 +2,9 @@ import {
   ActionIcon,
   Box,
   Button,
+  Code,
   Group,
+  Kbd,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -11,9 +13,17 @@ import {
   ThemeIcon,
   Tooltip,
 } from '@mantine/core'
-import { Kbd } from '@mantine/core'
 import type { NavigateFn } from '@tanstack/react-router'
-import { TbAlertTriangle, TbLayoutGrid, TbLayoutList, TbPlus, TbPlugConnected, TbPlugConnectedX, TbSearch, TbX } from 'react-icons/tb'
+import {
+  TbAlertTriangle,
+  TbLayoutGrid,
+  TbLayoutList,
+  TbPlugConnected,
+  TbPlugConnectedX,
+  TbPlus,
+  TbSearch,
+  TbX,
+} from 'react-icons/tb'
 import {
   type Connection,
   ConnectionGridCard,
@@ -201,7 +211,8 @@ export function ConnectionListView({
             </Button>
           ) : (
             <Text size="xs" c="dimmed">
-              Connection adalah infrastruktur global — hanya SUPER_ADMIN yang boleh menambah.
+              Connection adalah infrastruktur global — butuh capability <Code fz={10}>connection:manage</Code> untuk
+              menambah.
             </Text>
           )}
         </Box>

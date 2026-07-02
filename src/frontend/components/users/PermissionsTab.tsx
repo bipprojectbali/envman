@@ -15,20 +15,14 @@ import {
 import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import {
-  TbAlertTriangle,
-  TbCheck,
-  TbChevronDown,
-  TbInfoCircle,
-  TbShieldCheck,
-} from 'react-icons/tb'
+import { TbAlertTriangle, TbCheck, TbChevronDown, TbInfoCircle, TbShieldCheck } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import {
   CAPABILITY_GROUPS,
-  DESTRUCTIVE_CAPABILITIES,
-  CapabilityGroupsEditor,
   type CapabilityGroup,
+  CapabilityGroupsEditor,
+  DESTRUCTIVE_CAPABILITIES,
 } from './CapabilityGroupsEditor'
 import type { UserDetail } from './types'
 
@@ -200,12 +194,12 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
           <Divider />
           <Box p="sm">
             <Text size="xs" c="dimmed">
-              • <b>Portainer connection CRUD</b> (create/edit/delete connection itself) — <b>hanya SUPER_ADMIN</b>.
-              <br />• <b>Database sync &amp; Users management menu</b> — <b>hanya SUPER_ADMIN</b>.<br />•{' '}
+              • <b>Database sync &amp; Users management menu</b> — <b>hanya SUPER_ADMIN</b>.<br />•{' '}
               <b>Project member &amp; env access</b> — diatur per-project di tab <Code fz={10}>Access Matrix</Code>.
               <br />• <b>Project edit/delete &amp; member CRUD</b> — butuh ProjectMember OWNER (bukan capability).
-              <br />• <b>Env vars CRUD &amp; per-env Portainer sync</b> — butuh ProjectMember EDITOR+ untuk env
-              tersebut.
+              <br />• <b>Per-env Portainer (sync/deploy/prune)</b> — butuh ProjectMember EDITOR+ <b>atau</b> capability
+              terkait (<Code fz={10}>stack:sync</Code>/<Code fz={10}>stack:deploy</Code>/
+              <Code fz={10}>stack:prune</Code>). Env vars CRUD tetap butuh EDITOR+.
               <br />• <b>Default landing</b> — ADMIN ke <Code fz={10}>/envmanager</Code>; QC ke{' '}
               <Code fz={10}>/dashboard</Code>; SUPER_ADMIN ke <Code fz={10}>/dev</Code>.
             </Text>
