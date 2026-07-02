@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-07-02
+
+### Added
+- **Capability Portainer granular**: operasi Portainer kini bisa didelegasikan per-user lewat capability tanpa harus SUPER_ADMIN. Tujuh capability baru — `connection:manage` (CRUD connection), `stack:exec` (exec container), `stack:sync` (push env vars), `stack:power` (start/stop/restart), `stack:deploy` (repull/recreate), `backup:view`, `backup:manage`. Endpoint connection-scoped pakai capability; endpoint env-scoped lolos bila EDITOR/OWNER di env **atau** punya capability terkait (backward-compatible). Editor permission di halaman Users menampilkan seluruh capability, tombol UI di-gate sesuai izin.
+- **Kustomisasi avatar project**: OWNER bisa memilih icon (registry Tabler) dan warna background avatar (palet Mantine) di form edit project, dengan pratinjau langsung. Kosong = inisial nama + warna sesuai role.
+- **Tint background card project**: warna kartu project bisa diberi sentuhan warna tipis (palet Mantine) yang tetap terbaca di mode gelap & terang. Kosong = tanpa tint.
+
+### Changed
+- **Access Matrix (Users) seragam**: kontrol role per-env dan default role kini memakai idiom tombol ringkas `~ V E O ✕` (inherit/VIEWER/EDITOR/OWNER/deny) yang sama dengan matrix members project — menghilangkan card bertingkat dan kontrol ganda.
+- Manajemen Portainer connection & backup tidak lagi terkunci SUPER_ADMIN; kini lewat capability (`connection:manage`, `backup:view`/`backup:manage`).
+
+### Fixed
+- **Kebocoran otorisasi probe Portainer**: `POST /portainer/probe` yang memakai apiToken tersimpan suatu environment kini wajib punya akses ke environment tersebut — mencegah peminjaman kredensial Portainer milik project lain.
+
+### Security / Breaking
+- **`stack:exec` dipisah dari `stack:operate`**: exec ke container kini butuh capability `stack:exec` eksplisit (setara akses shell). User yang sebelumnya hanya punya `stack:operate` kehilangan kemampuan exec sampai di-grant `stack:exec`. Operasi lifecycle lain (restart/repull/recreate) di-backfill otomatis agar pemilik `stack:mutate` lama tidak kehilangan akses.
+
 ## [0.14.4] - 2026-06-30
 
 ### Added
