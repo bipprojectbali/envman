@@ -12,9 +12,16 @@ export const CAPABILITIES = [
   'menu:gists',
   // Portainer granular
   'connection:view',
-  'stack:operate',
-  'stack:mutate',
+  'connection:manage', // create/edit/delete connection (dulu SUPER_ADMIN-only)
+  'stack:operate', // read: view/logs/status/stats/dangling (TANPA exec)
+  'stack:exec', // exec masuk container — setara shell, dipisah dari operate
+  'stack:sync', // push env vars → stack
+  'stack:power', // start/stop/restart container/stack
+  'stack:deploy', // repull image / recreate stack / sync-repull
+  'stack:mutate', // edit compose file
   'stack:prune',
+  'backup:view', // list & download backup
+  'backup:manage', // create/delete backup + kelola schedule
 ] as const
 
 export type Capability = (typeof CAPABILITIES)[number]

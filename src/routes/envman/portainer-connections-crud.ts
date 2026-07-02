@@ -35,9 +35,9 @@ export const connectionsCrudRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'connection:manage')) {
       set.status = 403
-      return { error: 'Hanya SUPER_ADMIN yang boleh create Portainer connection.' }
+      return { error: 'Butuh capability: connection:manage' }
     }
     const body = await request.json().catch(() => null)
     if (!body?.name || !body?.portainerUrl || !body?.apiToken) {
@@ -56,9 +56,9 @@ export const connectionsCrudRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'connection:manage')) {
       set.status = 403
-      return { error: 'Hanya SUPER_ADMIN yang boleh edit Portainer connection.' }
+      return { error: 'Butuh capability: connection:manage' }
     }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) {
@@ -83,9 +83,9 @@ export const connectionsCrudRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    if (caller.role !== 'SUPER_ADMIN') {
+    if (!hasCapability(caller, 'connection:manage')) {
       set.status = 403
-      return { error: 'Hanya SUPER_ADMIN yang boleh hapus Portainer connection.' }
+      return { error: 'Butuh capability: connection:manage' }
     }
     const conn = await prisma.portainerConnection.findUnique({ where: { id: params.id } })
     if (!conn) {

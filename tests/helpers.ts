@@ -64,7 +64,9 @@ export async function seedTestUser(
     ? [
         'project:create', 'ticket:create', 'gist:create', 'token:create', 'note:create',
         'menu:overview', 'menu:tokens', 'menu:connections', 'menu:gists',
-        'connection:view', 'stack:operate', 'stack:mutate', 'stack:prune',
+        'connection:view', 'connection:manage',
+        'stack:operate', 'stack:exec', 'stack:sync', 'stack:power', 'stack:deploy', 'stack:mutate', 'stack:prune',
+        'backup:view', 'backup:manage',
       ]
     : []
   const perms = permissions ?? defaultPerms
