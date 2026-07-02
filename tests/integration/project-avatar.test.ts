@@ -39,7 +39,10 @@ const patch = (token: string, body: unknown) =>
   )
 
 const getIconColor = async () => {
-  const p = await prisma.project.findUnique({ where: { slug }, select: { icon: true, color: true } })
+  const p = await prisma.project.findUnique({
+    where: { slug },
+    select: { icon: true, color: true, cardColor: true },
+  })
   return p
 }
 
@@ -47,7 +50,21 @@ describe('PATCH avatar icon/color', () => {
   test('OWNER set icon + color valid → tersimpan', async () => {
     const res = await patch(ownerToken, { name: 'Avatar Project', icon: 'TbCloud', color: 'grape' })
     expect(res.status).toBe(200)
-    expect(await getIconColor()).toEqual({ icon: 'TbCloud', color: 'grape' })
+    const ic = await getIconColor()
+    expect(ic?.icon).toBe('TbCloud')
+    expect(ic?.color).toBe('grape')
+  })
+
+  test('OWNER set cardColor valid → tersimpan; tak valid diabaikan', async () => {
+    const ok = await patch(ownerToken, { name: 'Avatar Project', cardColor: 'blue' })
+    expect(ok.status).toBe(200)
+    expect((await getIconColor())?.cardColor).toBe('blue')
+    const bad = await patch(ownerToken, { name: 'Avatar Project', cardColor: '#hack' })
+    expect(bad.status).toBe(200)
+    expect((await getIconColor())?.cardColor).toBe('blue') // dipertahankan
+    const reset = await patch(ownerToken, { name: 'Avatar Project', cardColor: null })
+    expect(reset.status).toBe(200)
+    expect((await getIconColor())?.cardColor).toBeNull()
   })
 
   test('icon tak valid → diabaikan (nilai lama dipertahankan)', async () => {

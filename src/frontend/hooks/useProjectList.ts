@@ -15,6 +15,7 @@ export interface Project {
   isActive: boolean
   icon?: string | null
   color?: string | null
+  cardColor?: string | null
   createdAt?: string
   myRole: 'OWNER' | 'EDITOR' | 'VIEWER'
   _count: { environments: number }
@@ -82,6 +83,7 @@ export function useProjectList() {
       tags,
       icon,
       color,
+      cardColor,
     }: {
       slug: string
       name: string
@@ -89,10 +91,11 @@ export function useProjectList() {
       tags: string[]
       icon?: string | null
       color?: string | null
+      cardColor?: string | null
     }) =>
       apiFetch(`/api/envman/projects/${slug}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name, description, tags, icon, color }),
+        body: JSON.stringify({ name, description, tags, icon, color, cardColor }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['envman', 'projects'] })

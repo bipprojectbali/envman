@@ -145,9 +145,14 @@ export const projectsCoreRouter = new Elysia()
         description: body?.description,
         ...(body?.tags !== undefined ? { tags: body.tags } : {}),
         ...(typeof body?.isActive === 'boolean' ? { isActive: body.isActive } : {}),
-        // Avatar: hanya terima nilai dari registry/palet; null = reset ke default.
+        // Avatar & card: hanya terima nilai dari registry/palet; null = reset ke default.
         ...(isValidProjectIcon(body?.icon) ? { icon: body.icon } : body?.icon === null ? { icon: null } : {}),
         ...(isValidProjectColor(body?.color) ? { color: body.color } : body?.color === null ? { color: null } : {}),
+        ...(isValidProjectColor(body?.cardColor)
+          ? { cardColor: body.cardColor }
+          : body?.cardColor === null
+            ? { cardColor: null }
+            : {}),
       },
     })
     await invalidateProjectCaches(params.slug)

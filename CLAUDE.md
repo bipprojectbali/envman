@@ -35,7 +35,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`
 - `Ticket` (id, title, description, status, priority, route, reporterId, assigneeId, timestamps, closedAt)
 - `TicketComment` (id, ticketId, authorId, authorTag, body, createdAt)
 - `TicketEvidence` (id, ticketId, kind, url, note, createdAt)
-- `Project` (id, slug, name, description, tags[], icon?, color?, timestamps) — `icon` = nama Tabler icon (mis. `TbCloud`) untuk avatar, `color` = nama warna Mantine (mis. `grape`); keduanya nullable, null = fallback inisial nama + warna-by-role. Divalidasi server terhadap registry (`src/lib/project-avatar.ts`).
+- `Project` (id, slug, name, description, tags[], icon?, color?, cardColor?, timestamps) — `icon` = nama Tabler icon (mis. `TbCloud`) untuk avatar, `color` = nama warna Mantine (mis. `grape`) untuk bg avatar, `cardColor` = nama warna Mantine untuk tint tipis background card; semua nullable, null = fallback (inisial nama / warna-by-role / tanpa tint). Divalidasi server terhadap registry (`src/lib/project-avatar.ts`).
 - `Environment` (id, name, tags[], projectId, createdAt) — unique(projectId, name)
 - `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
@@ -313,7 +313,7 @@ Frontend: `src/frontend/components/TicketsPanel.tsx`
 
 Auth: session cookie atau `Authorization: Bearer <token>`. `requireEnvAuth()` di `src/app.ts`.
 
-**Projects:** `GET|POST /api/envman/projects`, `PATCH|GET /api/envman/projects/:slug`. PATCH (OWNER) menerima field additif `icon`/`color` untuk avatar — hanya nilai dari registry (`src/lib/project-avatar.ts`) yang tersimpan; `null` = reset ke default; nilai tak dikenal diabaikan.
+**Projects:** `GET|POST /api/envman/projects`, `PATCH|GET /api/envman/projects/:slug`. PATCH (OWNER) menerima field additif `icon`/`color`/`cardColor` untuk avatar & tint card — hanya nilai dari registry (`src/lib/project-avatar.ts`) yang tersimpan; `null` = reset ke default; nilai tak dikenal diabaikan.
 
 **Vars:** `GET /api/envman/projects/:slug/environments/:env/vars` (search, limit, offset) · `GET .../vars/export` (EDITOR+) · `POST|PUT|DELETE .../vars/:key`. Field additive (env import): `vars` list tambah `imported[]`/`importedKeys[]`/`deniedImports[]`; `vars/export` tambah `deniedImports` (hanya jika non-kosong). Bentuk `vars`/`total` existing tidak berubah — lihat [Env Import](#env-import-reference--live-link).
 

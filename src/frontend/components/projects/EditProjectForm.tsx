@@ -11,6 +11,7 @@ interface Project {
   tags: string[]
   icon?: string | null
   color?: string | null
+  cardColor?: string | null
   myRole?: string
 }
 
@@ -26,6 +27,7 @@ interface Props {
     tags: string[]
     icon: string | null
     color: string | null
+    cardColor: string | null
   }) => void
 }
 
@@ -35,15 +37,17 @@ export function EditProjectForm({ project, allTagValues, isPending, onClose, onS
   const [tags, setTags] = useState<string[]>(project.tags ?? [])
   const [icon, setIcon] = useState<string | null>(project.icon ?? null)
   const [color, setColor] = useState<string | null>(project.color ?? null)
+  const [cardColor, setCardColor] = useState<string | null>(project.cardColor ?? null)
 
   const dirty =
     name !== project.name ||
     description !== (project.description ?? '') ||
     JSON.stringify(tags) !== JSON.stringify(project.tags ?? []) ||
     icon !== (project.icon ?? null) ||
-    color !== (project.color ?? null)
+    color !== (project.color ?? null) ||
+    cardColor !== (project.cardColor ?? null)
   const canSubmit = !!name.trim() && dirty && !isPending
-  const submit = () => onSubmit({ slug: project.slug, name, description, tags, icon, color })
+  const submit = () => onSubmit({ slug: project.slug, name, description, tags, icon, color, cardColor })
 
   return (
     <Stack gap="lg">
@@ -85,8 +89,10 @@ export function EditProjectForm({ project, allTagValues, isPending, onClose, onS
           role={project.myRole ?? 'OWNER'}
           icon={icon}
           color={color}
+          cardColor={cardColor}
           onIconChange={setIcon}
           onColorChange={setColor}
+          onCardColorChange={setCardColor}
         />
       </Stack>
 

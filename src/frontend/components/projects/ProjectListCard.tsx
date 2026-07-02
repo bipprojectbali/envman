@@ -11,6 +11,7 @@ import {
   TbVariable,
 } from 'react-icons/tb'
 import { ProjectAvatar } from '@/frontend/components/projects/ProjectAvatar'
+import { cardTintStyle } from '@/frontend/lib/project-avatar'
 import { relativeDate, roleColor, tagColor } from '@/frontend/lib/project-utils'
 
 interface Project {
@@ -21,6 +22,7 @@ interface Project {
   isActive: boolean
   icon?: string | null
   color?: string | null
+  cardColor?: string | null
   createdAt?: string
   myRole: 'OWNER' | 'EDITOR' | 'VIEWER'
   _count: { environments: number }
@@ -65,7 +67,7 @@ export function ProjectListCard({
           onClick()
         }
       }}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', ...cardTintStyle(p.cardColor) }}
     >
       <Group justify="space-between" wrap="nowrap" gap="sm" align="flex-start">
         <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap" align="flex-start">

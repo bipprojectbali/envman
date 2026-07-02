@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { IconType } from 'react-icons'
 import {
   TbApi,
@@ -83,4 +84,17 @@ export { PROJECT_ICON_NAMES }
 export function getProjectIcon(name?: string | null): IconType | null {
   if (!name) return null
   return PROJECT_ICONS[name as ProjectIconName] ?? null
+}
+
+/**
+ * Style tint background card dari nama warna Mantine. Sangat tipis (color-mix
+ * ~8% dengan bg) + border senada agar tetap terbaca di dark & light. Null = kosong.
+ */
+export function cardTintStyle(color?: string | null): CSSProperties {
+  if (!color) return {}
+  const base = `var(--mantine-color-${color}-light)`
+  return {
+    background: `color-mix(in srgb, ${base} 55%, var(--mantine-color-body))`,
+    borderColor: `color-mix(in srgb, var(--mantine-color-${color}-outline) 45%, transparent)`,
+  }
 }

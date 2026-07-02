@@ -1,40 +1,100 @@
-import { ActionIcon, Box, Group, Stack, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Box, Group, Paper, Stack, Text, Tooltip } from '@mantine/core'
 import { TbLetterCase } from 'react-icons/tb'
 import { ProjectAvatar } from '@/frontend/components/projects/ProjectAvatar'
-import { PROJECT_AVATAR_COLORS, PROJECT_ICON_NAMES, PROJECT_ICONS } from '@/frontend/lib/project-avatar'
+import { cardTintStyle, PROJECT_AVATAR_COLORS, PROJECT_ICON_NAMES, PROJECT_ICONS } from '@/frontend/lib/project-avatar'
+
+/** Baris swatch warna Mantine + opsi "default" (null). Reusable untuk avatar & card. */
+function ColorSwatchRow({
+  value,
+  onChange,
+  defaultLabel,
+}: {
+  value: string | null
+  onChange: (v: string | null) => void
+  defaultLabel: string
+}) {
+  return (
+    <Group gap={6}>
+      <Tooltip label={defaultLabel} withArrow>
+        <Box
+          onClick={() => onChange(null)}
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: '50%',
+            cursor: 'pointer',
+            background: 'var(--mantine-color-gray-light)',
+            border:
+              value === null
+                ? '2px solid var(--mantine-color-blue-filled)'
+                : '2px solid var(--mantine-color-default-border)',
+          }}
+        />
+      </Tooltip>
+      {PROJECT_AVATAR_COLORS.map((c) => (
+        <Tooltip key={c} label={c} withArrow>
+          <Box
+            onClick={() => onChange(value === c ? null : c)}
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: '50%',
+              cursor: 'pointer',
+              background: `var(--mantine-color-${c}-filled)`,
+              border: value === c ? '2px solid var(--mantine-color-blue-filled)' : '2px solid transparent',
+              outline: value === c ? '1px solid var(--mantine-color-blue-filled)' : 'none',
+            }}
+          />
+        </Tooltip>
+      ))}
+    </Group>
+  )
+}
 
 /**
- * Picker icon + background color untuk avatar project. Nilai null = default
- * (inisial nama / warna-by-role). Live preview memakai ProjectAvatar yang sama.
+ * Picker icon avatar + warna avatar + warna tint card. Nilai null = default
+ * (inisial nama / warna-by-role / tanpa tint). Live preview memakai komponen asli.
  */
 export function ProjectAvatarPicker({
   name,
   role,
   icon,
   color,
+  cardColor,
   onIconChange,
   onColorChange,
+  onCardColorChange,
 }: {
   name: string
   role: string
   icon: string | null
   color: string | null
+  cardColor: string | null
   onIconChange: (v: string | null) => void
   onColorChange: (v: string | null) => void
+  onCardColorChange: (v: string | null) => void
 }) {
   return (
     <Stack gap="sm">
-      <Group gap="sm" align="center">
-        <ProjectAvatar name={name || '?'} role={role} size={48} icon={icon} color={color} />
-        <Text size="xs" c="dimmed">
-          Pratinjau avatar. Icon & warna opsional — kosong = inisial nama + warna sesuai role.
-        </Text>
-      </Group>
+      {/* Live preview: card tint + avatar */}
+      <Paper withBorder p="sm" radius="md" style={cardTintStyle(cardColor)}>
+        <Group gap="sm" align="center">
+          <ProjectAvatar name={name || '?'} role={role} size={44} icon={icon} color={color} />
+          <Box>
+            <Text size="sm" fw={700} lh={1.2}>
+              {name || 'Nama project'}
+            </Text>
+            <Text size="xs" c="dimmed">
+              Pratinjau kartu
+            </Text>
+          </Box>
+        </Group>
+      </Paper>
 
       {/* Icon grid */}
       <Stack gap={4}>
         <Text size="xs" c="dimmed">
-          Icon
+          Icon avatar
         </Text>
         <Group gap={6}>
           <Tooltip label="Inisial nama (default)" withArrow>
@@ -68,45 +128,20 @@ export function ProjectAvatarPicker({
         </Group>
       </Stack>
 
-      {/* Color swatch */}
+      {/* Avatar background color */}
       <Stack gap={4}>
         <Text size="xs" c="dimmed">
-          Background
+          Warna avatar
         </Text>
-        <Group gap={6}>
-          <Tooltip label="Warna sesuai role (default)" withArrow>
-            <Box
-              onClick={() => onColorChange(null)}
-              style={{
-                width: 26,
-                height: 26,
-                borderRadius: '50%',
-                cursor: 'pointer',
-                background: 'var(--mantine-color-gray-light)',
-                border:
-                  color === null
-                    ? '2px solid var(--mantine-color-blue-filled)'
-                    : '2px solid var(--mantine-color-default-border)',
-              }}
-            />
-          </Tooltip>
-          {PROJECT_AVATAR_COLORS.map((c) => (
-            <Tooltip key={c} label={c} withArrow>
-              <Box
-                onClick={() => onColorChange(color === c ? null : c)}
-                style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  background: `var(--mantine-color-${c}-filled)`,
-                  border: color === c ? '2px solid var(--mantine-color-blue-filled)' : '2px solid transparent',
-                  outline: color === c ? '1px solid var(--mantine-color-blue-filled)' : 'none',
-                }}
-              />
-            </Tooltip>
-          ))}
-        </Group>
+        <ColorSwatchRow value={color} onChange={onColorChange} defaultLabel="Warna sesuai role (default)" />
+      </Stack>
+
+      {/* Card tint color */}
+      <Stack gap={4}>
+        <Text size="xs" c="dimmed">
+          Warna kartu
+        </Text>
+        <ColorSwatchRow value={cardColor} onChange={onCardColorChange} defaultLabel="Tanpa warna (default)" />
       </Stack>
     </Stack>
   )
