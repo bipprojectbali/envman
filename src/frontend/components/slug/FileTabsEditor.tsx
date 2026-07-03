@@ -49,7 +49,7 @@ export function FileTabsEditor({ files, activeFile, preview, setActiveFile, setP
         <Tabs.List>
           {files.map((f, i) => (
             <Tabs.Tab
-              key={f.filename || i}
+              key={i}
               value={String(i)}
               leftSection={<Box style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: `var(--mantine-color-${getLangColor(f.language)}-5)` }} />}
               rightSection={
@@ -70,7 +70,7 @@ export function FileTabsEditor({ files, activeFile, preview, setActiveFile, setP
         </Tabs.List>
 
         {files.map((f, i) => (
-          <Tabs.Panel key={f.filename || i} value={String(i)} pt="sm">
+          <Tabs.Panel key={i} value={String(i)} pt="sm">
             <Stack gap="xs">
               <Group gap="xs" align="flex-end" wrap="nowrap">
                 <TextInput
