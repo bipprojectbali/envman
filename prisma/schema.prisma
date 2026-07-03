@@ -65,6 +65,7 @@ model User {
   projectAliases        ProjectAlias[]  @relation("ProjectAliasCreator")
   projectFiles          ProjectFile[]   @relation("ProjectFileAuthor")
   gists                 Gist[]
+  storageUploads        ProjectStorageObject[]
 
   @@map("user")
 }
@@ -282,15 +283,39 @@ model Project {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  storageQuotaMb    Int?      // null = pakai AppSetting storage_default_quota_mb (default 500)
+
   members           ProjectMember[]
   environments      Environment[]
   portainerConfigs  PortainerConfig[]
   notes             ProjectNote[]
   aliases           ProjectAlias[]
   projectFiles      ProjectFile[]
+  storageObjects    ProjectStorageObject[]
 
   @@index([deletedAt])
   @@map("project")
+}
+
+model ProjectStorageObject {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  path         String   // path relatif user, mis. "assets/logo.png"
+  minioKey     String   // key di MinIO: "{projectId}/{path}"
+  size         Int      // bytes
+  mimeType     String   @default("application/octet-stream")
+  isPublic     Boolean  @default(false)
+  tags         String[] @default([])
+  description  String?
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@map("project_storage_object")
 }
 
 model Environment {

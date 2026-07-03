@@ -10,6 +10,8 @@ const ALLOWED_KEYS = [
   'token_activity_log_vars_fetch',
   'token_activity_retention_days',
   'token_activity_cap_per_token',
+  'storage_max_file_mb',
+  'storage_default_quota_mb',
 ] as const
 
 export const settingsRouter = new Elysia()

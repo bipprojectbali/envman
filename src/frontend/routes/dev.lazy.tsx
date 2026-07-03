@@ -12,6 +12,7 @@ import { ExtensionsPanel } from '@/frontend/components/dev/extensions-panel'
 import { FileHealthPanel } from '@/frontend/components/dev/FileHealthPanel'
 import { OverviewPanel } from '@/frontend/components/dev/overview-panel'
 import { SettingsPanel } from '@/frontend/components/dev/SettingsPanel'
+import { StorageAdminPanel } from '@/frontend/components/dev/StorageAdminPanel'
 import { TokensAdminPanel } from '@/frontend/components/dev/TokensAdminPanel'
 import { UserLogsPanel } from '@/frontend/components/dev/user-logs-panel'
 import { UsersPanel } from '@/frontend/components/dev/users-panel'
@@ -90,6 +91,7 @@ function DevPage() {
             {active === 'file-health' && <FileHealthPanel />}
             {active === 'extensions' && <ExtensionsPanel />}
             {active === 'settings' && <SettingsPanel />}
+            {active === 'storage' && <StorageAdminPanel />}
           </>
         ) : (
           <Outlet />

@@ -12,6 +12,7 @@ const validTabs = [
   'tokens-admin',
   'extensions',
   'settings',
+  'storage',
 ] as const
 
 export const Route = createFileRoute('/dev')({

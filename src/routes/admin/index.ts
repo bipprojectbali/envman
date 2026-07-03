@@ -4,6 +4,7 @@ import { adminExtensionsRouter } from './extensions'
 import { adminFileHealthRouter } from './file-health'
 import { adminLogsRouter } from './logs'
 import { adminMigrateRouter } from './migrate'
+import { adminStorageRouter } from './storage-admin'
 import { adminTokenActivityRouter } from './token-activity'
 import { adminTokensRouter } from './tokens'
 import { adminUsersRouter } from './users'
@@ -17,3 +18,4 @@ export const adminRouter = new Elysia()
   .use(adminTokenActivityRouter)
   .use(adminExtensionsRouter)
   .use(adminMigrateRouter)
+  .use(adminStorageRouter)

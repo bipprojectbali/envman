@@ -12,6 +12,7 @@ import { authCompatRouter } from './routes/auth-compat'
 import { cliDownloadRouter } from './routes/cli-download'
 import { envmanRouter } from './routes/envman/index'
 import { infraRouter } from './routes/infra'
+import { publicStorageRouter } from './routes/public-storage'
 import { ticketsRouter } from './routes/tickets'
 import { v1Router } from './routes/v1/index'
 
@@ -74,6 +75,7 @@ export function createApp() {
       .use(v1Router)
       .use(infraRouter)
       .use(cliDownloadRouter)
+      .use(publicStorageRouter)
 
       // Public docs — raw markdown for AI crawlers and CLI
       .get('/api/docs.md', ({ request }) => {

@@ -21,6 +21,7 @@ import { portainerBackupRouter } from './portainer-backup'
 import { portainerProbeRouter } from './portainer-probe'
 import { projectsRouter } from './projects'
 import { settingsRouter } from './settings'
+import { storageRouter } from './storage'
 import { tokensRouter } from './tokens'
 
 const envmanMiscRouter = new Elysia()
@@ -76,3 +77,4 @@ export const envmanRouter = new Elysia()
   .use(adminUsersRouter)
   .use(pmAuditRouter)
   .use(mcpAuditRouter)
+  .use(storageRouter)

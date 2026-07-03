@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   TbFiles,
+  TbFolderOpen,
   TbNote,
   TbTerminal2,
   TbUsers,
@@ -14,6 +15,7 @@ import { FilesPanel } from '@/frontend/components/slug/FilesPanel'
 import { MembersPanel } from '@/frontend/components/slug/MembersPanel'
 import { NotesPanel } from '@/frontend/components/slug/NotesPanel'
 import { ProjectDetailHeader } from '@/frontend/components/slug/ProjectDetailHeader'
+import { StoragePanel } from '@/frontend/components/slug/StoragePanel'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/api'
 
@@ -31,7 +33,7 @@ function ProjectDetailPage() {
     navigate({
       to: '/envmanager/$slug',
       params: { slug },
-      search: { tab: t as 'environments' | 'notes' | 'aliases' | 'files' | 'members', fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId, noteId, noteNew, viewNoteId },
+      search: { tab: t as 'environments' | 'notes' | 'aliases' | 'files' | 'members' | 'storage', fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId, noteId, noteNew, viewNoteId },
     })
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -88,6 +90,9 @@ function ProjectDetailPage() {
               rightSection={memberCount > 0 ? <Badge size="xs" variant="light" color="primary" circle>{memberCount}</Badge> : undefined}>
               Members
             </Tabs.Tab>
+            <Tabs.Tab value="storage" leftSection={<TbFolderOpen size={13} />}>
+              Storage
+            </Tabs.Tab>
           </Tabs.List>
 
           <Tabs.Panel value="environments">
@@ -117,6 +122,11 @@ function ProjectDetailPage() {
                 environments={envs.map((e: { name: string }) => ({ name: e.name }))}
                 isOwner={isOwner} myUserId={myUserId ?? ''} onRefresh={refetch}
               />
+            </Paper>
+          </Tabs.Panel>
+          <Tabs.Panel value="storage">
+            <Paper withBorder p="md" radius="md">
+              <StoragePanel slug={slug} isOwner={isOwner} canEdit={canEdit} />
             </Paper>
           </Tabs.Panel>
         </Tabs>

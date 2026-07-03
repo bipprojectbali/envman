@@ -48,6 +48,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`
 - `AppSetting` (key PK, value, updatedAt, updatedById?) — konfigurasi global runtime, diubah via Dev > Settings
 - `Gist` (id, userId, title, description, files Json `[{filename, content, language}]`, isPublic, tags[], timestamps) — snippet multi-file. `isPublic=false` (default) = private milik owner; `isPublic=true` = terlihat user lain. Edit/delete: owner atau SUPER_ADMIN.
 - `EnvImport` (id, targetEnvId, sourceEnvId, order, createdById, createdAt) — unique(targetEnvId, sourceEnvId), index keduanya. Live-link: env target meminjam vars dari source env (boleh lintas project) secara **referensi** (bukan salinan). FK `ON DELETE CASCADE` — source/target env dihapus → link ikut hilang. Lihat section [Env Import](#env-import-reference--live-link).
+- `ProjectStorageObject` (id, projectId, path, minioKey, size, mimeType, isPublic, tags[], description?, uploadedById, timestamps) — unique(projectId, path). MinIO-backed file storage per project. `path` = path relatif user (mis. `"assets/logo.png"`), `minioKey` = key di MinIO (`"{projectId}/{path}"`). `isPublic=true` → accessible via `/api/public/storage/:slug/:path` tanpa auth. Lihat section [Project Storage](#project-storage).
 
 ### Enums
 
@@ -282,6 +283,62 @@ Per-key filter, transitive import (multi-level), per-import override value — b
 
 ---
 
+## Project Storage
+
+MinIO-backed file storage per project. Setiap project punya "direktori virtual" di MinIO dengan key prefix `{projectId}/{path}`. DB (`ProjectStorageObject`) = source of truth metadata; MinIO = content store.
+
+### Env Vars (wajib untuk aktifkan fitur)
+
+```
+MINIO_ENDPOINT=https://minio.example.com   # atau http://localhost:9000
+MINIO_ACCESS_KEY=...
+MINIO_SECRET_KEY=...
+MINIO_BUCKET=envman
+```
+
+Tanpa keempat var di atas, semua storage endpoint (yang butuh MinIO) return 503. List dan metadata PATCH tetap jalan (query DB saja).
+
+### Permission
+
+| Operasi | Role |
+|---|---|
+| List files + folder tree | VIEWER+ |
+| Upload / replace file | EDITOR+ |
+| Update metadata (tags, description) | EDITOR+ |
+| Set `isPublic` | OWNER only |
+| Delete file | OWNER only |
+| Public download (no auth) | `isPublic = true` |
+
+### Storage Limits (via AppSetting)
+
+- `storage_max_file_mb` — default 50 MB per file
+- `storage_default_quota_mb` — default 500 MB per project
+- `Project.storageQuotaMb` — override per-project (SUPER_ADMIN); `null` = pakai default
+
+### MinIO Object Cleanup
+
+- File dihapus (DELETE endpoint): MinIO delete dulu, lalu DB delete.
+- Project soft-deleted: `minioDeleteProject(projectId)` dipanggil di handler DELETE project — hapus semua object MinIO sebelum soft delete DB.
+- Orphan MinIO objects (upload sukses, DB gagal): upload handler otomatis delete MinIO object jika DB upsert throw.
+
+### Presigned URL
+
+- Private download: TTL 5 menit, `Content-Disposition: attachment` (force download, cegah MIME sniffing).
+- Public download: TTL 1 jam, same disposition.
+- CLI stream langsung dari MinIO via redirect 302 — server tidak jadi proxy data.
+
+### Implementasi
+
+- `src/lib/minio.ts` — `Bun.S3Client` singleton (lazy-init)
+- `src/lib/storage-service.ts` — `sanitizePath`, `getQuotaBytes`, `minioUpload`, `minioDelete`, `minioDeleteProject`, `minioPresign`, `buildMinioKey`
+- `src/routes/envman/storage-core.ts` — list, download, meta PATCH, delete
+- `src/routes/envman/storage-upload.ts` — upload handler
+- `src/routes/public-storage.ts` — public redirect endpoint
+- `src/frontend/components/slug/StoragePanel.tsx` — breadcrumb tree UI
+- `src/frontend/components/slug/StorageUploadModal.tsx` — upload modal
+
+---
+
 ## API Reference
 
 ### Admin API (SUPER_ADMIN only)
@@ -372,7 +429,9 @@ Endpoint yang di-cover:
 
 **Tidak di-cover (sengaja):** endpoint vars (jangan cache env vars), session, list endpoint, dan binary download `/download/cli/:platform` (sudah version-gated via `/download/cli/version`).
 
-**Settings:** `GET /api/envman/settings` (public, semua setting sebagai key-value map) · `PUT /api/envman/settings` (SUPER_ADMIN, body: `[{key, value}]`) — key yang valid: `user_token_creation` (boolean string), `user_token_max_days` (number string)
+**Storage (Project Storage):** `GET /api/envman/projects/:slug/storage` (VIEWER+; `?prefix=` untuk tree navigation) · `POST .../storage/upload` (EDITOR+; multipart/form-data: `file`, `path`, `description?`, `tags?`) · `GET .../storage/download?path=` (VIEWER+; kembalikan presigned URL MinIO) · `PATCH .../storage/meta` (EDITOR+; body `{path, description?, tags?, isPublic?}`; `isPublic` hanya OWNER) · `DELETE .../storage?path=` (OWNER). **Public (no auth):** `GET /api/public/storage/:slug/:path` (redirect 302 ke presigned URL; 404 jika private/tidak ada). Lihat section [Project Storage](#project-storage).
+
+**Settings:** `GET /api/envman/settings` (public, semua setting sebagai key-value map) · `PUT /api/envman/settings` (SUPER_ADMIN, body: `[{key, value}]`) — key yang valid: `user_token_creation` (boolean string), `user_token_max_days` (number string), `storage_max_file_mb` (number string, default 50), `storage_default_quota_mb` (number string, default 500)
 
 ### Auth Endpoints
 
