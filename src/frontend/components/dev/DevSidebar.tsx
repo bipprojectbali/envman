@@ -26,6 +26,7 @@ import {
   TbLogout,
   TbPuzzle,
   TbServer,
+  TbBucket,
   TbSettings,
   TbSitemap,
   TbUser,
@@ -65,6 +66,7 @@ export const navGroups = [
     group: 'System',
     items: [
       { key: 'extensions', label: 'Extensions', icon: TbPuzzle, desc: 'Integrasi & plugin tambahan' },
+      { key: 'storage', label: 'Storage', icon: TbBucket, desc: 'Status MinIO dan manajemen bucket' },
       { key: 'settings', label: 'Settings', icon: TbSettings, desc: 'Konfigurasi sistem dan aplikasi' },
     ],
   },

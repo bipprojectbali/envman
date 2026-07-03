@@ -81,7 +81,12 @@ export const storageUploadRouter = new Elysia()
 
     // Upload ke MinIO dulu, baru upsert DB
     const buffer = Buffer.from(await file.arrayBuffer())
-    await minioUpload(minioKey, buffer, mimeType)
+    try {
+      await minioUpload(minioKey, buffer, mimeType)
+    } catch (e) {
+      set.status = 502
+      return { error: `Gagal upload ke storage: ${(e as Error).message ?? e}` }
+    }
 
     let obj: { id: string; path: string; size: number; mimeType: string; isPublic: boolean; tags: string[]; description: string | null; createdAt: Date; updatedAt: Date }
     try {

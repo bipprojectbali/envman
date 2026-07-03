@@ -167,6 +167,18 @@ async function serveFrontend(request: Request): Promise<Response> {
   return new Response('Not Found', { status: 404 })
 }
 
+// ─── MinIO Bucket Auto-Setup ──────────────────────────
+import { ensureBucket } from './lib/minio-bucket'
+
+ensureBucket()
+  .then(({ created, alreadyExisted, notConfigured, error }) => {
+    if (notConfigured) return
+    if (error) console.warn(`[Storage] Gagal check/buat bucket MinIO: ${error}`)
+    else if (created) console.log('[Storage] Bucket MinIO berhasil dibuat')
+    else if (alreadyExisted) console.log('[Storage] Bucket MinIO sudah ada — OK')
+  })
+  .catch(console.error)
+
 // ─── Portainer Backup Crons ───────────────────────────
 import { syncBackupCrons } from './lib/portainer-cron'
 
