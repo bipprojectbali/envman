@@ -6,6 +6,7 @@ import { prisma } from '../../lib/db'
 import { notDeleted, softDelete } from '../../lib/db-helpers'
 import { hasCapability } from '../../lib/permissions'
 import { isValidProjectColor, isValidProjectIcon } from '../../lib/project-avatar'
+import { minioDeleteProject } from '../../lib/storage-service'
 
 export const projectsCoreRouter = new Elysia()
 
@@ -170,6 +171,15 @@ export const projectsCoreRouter = new Elysia()
       set.status = 403
       return { error: 'Owner required' }
     }
+    const project = await prisma.project.findFirst({
+      where: { slug: params.slug, ...notDeleted },
+      select: { id: true },
+    })
+    if (!project) { set.status = 404; return { error: 'Project tidak ditemukan' } }
+
+    // Hapus semua storage objects dari MinIO sebelum soft delete project
+    await minioDeleteProject(project.id)
+
     await invalidateProjectCaches(params.slug)
     await prisma.project.update({ where: { slug: params.slug }, data: softDelete() })
     return { ok: true }
