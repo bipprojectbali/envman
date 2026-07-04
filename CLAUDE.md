@@ -518,10 +518,9 @@ Standalone binary. Entry: `src/cli.ts`. Build: `bun run build:cli` → `dist/cli
 envman login <server-url> --token <token>
 envman logout
 envman whoami
+envman docs
 envman run [-e <source>]... <project>:<alias>
 envman [options] -- <command>
-envman pm daemon <start|stop|status>
-envman pm <subcommand>
 envman mcp [--write] [--debug]
 ```
 
@@ -548,7 +547,7 @@ Interpreter stdin (zero disk write): `bash`, `sh`, `zsh`, `bun`, `node`, `python
 
 Bun scripts bisa langsung import npm tanpa `node_modules` — CLI auto-pass `--install=fallback`. Pin versi inline: `import { z } from "zod@^3.22"`.
 
-**❌ Jangan tulis `files:X`** di MCP tool descriptions, alias args baru, atau docs baru.
+**❌ Jangan tulis `files:X`** di alias args baru atau docs baru.
 
 ### Alias Expansion
 
@@ -572,39 +571,6 @@ Bun scripts bisa langsung import npm tanpa `node_modules` — CLI auto-pass `--i
 - Fallback: kalau `304` tapi cache hilang (race), re-fetch tanpa conditional.
 
 Efek: `envman -- bash myapp:scripts/x.sh` / `envman run myapp:deploy` berulang hanya transfer `304` saat konten tak berubah.
-
----
-
-## Process Manager (`envman pm`)
-
-Native Bun process manager. File: `src/pm/{shared,daemon,cli}/`. Daemon socket: `~/.config/envman/run/daemon.sock` (chmod 0600 + header token auth).
-
-```bash
-envman pm daemon start|stop|status
-envman pm start --name X [-s project:env]... -- <cmd>
-envman pm ls|describe|stop|restart|delete|reset|save|sync|logs <name>
-```
-
-Supervisor: auto-restart, exponential backoff 1s→60s, quarantine setelah 5 restarts/60s. Log rotation 10MB×5. State: atomic tmp+rename + .bak.
-
-Audit events → `POST /api/envman/pm/audit`: `PM_DAEMON_*`, `PM_PROCESS_*`, `PM_SYNC_TRIGGERED`.
-
----
-
-## MCP Server (`envman mcp`)
-
-Stdio MCP built into CLI binary. Auth: `ENVMAN_SERVER`/`ENVMAN_TOKEN` atau `~/.config/envman/config.json`.
-
-Setup `.mcp.json`:
-```json
-{ "mcpServers": { "envman": { "command": "envman", "args": ["mcp"] } } }
-```
-
-**Readonly (15 tools):** `whoami`, `server_info`, `projects_list`, `project_get`, `vars_list`, `vars_export`, `vars_diff`, `aliases_list`, `alias_resolve`, `files_list`, `file_resolve`, `pm_daemon_status`, `pm_list`, `pm_describe`, `pm_logs`
-
-**Write (13 tools, requires `--write` + token canWrite=true):** `var_set/delete`, `alias_create/update/delete`, `file_create`, `pm_start/stop/restart/reset/delete/sync`, `pm_daemon_start/stop`
-
-All write calls emit `MCP_*` audit events.
 
 ---
 

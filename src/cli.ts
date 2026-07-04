@@ -5,9 +5,6 @@ import { getSavedServerUrl } from './cli/auth-resolver'
 import { cmdAlias, cmdRun, detectsNpmImports, isProjectFileRef } from './cli/run'
 import { cmdUpdate, runBgUpdateCheck, showUpdateNoticeFromCache, spawnUpdateCheck } from './cli/update'
 
-// Public API: detectsNpmImports is used by MCP and other internal callers
-export { detectsNpmImports } from './cli/run'
-
 async function main() {
   const args = process.argv.slice(2)
 
@@ -53,27 +50,6 @@ async function main() {
     case 'run':
       await cmdAlias(args.slice(1))
       return
-    case 'pm': {
-      const { cmdPm } = await import('./pm/cli/pm-commands')
-      await cmdPm(args.slice(1))
-      return
-    }
-    case 'mcp': {
-      process.stderr.write(
-        '[envman] WARNING: envman mcp is deprecated.\n' +
-        '         Use CLI commands directly. Run `envman docs` for full reference.\n\n',
-      )
-      const { runMcpServer } = await import('./mcp')
-      await runMcpServer(args.slice(1))
-      return
-    }
-    case 'daemon-internal': {
-      // Hidden subcommand — di-spawn oleh `envman daemon start`.
-      // Tidak boleh dipanggil user secara langsung.
-      const { runDaemon } = await import('./pm/daemon/main')
-      await runDaemon()
-      return
-    }
   }
 
   // Run mode — collect all flags before --

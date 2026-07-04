@@ -22,10 +22,6 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxx
 # ─── Redis (untuk app logs + presence)
 REDIS_URL=your-redis-url
 
-# ─── MCP server (opsional, untuk Claude integration)
-MCP_SECRET=<hex>
-MCP_SECRET_ADMIN=<hex>
-
 # ─── Audit log retention
 AUDIT_LOG_RETENTION_DAYS=90
 \`\`\`

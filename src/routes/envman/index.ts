@@ -13,9 +13,7 @@ import { envMembersRouter } from './env-members'
 import { filesResolveRouter } from './files-resolve'
 import { filesRouter } from './files'
 import { gistsRouter } from './gists'
-import { mcpAuditRouter } from './mcp-audit'
 import { notesRouter } from './notes'
-import { pmAuditRouter } from './pm-audit'
 import { portainerRouter } from './portainer'
 import { portainerBackupRouter } from './portainer-backup'
 import { portainerProbeRouter } from './portainer-probe'
@@ -75,6 +73,4 @@ export const envmanRouter = new Elysia()
   .use(databaseRouter)
   .use(adminUsersQueryRouter)
   .use(adminUsersRouter)
-  .use(pmAuditRouter)
-  .use(mcpAuditRouter)
   .use(storageRouter)

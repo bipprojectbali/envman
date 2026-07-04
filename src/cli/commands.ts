@@ -80,9 +80,6 @@ USAGE:
   envman run [-e <source>]... <project>:<alias> [args...]  Expand alias + passthrough args
   envman [options] -- <command>                Inject env vars and run command
   envman -- <interpreter> <project>:<path/file.ext>  Execute project file (no -e needed)
-  envman pm daemon <start|stop|status>         Manage the pm daemon (supervisor)
-  envman pm <start|stop|ls|restart|...>        Manage long-running processes
-  envman mcp [--write] [--debug]               [DEPRECATED] Start MCP server
 
 OPTIONS:
   -e <project>:<env>   Fetch vars from server environment (project:env)

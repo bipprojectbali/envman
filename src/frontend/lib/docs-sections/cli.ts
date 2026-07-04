@@ -48,13 +48,9 @@ envman docs                                        # Print docs + referensi leng
 envman run [-e <source>]... <project>:<alias> [args...]  # Ekspansi alias + inject vars
 envman [options] -- <command>                      # Inject vars & jalankan command
 envman -- <interpreter> <project>:<path/file.ext>  # Execute project file (tanpa tulis ke disk)
-envman pm daemon <start|stop|status>               # Kelola daemon supervisor
-envman pm <subcommand> <name>                      # Kelola proses panjang
 envman --version                                   # Tampilkan versi CLI
 envman --help                                      # Bantuan
 \`\`\`
-
-> **envman mcp** — deprecated. Gunakan CLI command + \`envman docs\`.
 
 ---
 
@@ -102,38 +98,6 @@ envman -e myapp:production -- bash myapp:scripts/deploy.sh
 **Interpreter stdin (zero disk write):** \`bash\`, \`sh\`, \`zsh\`, \`bun\`, \`node\`, \`python3\`, \`python\`, \`deno\`. Interpreter lain → temp file 0600.
 
 Bun scripts bisa langsung import npm tanpa \`node_modules\` — CLI auto-pass \`--install=fallback\`. Pin versi inline: \`import { z } from "zod@^3.22"\`.
-
----
-
-### Process Manager (\`envman pm\`)
-
-Native Bun process manager. Daemon socket: \`~/.config/envman/run/daemon.sock\`.
-
-\`\`\`bash
-# Daemon
-envman pm daemon start    # Start supervisor daemon (background)
-envman pm daemon stop     # Stop daemon
-envman pm daemon status   # Status daemon (running / stopped)
-
-# Kelola proses
-envman pm start --name <X> [-s <project:env>]... -- <command>
-envman pm ls              # List semua proses + status
-envman pm describe <name> # Detail proses (config, stats, restart history)
-envman pm stop <name>     # Stop proses (SIGTERM)
-envman pm restart <name>  # Restart proses
-envman pm delete <name>   # Hapus proses dari registry
-envman pm reset <name>    # Reset restart counter + quarantine flag
-envman pm save            # Persist state ke disk (survive daemon restart)
-envman pm sync <name>     # Re-fetch vars dari server + restart proses
-envman pm logs <name>     # Tail log proses (stdout + stderr)
-\`\`\`
-
-| Flag | Keterangan |
-|------|-----------|
-| \`--name <X>\` | Nama unik proses |
-| \`-s <project:env>\` | Source vars yang di-inject ke proses (bisa multiple) |
-
-**Auto-restart**: exponential backoff 1s→60s, quarantine setelah 5 restart dalam 60 detik. Log rotation 10 MB × 5 file.
 
 ---
 
