@@ -171,7 +171,10 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
             Simpan file per project — gambar, konfigurasi, skrip, dokumen, dsb. Upload via tombol, drag-drop ke panel, atau paste dari clipboard (Ctrl+V / ⌘V).
           </Text>
           <Text size="xs" c="dimmed">
-            Pilih banyak file sekaligus dengan checkbox untuk batch pindah atau hapus. Klik file untuk preview. Toggle list/grid via ikon kanan atas. File dengan <strong>isPublic</strong> dapat diakses tanpa login.
+            Pilih banyak file sekaligus dengan checkbox untuk batch pindah atau hapus. Klik file untuk preview. Toggle list/grid via ikon kanan atas. File <strong>isPublic</strong> dapat diakses tanpa login.
+          </Text>
+          <Text size="xs" c="dimmed">
+            CLI: <code>envman storage ls {slug}</code> · <code>envman storage upload {slug} file.txt</code> · <code>envman storage download {slug}:path | bash</code>
           </Text>
         </Stack>
       </Alert>

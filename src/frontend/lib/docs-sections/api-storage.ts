@@ -226,5 +226,46 @@ GET /api/public/storage/myapp/assets/logo.png
 \`\`\`
 
 ---
+
+### CLI Storage Commands
+
+Tersedia via \`envman storage\` — tidak butuh setup tambahan selain \`envman login\`.
+
+#### List
+
+\`\`\`bash
+envman storage ls myapp                     # list semua di root
+envman storage ls myapp --prefix assets/    # list folder assets/
+envman storage ls myapp --page 2            # halaman berikutnya (50 per halaman)
+\`\`\`
+
+Output: kuota terpakai, daftar folder, daftar file (path, ukuran, MIME, badge public).
+
+#### Upload (Streaming)
+
+\`\`\`bash
+envman storage upload myapp compose.yml                         # path = compose.yml
+envman storage upload myapp ./logo.png --path assets/logo.png  # path eksplisit
+envman storage upload myapp ./dump.sql --path backup/dump.sql
+\`\`\`
+
+File dialirkan langsung dari disk ke server — tidak dibuffer ke memori. Aman untuk file besar.
+
+#### Download (Streaming ke Stdout)
+
+\`\`\`bash
+# Pipe langsung ke tool lain
+envman storage download myapp:compose.yml | docker compose -f - up
+envman storage download myapp:scripts/setup.sh | bash
+envman storage download myapp:dump.sql | psql mydb
+
+# Simpan ke file
+envman storage download myapp:assets/logo.png -o logo.png
+envman storage download myapp:backup/dump.sql -o /tmp/dump.sql
+\`\`\`
+
+Download menggunakan presigned MinIO URL — file dialirkan langsung dari MinIO ke stdout tanpa melewati server envman.
+
+---
 `
 }

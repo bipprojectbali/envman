@@ -11,6 +11,7 @@ import (
 	"github.com/bipprojectbali/envman/cli/internal/api"
 	"github.com/bipprojectbali/envman/cli/internal/auth"
 	"github.com/bipprojectbali/envman/cli/internal/run"
+	"github.com/bipprojectbali/envman/cli/internal/storage"
 	"github.com/bipprojectbali/envman/cli/internal/update"
 	"github.com/spf13/cobra"
 )
@@ -100,6 +101,7 @@ Reference project files and aliases stored on the server.`, VERSION),
 		docsCmd(),
 		updateCmdFn(),
 		runCmd(),
+		storageCmd(),
 	)
 
 	return root
@@ -265,6 +267,134 @@ Extra -e flags you pass here are merged in (alias sources take precedence).`,
 		},
 	}
 	cmd.Flags().StringArrayVarP(&sources, "env", "e", nil, "Additional source: `project:env` or local file")
+	return cmd
+}
+
+func storageCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "storage <subcommand>",
+		Short: "Manage project file storage",
+		Long: `Upload, download, and list files in a project's storage.
+
+Download streams to stdout by default — composable with pipes:
+  envman storage download myapp:compose.yml | docker compose -f - up
+  envman storage download myapp:scripts/setup.sh | bash`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
+	}
+	cmd.AddCommand(storageLsCmd(), storageUploadCmd(), storageDownloadCmd())
+	return cmd
+}
+
+func storageLsCmd() *cobra.Command {
+	var prefix string
+	var page int
+	cmd := &cobra.Command{
+		Use:     "ls <project>",
+		Short:   "List files and folders in project storage",
+		Example: "  envman storage ls myapp\n  envman storage ls myapp --prefix assets/",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return err
+			}
+			result, err := storage.List(cfg, args[0], prefix, page)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Storage: %s / %s  (%d files)\n\n",
+				storage.FmtBytes(result.Usage.UsedBytes),
+				storage.FmtBytes(result.Usage.QuotaBytes),
+				result.TotalFiles)
+			for _, f := range result.Folders {
+				fmt.Printf("  %s/\n", f)
+			}
+			for _, f := range result.Files {
+				pub := ""
+				if f.IsPublic {
+					pub = " [public]"
+				}
+				fmt.Printf("  %-40s  %8s  %s%s\n", f.Path, storage.FmtBytes(f.Size), f.MimeType, pub)
+			}
+			if result.TotalFiles > result.PageSize {
+				fmt.Printf("\nPage %d / %d  (use --page N for more)\n", result.Page, (result.TotalFiles+result.PageSize-1)/result.PageSize)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&prefix, "prefix", "", "Folder prefix to list (e.g. assets/)")
+	cmd.Flags().IntVar(&page, "page", 1, "Page number")
+	return cmd
+}
+
+func storageUploadCmd() *cobra.Command {
+	var remotePath string
+	cmd := &cobra.Command{
+		Use:   "upload <project> <file>",
+		Short: "Upload a file to project storage (streaming)",
+		Example: "  envman storage upload myapp compose.yml\n" +
+			"  envman storage upload myapp ./logo.png --path assets/logo.png",
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return err
+			}
+			slug := args[0]
+			localFile := args[1]
+			target := storage.RemotePath(localFile, remotePath)
+			result, err := storage.Upload(cfg, slug, localFile, target)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Uploaded: %s (%s)\n", result.Object.Path, storage.FmtBytes(result.Object.Size))
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&remotePath, "path", "", "Remote path (default: basename of local file)")
+	return cmd
+}
+
+func storageDownloadCmd() *cobra.Command {
+	var outFile string
+	cmd := &cobra.Command{
+		Use:   "download <project>:<path>",
+		Short: "Download a file from project storage (streams to stdout by default)",
+		Long: `Download a file and stream it to stdout, or save to a file with -o.
+
+Streaming to stdout enables direct piping:
+  envman storage download myapp:compose.yml | docker compose -f - up
+  envman storage download myapp:scripts/setup.sh | bash
+  envman storage download myapp:dump.sql | psql mydb`,
+		Example: "  envman storage download myapp:assets/logo.png -o logo.png\n" +
+			"  envman storage download myapp:compose.yml | docker compose -f - up",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return err
+			}
+			slug, remotePath, err := storage.ParseRef(args[0])
+			if err != nil {
+				return err
+			}
+			if outFile == "" || outFile == "-" {
+				return storage.Download(cfg, slug, remotePath, os.Stdout)
+			}
+			f, err := os.Create(outFile)
+			if err != nil {
+				return fmt.Errorf("[envman] create %s: %w", outFile, err)
+			}
+			defer f.Close()
+			if err := storage.Download(cfg, slug, remotePath, f); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Downloaded: %s → %s\n", remotePath, outFile)
+			return nil
+		},
+	}
+	cmd.Flags().StringVarP(&outFile, "output", "o", "", "Output file (default: stdout)")
 	return cmd
 }
 

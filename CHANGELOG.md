@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-07-04
+
+### Added
+- **CLI Go — `envman storage` subcommand**: akses Project Storage langsung dari terminal tanpa buka browser. Tiga subcommand:
+  - `envman storage ls <project> [--prefix folder/] [--page N]` — list file & folder dengan info kuota
+  - `envman storage upload <project> <file> [--path remote/path]` — upload streaming dari disk ke server tanpa buffer memori
+  - `envman storage download <project>:<path> [-o file]` — download streaming ke stdout (default) atau file. Mendukung pipe langsung ke tools: `envman storage download myapp:compose.yml | docker compose -f - up`
+
 ## [0.18.3] - 2026-07-04
 
 ### Fixed
