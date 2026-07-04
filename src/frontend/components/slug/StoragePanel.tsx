@@ -3,8 +3,8 @@ import {
   Progress, Skeleton, Stack, Text, ThemeIcon, Tooltip,
 } from '@mantine/core'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
-import { TbCloudUpload, TbFile, TbFolder, TbLayoutGrid, TbList } from 'react-icons/tb'
+import { useEffect, useRef, useState } from 'react'
+import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbLayoutGrid, TbList } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { fmtBytes } from '@/frontend/lib/storage-format'
 import { StorageFileGrid } from './StorageFileCard'
@@ -19,12 +19,14 @@ interface StorageObject {
 interface StorageData {
   prefix: string; folders: string[]; files: StorageObject[]
   usage: { usedBytes: number; quotaBytes: number }
+  totalFiles: number; page: number; pageSize: number
 }
 
 interface Props { slug: string; isOwner: boolean; canEdit: boolean }
 
 export function StoragePanel({ slug, isOwner, canEdit }: Props) {
   const [prefix, setPrefix] = useState('')
+  const [page, setPage] = useState(1)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
@@ -33,15 +35,26 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
   )
   const dragCounter = useRef(0)
   const qc = useQueryClient()
+
+  // Reset ke halaman 1 setiap kali prefix berubah
+  useEffect(() => { setPage(1) }, [prefix])
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ['storage', slug, prefix] })
 
   const { data, isLoading } = useQuery<StorageData>({
-    queryKey: ['storage', slug, prefix],
-    queryFn: () => apiFetch(`/api/envman/projects/${slug}/storage${prefix ? `?prefix=${encodeURIComponent(prefix)}` : ''}`),
+    queryKey: ['storage', slug, prefix, page],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (prefix) params.set('prefix', prefix)
+      params.set('page', String(page))
+      return apiFetch(`/api/envman/projects/${slug}/storage?${params}`)
+    },
     staleTime: 30_000,
   })
 
   const breadcrumbs = prefix ? prefix.split('/') : []
+
+  function navigatePrefix(p: string) { setPrefix(p); setPage(1) }
 
   async function handleDelete(path: string) {
     if (!confirm(`Hapus "${path}"?`)) return
@@ -69,14 +82,10 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
     dragCounter.current--
     if (dragCounter.current === 0) setIsDragOver(false)
   }
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
-  }
+  function handleDragOver(e: React.DragEvent) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
-    dragCounter.current = 0
-    setIsDragOver(false)
+    dragCounter.current = 0; setIsDragOver(false)
     if (!canEdit) return
     const files = Array.from(e.dataTransfer.files)
     if (files.length > 0) { setDroppedFile(files[0]); setUploadOpen(true) }
@@ -84,8 +93,7 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
 
   function toggleView() {
     const next = viewMode === 'list' ? 'grid' : 'list'
-    setViewMode(next)
-    localStorage.setItem('storage:viewMode', next)
+    setViewMode(next); localStorage.setItem('storage:viewMode', next)
   }
 
   function closeModal() { setUploadOpen(false); setDroppedFile(null) }
@@ -93,6 +101,9 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
   const usage = data?.usage
   const usedPct = usage ? Math.min(100, (usage.usedBytes / usage.quotaBytes) * 100) : 0
   const usedColor = usedPct > 90 ? 'red' : usedPct > 70 ? 'yellow' : 'blue'
+  const totalPages = data ? Math.max(1, Math.ceil(data.totalFiles / data.pageSize)) : 1
+  const isEmpty = !data?.folders.length && !data?.files.length
+  const allExistingPaths = data?.files.map((f) => f.path)
 
   return (
     <Stack gap="md">
@@ -126,17 +137,16 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
       )}
 
       <Breadcrumbs separator="/" fz="sm">
-        <Anchor size="sm" onClick={() => setPrefix('')} c={prefix ? 'blue' : 'dimmed'}>root</Anchor>
+        <Anchor size="sm" onClick={() => navigatePrefix('')} c={prefix ? 'blue' : 'dimmed'}>root</Anchor>
         {breadcrumbs.map((seg, i) => {
           const pathTo = breadcrumbs.slice(0, i + 1).join('/')
           return (
-            <Anchor key={pathTo} size="sm" onClick={() => setPrefix(pathTo)}
+            <Anchor key={pathTo} size="sm" onClick={() => navigatePrefix(pathTo)}
               c={i === breadcrumbs.length - 1 ? 'dimmed' : 'blue'}>{seg}</Anchor>
           )
         })}
       </Breadcrumbs>
 
-      {/* Drop zone wrapper */}
       <Box style={{ position: 'relative' }}
         onDragEnter={handleDragEnter} onDragLeave={handleDragLeave}
         onDragOver={handleDragOver} onDrop={handleDrop}>
@@ -154,12 +164,12 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
           <Stack gap="xs">{[1, 2, 3].map((i) => <Skeleton key={i} h={36} radius="md" />)}</Stack>
         ) : viewMode === 'grid' ? (
           <>
-            {(!data?.folders.length && !data?.files.length) ? (
+            {isEmpty ? (
               <Text size="sm" c="dimmed" ta="center" py="xl">Storage kosong. Upload file pertama.</Text>
             ) : (
               <StorageFileGrid slug={slug} isOwner={isOwner} canEdit={canEdit}
                 folders={data?.folders ?? []} files={data?.files ?? []} prefix={prefix}
-                onFolderClick={setPrefix} onTogglePublic={togglePublic} onDelete={handleDelete} onRename={invalidate} />
+                onFolderClick={navigatePrefix} onTogglePublic={togglePublic} onDelete={handleDelete} onRename={invalidate} />
             )}
           </>
         ) : (
@@ -169,7 +179,7 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
               return (
                 <Group key={folderPath} px="sm" py={6}
                   style={{ borderRadius: 6, cursor: 'pointer', border: '1px solid var(--mantine-color-default-border)' }}
-                  onClick={() => setPrefix(folderPath)}>
+                  onClick={() => navigatePrefix(folderPath)}>
                   <TbFolder size={15} color="var(--mantine-color-yellow-5)" />
                   <Text size="sm" style={{ flex: 1 }}>{folder}/</Text>
                 </Group>
@@ -181,16 +191,34 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
                 onDelete={() => handleDelete(f.path)}
                 onRename={invalidate} />
             ))}
-            {!data?.folders.length && !data?.files.length && (
+            {isEmpty && (
               <Text size="sm" c="dimmed" ta="center" py="xl">Storage kosong. Upload file pertama.</Text>
             )}
           </Stack>
         )}
       </Box>
 
+      {/* Pagination — hanya tampil jika ada >1 halaman */}
+      {totalPages > 1 && (
+        <Group justify="space-between" align="center">
+          <Text size="xs" c="dimmed">
+            {(page - 1) * (data?.pageSize ?? 50) + 1}–{Math.min(page * (data?.pageSize ?? 50), data?.totalFiles ?? 0)} dari {data?.totalFiles} file
+          </Text>
+          <Group gap={4}>
+            <Button size="xs" variant="subtle" px={6} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              <TbChevronLeft size={14} />
+            </Button>
+            <Text size="xs" c="dimmed">{page} / {totalPages}</Text>
+            <Button size="xs" variant="subtle" px={6} disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+              <TbChevronRight size={14} />
+            </Button>
+          </Group>
+        </Group>
+      )}
+
       <Modal opened={uploadOpen} onClose={closeModal} title="Upload File" size="md">
         <StorageUploadModal slug={slug} prefix={prefix} defaultFile={droppedFile ?? undefined}
-          existingPaths={data?.files.map((f) => f.path)}
+          existingPaths={allExistingPaths}
           onSuccess={invalidate} onClose={closeModal} />
       </Modal>
     </Stack>

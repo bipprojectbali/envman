@@ -8,7 +8,7 @@ import { getUsedBytes, getQuotaBytes, minioDelete, minioPresign } from '../../li
 
 export const storageCoreRouter = new Elysia()
 
-  // ─── List (dengan prefix untuk tree navigation) ──────────────────────────
+  // ─── List (dengan prefix untuk tree navigation + pagination) ──────────────
   .get('/api/envman/projects/:slug/storage', async ({ request, params, query, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
@@ -22,28 +22,34 @@ export const storageCoreRouter = new Elysia()
     if (!project) { set.status = 404; return { error: 'Project tidak ditemukan' } }
 
     const prefix = ((query.prefix as string | undefined) ?? '').replace(/^\/+/, '')
-    const objects = await prisma.projectStorageObject.findMany({
-      where: {
-        projectId: project.id,
-        path: prefix ? { startsWith: prefix + '/' } : undefined,
-      },
+    const page = Math.max(1, parseInt((query.page as string | undefined) ?? '1') || 1)
+    const PAGE_SIZE = 50
+
+    // Query 1: hanya path — ringan, untuk deteksi folder + enumerate file di level ini
+    const allPaths = await prisma.projectStorageObject.findMany({
+      where: { projectId: project.id, path: prefix ? { startsWith: prefix + '/' } : undefined },
       orderBy: { path: 'asc' },
-      select: { id: true, path: true, size: true, mimeType: true, isPublic: true, tags: true, description: true, createdAt: true, updatedAt: true },
+      select: { path: true },
     })
 
-    // Build virtual tree: folder entries + file entries untuk level saat ini
-    const depth = prefix ? prefix.split('/').length : 0
     const folders = new Set<string>()
-    const files: typeof objects = []
-    for (const obj of objects) {
-      const relative = prefix ? obj.path.slice(prefix.length + 1) : obj.path
+    const filePathsAtLevel: string[] = []
+    for (const { path } of allPaths) {
+      const relative = prefix ? path.slice(prefix.length + 1) : path
       const parts = relative.split('/')
-      if (parts.length > 1) {
-        folders.add(parts[0])
-      } else {
-        files.push(obj)
-      }
+      if (parts.length > 1) folders.add(parts[0])
+      else filePathsAtLevel.push(path)
     }
+
+    // Query 2: data lengkap hanya untuk file di halaman ini
+    const paginatedPaths = filePathsAtLevel.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    const files = paginatedPaths.length > 0
+      ? await prisma.projectStorageObject.findMany({
+          where: { projectId: project.id, path: { in: paginatedPaths } },
+          orderBy: { path: 'asc' },
+          select: { id: true, path: true, size: true, mimeType: true, isPublic: true, tags: true, description: true, createdAt: true, updatedAt: true },
+        })
+      : []
 
     const [usedBytes, quotaBytes] = await Promise.all([
       getUsedBytes(project.id),
@@ -51,7 +57,8 @@ export const storageCoreRouter = new Elysia()
     ])
 
     return {
-      prefix,
+      prefix, page, pageSize: PAGE_SIZE,
+      totalFiles: filePathsAtLevel.length,
       folders: [...folders].sort(),
       files,
       usage: { usedBytes, quotaBytes },
