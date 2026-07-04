@@ -75,7 +75,7 @@ bun run test:integration  # integration tests saja
 | Routing | TanStack Router |
 | State | TanStack Query |
 | Auth | Session-based (HttpOnly cookie) + Better Auth |
-| CLI | Bun compile (standalone binary) |
+| CLI | Go (standalone binary, ~8 MB) |
 
 ---
 
