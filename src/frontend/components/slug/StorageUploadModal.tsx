@@ -42,7 +42,8 @@ export function StorageUploadModal({ slug, prefix, defaultFile, existingPaths, o
 
   function handleFileChange(f: File | null) {
     setFile(f)
-    if (f && !path.trim()) {
+    // Auto-fill filename jika path kosong atau hanya berisi prefix (berakhiran '/')
+    if (f && (!path.trim() || path.trim().endsWith('/'))) {
       const base = prefix ? `${prefix}/${f.name}` : f.name
       setPath(suggestNonConflictPath(base, existingPaths ?? []))
     }
