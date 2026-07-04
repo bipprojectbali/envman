@@ -76,7 +76,7 @@ func main() {
 			os.Exit(1)
 		}
 	default:
-		// Run mode with -- separator
+		// Run mode with -- separator (handles: -e flag, --server-wins, or bare --)
 		sepIdx := -1
 		for i, a := range args {
 			if a == "--" {
@@ -85,8 +85,14 @@ func main() {
 			}
 		}
 		if sepIdx == -1 {
-			fmt.Fprintln(os.Stderr, "Unknown command:", args[0])
-			fmt.Fprintln(os.Stderr, "Run 'envman --help' for usage.")
+			// If args look like flags (-e, --server-wins) without --, give targeted error
+			if strings.HasPrefix(args[0], "-") {
+				fmt.Fprintln(os.Stderr, "Missing -- separator.")
+				fmt.Fprintln(os.Stderr, "Usage: envman -e <project:env|file> -- <command>")
+			} else {
+				fmt.Fprintln(os.Stderr, "Unknown command:", args[0])
+				fmt.Fprintln(os.Stderr, "Run 'envman --help' for usage.")
+			}
 			os.Exit(1)
 		}
 		flagArgs := args[:sepIdx]
