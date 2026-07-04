@@ -7,6 +7,7 @@
 ### Fixed
 - **CLI Go — `envman run` unmarshal error**: endpoint `vars/export` mengembalikan `vars` sebagai JSON object `{"KEY":"VALUE"}`, bukan array. Go struct salah memakai `[]struct{key,value}` — diubah ke `map[string]string`. Perintah `envman run` dan `envman -e proj:env -- cmd` kini berjalan normal.
 - **CLI Go — update notice arah terbalik (`v0.18.2 → v0.18.0`)**: `ShowUpdateNotice` sebelumnya menampilkan notice jika versi cache berbeda dari binary, termasuk jika cache lebih tua. Ditambah perbandingan semver — notice hanya muncul jika `latest > current`. Race condition tambahan: cache write di `Update()` kini memakai `CheckedAt = now + 15 menit` sehingga background check yang berjalan bersamaan tidak bisa menimpa dengan data lama.
+- **CLI Go — env name dengan titik salah dideteksi sebagai file ref**: `isProjectFileRef` sebelumnya menandai *semua* string yang mengandung `.` sebagai file reference — env name seperti `staging.v2` atau `env.local` akan salah dirouting ke file fetch lalu gagal. Diganti dengan whitelist ekstensi yang dikenal (`sh`, `ts`, `py`, `yaml`, dll.) — hanya string dengan ekstensi valid yang dianggap file ref.
 
 ## [0.18.1] - 2026-07-04
 

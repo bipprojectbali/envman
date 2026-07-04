@@ -19,11 +19,46 @@ import (
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
-// isProjectFileRef returns true if the token after ":" refers to a file.
-// Rules: has "/" OR has a "." extension → file reference; else → env name.
-func isProjectFileRef(colonPart string) bool {
-	return strings.Contains(colonPart, "/") || strings.Contains(colonPart, ".")
+// knownFileExts is the set of extensions that qualify as a project file reference.
+// Any dot-suffixed string NOT in this set is treated as an env name (e.g., "staging.v2", "env.local").
+var knownFileExts = map[string]bool{
+	// Shell
+	"sh": true, "bash": true, "zsh": true, "fish": true,
+	"ps1": true, "bat": true, "cmd": true,
+	// JavaScript / TypeScript
+	"js": true, "mjs": true, "cjs": true, "jsx": true,
+	"ts": true, "tsx": true, "mts": true, "cts": true,
+	// Python
+	"py": true, "pyw": true,
+	// Other scripting
+	"rb": true, "pl": true, "php": true, "lua": true,
+	// Compiled (used as scripts)
+	"go": true, "rs": true,
+	// Data & config
+	"sql": true,
+	"json": true, "yaml": true, "yml": true, "toml": true,
+	"ini": true, "conf": true, "cfg": true,
+	// Text
+	"md": true, "txt": true,
 }
+
+// isProjectFileRef returns true if the token after ":" refers to a file, not an env name.
+// "/" always means a path. For ".", only known scripting/config extensions count —
+// this prevents false positives on env names like "staging.v2" or "env.local".
+func isProjectFileRef(colonPart string) bool {
+	if strings.Contains(colonPart, "/") {
+		return true
+	}
+	dot := strings.LastIndexByte(colonPart, '.')
+	if dot < 0 || dot == len(colonPart)-1 {
+		return false
+	}
+	ext := strings.ToLower(colonPart[dot+1:])
+	return knownFileExts[ext]
+}
+
+// IsProjectFileRef is the exported form, used by the main package's hasFileRef.
+func IsProjectFileRef(colonPart string) bool { return isProjectFileRef(colonPart) }
 
 // parseSource splits a source string into (project, env, localFile).
 // "project:env" → project+env

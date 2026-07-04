@@ -142,20 +142,38 @@ func TestIsProjectFileRef(t *testing.T) {
 	cases := []struct {
 		input string
 		want  bool
+		desc  string
 	}{
-		{"production", false},
-		{"staging", false},
-		{"dev", false},
-		{"scripts/deploy.sh", true},
-		{"script.sh", true},
-		{"utils/seed.ts", true},
-		{"deploy.sh", true},
-		{"a/b", true},
+		// Env names → NOT file refs
+		{"production", false, "plain env name"},
+		{"staging", false, "plain env name"},
+		{"dev", false, "plain env name"},
+		// Env names with dots → must NOT be file refs (was the bug)
+		{"staging.v2", false, "version suffix must not trigger file ref"},
+		{"env.local", false, "'local' is not a known extension"},
+		{"prod.eu", false, "'eu' is not a known extension"},
+		{"v2", false, "no dot"},
+		// File refs with "/"
+		{"scripts/deploy.sh", true, "path with slash"},
+		{"utils/seed.ts", true, "nested path"},
+		{"a/b", true, "any slash"},
+		// File refs with known extension (no slash)
+		{"deploy.sh", true, "known ext: sh"},
+		{"script.sh", true, "known ext: sh"},
+		{"seed.ts", true, "known ext: ts"},
+		{"seed.py", true, "known ext: py"},
+		{"config.yaml", true, "known ext: yaml"},
+		{"config.yml", true, "known ext: yml"},
+		{"config.toml", true, "known ext: toml"},
+		{"data.sql", true, "known ext: sql"},
+		{"notes.md", true, "known ext: md"},
+		{"app.js", true, "known ext: js"},
+		{"app.go", true, "known ext: go"},
 	}
 	for _, c := range cases {
 		got := isProjectFileRef(c.input)
 		if got != c.want {
-			t.Errorf("isProjectFileRef(%q) = %v, want %v", c.input, got, c.want)
+			t.Errorf("isProjectFileRef(%q) [%s] = %v, want %v", c.input, c.desc, got, c.want)
 		}
 	}
 }
@@ -163,24 +181,32 @@ func TestIsProjectFileRef(t *testing.T) {
 // TestParseSource verifies source string parsing.
 func TestParseSource(t *testing.T) {
 	cases := []struct {
-		input              string
-		wantProject        string
-		wantEnv            string
-		wantLocalFile      string
+		input         string
+		wantProject   string
+		wantEnv       string
+		wantLocalFile string
+		desc          string
 	}{
-		{"project:production", "project", "production", ""},
-		{"project:staging", "project", "staging", ""},
-		{".env", "", "", ".env"},
-		{"/home/user/.env.local", "", "", "/home/user/.env.local"},
-		{"./local.env", "", "", "./local.env"},
-		{"project:scripts/deploy.sh", "", "", "project:scripts/deploy.sh"},
-		{"project:seed.ts", "", "", "project:seed.ts"},
+		{"project:production", "project", "production", "", "simple env"},
+		{"project:staging", "project", "staging", "", "simple env"},
+		// Env names with dots must still be treated as project:env, not file refs
+		{"project:staging.v2", "project", "staging.v2", "", "env with version suffix"},
+		{"project:env.local", "project", "env.local", "", "env with non-extension dot"},
+		// Local files (no colon)
+		{".env", "", "", ".env", "dotenv file"},
+		{"/home/user/.env.local", "", "", "/home/user/.env.local", "absolute path"},
+		{"./local.env", "", "", "./local.env", "relative path"},
+		// File refs with slash → local file path
+		{"project:scripts/deploy.sh", "", "", "project:scripts/deploy.sh", "file ref with slash"},
+		// File refs with known extension → local file path
+		{"project:seed.ts", "", "", "project:seed.ts", "file ref ts"},
+		{"project:deploy.sh", "", "", "project:deploy.sh", "file ref sh"},
 	}
 	for _, c := range cases {
 		p, e, f := parseSource(c.input)
 		if p != c.wantProject || e != c.wantEnv || f != c.wantLocalFile {
-			t.Errorf("parseSource(%q) = (%q,%q,%q), want (%q,%q,%q)",
-				c.input, p, e, f, c.wantProject, c.wantEnv, c.wantLocalFile)
+			t.Errorf("parseSource(%q) [%s] = (%q,%q,%q), want (%q,%q,%q)",
+				c.input, c.desc, p, e, f, c.wantProject, c.wantEnv, c.wantLocalFile)
 		}
 	}
 }

@@ -269,8 +269,8 @@ Extra -e flags you pass here are merged in (alias sources take precedence).`,
 }
 
 // hasFileRef returns true if any arg looks like a project file reference (slug:path/or.ext).
-// Excludes URL schemes (http://, https://, ftp://, etc.) to avoid false positives
-// when the command contains URLs.
+// Delegates to run.IsProjectFileRef for consistent logic with the run package.
+// Excludes URL schemes (http://, https://, ftp://, etc.) to avoid false positives.
 func hasFileRef(args []string) bool {
 	for _, arg := range args {
 		colon := strings.IndexByte(arg, ':')
@@ -282,7 +282,7 @@ func hasFileRef(args []string) bool {
 		if strings.HasPrefix(rest, "//") {
 			continue
 		}
-		if strings.Contains(rest, "/") || strings.Contains(rest, ".") {
+		if run.IsProjectFileRef(rest) {
 			return true
 		}
 	}
