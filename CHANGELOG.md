@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-07-04
+
+### Added
+- **Project Storage (MinIO)**: setiap project kini punya ruang penyimpanan file berbasis MinIO. Upload file via tombol, drag-drop ke panel, atau paste dari clipboard. Navigasi hierarki folder via breadcrumb. Kuota per-project (default 500 MB) dengan indikator penggunaan.
+- **Multi-select file**: pilih banyak file sekaligus dengan checkbox (muncul saat hover atau saat mode seleksi aktif). Action bar muncul otomatis — mendukung "Pindah" dan "Hapus" batch. Seleksi reset saat pindah folder.
+- **Batch move**: pindah satu atau banyak file ke folder manapun sekaligus. Modal pindah menampilkan chip folder yang sudah ada (BFS discovery satu level) untuk quick-pick, plus input manual untuk folder baru atau nested.
+- **Drag-to-download**: seret file dari panel storage langsung ke desktop atau folder OS (Chrome/Edge). Presigned URL di-prefetch saat hover untuk mengurangi latensi.
+- **Tampilan grid dan list**: toggle tampilan list ↔ grid (ikon SimpleGrid 2-4 kolom) — preferensi disimpan di localStorage.
+- **Preview file in-drawer**: klik file membuka drawer dengan pratinjau — gambar (img tag), teks/kode (Monaco editor dengan syntax highlight), dokumen lain dengan info metadata. Monaco di-lazy-load (~1 MB, Suspense).
+- **Rename file**: setiap file bisa di-rename langsung dari panel (list dan grid), path di MinIO dan DB diupdate atomik.
+- **Ikon tipe file**: setiap file mendapat ikon sesuai tipe MIME (gambar, PDF, teks, kode, arsip, video, audio, dll.) — representasi visual tanpa thumbnail.
+- **Thumbnail private**: file gambar private mendapat presigned URL otomatis saat card dimuat (TTL 5 menit, di-cache per file) untuk ditampilkan sebagai thumbnail di grid view.
+- **Auto-copy suffix**: upload file dengan nama yang sudah ada di folder yang sama secara otomatis mendapat suffix `_2`, `_3`, dst. untuk menghindari konflik.
+- **Paginasi server-side**: list file dipaginasi 50 per halaman — navigasi halaman di bawah panel. Seleksi reset saat ganti halaman.
+- **Paste dari clipboard**: buka modal upload lalu Ctrl+V / ⌘V untuk langsung paste gambar atau file dari clipboard.
+- **Upload progress bar**: progress upload realtime dengan persentase, bytes, kecepatan transfer (MB/s), dan estimasi waktu selesai. Tombol "Batalkan Upload" saat upload berlangsung.
+
+### Fixed
+- **Drag-drop upload gagal di dalam subfolder**: bug `dragCounter` bertabrakan dengan atribut `draggable` di file card, menyebabkan `dragLeave` terpicu palsu dan overlay hilang. Diganti dengan pengecekan `e.relatedTarget` yang lebih andal.
+- **Filename tidak ditambahkan ke path upload di subfolder**: kondisi auto-fill filename hanya memeriksa `!path.trim()`, sehingga path `"satu/"` (prefix + slash) tidak memicu auto-fill — file tersimpan di root. Kini juga memicu bila path berakhiran `/`.
+
 ## [0.15.0] - 2026-07-02
 
 ### Added
