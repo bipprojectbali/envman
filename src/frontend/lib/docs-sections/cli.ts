@@ -93,7 +93,7 @@ envman -- python3 myapp:jobs/ingest.py
 envman -e myapp:production -- bash myapp:scripts/deploy.sh
 \`\`\`
 
-**Disambiguasi path**: setelah colon, ada \`/\` **atau** ada extension → file reference. Sisanya → nama environment.
+**Disambiguasi path**: setelah colon, ada \`/\` **atau** ada ekstensi file yang dikenal (\`sh\`, \`ts\`, \`js\`, \`py\`, \`go\`, \`yaml\`, \`sql\`, \`md\`, dll.) → file reference. Sisanya → nama environment (termasuk nama seperti \`staging.v2\` atau \`env.local\`).
 
 **Interpreter stdin (zero disk write):** \`bash\`, \`sh\`, \`zsh\`, \`bun\`, \`node\`, \`python3\`, \`python\`, \`deno\`. Interpreter lain → temp file 0600.
 
