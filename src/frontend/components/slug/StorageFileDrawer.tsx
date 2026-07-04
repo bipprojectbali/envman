@@ -1,8 +1,9 @@
-import { Code, Drawer, Group, Image, Loader, ScrollArea, Stack, Text, ThemeIcon } from '@mantine/core'
+import { Drawer, Group, Image, Loader, Stack, Text, ThemeIcon } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import { TbFile } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
-import { isTextFile } from '@/frontend/lib/storage-format'
+import { isTextFile, getFileIcon } from '@/frontend/lib/storage-format'
+import { CodeEditor } from '../CodeEditor'
 
 interface FileInfo { path: string; mimeType: string; isPublic: boolean }
 interface Props { file: FileInfo; slug: string; opened: boolean; onClose: () => void }
@@ -31,14 +32,19 @@ function PreviewContent({ url, mimeType, path }: { url: string; mimeType: string
   if (isText) {
     if (fetching) return <Loader size="sm" />
     return (
-      <ScrollArea h={480}>
-        <Code block fz="xs" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{text ?? ''}</Code>
-      </ScrollArea>
+      <CodeEditor
+        value={text ?? ''}
+        filename={path}
+        readOnly
+        height="calc(100vh - 140px)"
+        minHeight={300}
+        noMinimap
+      />
     )
   }
   return (
     <Text c="dimmed" ta="center" py="xl" size="sm">
-      Format ini tidak bisa dipreview secara langsung.<br />Gunakan tombol download.
+      Format ini tidak bisa dipreview.<br />Gunakan tombol download.
     </Text>
   )
 }
@@ -57,13 +63,14 @@ export function StorageFileDrawer({ file, slug, opened, onClose }: Props) {
   }, [opened, slug, file.path])
 
   const name = file.path.split('/').pop()
+  const FileIcon = getFileIcon(file.mimeType, file.path)
 
   return (
     <Drawer
       opened={opened} onClose={onClose} position="right" size="lg"
       title={
         <Group gap="xs">
-          <ThemeIcon size="sm" variant="light" color="teal"><TbFile size={12} /></ThemeIcon>
+          <ThemeIcon size="sm" variant="light" color="teal"><FileIcon size={12} /></ThemeIcon>
           <Text size="sm" fw={500} style={{ wordBreak: 'break-all' }}>{name}</Text>
           {file.isPublic && <Text size="xs" c="green">(publik)</Text>}
         </Group>
