@@ -194,8 +194,11 @@ func whoamiCmd() *cobra.Command {
 func docsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "docs",
-		Short: "Print full API docs and CLI reference to stdout",
-		Long: `Fetch and print the complete API documentation and CLI reference.
+		Short: "Print CLI reference to stdout (install, auth, inject, storage, CI/CD, troubleshoot)",
+		Long: `Fetch and print the complete CLI reference.
+
+Covers: install, auth setup, inject vars, file execution,
+alias expansion, storage commands, CI/CD patterns, troubleshooting.
 
 Designed for piping into AI agents, files, or a pager:
 
@@ -208,7 +211,7 @@ Designed for piping into AI agents, files, or a pager:
 			if err != nil {
 				return err
 			}
-			req, err := http.NewRequest("GET", cfg.Server+"/api/docs.md", nil)
+			req, err := http.NewRequest("GET", cfg.Server+"/api/cli-docs.md", nil)
 			if err != nil {
 				return err
 			}

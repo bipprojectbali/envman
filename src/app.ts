@@ -4,6 +4,7 @@ import { Elysia } from 'elysia'
 import { appLog } from './lib/applog'
 import { auth } from './lib/auth'
 import { buildDocsMd } from './lib/docs-builder'
+import { buildCliDocsMd } from './lib/cli-docs-builder'
 import { conditional, notModifiedResponse, strongEtag } from './lib/http-cache'
 import { broadcastToAdmins } from './lib/presence'
 import { getPublicOrigin } from './lib/request'
@@ -81,6 +82,24 @@ export function createApp() {
       .get('/api/docs.md', ({ request }) => {
         const origin = getPublicOrigin(request)
         const md = buildDocsMd(origin)
+        const { notModified, headers } = conditional(request, {
+          etag: strongEtag(md),
+          cacheControl: 'public, max-age=300',
+        })
+        if (notModified) return notModifiedResponse(headers)
+        return new Response(md, {
+          headers: {
+            ...headers,
+            'Content-Type': 'text/markdown; charset=utf-8',
+            'X-Content-Type-Options': 'nosniff',
+          },
+        })
+      })
+
+      // CLI-focused docs — fetched by `envman docs`
+      .get('/api/cli-docs.md', ({ request }) => {
+        const origin = getPublicOrigin(request)
+        const md = buildCliDocsMd(origin)
         const { notModified, headers } = conditional(request, {
           etag: strongEtag(md),
           cacheControl: 'public, max-age=300',

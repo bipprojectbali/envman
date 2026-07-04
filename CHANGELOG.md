@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-07-04
+
+### Changed
+- **`envman docs` — fokus ke CLI**: output sekarang hanya mencakup referensi CLI (install, auth, inject vars, file execution, alias, storage, CI/CD, troubleshooting) dengan banyak contoh nyata per kasus. Referensi API server tetap tersedia di `/api/docs.md`. Endpoint baru `/api/cli-docs.md` di-fetch oleh `envman docs`.
+
 ## [0.19.0] - 2026-07-04
 
 ### Added
