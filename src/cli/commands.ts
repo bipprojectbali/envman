@@ -3,6 +3,30 @@ import { apiFetch } from './api'
 import { resolveAuth } from './auth-resolver'
 import { CONFIG_DIR, CONFIG_FILE, VERSION } from './constants'
 
+export async function cmdDocs(args: string[]) {
+  if (args[0] === '--help' || args[0] === '-h') {
+    console.log(
+      'Usage: envman docs\n' +
+      '\n' +
+      'Print the full API docs and CLI reference to stdout.\n' +
+      'Pipe to a file or clipboard for use as AI agent context:\n' +
+      '\n' +
+      '  envman docs > context.md\n' +
+      '  envman docs | pbcopy\n',
+    )
+    return
+  }
+  const cfg = resolveAuth({})
+  const res = await fetch(`${cfg.server}/api/docs.md`, {
+    headers: { Authorization: `Bearer ${cfg.token}` },
+  })
+  if (!res.ok) {
+    console.error(`[envman] Failed to fetch docs (HTTP ${res.status})`)
+    process.exit(1)
+  }
+  process.stdout.write(await res.text())
+}
+
 export async function cmdLogin(args: string[]) {
   const server = args[0]
   const tokenIdx = args.indexOf('--token')
@@ -52,12 +76,13 @@ USAGE:
   envman logout                                Remove saved credentials
   envman whoami                                Show current authenticated user
   envman update                                Update CLI to latest version
+  envman docs                                  Print full API docs + CLI reference to stdout
   envman run [-e <source>]... <project>:<alias> [args...]  Expand alias + passthrough args
   envman [options] -- <command>                Inject env vars and run command
   envman -- <interpreter> <project>:<path/file.ext>  Execute project file (no -e needed)
   envman pm daemon <start|stop|status>         Manage the pm daemon (supervisor)
   envman pm <start|stop|ls|restart|...>        Manage long-running processes
-  envman mcp [--write] [--debug]               Start MCP server for AI agents (Claude Code)
+  envman mcp [--write] [--debug]               [DEPRECATED] Start MCP server
 
 OPTIONS:
   -e <project>:<env>   Fetch vars from server environment (project:env)
