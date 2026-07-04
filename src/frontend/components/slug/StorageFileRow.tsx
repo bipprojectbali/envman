@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Group, Modal, Stack, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Badge, Box, Checkbox, Group, Modal, Stack, Text, Tooltip } from '@mantine/core'
 import { useState } from 'react'
 import { TbCheck, TbCopy, TbDownload, TbEye, TbEyeOff, TbFileSearch, TbPencil, TbShare2, TbTrash } from 'react-icons/tb'
 import { useStorageFileActions } from '@/frontend/hooks/useStorageFileActions'
@@ -12,13 +12,16 @@ interface StorageObject {
 }
 interface Props {
   file: StorageObject; slug: string; isOwner: boolean; canEdit: boolean
+  selected?: boolean; selectionMode?: boolean; onSelect?: (path: string) => void
   onTogglePublic: () => void; onDelete: () => void; onRename: () => void
 }
 
-export function StorageFileRow({ file, slug, isOwner, canEdit, onTogglePublic, onDelete, onRename }: Props) {
+export function StorageFileRow({ file, slug, isOwner, canEdit, selected, selectionMode, onSelect, onTogglePublic, onDelete, onRename }: Props) {
   const { copied, previewOpen, setPreviewOpen, handleShare, handleCopyContent, handleDownload,
     handleDragStart, prefetchPresigned, canPreview, canCopy } = useStorageFileActions(file, slug)
   const [renameOpen, setRenameOpen] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const showCheckbox = !!selected || !!selectionMode || hovered
 
   const name = file.path.split('/').pop()
   const ext = name?.includes('.') ? name.split('.').pop()?.toUpperCase() : null
@@ -26,9 +29,25 @@ export function StorageFileRow({ file, slug, isOwner, canEdit, onTogglePublic, o
 
   return (
     <>
-      <Group px="sm" py={6} draggable onDragStart={handleDragStart} onMouseEnter={prefetchPresigned}
-        style={{ borderRadius: 6, border: '1px solid var(--mantine-color-default-border)', cursor: 'grab' }}
+      <Group px="sm" py={6}
+        draggable={!selected} onDragStart={selected ? undefined : handleDragStart}
+        onMouseEnter={() => { setHovered(true); prefetchPresigned() }}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          borderRadius: 6,
+          border: selected
+            ? '1px solid var(--mantine-color-blue-5)'
+            : '1px solid var(--mantine-color-default-border)',
+          background: selected ? 'var(--mantine-color-blue-light)' : undefined,
+          cursor: selected ? 'default' : 'grab',
+        }}
         wrap="nowrap">
+        {onSelect && (
+          <Box style={{ width: 20, flexShrink: 0, opacity: showCheckbox ? 1 : 0, transition: 'opacity 0.12s' }}>
+            <Checkbox size="xs" checked={!!selected} onChange={() => onSelect(file.path)}
+              onClick={(e) => e.stopPropagation()} />
+          </Box>
+        )}
         <FileIcon size={15} style={{ flexShrink: 0 }} />
         <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
           <Text size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</Text>

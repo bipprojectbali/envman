@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Card, Group, Image, Modal, SimpleGrid, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core'
+import { ActionIcon, Badge, Box, Card, Checkbox, Group, Image, Modal, SimpleGrid, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import { TbCheck, TbCopy, TbDownload, TbEye, TbEyeOff, TbFileSearch, TbFolder, TbPencil, TbShare2, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
@@ -13,21 +13,25 @@ interface StorageObject {
 }
 interface FileCardProps {
   file: StorageObject; slug: string; isOwner: boolean; canEdit: boolean
+  selected?: boolean; selectionMode?: boolean; onSelect?: (path: string) => void
   onTogglePublic: () => void; onDelete: () => void; onRename: () => void
 }
 interface FolderCardProps { name: string; onClick: () => void }
 interface GridProps {
   slug: string; isOwner: boolean; canEdit: boolean; folders: string[]; files: StorageObject[]; prefix: string
+  selected?: Set<string>; selectionMode?: boolean; onSelect?: (path: string) => void
   onFolderClick: (path: string) => void
   onTogglePublic: (path: string, isPublic: boolean) => void
   onDelete: (path: string) => void
   onRename: () => void
 }
 
-function FileCard({ file, slug, isOwner, canEdit, onTogglePublic, onDelete, onRename }: FileCardProps) {
+function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSelect, onTogglePublic, onDelete, onRename }: FileCardProps) {
   const { copied, previewOpen, setPreviewOpen, handleShare, handleCopyContent, handleDownload,
     handleDragStart, prefetchPresigned, setPresignedCache, canPreview, canCopy } = useStorageFileActions(file, slug)
   const [renameOpen, setRenameOpen] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const showCheckbox = !!selected || !!selectionMode || hovered
 
   const name = file.path.split('/').pop() ?? file.path
   const ext = name.includes('.') ? name.split('.').pop()?.toUpperCase() : null
@@ -52,9 +56,24 @@ function FileCard({ file, slug, isOwner, canEdit, onTogglePublic, onDelete, onRe
 
   return (
     <>
-      <Card withBorder padding="sm" radius="md" draggable onDragStart={handleDragStart} onMouseEnter={prefetchPresigned}
-        style={{ cursor: 'grab' }}>
-        <Card.Section onClick={canPreview ? () => setPreviewOpen(true) : undefined}
+      <Card withBorder padding="sm" radius="md"
+        draggable={!selected} onDragStart={selected ? undefined : handleDragStart}
+        onMouseEnter={() => { setHovered(true); if (!selected) prefetchPresigned() }}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          cursor: selected ? 'default' : 'grab',
+          position: 'relative',
+          outline: selected ? '2px solid var(--mantine-color-blue-5)' : undefined,
+          outlineOffset: -2,
+        }}>
+        {onSelect && (
+          <Box style={{ position: 'absolute', top: 6, left: 6, zIndex: 10,
+            opacity: showCheckbox ? 1 : 0, transition: 'opacity 0.12s' }}>
+            <Checkbox size="xs" checked={!!selected} onChange={() => onSelect(file.path)}
+              onClick={(e) => e.stopPropagation()} />
+          </Box>
+        )}
+        <Card.Section onClick={!selectionMode && canPreview ? () => setPreviewOpen(true) : undefined}
           style={{ cursor: canPreview ? 'pointer' : undefined, display: 'flex', alignItems: 'center',
             justifyContent: 'center', height: 90,
             background: 'var(--mantine-color-default-hover)', overflow: 'hidden' }}>
@@ -142,7 +161,7 @@ function FolderCard({ name, onClick }: FolderCardProps) {
   )
 }
 
-export function StorageFileGrid({ slug, isOwner, canEdit, folders, files, prefix, onFolderClick, onTogglePublic, onDelete, onRename }: GridProps) {
+export function StorageFileGrid({ slug, isOwner, canEdit, folders, files, prefix, selected, selectionMode, onSelect, onFolderClick, onTogglePublic, onDelete, onRename }: GridProps) {
   return (
     <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
       {folders.map((folder) => {
@@ -151,6 +170,7 @@ export function StorageFileGrid({ slug, isOwner, canEdit, folders, files, prefix
       })}
       {files.map((f) => (
         <FileCard key={f.id} file={f} slug={slug} isOwner={isOwner} canEdit={canEdit}
+          selected={selected?.has(f.path)} selectionMode={selectionMode} onSelect={onSelect}
           onTogglePublic={() => onTogglePublic(f.path, f.isPublic)}
           onDelete={() => onDelete(f.path)}
           onRename={onRename} />

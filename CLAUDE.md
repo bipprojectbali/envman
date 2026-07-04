@@ -334,10 +334,13 @@ Tanpa keempat var di atas, semua storage endpoint (yang butuh MinIO) return 503.
 - `src/routes/envman/storage-core.ts` — list, download, meta PATCH, delete
 - `src/routes/envman/storage-upload.ts` — upload handler
 - `src/routes/public-storage.ts` — public redirect endpoint
-- `src/frontend/components/slug/StoragePanel.tsx` — breadcrumb tree UI; drag-drop upload (drop file → buka modal); list/grid view toggle (persist `localStorage storage:viewMode`)
+- `src/routes/envman/storage-rename.ts` — rename handler (EDITOR+)
+- `src/routes/envman/storage-move.ts` — batch move handler (EDITOR+); body `{paths[], targetFolder}` → `{ok, moved, errors}`
+- `src/frontend/components/slug/StoragePanel.tsx` — breadcrumb tree UI; drag-drop upload; list/grid toggle; **multi-select** dengan action bar (Pindah / Hapus); selection reset saat prefix berubah
 - `src/frontend/components/slug/StorageUploadModal.tsx` — upload modal; clipboard paste; file preview; `defaultFile` prop untuk pre-fill dari drag-drop
-- `src/frontend/components/slug/StorageFileRow.tsx` — baris list view; draggable → drag-to-download (Chrome/Edge, `DownloadURL` dataTransfer); prefetch presigned on mouseenter
-- `src/frontend/components/slug/StorageFileCard.tsx` — grid card view; thumbnail public image; `StorageFileGrid` component untuk SimpleGrid layout
+- `src/frontend/components/slug/StorageFileRow.tsx` — baris list view; checkbox (visible on hover/selection); draggable → drag-to-download (Chrome/Edge); props: `selected`, `selectionMode`, `onSelect`
+- `src/frontend/components/slug/StorageFileCard.tsx` — grid card view; checkbox overlay (top-left); outline saat selected; thumbnail public image; `StorageFileGrid` component; props: `selected`, `selectionMode`, `onSelect`
+- `src/frontend/components/slug/StorageMoveModal.tsx` — modal pindah file batch; text input target folder; error partial (sebagian berhasil)
 - `src/frontend/hooks/useStorageFileActions.ts` — shared hook: share, copy content, download, drag-to-download, presigned cache (4 mnt)
 
 ---
@@ -432,7 +435,7 @@ Endpoint yang di-cover:
 
 **Tidak di-cover (sengaja):** endpoint vars (jangan cache env vars), session, list endpoint, dan binary download `/download/cli/:platform` (sudah version-gated via `/download/cli/version`).
 
-**Storage (Project Storage):** `GET /api/envman/projects/:slug/storage` (VIEWER+; `?prefix=` untuk tree navigation) · `POST .../storage/upload` (EDITOR+; multipart/form-data: `file`, `path`, `description?`, `tags?`) · `GET .../storage/download?path=` (VIEWER+; kembalikan presigned URL MinIO) · `PATCH .../storage/meta` (EDITOR+; body `{path, description?, tags?, isPublic?}`; `isPublic` hanya OWNER) · `DELETE .../storage?path=` (OWNER). **Public (no auth):** `GET /api/public/storage/:slug/:path` (redirect 302 ke presigned URL; 404 jika private/tidak ada). Lihat section [Project Storage](#project-storage).
+**Storage (Project Storage):** `GET /api/envman/projects/:slug/storage` (VIEWER+; `?prefix=` untuk tree navigation) · `POST .../storage/upload` (EDITOR+; multipart/form-data: `file`, `path`, `description?`, `tags?`) · `GET .../storage/download?path=` (VIEWER+; kembalikan presigned URL MinIO) · `PATCH .../storage/meta` (EDITOR+; body `{path, description?, tags?, isPublic?}`; `isPublic` hanya OWNER) · `PATCH .../storage/rename` (EDITOR+; body `{oldPath, newName}`) · `PATCH .../storage/move` (EDITOR+; batch: body `{paths[], targetFolder}` → `{ok, moved, errors[]}`) · `DELETE .../storage?path=` (OWNER). **Public (no auth):** `GET /api/public/storage/:slug/:path` (redirect 302 ke presigned URL; 404 jika private/tidak ada). Lihat section [Project Storage](#project-storage).
 
 **Settings:** `GET /api/envman/settings` (public, semua setting sebagai key-value map) · `PUT /api/envman/settings` (SUPER_ADMIN, body: `[{key, value}]`) — key yang valid: `user_token_creation` (boolean string), `user_token_max_days` (number string), `storage_max_file_mb` (number string, default 50), `storage_default_quota_mb` (number string, default 500)
 

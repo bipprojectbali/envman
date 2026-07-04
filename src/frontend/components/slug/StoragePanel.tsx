@@ -4,11 +4,12 @@ import {
 } from '@mantine/core'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbLayoutGrid, TbList } from 'react-icons/tb'
+import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbFolderSymlink, TbLayoutGrid, TbList, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { fmtBytes } from '@/frontend/lib/storage-format'
 import { StorageFileGrid } from './StorageFileCard'
 import { StorageFileRow } from './StorageFileRow'
+import { StorageMoveModal } from './StorageMoveModal'
 import { StorageUploadModal } from './StorageUploadModal'
 
 interface StorageObject {
@@ -28,18 +29,45 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
   const [prefix, setPrefix] = useState('')
   const [page, setPage] = useState(1)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() =>
     (localStorage.getItem('storage:viewMode') as 'list' | 'grid') ?? 'list'
   )
   const dragCounter = useRef(0)
   const qc = useQueryClient()
 
-  // Reset ke halaman 1 setiap kali prefix berubah
-  useEffect(() => { setPage(1) }, [prefix])
+  const selectionMode = selectedPaths.size > 0
+
+  // Reset ke halaman 1 dan hapus seleksi setiap kali prefix berubah
+  useEffect(() => { setPage(1); setSelectedPaths(new Set()) }, [prefix])
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['storage', slug, prefix] })
+
+  function toggleSelect(path: string) {
+    setSelectedPaths((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  function selectAll() { setSelectedPaths(new Set(data?.files.map((f) => f.path) ?? [])) }
+  function clearSelection() { setSelectedPaths(new Set()) }
+
+  async function handleBulkDelete() {
+    if (!confirm(`Hapus ${selectedPaths.size} file? Tindakan ini tidak bisa dibatalkan.`)) return
+    for (const path of Array.from(selectedPaths)) {
+      await fetch(`/api/envman/projects/${slug}/storage?path=${encodeURIComponent(path)}`, {
+        method: 'DELETE', credentials: 'include',
+      })
+    }
+    clearSelection()
+    invalidate()
+  }
 
   const { data, isLoading } = useQuery<StorageData>({
     queryKey: ['storage', slug, prefix, page],
@@ -147,6 +175,26 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
         })}
       </Breadcrumbs>
 
+      {/* Action bar seleksi */}
+      {selectionMode && (
+        <Group px="sm" py={8} style={{ borderRadius: 8, background: 'var(--mantine-color-blue-light)',
+          border: '1px solid var(--mantine-color-blue-3)' }}>
+          <Text size="sm" fw={500} c="blue">{selectedPaths.size} dipilih</Text>
+          <Button size="xs" variant="subtle" c="blue" onClick={selectAll}>Pilih semua</Button>
+          <Group gap={6} ml="auto">
+            {canEdit && (
+              <Button size="xs" variant="light" color="blue" leftSection={<TbFolderSymlink size={13} />}
+                onClick={() => setMoveOpen(true)}>Pindah</Button>
+            )}
+            {isOwner && (
+              <Button size="xs" variant="light" color="red" leftSection={<TbTrash size={13} />}
+                onClick={handleBulkDelete}>Hapus</Button>
+            )}
+            <Button size="xs" variant="subtle" color="gray" onClick={clearSelection}>Batalkan</Button>
+          </Group>
+        </Group>
+      )}
+
       <Box style={{ position: 'relative' }}
         onDragEnter={handleDragEnter} onDragLeave={handleDragLeave}
         onDragOver={handleDragOver} onDrop={handleDrop}>
@@ -169,6 +217,7 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
             ) : (
               <StorageFileGrid slug={slug} isOwner={isOwner} canEdit={canEdit}
                 folders={data?.folders ?? []} files={data?.files ?? []} prefix={prefix}
+                selected={selectedPaths} selectionMode={selectionMode} onSelect={toggleSelect}
                 onFolderClick={navigatePrefix} onTogglePublic={togglePublic} onDelete={handleDelete} onRename={invalidate} />
             )}
           </>
@@ -187,6 +236,7 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
             })}
             {data?.files.map((f) => (
               <StorageFileRow key={f.id} file={f} slug={slug} isOwner={isOwner} canEdit={canEdit}
+                selected={selectedPaths.has(f.path)} selectionMode={selectionMode} onSelect={toggleSelect}
                 onTogglePublic={() => togglePublic(f.path, f.isPublic)}
                 onDelete={() => handleDelete(f.path)}
                 onRename={invalidate} />
@@ -220,6 +270,14 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
         <StorageUploadModal slug={slug} prefix={prefix} defaultFile={droppedFile ?? undefined}
           existingPaths={allExistingPaths}
           onSuccess={invalidate} onClose={closeModal} />
+      </Modal>
+
+      <Modal opened={moveOpen} onClose={() => setMoveOpen(false)} title="Pindah File" size="sm">
+        <StorageMoveModal
+          slug={slug} currentPrefix={prefix}
+          selectedPaths={Array.from(selectedPaths)}
+          onSuccess={() => { clearSelection(); invalidate() }}
+          onClose={() => setMoveOpen(false)} />
       </Modal>
     </Stack>
   )
