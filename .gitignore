@@ -48,3 +48,4 @@ prisma/seed-dev.ts
 xnote.md
 xtest.ts
 .tanstack/tmp/
+cli-go/envman
