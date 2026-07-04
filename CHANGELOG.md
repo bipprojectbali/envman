@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-07-04
+
+### Added
+- **CLI Go port**: CLI binary di-rewrite dari Bun/TypeScript ke Go. Ukuran binary turun ~90% (61 MB → 5.5–6 MB, gzip 2.2–2.5 MB). Semua fitur terjaga: env inject, file execution via stdin, alias expansion, response cache, background update check, sudo fallback.
+- **`envman docs` command**: output seluruh API docs + referensi CLI ke stdout dalam satu perintah — dirancang untuk digunakan sebagai konteks AI agent (`envman docs > context.md`).
+- **Docs coverage lengkap**: endpoint Project Storage, Env Import (live-link), Portainer Capabilities, dan semua subcommand CLI kini terdokumentasi di `/api/docs.md`.
+
+### Removed
+- **PM Daemon (`envman pm`)**: dihapus dari codebase setelah 2 bulan tidak digunakan. Tidak ada breaking change pada API server.
+- **MCP Server (`envman mcp`)**: dihapus dari codebase — dukungan agent dialihkan penuh ke CLI + `envman docs`. Deploy MCP (`scripts/mcp/deploy.ts`) tetap ada.
+
 ## [0.17.0] - 2026-07-04
 
 ### Added
