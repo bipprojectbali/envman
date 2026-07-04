@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -356,21 +357,19 @@ func storageUploadCmd() *cobra.Command {
 
 			if stat.IsDir() {
 				prefix := storage.RemotePath(localPath, remotePath)
-				return storage.UploadDir(cfg, slug, localPath, prefix, func(done, total int, path string) {
-					if path == "" {
-						fmt.Printf("Selesai: %d file diupload ke %s/\n", total, prefix)
-					} else {
-						fmt.Printf("[%d/%d] %s\n", done+1, total, path)
-					}
-				})
+				return storage.UploadDir(cfg, slug, localPath, prefix, os.Stderr)
 			}
 
 			target := storage.RemotePath(localPath, remotePath)
-			result, err := storage.Upload(cfg, slug, localPath, target)
+			name := filepath.Base(localPath)
+			result, err := storage.Upload(cfg, slug, localPath, target, func(written, total int64, elapsed time.Duration) {
+				renderProgress(name, written, total, elapsed)
+			})
+			clearProgress()
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Uploaded: %s (%s)\n", result.Object.Path, storage.FmtBytes(result.Object.Size))
+			fmt.Fprintf(os.Stderr, "Uploaded: %s (%s)\n", result.Object.Path, storage.FmtBytes(result.Object.Size))
 			return nil
 		},
 	}
@@ -402,14 +401,20 @@ Streaming to stdout enables direct piping:
 				return err
 			}
 			if outFile == "" || outFile == "-" {
-				return storage.Download(cfg, slug, remotePath, os.Stdout)
+				// Pipe mode: no progress — stdout must stay clean for downstream tools.
+				return storage.Download(cfg, slug, remotePath, os.Stdout, nil)
 			}
 			f, err := os.Create(outFile)
 			if err != nil {
 				return fmt.Errorf("[envman] create %s: %w", outFile, err)
 			}
 			defer f.Close()
-			if err := storage.Download(cfg, slug, remotePath, f); err != nil {
+			name := filepath.Base(remotePath)
+			err = storage.Download(cfg, slug, remotePath, f, func(written, total int64, elapsed time.Duration) {
+				renderProgress(name, written, total, elapsed)
+			})
+			clearProgress()
+			if err != nil {
 				return err
 			}
 			fmt.Fprintf(os.Stderr, "Downloaded: %s → %s\n", remotePath, outFile)

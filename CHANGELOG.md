@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.19.4] - 2026-07-05
+
+### Changed
+- **CLI storage upload/download — progress bar**: upload file tunggal dan download ke file (`-o`) kini menampilkan progress bar animasi + persentase + size + kecepatan transfer + estimasi waktu (ETA) ke stderr. Download pipe ke stdout tetap diam agar output bersih untuk tools downstream. Upload folder tetap menampilkan baris per-file dengan ukuran setelah selesai.
+
 ## [0.19.3] - 2026-07-04
 
 ### Added

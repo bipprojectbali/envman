@@ -20,6 +20,34 @@ import (
 // uploadClient uses a longer timeout for potentially large file uploads.
 var uploadClient = &http.Client{Timeout: 5 * time.Minute}
 
+// ProgressFunc is called during streaming operations.
+// written = bytes transferred so far, total = expected total (-1 if unknown), elapsed = time since start.
+type ProgressFunc func(written, total int64, elapsed time.Duration)
+
+// progressReader wraps an io.Reader and calls fn at most every 100 ms (and always at EOF).
+type progressReader struct {
+	r        io.Reader
+	written  int64
+	total    int64
+	start    time.Time
+	fn       ProgressFunc
+	lastCall time.Time
+}
+
+func newProgressReader(r io.Reader, total int64, fn ProgressFunc) *progressReader {
+	return &progressReader{r: r, total: total, fn: fn, start: time.Now()}
+}
+
+func (p *progressReader) Read(buf []byte) (int, error) {
+	n, err := p.r.Read(buf)
+	p.written += int64(n)
+	if p.fn != nil && (err == io.EOF || time.Since(p.lastCall) >= 100*time.Millisecond) {
+		p.fn(p.written, p.total, time.Since(p.start))
+		p.lastCall = time.Now()
+	}
+	return n, err
+}
+
 // StorageFile is a single file entry from the server list response.
 type StorageFile struct {
 	ID          string   `json:"id"`
@@ -96,12 +124,18 @@ func List(cfg *auth.Config, slug, prefix string, page int) (*ListResult, error) 
 
 // Upload streams a local file to the server without buffering the entire file in memory.
 // Uses io.Pipe so the multipart body is written and read concurrently.
-func Upload(cfg *auth.Config, slug, localFile, remotePath string) (*UploadResult, error) {
+// onProgress is optional — pass nil to disable progress reporting.
+func Upload(cfg *auth.Config, slug, localFile, remotePath string, onProgress ProgressFunc) (*UploadResult, error) {
 	f, err := os.Open(localFile)
 	if err != nil {
 		return nil, fmt.Errorf("[envman] open %s: %w", localFile, err)
 	}
 	defer f.Close()
+
+	var fileSize int64 = -1
+	if info, serr := f.Stat(); serr == nil {
+		fileSize = info.Size()
+	}
 
 	pr, pw := io.Pipe()
 	mw := multipart.NewWriter(pw)
@@ -113,7 +147,11 @@ func Upload(cfg *auth.Config, slug, localFile, remotePath string) (*UploadResult
 			pw.CloseWithError(ferr)
 			return
 		}
-		if _, ferr = io.Copy(part, f); ferr != nil {
+		var src io.Reader = f
+		if onProgress != nil {
+			src = newProgressReader(f, fileSize, onProgress)
+		}
+		if _, ferr = io.Copy(part, src); ferr != nil {
 			pw.CloseWithError(ferr)
 			return
 		}
@@ -162,9 +200,8 @@ func Upload(cfg *auth.Config, slug, localFile, remotePath string) (*UploadResult
 // UploadDir walks localDir recursively and uploads every file under it.
 // Each file's remote path is: remotePrefix + "/" + relative-path-from-localDir.
 // If remotePrefix is empty, files are uploaded at the top level.
-// onProgress is called before each file upload with (doneIndex, total, remotePath)
-// and once more at the end with (total, total, "").
-func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, onProgress func(done, total int, path string)) error {
+// verbose is an optional writer for per-file progress lines (pass nil to suppress).
+func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, verbose io.Writer) error {
 	var files []string
 	err := filepath.WalkDir(localDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -187,15 +224,22 @@ func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, onProgress
 		if remotePrefix != "" {
 			remotePath = remotePrefix + "/" + remotePath
 		}
-		if onProgress != nil {
-			onProgress(i, len(files), remotePath)
+		if verbose != nil {
+			fmt.Fprintf(verbose, "[%d/%d] %-50s", i+1, len(files), remotePath)
 		}
-		if _, err := Upload(cfg, slug, f, remotePath); err != nil {
+		result, err := Upload(cfg, slug, f, remotePath, nil)
+		if err != nil {
+			if verbose != nil {
+				fmt.Fprintln(verbose, " gagal")
+			}
 			return fmt.Errorf("[envman] upload %s: %w", rel, err)
 		}
+		if verbose != nil {
+			fmt.Fprintf(verbose, " %s ✓\n", FmtBytes(result.Object.Size))
+		}
 	}
-	if onProgress != nil {
-		onProgress(len(files), len(files), "")
+	if verbose != nil {
+		fmt.Fprintf(verbose, "\nSelesai: %d file diupload ke %s/\n", len(files), remotePrefix)
 	}
 	return nil
 }
@@ -248,8 +292,8 @@ func DeleteFolder(cfg *auth.Config, slug, prefix string) (int, error) {
 
 // Download fetches a file and streams it to out.
 // It resolves the presigned URL from the server, then streams directly from MinIO.
-// If out is os.Stdout, the binary stream goes directly — suitable for piping.
-func Download(cfg *auth.Config, slug, remotePath string, out io.Writer) error {
+// onProgress is optional — pass nil when streaming to stdout (pipe mode).
+func Download(cfg *auth.Config, slug, remotePath string, out io.Writer, onProgress ProgressFunc) error {
 	apiPath := fmt.Sprintf("/api/envman/projects/%s/storage/download?path=%s",
 		url.PathEscape(slug), url.QueryEscape(remotePath))
 
@@ -274,7 +318,17 @@ func Download(cfg *auth.Config, slug, remotePath string, out io.Writer) error {
 		return fmt.Errorf("[envman] MinIO returned HTTP %d", resp.StatusCode)
 	}
 
-	if _, err := io.Copy(out, resp.Body); err != nil {
+	var total int64 = -1
+	if cl := resp.Header.Get("Content-Length"); cl != "" {
+		fmt.Sscanf(cl, "%d", &total) //nolint:errcheck
+	}
+
+	var src io.Reader = resp.Body
+	if onProgress != nil {
+		src = newProgressReader(resp.Body, total, onProgress)
+	}
+
+	if _, err := io.Copy(out, src); err != nil {
 		return fmt.Errorf("[envman] stream failed: %w", err)
 	}
 	return nil
