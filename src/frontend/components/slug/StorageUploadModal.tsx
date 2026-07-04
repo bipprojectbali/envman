@@ -6,6 +6,7 @@ import { fmtBytes, isTextFile } from '@/frontend/lib/storage-format'
 interface Props {
   slug: string
   prefix: string
+  defaultFile?: File
   onSuccess: () => void
   onClose: () => void
 }
@@ -24,7 +25,7 @@ function fmtEta(sec: number): string {
   return `~${(sec / 3600).toFixed(1)} jam`
 }
 
-export function StorageUploadModal({ slug, prefix, onSuccess, onClose }: Props) {
+export function StorageUploadModal({ slug, prefix, defaultFile, onSuccess, onClose }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [path, setPath] = useState(prefix ? prefix + '/' : '')
   const [description, setDescription] = useState('')
@@ -54,6 +55,9 @@ export function StorageUploadModal({ slug, prefix, onSuccess, onClose }: Props) 
       f.text().then((t) => setPreviewText(t.slice(0, 2000))).catch(() => {})
     }
   }
+
+  // Pre-fill file saat dibuka via drag & drop
+  useEffect(() => { if (defaultFile) handleFileChange(defaultFile) }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Revoke object URL saat file berganti atau modal unmount
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])

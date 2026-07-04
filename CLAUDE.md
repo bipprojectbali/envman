@@ -334,8 +334,11 @@ Tanpa keempat var di atas, semua storage endpoint (yang butuh MinIO) return 503.
 - `src/routes/envman/storage-core.ts` — list, download, meta PATCH, delete
 - `src/routes/envman/storage-upload.ts` — upload handler
 - `src/routes/public-storage.ts` — public redirect endpoint
-- `src/frontend/components/slug/StoragePanel.tsx` — breadcrumb tree UI
-- `src/frontend/components/slug/StorageUploadModal.tsx` — upload modal
+- `src/frontend/components/slug/StoragePanel.tsx` — breadcrumb tree UI; drag-drop upload (drop file → buka modal); list/grid view toggle (persist `localStorage storage:viewMode`)
+- `src/frontend/components/slug/StorageUploadModal.tsx` — upload modal; clipboard paste; file preview; `defaultFile` prop untuk pre-fill dari drag-drop
+- `src/frontend/components/slug/StorageFileRow.tsx` — baris list view; draggable → drag-to-download (Chrome/Edge, `DownloadURL` dataTransfer); prefetch presigned on mouseenter
+- `src/frontend/components/slug/StorageFileCard.tsx` — grid card view; thumbnail public image; `StorageFileGrid` component untuk SimpleGrid layout
+- `src/frontend/hooks/useStorageFileActions.ts` — shared hook: share, copy content, download, drag-to-download, presigned cache (4 mnt)
 
 ---
 

@@ -1,9 +1,7 @@
 import { ActionIcon, Badge, Group, Stack, Text, Tooltip } from '@mantine/core'
-import { useState } from 'react'
-import { TbCopy, TbCheck, TbDownload, TbEye, TbEyeOff, TbFileSearch, TbShare2, TbTrash } from 'react-icons/tb'
-import { TbFile } from 'react-icons/tb'
-import { apiFetch } from '@/frontend/lib/api'
-import { fmtBytes, isPreviewable, isTextFile } from '@/frontend/lib/storage-format'
+import { TbCheck, TbCopy, TbDownload, TbEye, TbEyeOff, TbFile, TbFileSearch, TbShare2, TbTrash } from 'react-icons/tb'
+import { useStorageFileActions } from '@/frontend/hooks/useStorageFileActions'
+import { fmtBytes } from '@/frontend/lib/storage-format'
 import { StorageFileDrawer } from './StorageFileDrawer'
 
 interface StorageObject {
@@ -15,49 +13,18 @@ interface Props {
   onTogglePublic: () => void; onDelete: () => void
 }
 
-type CopiedState = 'link' | 'content' | null
-
 export function StorageFileRow({ file, slug, isOwner, onTogglePublic, onDelete }: Props) {
-  const [copied, setCopied] = useState<CopiedState>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
-
-  async function getPresignedUrl(): Promise<string | null> {
-    const res = await apiFetch<{ url: string }>(`/api/envman/projects/${slug}/storage/download?path=${encodeURIComponent(file.path)}`)
-    return res?.url ?? null
-  }
-
-  async function handleShare() {
-    const url = file.isPublic
-      ? `${window.location.origin}/api/public/storage/${slug}/${file.path}`
-      : await getPresignedUrl()
-    if (!url) return
-    await navigator.clipboard.writeText(url)
-    setCopied('link')
-    setTimeout(() => setCopied(null), 2000)
-  }
-
-  async function handleCopyContent() {
-    const url = await getPresignedUrl()
-    if (!url) return
-    const text = await fetch(url).then((r) => r.text())
-    await navigator.clipboard.writeText(text)
-    setCopied('content')
-    setTimeout(() => setCopied(null), 2000)
-  }
-
-  async function handleDownload() {
-    const url = await getPresignedUrl()
-    if (url) window.open(url, '_blank')
-  }
+  const { copied, previewOpen, setPreviewOpen, handleShare, handleCopyContent, handleDownload,
+    handleDragStart, prefetchPresigned, canPreview, canCopy } = useStorageFileActions(file, slug)
 
   const name = file.path.split('/').pop()
   const ext = name?.includes('.') ? name.split('.').pop()?.toUpperCase() : null
-  const canPreview = isPreviewable(file.mimeType, file.path)
-  const canCopy = isTextFile(file.mimeType, file.path)
 
   return (
     <>
-      <Group px="sm" py={6} style={{ borderRadius: 6, border: '1px solid var(--mantine-color-default-border)' }} wrap="nowrap">
+      <Group px="sm" py={6} draggable onDragStart={handleDragStart} onMouseEnter={prefetchPresigned}
+        style={{ borderRadius: 6, border: '1px solid var(--mantine-color-default-border)', cursor: 'grab' }}
+        wrap="nowrap">
         <TbFile size={15} style={{ flexShrink: 0 }} />
         <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
           <Text size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</Text>
