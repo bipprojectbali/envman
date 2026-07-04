@@ -1,14 +1,16 @@
 import {
-  Alert, Anchor, Box, Breadcrumbs, Button, Group, Modal,
+  ActionIcon, Alert, Anchor, Box, Breadcrumbs, Button, Group, Modal,
   Progress, Skeleton, Stack, Text, ThemeIcon, Tooltip,
 } from '@mantine/core'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
-import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbFolderSymlink, TbInfoCircle, TbLayoutGrid, TbList, TbTrash } from 'react-icons/tb'
+import { useEffect, useRef, useState } from 'react'
+import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbFolderPlus, TbFolderSymlink, TbInfoCircle, TbLayoutGrid, TbList, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
+import { collectFilesFromEntry, filesFromInput, type CollectedFile } from '@/frontend/lib/folder-upload-utils'
 import { fmtBytes } from '@/frontend/lib/storage-format'
 import { StorageFileGrid } from './StorageFileCard'
 import { StorageFileRow } from './StorageFileRow'
+import { StorageFolderUploadModal } from './StorageFolderUploadModal'
 import { StorageMoveModal } from './StorageMoveModal'
 import { StorageUploadModal } from './StorageUploadModal'
 
@@ -32,6 +34,9 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
   const [moveOpen, setMoveOpen] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [folderUploadOpen, setFolderUploadOpen] = useState(false)
+  const [folderDropped, setFolderDropped] = useState<CollectedFile[]>([])
+  const folderInputRef = useRef<HTMLInputElement>(null)
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() =>
     (localStorage.getItem('storage:viewMode') as 'list' | 'grid') ?? 'list'
@@ -83,6 +88,14 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
 
   function navigatePrefix(p: string) { setPrefix(p); setPage(1) }
 
+  async function handleDeleteFolder(folderPath: string) {
+    if (!confirm(`Hapus folder "${folderPath}/" dan semua isinya? Tindakan ini tidak bisa dibatalkan.`)) return
+    await fetch(`/api/envman/projects/${slug}/storage/folder?prefix=${encodeURIComponent(folderPath)}`, {
+      method: 'DELETE', credentials: 'include',
+    })
+    invalidate()
+  }
+
   async function handleDelete(path: string) {
     if (!confirm(`Hapus "${path}"?`)) return
     await fetch(`/api/envman/projects/${slug}/storage?path=${encodeURIComponent(path)}`, {
@@ -111,10 +124,17 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
     setIsDragOver(false)
   }
   function handleDragOver(e: React.DragEvent) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }
-  function handleDrop(e: React.DragEvent) {
+  async function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setIsDragOver(false)
     if (!canEdit) return
+    const items = Array.from(e.dataTransfer.items)
+    const entry = items[0]?.webkitGetAsEntry?.()
+    if (entry?.isDirectory) {
+      const collected = await collectFilesFromEntry(entry as FileSystemDirectoryEntry, '')
+      if (collected.length > 0) { setFolderDropped(collected); setFolderUploadOpen(true) }
+      return
+    }
     const files = Array.from(e.dataTransfer.files)
     if (files.length > 0) { setDroppedFile(files[0]); setUploadOpen(true) }
   }
@@ -147,9 +167,24 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
             </Button>
           </Tooltip>
           {canEdit && (
-            <Button size="xs" variant="light" leftSection={<TbCloudUpload size={13} />} onClick={() => setUploadOpen(true)}>
-              Upload
-            </Button>
+            <>
+              <Button size="xs" variant="light" leftSection={<TbCloudUpload size={13} />} onClick={() => setUploadOpen(true)}>
+                Upload
+              </Button>
+              <Tooltip label="Upload folder">
+                <Button size="xs" variant="light" color="teal" px={6} onClick={() => folderInputRef.current?.click()}>
+                  <TbFolderPlus size={14} />
+                </Button>
+              </Tooltip>
+              <input ref={folderInputRef} type="file" style={{ display: 'none' }}
+                // @ts-expect-error -- webkitdirectory is not in React types but supported in all major browsers
+                webkitdirectory=""
+                onChange={(e) => {
+                  const collected = filesFromInput(Array.from(e.target.files ?? []))
+                  if (collected.length > 0) { setFolderDropped(collected); setFolderUploadOpen(true) }
+                  e.target.value = ''
+                }} />
+            </>
           )}
         </Group>
       </Group>
@@ -219,7 +254,7 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
             border: '2px dashed var(--mantine-color-blue-5)',
             background: 'var(--mantine-color-blue-light-hover)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-            <Text size="md" fw={600} c="blue">Drop untuk upload</Text>
+            <Text size="md" fw={600} c="blue">Drop file atau folder untuk upload</Text>
           </Box>
         )}
 
@@ -233,7 +268,8 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
               <StorageFileGrid slug={slug} isOwner={isOwner} canEdit={canEdit}
                 folders={data?.folders ?? []} files={data?.files ?? []} prefix={prefix}
                 selected={selectedPaths} selectionMode={selectionMode} onSelect={toggleSelect}
-                onFolderClick={navigatePrefix} onTogglePublic={togglePublic} onDelete={handleDelete} onRename={invalidate} />
+                onFolderClick={navigatePrefix} onDeleteFolder={isOwner ? handleDeleteFolder : undefined}
+                onTogglePublic={togglePublic} onDelete={handleDelete} onRename={invalidate} />
             )}
           </>
         ) : (
@@ -246,6 +282,14 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
                   onClick={() => navigatePrefix(folderPath)}>
                   <TbFolder size={15} color="var(--mantine-color-yellow-5)" />
                   <Text size="sm" style={{ flex: 1 }}>{folder}/</Text>
+                  {isOwner && (
+                    <Tooltip label="Hapus folder">
+                      <ActionIcon size="sm" variant="subtle" color="red"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folderPath) }}>
+                        <TbTrash size={13} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
                 </Group>
               )
             })}
@@ -285,6 +329,11 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
         <StorageUploadModal slug={slug} prefix={prefix} defaultFile={droppedFile ?? undefined}
           existingPaths={allExistingPaths}
           onSuccess={invalidate} onClose={closeModal} />
+      </Modal>
+
+      <Modal opened={folderUploadOpen} onClose={() => setFolderUploadOpen(false)} title="Upload Folder" size="md">
+        <StorageFolderUploadModal slug={slug} prefix={prefix} files={folderDropped}
+          onSuccess={invalidate} onClose={() => setFolderUploadOpen(false)} />
       </Modal>
 
       <Modal opened={moveOpen} onClose={() => setMoveOpen(false)} title="Pindah File" size="sm">

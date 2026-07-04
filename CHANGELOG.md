@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.19.3] - 2026-07-04
+
+### Added
+- **Hapus folder**: OWNER bisa menghapus seluruh folder sekaligus (beserta semua isinya) tanpa harus hapus file satu per satu.
+  - UI: tombol hapus (merah) muncul di tiap baris folder di list view dan grid view. Konfirmasi sebelum eksekusi.
+  - CLI: `envman storage rm myapp:assets/` — hapus folder rekursif, tampilkan jumlah file yang dihapus.
+  - Server: endpoint `DELETE /api/envman/projects/:slug/storage/folder?prefix=` — hapus MinIO objects + DB records atomis (OWNER only).
+
+## [0.19.2] - 2026-07-04
+
+### Added
+- **Folder upload — CLI + UI**: upload seluruh folder sekaligus.
+  - CLI: `envman storage upload myapp ./assets/` otomatis deteksi direktori, upload rekursif dengan progress `[N/total]`. Flag `--path` menjadi remote prefix. Direktori kosong ditolak dengan pesan jelas.
+  - UI: drag-drop folder ke panel Storage atau klik tombol folder (picker `webkitdirectory`). Modal antrian menampilkan status per-file (pending/uploading/done/error) dan progress keseluruhan.
+
 ## [0.19.1] - 2026-07-04
 
 ### Changed

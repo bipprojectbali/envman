@@ -99,10 +99,12 @@ envman -- <interpreter> project:path/file.ext    # eksekusi file project
 
 envman storage ls <project>                       # list files
 envman storage ls <project> --prefix folder/
-envman storage upload <project> <file>            # upload (streaming)
+envman storage upload <project> <file|dir>        # upload file atau folder (streaming)
 envman storage upload <project> <file> --path remote/path
+envman storage upload <project> <dir> --path remote/prefix
 envman storage download <project>:<path>          # download ke stdout
 envman storage download <project>:<path> -o file  # download ke file
+envman storage rm <project>:<folder>/             # hapus folder beserta isinya (OWNER)
 \`\`\`
 
 ---

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
 )
 
@@ -96,6 +97,36 @@ func TestListResponseUnmarshal(t *testing.T) {
 	}
 	if result.Usage.UsedBytes != 126976 || result.Usage.QuotaBytes != 524288000 {
 		t.Errorf("Usage = %+v, unexpected values", result.Usage)
+	}
+}
+
+func TestUploadDirPaths(t *testing.T) {
+	cases := []struct {
+		base   string
+		file   string
+		prefix string
+		want   string
+		desc   string
+	}{
+		{"/tmp/mydir", "/tmp/mydir/logo.png", "assets", "assets/logo.png", "flat file with prefix"},
+		{"/tmp/mydir", "/tmp/mydir/sub/file.txt", "assets", "assets/sub/file.txt", "nested file with prefix"},
+		{"/tmp/mydir", "/tmp/mydir/a.sh", "", "a.sh", "no prefix"},
+		{"/tmp/mydir", "/tmp/mydir/a/b/c.yml", "", "a/b/c.yml", "deep nested no prefix"},
+		{"/tmp/mydir", "/tmp/mydir/logo.png", "dist/static", "dist/static/logo.png", "multi-segment prefix"},
+	}
+	for _, c := range cases {
+		rel, err := filepath.Rel(c.base, c.file)
+		if err != nil {
+			t.Errorf("[%s] filepath.Rel(%q, %q) error: %v", c.desc, c.base, c.file, err)
+			continue
+		}
+		got := filepath.ToSlash(rel)
+		if c.prefix != "" {
+			got = c.prefix + "/" + got
+		}
+		if got != c.want {
+			t.Errorf("[%s] got %q, want %q", c.desc, got, c.want)
+		}
 	}
 }
 

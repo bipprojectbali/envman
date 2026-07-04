@@ -285,7 +285,7 @@ Download streams to stdout by default — composable with pipes:
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
-	cmd.AddCommand(storageLsCmd(), storageUploadCmd(), storageDownloadCmd())
+	cmd.AddCommand(storageLsCmd(), storageUploadCmd(), storageDownloadCmd(), storageRmCmd())
 	return cmd
 }
 
@@ -334,10 +334,12 @@ func storageLsCmd() *cobra.Command {
 func storageUploadCmd() *cobra.Command {
 	var remotePath string
 	cmd := &cobra.Command{
-		Use:   "upload <project> <file>",
-		Short: "Upload a file to project storage (streaming)",
+		Use:   "upload <project> <file|dir>",
+		Short: "Upload a file or folder to project storage (streaming)",
 		Example: "  envman storage upload myapp compose.yml\n" +
-			"  envman storage upload myapp ./logo.png --path assets/logo.png",
+			"  envman storage upload myapp ./logo.png --path assets/logo.png\n" +
+			"  envman storage upload myapp ./assets/\n" +
+			"  envman storage upload myapp ./dist/ --path static/dist",
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := auth.Resolve()
@@ -345,9 +347,26 @@ func storageUploadCmd() *cobra.Command {
 				return err
 			}
 			slug := args[0]
-			localFile := args[1]
-			target := storage.RemotePath(localFile, remotePath)
-			result, err := storage.Upload(cfg, slug, localFile, target)
+			localPath := args[1]
+
+			stat, err := os.Stat(localPath)
+			if err != nil {
+				return fmt.Errorf("[envman] %w", err)
+			}
+
+			if stat.IsDir() {
+				prefix := storage.RemotePath(localPath, remotePath)
+				return storage.UploadDir(cfg, slug, localPath, prefix, func(done, total int, path string) {
+					if path == "" {
+						fmt.Printf("Selesai: %d file diupload ke %s/\n", total, prefix)
+					} else {
+						fmt.Printf("[%d/%d] %s\n", done+1, total, path)
+					}
+				})
+			}
+
+			target := storage.RemotePath(localPath, remotePath)
+			result, err := storage.Upload(cfg, slug, localPath, target)
 			if err != nil {
 				return err
 			}
@@ -355,7 +374,7 @@ func storageUploadCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&remotePath, "path", "", "Remote path (default: basename of local file)")
+	cmd.Flags().StringVar(&remotePath, "path", "", "Remote path or prefix (default: basename of local file/dir)")
 	return cmd
 }
 
@@ -399,6 +418,41 @@ Streaming to stdout enables direct piping:
 	}
 	cmd.Flags().StringVarP(&outFile, "output", "o", "", "Output file (default: stdout)")
 	return cmd
+}
+
+func storageRmCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "rm <project>:<folder>/",
+		Short: "Delete a folder and all its contents from project storage (OWNER only)",
+		Long: `Delete every file under a folder prefix. This action cannot be undone.
+
+Requires OWNER role on the project.`,
+		Example: "  envman storage rm myapp:assets/\n" +
+			"  envman storage rm myapp:backup/2026-01/",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return err
+			}
+			slug, folderPath, err := storage.ParseRef(args[0])
+			if err != nil {
+				return err
+			}
+			folderPath = strings.TrimRight(folderPath, "/")
+			if folderPath == "" {
+				return fmt.Errorf("[envman] folder path tidak boleh kosong")
+			}
+			fmt.Printf("Menghapus %s:%s/ ... ", slug, folderPath)
+			deleted, err := storage.DeleteFolder(cfg, slug, folderPath)
+			if err != nil {
+				fmt.Println("gagal")
+				return err
+			}
+			fmt.Printf("selesai (%d file dihapus)\n", deleted)
+			return nil
+		},
+	}
 }
 
 // hasFileRef returns true if any arg looks like a project file reference (slug:path/or.ext).

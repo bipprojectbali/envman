@@ -30,9 +30,13 @@ envman storage upload myapp ./seed.sql     --path backup/2026-07-04.sql
 
 # Upload dari script (CI/CD)
 envman storage upload myapp ./dist/report.html --path reports/$(date +%F).html
+
+# Upload seluruh folder (rekursif)
+envman storage upload myapp ./assets/              # → assets/logo.png, assets/sub/icon.svg, ...
+envman storage upload myapp ./dist/ --path static  # → static/index.html, static/bundle.js, ...
 \`\`\`
 
-Upload **streaming** dari disk ke server — tidak di-buffer ke memori. Aman untuk file besar.
+Upload **streaming** dari disk ke server — tidak di-buffer ke memori. Aman untuk file besar. Upload folder menampilkan progress \`[N/total]\` per file.
 
 ### Download — streaming ke stdout
 
@@ -60,6 +64,15 @@ envman storage download myapp:config/nginx.conf | nginx -t -c /dev/stdin
 \`\`\`
 
 Download stream langsung dari MinIO — tidak melewati server envman (presigned URL).
+
+### Hapus folder
+
+\`\`\`bash
+envman storage rm myapp:assets/            # hapus folder assets/ dan semua isinya
+envman storage rm myapp:backup/2026-01/    # hapus subfolder spesifik
+\`\`\`
+
+Hanya OWNER project yang bisa menghapus folder. Operasi tidak bisa dibatalkan.
 
 ### Pattern CI/CD dengan storage
 

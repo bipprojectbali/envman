@@ -16,11 +16,12 @@ interface FileCardProps {
   selected?: boolean; selectionMode?: boolean; onSelect?: (path: string) => void
   onTogglePublic: () => void; onDelete: () => void; onRename: () => void
 }
-interface FolderCardProps { name: string; onClick: () => void }
+interface FolderCardProps { name: string; onClick: () => void; onDelete?: () => void }
 interface GridProps {
   slug: string; isOwner: boolean; canEdit: boolean; folders: string[]; files: StorageObject[]; prefix: string
   selected?: Set<string>; selectionMode?: boolean; onSelect?: (path: string) => void
   onFolderClick: (path: string) => void
+  onDeleteFolder?: (path: string) => void
   onTogglePublic: (path: string, isPublic: boolean) => void
   onDelete: (path: string) => void
   onRename: () => void
@@ -149,24 +150,35 @@ function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSel
   )
 }
 
-function FolderCard({ name, onClick }: FolderCardProps) {
+function FolderCard({ name, onClick, onDelete }: FolderCardProps) {
   return (
     <Card withBorder padding="sm" radius="md" style={{ cursor: 'pointer' }} onClick={onClick}>
-      <Card.Section style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 90,
-        background: 'var(--mantine-color-default-hover)' }}>
+      <Card.Section style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: 90, background: 'var(--mantine-color-default-hover)' }}>
         <TbFolder size={36} color="var(--mantine-color-yellow-5)" />
+        {onDelete && (
+          <Tooltip label="Hapus folder">
+            <ActionIcon size="sm" variant="subtle" color="red" pos="absolute" top={4} right={4}
+              onClick={(e) => { e.stopPropagation(); onDelete() }}>
+              <TbTrash size={13} />
+            </ActionIcon>
+          </Tooltip>
+        )}
       </Card.Section>
       <Text size="xs" fw={500} mt={8} lineClamp={2}>{name}/</Text>
     </Card>
   )
 }
 
-export function StorageFileGrid({ slug, isOwner, canEdit, folders, files, prefix, selected, selectionMode, onSelect, onFolderClick, onTogglePublic, onDelete, onRename }: GridProps) {
+export function StorageFileGrid({ slug, isOwner, canEdit, folders, files, prefix, selected, selectionMode, onSelect, onFolderClick, onDeleteFolder, onTogglePublic, onDelete, onRename }: GridProps) {
   return (
     <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
       {folders.map((folder) => {
         const folderPath = prefix ? `${prefix}/${folder}` : folder
-        return <FolderCard key={folderPath} name={folder} onClick={() => onFolderClick(folderPath)} />
+        return (
+          <FolderCard key={folderPath} name={folder} onClick={() => onFolderClick(folderPath)}
+            onDelete={onDeleteFolder ? () => onDeleteFolder(folderPath) : undefined} />
+        )
       })}
       {files.map((f) => (
         <FileCard key={f.id} file={f} slug={slug} isOwner={isOwner} canEdit={canEdit}

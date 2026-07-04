@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -156,6 +157,93 @@ func Upload(cfg *auth.Config, slug, localFile, remotePath string) (*UploadResult
 		return nil, fmt.Errorf("[envman] parse upload response: %w", err)
 	}
 	return &result, nil
+}
+
+// UploadDir walks localDir recursively and uploads every file under it.
+// Each file's remote path is: remotePrefix + "/" + relative-path-from-localDir.
+// If remotePrefix is empty, files are uploaded at the top level.
+// onProgress is called before each file upload with (doneIndex, total, remotePath)
+// and once more at the end with (total, total, "").
+func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, onProgress func(done, total int, path string)) error {
+	var files []string
+	err := filepath.WalkDir(localDir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			files = append(files, p)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("[envman] scan dir %s: %w", localDir, err)
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("[envman] directory %s is empty", localDir)
+	}
+	for i, f := range files {
+		rel, _ := filepath.Rel(localDir, f)
+		remotePath := filepath.ToSlash(rel)
+		if remotePrefix != "" {
+			remotePath = remotePrefix + "/" + remotePath
+		}
+		if onProgress != nil {
+			onProgress(i, len(files), remotePath)
+		}
+		if _, err := Upload(cfg, slug, f, remotePath); err != nil {
+			return fmt.Errorf("[envman] upload %s: %w", rel, err)
+		}
+	}
+	if onProgress != nil {
+		onProgress(len(files), len(files), "")
+	}
+	return nil
+}
+
+// DeleteFolder removes all files under the given prefix from the server.
+// prefix should not include a trailing slash. Returns the number of deleted files.
+func DeleteFolder(cfg *auth.Config, slug, prefix string) (int, error) {
+	prefix = strings.TrimRight(prefix, "/")
+	if prefix == "" {
+		return 0, fmt.Errorf("[envman] folder prefix tidak boleh kosong")
+	}
+	apiPath := fmt.Sprintf("/api/envman/projects/%s/storage/folder?prefix=%s",
+		url.PathEscape(slug), url.QueryEscape(prefix))
+
+	req, err := http.NewRequest(http.MethodDelete, cfg.Server+apiPath, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("[envman] hapus folder gagal: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errPayload struct {
+			Error string `json:"error"`
+		}
+		_ = json.Unmarshal(body, &errPayload)
+		msg := errPayload.Error
+		if msg == "" {
+			msg = http.StatusText(resp.StatusCode)
+		}
+		return 0, fmt.Errorf("[envman] %s", msg)
+	}
+
+	var result struct {
+		OK      bool `json:"ok"`
+		Deleted int  `json:"deleted"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, fmt.Errorf("[envman] parse response: %w", err)
+	}
+	return result.Deleted, nil
 }
 
 // Download fetches a file and streams it to out.
