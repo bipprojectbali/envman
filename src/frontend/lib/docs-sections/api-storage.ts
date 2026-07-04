@@ -2,7 +2,59 @@ export function buildApiStorageSection(origin: string): string {
   return `
 ## Project Storage
 
-File storage berbasis MinIO — setiap project punya direktori virtual sendiri.
+File storage berbasis MinIO — setiap project punya direktori virtual sendiri. Akses via tab **Storage** di halaman detail project. Mendukung upload file, navigasi folder, preview, multi-select batch action, dan public sharing.
+
+---
+
+### Cara Menggunakan (UI)
+
+#### Upload File
+
+- Klik tombol **Upload** (kanan atas panel) untuk buka modal upload
+- **Drag-drop** file langsung ke panel — modal upload otomatis terbuka dengan file yang di-drop
+- **Paste dari clipboard**: buka modal upload lalu tekan \`Ctrl+V\` / \`⌘V\` untuk paste gambar atau file
+- Upload progress bar menampilkan persentase, kecepatan transfer (MB/s), dan estimasi waktu selesai
+- Tombol **Batalkan Upload** tersedia saat upload berlangsung
+- File dengan nama yang sudah ada di folder yang sama otomatis mendapat suffix \`_2\`, \`_3\`, dst.
+
+#### Navigasi Folder
+
+- Panel menampilkan breadcrumb untuk navigasi hierarki folder
+- Klik folder untuk masuk; klik breadcrumb untuk naik
+- Path aktif tercermin di URL (\`?prefix=folder/subfolder\`) — bisa di-bookmark
+
+#### Tampilan Grid / List
+
+- Toggle tampilan **list** ↔ **grid** via ikon di kanan atas panel
+- Preferensi disimpan di localStorage — persisten antar sesi
+- Grid view menampilkan thumbnail otomatis untuk gambar publik (presigned URL TTL 5 menit, di-cache per file)
+
+#### Preview File
+
+- Klik file untuk membuka drawer pratinjau
+- Gambar ditampilkan inline (\`img\`); teks/kode ditampilkan di Monaco editor dengan syntax highlight (lazy-load ~1 MB, Suspense)
+- Monaco memuat sesuai ekstensi file — JS, TS, Python, YAML, SQL, Markdown, dll.
+
+#### Multi-Select & Batch Action
+
+- Checkbox muncul saat hover file atau saat mode seleksi aktif
+- Pilih beberapa file sekaligus → action bar muncul otomatis di bawah panel
+- **Batch Pindah**: pindah semua file yang dipilih ke folder lain sekaligus
+- **Batch Hapus**: hapus semua file yang dipilih (OWNER saja)
+- Seleksi reset otomatis saat pindah folder atau ganti halaman
+
+#### Drag-to-Download
+
+- Seret file langsung dari panel ke desktop atau folder OS (Chrome/Edge)
+- Presigned URL di-prefetch saat hover untuk mengurangi latensi
+
+#### Share / Set Publik
+
+- OWNER bisa set file sebagai **publik** via tombol toggle di metadata
+- File publik dapat diakses siapapun via URL tanpa auth: \`${origin}/api/public/storage/:slug/:path\`
+- Icon lock/unlock di grid card menandai status publik file
+
+---
 
 ### Prerequisites
 
