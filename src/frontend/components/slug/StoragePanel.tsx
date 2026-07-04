@@ -3,7 +3,7 @@ import {
   Progress, Skeleton, Stack, Text, ThemeIcon, Tooltip,
 } from '@mantine/core'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbFolderSymlink, TbLayoutGrid, TbList, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { fmtBytes } from '@/frontend/lib/storage-format'
@@ -36,7 +36,6 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() =>
     (localStorage.getItem('storage:viewMode') as 'list' | 'grid') ?? 'list'
   )
-  const dragCounter = useRef(0)
   const qc = useQueryClient()
 
   const selectionMode = selectedPaths.size > 0
@@ -103,17 +102,18 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
   function handleDragEnter(e: React.DragEvent) {
     e.preventDefault()
     if (!canEdit || !e.dataTransfer.types.includes('Files')) return
-    dragCounter.current++
     setIsDragOver(true)
   }
-  function handleDragLeave() {
-    dragCounter.current--
-    if (dragCounter.current === 0) setIsDragOver(false)
+  function handleDragLeave(e: React.DragEvent) {
+    // Hanya reset jika drag benar-benar keluar dari Box — bukan pindah ke child.
+    // e.relatedTarget = elemen yang dimasuki drag; null = keluar ke luar browser/OS.
+    if ((e.currentTarget as Element).contains(e.relatedTarget as Node | null)) return
+    setIsDragOver(false)
   }
   function handleDragOver(e: React.DragEvent) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
-    dragCounter.current = 0; setIsDragOver(false)
+    setIsDragOver(false)
     if (!canEdit) return
     const files = Array.from(e.dataTransfer.files)
     if (files.length > 0) { setDroppedFile(files[0]); setUploadOpen(true) }
