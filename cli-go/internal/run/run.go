@@ -49,23 +49,20 @@ func parseSource(s string) (project, env, localFile string) {
 }
 
 // fetchServerVars fetches vars for a project:env from the server.
+// The vars/export endpoint returns vars as a JSON object {"KEY": "VALUE"}, not an array.
 func fetchServerVars(cfg *auth.Config, project, envName string) (map[string]string, error) {
 	path := fmt.Sprintf("/api/envman/projects/%s/environments/%s/vars/export",
 		url.PathEscape(project), url.PathEscape(envName))
 	var result struct {
-		Vars []struct {
-			Key   string `json:"key"`
-			Value string `json:"value"`
-		} `json:"vars"`
+		Vars map[string]string `json:"vars"`
 	}
 	if err := api.FetchJSON(cfg, path, &result); err != nil {
 		return nil, err
 	}
-	m := make(map[string]string, len(result.Vars))
-	for _, v := range result.Vars {
-		m[v.Key] = v.Value
+	if result.Vars == nil {
+		return map[string]string{}, nil
 	}
-	return m, nil
+	return result.Vars, nil
 }
 
 // Run injects env vars from sources into command and executes it.

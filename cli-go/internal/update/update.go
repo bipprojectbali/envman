@@ -17,6 +17,30 @@ import (
 	"github.com/bipprojectbali/envman/cli/internal/auth"
 )
 
+// semverGT returns true if version a is strictly greater than b (X.Y.Z format).
+func semverGT(a, b string) bool {
+	parse := func(v string) (int, int, int) {
+		parts := strings.SplitN(v, ".", 3)
+		var n [3]int
+		for i, p := range parts {
+			if i >= 3 {
+				break
+			}
+			n[i], _ = strconv.Atoi(p)
+		}
+		return n[0], n[1], n[2]
+	}
+	ma, na, pa := parse(a)
+	mb, nb, pb := parse(b)
+	if ma != mb {
+		return ma > mb
+	}
+	if na != nb {
+		return na > nb
+	}
+	return pa > pb
+}
+
 const updateCheckInterval = 15 * time.Minute
 
 type updateCheck struct {
@@ -48,7 +72,8 @@ func DetectPlatform() string {
 	}
 }
 
-// ShowUpdateNotice prints a notice to stderr if there is a newer version available.
+// ShowUpdateNotice prints a notice to stderr if a strictly newer version is available.
+// Only shows if latest > current (semver), preventing false notices from stale cache.
 func ShowUpdateNotice(currentVersion string) {
 	data, err := os.ReadFile(updateCheckFile())
 	if err != nil {
@@ -60,7 +85,7 @@ func ShowUpdateNotice(currentVersion string) {
 	}
 	current := strings.TrimPrefix(currentVersion, "v")
 	latest := strings.TrimPrefix(uc.LatestVersion, "v")
-	if latest != "" && latest != current {
+	if latest != "" && semverGT(latest, current) {
 		fmt.Fprintf(os.Stderr, "\n[envman] Update available: v%s → v%s\n  Run: envman update\n\n", current, latest)
 	}
 }
@@ -175,11 +200,13 @@ func Update(serverURL, currentVersion string) error {
 	fmt.Printf("Updated to v%s successfully.\n", latestClean)
 
 	// Update the cache so the update notice doesn't reappear on the next run.
+	// Set CheckedAt to now + interval so any racing background check sees it as fresh
+	// and returns early without overwriting with stale data.
 	now := time.Now().UnixNano() / int64(time.Millisecond)
 	cacheOut := updateCheck{
 		LatestVersion: latestClean,
 		CurrentBinary: self,
-		CheckedAt:     now,
+		CheckedAt:     now + int64(updateCheckInterval.Milliseconds()),
 	}
 	cacheData, _ := json.Marshal(cacheOut)
 	_ = os.MkdirAll(auth.ConfigDir(), 0700)

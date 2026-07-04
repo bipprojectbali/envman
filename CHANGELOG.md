@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-07-04
+
+### Fixed
+- **CLI Go — `envman run` unmarshal error**: endpoint `vars/export` mengembalikan `vars` sebagai JSON object `{"KEY":"VALUE"}`, bukan array. Go struct salah memakai `[]struct{key,value}` — diubah ke `map[string]string`. Perintah `envman run` dan `envman -e proj:env -- cmd` kini berjalan normal.
+- **CLI Go — update notice arah terbalik (`v0.18.2 → v0.18.0`)**: `ShowUpdateNotice` sebelumnya menampilkan notice jika versi cache berbeda dari binary, termasuk jika cache lebih tua. Ditambah perbandingan semver — notice hanya muncul jika `latest > current`. Race condition tambahan: cache write di `Update()` kini memakai `CheckedAt = now + 15 menit` sehingga background check yang berjalan bersamaan tidak bisa menimpa dengan data lama.
+
 ## [0.18.1] - 2026-07-04
 
 ### Fixed
