@@ -127,5 +127,38 @@ export function buildApiTokensPortainerSection(origin: string): string {
 \`\`\`
 
 ---
+
+#### Portainer Capabilities (delegasi granular)
+
+Operasi Portainer bisa didelegasikan ke user non-SUPER_ADMIN lewat capability. SUPER_ADMIN bypass semua.
+
+**Assign capability:**
+
+\`\`\`
+PUT /api/envman/admin/users/:userId/permissions
+Body: { "permissions": ["stack:sync", "stack:deploy"] }
+\`\`\`
+
+**Daftar capability:**
+
+| Capability | Mengizinkan |
+|---|---|
+| \`connection:view\` | List & detail connection, health, probe |
+| \`connection:manage\` | Create/edit/delete connection |
+| \`stack:operate\` | View stacks, logs, status, stats, compose file (bukan exec) |
+| \`stack:exec\` | Exec masuk container (setara shell akses — dipisah dari operate) |
+| \`stack:sync\` | Push env vars → stack |
+| \`stack:power\` | Start/stop/restart container/stack |
+| \`stack:deploy\` | Repull image, recreate stack, sync-repull |
+| \`stack:mutate\` | Edit compose/stack file |
+| \`stack:prune\` | Prune images/volumes/networks/containers (destructive) |
+| \`backup:view\` | List & download backup |
+| \`backup:manage\` | Create/delete backup + kelola schedule |
+
+**Dua keluarga endpoint:**
+- **Connection-scoped** (\`/portainer/connections/...\`) — murni capability: butuh capability eksplisit
+- **Env-scoped** (\`/projects/:slug/.../portainer/...\`) — **role ATAU capability**: lolos jika EDITOR/OWNER di env tsb **atau** punya capability terkait (\`stack:sync\`/\`stack:deploy\`/\`stack:prune\`) — backward-compatible dengan EDITOR existing
+
+---
 `
 }

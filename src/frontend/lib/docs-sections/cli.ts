@@ -40,13 +40,21 @@ Binary standalone — tidak butuh Node.js, npm, atau runtime lain.
 ### Commands
 
 \`\`\`bash
-envman login <server-url> --token <token>   # Simpan ke ~/.config/envman/config.json
-envman logout                                # Hapus config tersimpan
-envman whoami                                # Tampilkan user + server aktif
-envman [options] -- <command>               # Inject vars & jalankan command
-envman --version                             # Tampilkan versi CLI
-envman --help                                # Bantuan
+envman login <server-url> --token <token>          # Simpan ke ~/.config/envman/config.json
+envman logout                                       # Hapus config tersimpan
+envman whoami                                       # Tampilkan user + server aktif
+envman update                                       # Update CLI ke versi terbaru
+envman docs                                        # Print docs + referensi lengkap ke stdout
+envman run [-e <source>]... <project>:<alias> [args...]  # Ekspansi alias + inject vars
+envman [options] -- <command>                      # Inject vars & jalankan command
+envman -- <interpreter> <project>:<path/file.ext>  # Execute project file (tanpa tulis ke disk)
+envman pm daemon <start|stop|status>               # Kelola daemon supervisor
+envman pm <subcommand> <name>                      # Kelola proses panjang
+envman --version                                   # Tampilkan versi CLI
+envman --help                                      # Bantuan
 \`\`\`
+
+> **envman mcp** — deprecated. Gunakan CLI command + \`envman docs\`.
 
 ---
 
@@ -65,6 +73,90 @@ envman --help                                # Bantuan
 
 ---
 
+### Alias Expansion (\`envman run\`)
+
+\`\`\`bash
+envman run myapp:deploy            # Ekspansi alias "deploy" di project myapp
+envman run -e myapp:prod myapp:deploy  # Extra -e di-merge sebelum stored sources (stored wins)
+envman run myapp:seed -- --dry-run # Argumen setelah -- diteruskan ke command alias
+\`\`\`
+
+Alias menyimpan args + sources di server. \`envman run\` fetch via \`GET /api/envman/aliases/resolve/<ref>\`, parse ulang, lalu inject vars.
+
+---
+
+### File Execution (execute project file tanpa tulis ke disk)
+
+\`\`\`bash
+# Canonical syntax: slug:prefix/file.ext atau slug:file.ext
+envman -- bash myapp:scripts/deploy.sh
+envman -- bun myapp:utils/seed.ts
+envman -- python3 myapp:jobs/ingest.py
+
+# Dengan inject vars
+envman -e myapp:production -- bash myapp:scripts/deploy.sh
+\`\`\`
+
+**Disambiguasi path**: setelah colon, ada \`/\` **atau** ada extension → file reference. Sisanya → nama environment.
+
+**Interpreter stdin (zero disk write):** \`bash\`, \`sh\`, \`zsh\`, \`bun\`, \`node\`, \`python3\`, \`python\`, \`deno\`. Interpreter lain → temp file 0600.
+
+Bun scripts bisa langsung import npm tanpa \`node_modules\` — CLI auto-pass \`--install=fallback\`. Pin versi inline: \`import { z } from "zod@^3.22"\`.
+
+---
+
+### Process Manager (\`envman pm\`)
+
+Native Bun process manager. Daemon socket: \`~/.config/envman/run/daemon.sock\`.
+
+\`\`\`bash
+# Daemon
+envman pm daemon start    # Start supervisor daemon (background)
+envman pm daemon stop     # Stop daemon
+envman pm daemon status   # Status daemon (running / stopped)
+
+# Kelola proses
+envman pm start --name <X> [-s <project:env>]... -- <command>
+envman pm ls              # List semua proses + status
+envman pm describe <name> # Detail proses (config, stats, restart history)
+envman pm stop <name>     # Stop proses (SIGTERM)
+envman pm restart <name>  # Restart proses
+envman pm delete <name>   # Hapus proses dari registry
+envman pm reset <name>    # Reset restart counter + quarantine flag
+envman pm save            # Persist state ke disk (survive daemon restart)
+envman pm sync <name>     # Re-fetch vars dari server + restart proses
+envman pm logs <name>     # Tail log proses (stdout + stderr)
+\`\`\`
+
+| Flag | Keterangan |
+|------|-----------|
+| \`--name <X>\` | Nama unik proses |
+| \`-s <project:env>\` | Source vars yang di-inject ke proses (bisa multiple) |
+
+**Auto-restart**: exponential backoff 1s→60s, quarantine setelah 5 restart dalam 60 detik. Log rotation 10 MB × 5 file.
+
+---
+
+### \`envman docs\`
+
+\`\`\`bash
+envman docs              # Print docs lengkap ke stdout (markdown)
+envman docs | pbcopy     # Salin ke clipboard
+envman docs > context.md # Simpan ke file, lalu attach ke context AI agent
+\`\`\`
+
+Butuh auth (\`envman login\` atau env var). Fetch dari \`${origin}/api/docs.md\`.
+
+---
+
+### Auth Resolution (prioritas tertinggi → terendah)
+
+1. \`ENVMAN_SERVER\` + \`ENVMAN_TOKEN\` dari vars di file \`-e\` (lokal)
+2. \`ENVMAN_SERVER\` + \`ENVMAN_TOKEN\` dari \`process.env\` / system env
+3. \`~/.config/envman/config.json\` (disimpan oleh \`envman login\`)
+
+---
+
 ### Contoh Penggunaan
 
 \`\`\`bash
@@ -80,9 +172,6 @@ envman -e myapp:production -e .env.local -- bun dev
 # Dua project berbeda sekaligus
 envman -e project-a:production -e project-b:staging -- bun start
 
-# Auth dari file lokal (bisa simpan ENVMAN_SERVER + TOKEN di sini)
-envman -e .env.creds -e myapp:production -- bun dev
-
 # CI/CD — auth via env vars, tanpa login
 ENVMAN_SERVER=${origin} \\
 ENVMAN_TOKEN=<TOKEN> \\
@@ -94,20 +183,9 @@ ENVMAN_TOKEN=<TOKEN> \\
 #   ENVMAN_TOKEN: $\{{ secrets.ENVMAN_TOKEN }}
 # run: envman -e myapp:production -- bun start
 
-# System env menang (PORT=8080 system beats server PORT=3000)
-PORT=8080 envman -e myapp:production -- bun start
-
-# Server menang (PORT dari server beats system)
-PORT=8080 envman --server-wins -e myapp:production -- bun start
+# Print docs untuk context AI agent
+envman docs > /tmp/envman-context.md
 \`\`\`
-
----
-
-### Auth Resolution (prioritas tertinggi → terendah)
-
-1. \`ENVMAN_SERVER\` + \`ENVMAN_TOKEN\` dari vars di file \`-e\` (lokal)
-2. \`ENVMAN_SERVER\` + \`ENVMAN_TOKEN\` dari \`process.env\` / system env
-3. \`~/.config/envman/config.json\` (disimpan oleh \`envman login\`)
 
 ---
 `
