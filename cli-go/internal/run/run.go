@@ -137,11 +137,24 @@ func Run(sources []string, command []string, serverWins bool) error {
 	// Build child environment
 	var childEnv []string
 	if serverWins {
-		// system env wins: start with merged, override with system
+		// System env wins: start from merged, then overwrite with system vars.
+		// Using a map to avoid undefined behavior from duplicate keys in env slice.
+		sysWin := make(map[string]string)
 		for k, v := range merged {
+			sysWin[k] = v
+		}
+		for _, e := range os.Environ() {
+			idx := strings.IndexByte(e, '=')
+			if idx < 0 {
+				continue
+			}
+			sysWin[e[:idx]] = e[idx+1:] // system overwrites merged
+		}
+		delete(sysWin, "ENVMAN_SERVER")
+		delete(sysWin, "ENVMAN_TOKEN")
+		for k, v := range sysWin {
 			childEnv = append(childEnv, k+"="+v)
 		}
-		childEnv = append(childEnv, os.Environ()...)
 	} else {
 		// merged wins: start with system, override with merged
 		sysEnv := make(map[string]string)
@@ -330,23 +343,74 @@ func interpreterExt(interpreter string) string {
 	return ""
 }
 
+// splitArgs splits a shell-like command string into tokens.
+// Handles single/double quotes (no backslash escaping — sufficient for stored alias args).
+func splitArgs(s string) []string {
+	var tokens []string
+	var cur strings.Builder
+	inSingle, inDouble := false, false
+	for _, ch := range s {
+		switch {
+		case ch == '\'' && !inDouble:
+			inSingle = !inSingle
+		case ch == '"' && !inSingle:
+			inDouble = !inDouble
+		case (ch == ' ' || ch == '\t' || ch == '\n') && !inSingle && !inDouble:
+			if cur.Len() > 0 {
+				tokens = append(tokens, cur.String())
+				cur.Reset()
+			}
+		default:
+			cur.WriteRune(ch)
+		}
+	}
+	if cur.Len() > 0 {
+		tokens = append(tokens, cur.String())
+	}
+	return tokens
+}
+
 // Alias resolves a project alias and runs it.
 func Alias(sources []string, ref string, extraArgs []string) error {
-	// ref format: "project:aliasName"
-	cfg, err := auth.Resolve()
-	if err != nil {
-		return err
+	// Mirror auth resolution from Run(): scan -e files for ENVMAN_SERVER/ENVMAN_TOKEN
+	var fileVars map[string]string
+	for _, s := range sources {
+		_, _, localFile := parseSource(s)
+		if localFile != "" {
+			fv, ferr := envparser.ParseFile(localFile)
+			if ferr != nil {
+				return fmt.Errorf("load %s: %w", localFile, ferr)
+			}
+			if fv["ENVMAN_SERVER"] != "" && fv["ENVMAN_TOKEN"] != "" {
+				fileVars = fv
+				break
+			}
+		}
 	}
+
+	var cfg *auth.Config
+	var cfgErr error
+	if fileVars != nil {
+		cfg, cfgErr = auth.ResolveWithEnvFile(fileVars)
+	} else {
+		cfg, cfgErr = auth.Resolve()
+	}
+	if cfgErr != nil {
+		return cfgErr
+	}
+
 	path := "/api/envman/aliases/resolve/" + url.PathEscape(ref)
 	body, err := api.Fetch(cfg, path, true /* useCache */)
 	if err != nil {
 		return err
 	}
 
+	// Server returns: { "args": "<string>", "project": "<slug>", "alias": "<name>" }
 	var result struct {
-		Args   []string `json:"args"`
-		Name   string   `json:"name"`
-		Error  string   `json:"error"`
+		Args    string `json:"args"`
+		Project string `json:"project"`
+		Alias   string `json:"alias"`
+		Error   string `json:"error"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return fmt.Errorf("parse alias response: %w", err)
@@ -355,9 +419,9 @@ func Alias(sources []string, ref string, extraArgs []string) error {
 		return fmt.Errorf("[envman] %s", result.Error)
 	}
 
-	// Re-parse args from the alias definition
-	// Args contains the full command with -e flags
-	allArgs := append(result.Args, extraArgs...)
+	// Split stored args string into tokens, then append any caller-supplied extra args
+	aliasArgs := splitArgs(result.Args)
+	allArgs := append(aliasArgs, extraArgs...)
 	return parseAndRun(cfg, sources, allArgs)
 }
 

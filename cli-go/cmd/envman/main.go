@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,324 +12,279 @@ import (
 	"github.com/bipprojectbali/envman/cli/internal/auth"
 	"github.com/bipprojectbali/envman/cli/internal/run"
 	"github.com/bipprojectbali/envman/cli/internal/update"
+	"github.com/spf13/cobra"
 )
 
-const VERSION = "0.17.0"
+// VERSION is set at build time via -ldflags "-X main.VERSION=x.y.z"
+var VERSION = "0.18.0"
 
 func main() {
-	args := os.Args[1:]
-
-	// Hidden background update check flag
-	if len(args) >= 4 && args[0] == "--_update-check" {
-		update.RunBgUpdateCheck(args[1], args[2], args[3])
+	// Handle hidden background update-check before cobra sees the args.
+	// Format: envman --_update-check <serverURL> <binaryPath> <currentVersion>
+	if len(os.Args) >= 5 && os.Args[1] == "--_update-check" {
+		update.RunBgUpdateCheck(os.Args[2], os.Args[3], os.Args[4])
 		return
 	}
 
-	// Show update notice + spawn background check (skip during update itself)
-	if len(args) == 0 || args[0] != "update" {
-		update.ShowUpdateNotice(VERSION)
-		if sv := auth.SavedServerURL(); sv != "" {
-			update.SpawnUpdateCheck(sv, "", VERSION)
-		}
-	}
-
-	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		printHelp()
-		return
-	}
-	if args[0] == "--version" || args[0] == "-v" {
-		fmt.Println(VERSION)
-		return
-	}
-
-	switch args[0] {
-	case "login":
-		if err := cmdLogin(args[1:]); err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
-	case "logout":
-		if err := auth.Remove(); err != nil {
-			fmt.Fprintln(os.Stderr, "[envman] Failed to remove config:", err)
-			os.Exit(1)
-		}
-		fmt.Println("Logged out.")
-	case "whoami":
-		if err := cmdWhoami(); err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
-	case "docs":
-		if err := cmdDocs(args[1:]); err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
-	case "update":
-		if err := cmdUpdate(); err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
-	case "run":
-		if err := cmdRun(args[1:]); err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
-	default:
-		// Run mode with -- separator (handles: -e flag, --server-wins, or bare --)
-		sepIdx := -1
-		for i, a := range args {
-			if a == "--" {
-				sepIdx = i
-				break
-			}
-		}
-		if sepIdx == -1 {
-			// If args look like flags (-e, --server-wins) without --, give targeted error
-			if strings.HasPrefix(args[0], "-") {
-				fmt.Fprintln(os.Stderr, "Missing -- separator.")
-				fmt.Fprintln(os.Stderr, "Usage: envman -e <project:env|file> -- <command>")
-			} else {
-				fmt.Fprintln(os.Stderr, "Unknown command:", args[0])
-				fmt.Fprintln(os.Stderr, "Run 'envman --help' for usage.")
-			}
-			os.Exit(1)
-		}
-		flagArgs := args[:sepIdx]
-		command := args[sepIdx+1:]
-		if err := cmdRunWithFlags(flagArgs, command); err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
-		}
+	if err := buildRootCmd().Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }
 
-func cmdLogin(args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("Usage: envman login <server-url> --token <token>")
+func buildRootCmd() *cobra.Command {
+	var sources []string
+	var serverWins bool
+
+	root := &cobra.Command{
+		Use:   "envman",
+		Short: "Environment variable manager CLI",
+		Long: fmt.Sprintf(`envman v%s — Environment variable manager
+
+Inject env vars from your envman server into any command.
+Reference project files and aliases stored on the server.`, VERSION),
+		Version:       VERSION,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		// Default run mode: handles "envman -e proj:env -- cmd" and "envman -- bash proj:script.sh"
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return cmd.Help()
+			}
+			if len(sources) == 0 && !hasFileRef(args) {
+				return fmt.Errorf(
+					"specify at least one -e source, or reference a project file\n\n" +
+						"Usage:\n" +
+						"  envman -e project:env -- command\n" +
+						"  envman -- bash myapp:scripts/deploy.sh",
+				)
+			}
+			return run.Run(sources, args, serverWins)
+		},
+		Example: `  # Inject env vars and run
+  envman -e myapp:production -- bun start
+
+  # Multiple sources (later overrides earlier)
+  envman -e myapp:base -e myapp:production -- bun dev
+
+  # Execute a project file
+  envman -- bash myapp:scripts/deploy.sh
+
+  # Expand and run an alias
+  envman run myapp:deploy`,
 	}
-	server := args[0]
+
+	// Output just the version number (no "envman version x.y.z" prefix)
+	root.SetVersionTemplate("{{.Version}}\n")
+
+	// Flags for root run-mode
+	root.Flags().StringArrayVarP(&sources, "env", "e", nil, "Source: `project:env` or local .env file (repeatable)")
+	root.Flags().BoolVar(&serverWins, "server-wins", false, "System env overrides merged vars (default: merged wins)")
+
+	// Show update notice before any command except update/help/version.
+	// PersistentPreRun is NOT called for --help or --version (cobra handles those first).
+	root.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if cmd.Name() != "update" {
+			update.ShowUpdateNotice(VERSION)
+			if sv := auth.SavedServerURL(); sv != "" {
+				update.SpawnUpdateCheck(sv, "", VERSION)
+			}
+		}
+	}
+
+	root.AddCommand(
+		loginCmd(),
+		logoutCmd(),
+		whoamiCmd(),
+		docsCmd(),
+		updateCmdFn(),
+		runCmd(),
+	)
+
+	return root
+}
+
+func loginCmd() *cobra.Command {
 	var token string
-	for i, a := range args {
-		if a == "--token" && i+1 < len(args) {
-			token = args[i+1]
-		}
-	}
-	if token == "" {
-		return fmt.Errorf("--token <token> required")
-	}
-	cfg := &auth.Config{Server: server, Token: token}
-	var result struct {
-		User struct {
-			Email string `json:"email"`
-			Role  string `json:"role"`
-		} `json:"user"`
-		TokenName string `json:"tokenName"`
-	}
-	if err := api.FetchJSON(cfg, "/api/envman/whoami", &result); err != nil {
-		return fmt.Errorf("login failed — check server URL and token: %w", err)
-	}
-	if err := auth.Save(cfg); err != nil {
-		return fmt.Errorf("save config: %w", err)
-	}
-	fmt.Printf("Logged in as %s (%s)\n", result.User.Email, result.User.Role)
-	if result.TokenName != "" {
-		fmt.Printf("Token: %s\n", result.TokenName)
-	}
-	return nil
-}
+	cmd := &cobra.Command{
+		Use:   "login <server-url>",
+		Short: "Save server credentials to config file",
+		Long: `Authenticate with an envman server and save credentials locally.
 
-func cmdWhoami() error {
-	cfg, err := auth.Resolve()
-	if err != nil {
-		return err
-	}
-	var result struct {
-		User struct {
-			Email string `json:"email"`
-			Role  string `json:"role"`
-		} `json:"user"`
-		TokenName string `json:"tokenName"`
-	}
-	if err := api.FetchJSON(cfg, "/api/envman/whoami", &result); err != nil {
-		return err
-	}
-	fmt.Printf("User:   %s (%s)\n", result.User.Email, result.User.Role)
-	if result.TokenName != "" {
-		fmt.Printf("Token:  %s\n", result.TokenName)
-	}
-	fmt.Printf("Server: %s\n", cfg.Server)
-	return nil
-}
-
-func cmdDocs(args []string) error {
-	if len(args) > 0 && (args[0] == "--help" || args[0] == "-h") {
-		fmt.Println("Usage: envman docs")
-		fmt.Println()
-		fmt.Println("Print the full API docs and CLI reference to stdout.")
-		fmt.Println("Pipe to a file or clipboard for use as AI agent context:")
-		fmt.Println()
-		fmt.Println("  envman docs > context.md")
-		fmt.Println("  envman docs | pbcopy")
-		return nil
-	}
-	cfg, err := auth.Resolve()
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequest("GET", cfg.Server+"/api/docs.md", nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+cfg.Token)
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("[envman] failed to fetch docs: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("[envman] failed to fetch docs (HTTP %d)", resp.StatusCode)
-	}
-	_, err = io.Copy(os.Stdout, resp.Body)
-	return err
-}
-
-func cmdUpdate() error {
-	cfg, err := auth.Resolve()
-	if err != nil {
-		return fmt.Errorf("need auth to check update server — %w", err)
-	}
-	return update.Update(cfg.Server, VERSION)
-}
-
-func cmdRun(args []string) error {
-	// "envman run [-e <source>]... <project>:<alias> [-- extraArgs...]"
-	var sources []string
-	var ref string
-	var extraArgs []string
-
-	i := 0
-	for i < len(args) {
-		if args[i] == "-e" && i+1 < len(args) {
-			sources = append(sources, args[i+1])
-			i += 2
-		} else if args[i] == "--" {
-			extraArgs = args[i+1:]
-			i = len(args)
-		} else if ref == "" {
-			ref = args[i]
-			i++
-		} else {
-			extraArgs = append(extraArgs, args[i])
-			i++
-		}
-	}
-
-	if ref == "" {
-		return fmt.Errorf("Usage: envman run [-e <source>]... <project>:<alias>")
-	}
-
-	return run.Alias(sources, ref, extraArgs)
-}
-
-func cmdRunWithFlags(flagArgs []string, command []string) error {
-	var sources []string
-	serverWins := false
-	i := 0
-	for i < len(flagArgs) {
-		switch flagArgs[i] {
-		case "-e":
-			if i+1 >= len(flagArgs) {
-				return fmt.Errorf("-e requires a value")
+Credentials are stored at ~/.config/envman/config.json and used
+by default for all subsequent commands.`,
+		Args:    cobra.ExactArgs(1),
+		Example: `  envman login https://envman.example.com --token em_abc123`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			server := strings.TrimRight(args[0], "/")
+			cfg := &auth.Config{Server: server, Token: token}
+			var result struct {
+				User struct {
+					Email string `json:"email"`
+					Role  string `json:"role"`
+				} `json:"user"`
+				TokenName string `json:"tokenName"`
 			}
-			sources = append(sources, flagArgs[i+1])
-			i += 2
-		case "--server-wins":
-			serverWins = true
-			i++
-		default:
-			return fmt.Errorf("unknown flag: %s\nRun 'envman --help' for usage.", flagArgs[i])
-		}
+			if err := api.FetchJSON(cfg, "/api/envman/whoami", &result); err != nil {
+				return fmt.Errorf("login failed — check server URL and token: %w", err)
+			}
+			if err := auth.Save(cfg); err != nil {
+				return fmt.Errorf("save config: %w", err)
+			}
+			fmt.Printf("Logged in as %s (%s)\n", result.User.Email, result.User.Role)
+			if result.TokenName != "" {
+				fmt.Printf("Token: %s\n", result.TokenName)
+			}
+			return nil
+		},
 	}
-
-	if len(sources) == 0 && !hasFileRef(command) {
-		return fmt.Errorf("Specify at least one -e source, or reference a project file directly.\n" +
-			"Usage: envman -e project:env -- command\n" +
-			"       envman -- bash myapp:scripts/deploy.sh")
-	}
-
-	return run.Run(sources, command, serverWins)
+	cmd.Flags().StringVar(&token, "token", "", "API token (required)")
+	_ = cmd.MarkFlagRequired("token")
+	return cmd
 }
 
-// hasFileRef checks if any command arg looks like a project file reference (slug:path/file.ext).
-func hasFileRef(command []string) bool {
-	for _, arg := range command {
-		idx := strings.IndexByte(arg, ':')
-		if idx < 0 {
+func logoutCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "logout",
+		Short: "Remove saved server credentials",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := auth.Remove(); err != nil {
+				return fmt.Errorf("remove config: %w", err)
+			}
+			fmt.Println("Logged out.")
+			return nil
+		},
+	}
+}
+
+func whoamiCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "whoami",
+		Short: "Show current authenticated user and server",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return err
+			}
+			var result struct {
+				User struct {
+					Email string `json:"email"`
+					Role  string `json:"role"`
+				} `json:"user"`
+				TokenName string `json:"tokenName"`
+			}
+			if err := api.FetchJSON(cfg, "/api/envman/whoami", &result); err != nil {
+				return err
+			}
+			fmt.Printf("User:   %s (%s)\n", result.User.Email, result.User.Role)
+			if result.TokenName != "" {
+				fmt.Printf("Token:  %s\n", result.TokenName)
+			}
+			fmt.Printf("Server: %s\n", cfg.Server)
+			return nil
+		},
+	}
+}
+
+func docsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "docs",
+		Short: "Print full API docs and CLI reference to stdout",
+		Long: `Fetch and print the complete API documentation and CLI reference.
+
+Designed for piping into AI agents, files, or a pager:
+
+  envman docs > context.md
+  envman docs | pbcopy
+  envman docs | less`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return err
+			}
+			req, err := http.NewRequest("GET", cfg.Server+"/api/docs.md", nil)
+			if err != nil {
+				return err
+			}
+			req.Header.Set("Authorization", "Bearer "+cfg.Token)
+			client := &http.Client{Timeout: 60 * time.Second}
+			resp, err := client.Do(req)
+			if err != nil {
+				return fmt.Errorf("failed to fetch docs: %w", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("failed to fetch docs (HTTP %d)", resp.StatusCode)
+			}
+			_, err = io.Copy(os.Stdout, resp.Body)
+			return err
+		},
+	}
+}
+
+func updateCmdFn() *cobra.Command {
+	return &cobra.Command{
+		Use:   "update",
+		Short: "Update CLI to the latest version from the server",
+		Long: `Download and replace the current binary with the latest version.
+
+The server URL is read from the saved credentials (envman login).
+On macOS/Linux the binary is replaced in-place; sudo is used as fallback.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return fmt.Errorf("need auth to check update server — %w", err)
+			}
+			return update.Update(cfg.Server, VERSION)
+		},
+	}
+}
+
+func runCmd() *cobra.Command {
+	var sources []string
+	cmd := &cobra.Command{
+		Use:   "run [-e source]... project:alias [-- extra args]",
+		Short: "Expand a stored alias and run it",
+		Long: `Fetch a stored alias from the server, expand its command args, and execute.
+
+The alias defines the full command including any -e sources.
+Extra -e flags you pass here are merged in (alias sources take precedence).`,
+		Example: `  envman run myapp:deploy
+  envman run -e .env.local myapp:deploy
+  envman run myapp:deploy -- --verbose`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ref := args[0]
+			extraArgs := args[1:]
+			return run.Alias(sources, ref, extraArgs)
+		},
+	}
+	cmd.Flags().StringArrayVarP(&sources, "env", "e", nil, "Additional source: `project:env` or local file")
+	return cmd
+}
+
+// hasFileRef returns true if any arg looks like a project file reference (slug:path/or.ext).
+// Excludes URL schemes (http://, https://, ftp://, etc.) to avoid false positives
+// when the command contains URLs.
+func hasFileRef(args []string) bool {
+	for _, arg := range args {
+		colon := strings.IndexByte(arg, ':')
+		if colon <= 0 {
 			continue
 		}
-		rest := arg[idx+1:]
+		rest := arg[colon+1:]
+		// Exclude URL schemes: they always have "//" immediately after ":"
+		if strings.HasPrefix(rest, "//") {
+			continue
+		}
 		if strings.Contains(rest, "/") || strings.Contains(rest, ".") {
 			return true
 		}
 	}
 	return false
 }
-
-func printHelp() {
-	fmt.Printf(`envman v%s
-
-USAGE:
-  envman login <server-url> --token <token>   Save credentials to config file
-  envman logout                                Remove saved credentials
-  envman whoami                                Show current authenticated user
-  envman update                                Update CLI to latest version
-  envman docs                                  Print full API docs + CLI reference to stdout
-  envman run [-e <source>]... <project>:<alias> [args...]  Expand alias + run
-  envman [options] -- <command>                Inject env vars and run command
-  envman -- <interpreter> <project>:<path/file.ext>  Execute project file
-
-OPTIONS:
-  -e <project>:<env>   Fetch vars from server environment
-  -e <file>            Load vars from local file (.env, etc.)
-  --server-wins        System env overrides merged vars (default: merged wins)
-
-FILE REFERENCE (in command args, after --)
-  slug:prefix/file.ext   Short form — disambiguated by "/" or extension
-  slug:file.ext          Short form — single file
-
-AUTHENTICATION (highest priority first):
-  1. ENVMAN_SERVER + ENVMAN_TOKEN in a local -e file
-  2. ENVMAN_SERVER + ENVMAN_TOKEN as system env vars
-  3. Config file saved by envman login (~/.config/envman/config.json)
-
-EXAMPLES:
-  # Login
-  envman login https://envman.example.com --token em_abc123
-
-  # Single server env
-  envman -e myapp:production -- bun start
-
-  # Multiple server envs (later overrides earlier)
-  envman -e myapp:base -e myapp:production -- bun dev
-
-  # Mix server + local
-  envman -e myapp:production -e .env.local -- bun dev
-
-  # Execute project file
-  envman -- bash myapp:scripts/deploy.sh
-  envman -- bun myapp:utils/seed.ts
-
-  # With env vars
-  envman -e myapp:production -- bash myapp:scripts/deploy.sh
-
-  # CI/CD — auth via env vars
-  ENVMAN_SERVER=https://envman.example.com ENVMAN_TOKEN=em_xxx \
-    envman -e myapp:production -- bun start
-
-Manage projects at: <server-url>/envmanager
-`, VERSION)
-}
-
-// Ensure api package is imported (used indirectly via FetchJSON)
-var _ = json.Marshal

@@ -1,6 +1,7 @@
 package update
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,7 +48,7 @@ func DetectPlatform() string {
 	}
 }
 
-// ShowUpdateNotice prints a notice if there's a pending update.
+// ShowUpdateNotice prints a notice to stderr if there is a newer version available.
 func ShowUpdateNotice(currentVersion string) {
 	data, err := os.ReadFile(updateCheckFile())
 	if err != nil {
@@ -57,13 +58,14 @@ func ShowUpdateNotice(currentVersion string) {
 	if err := json.Unmarshal(data, &uc); err != nil {
 		return
 	}
-	if uc.LatestVersion != "" && uc.LatestVersion != currentVersion && uc.LatestVersion != "v"+currentVersion {
-		latest := strings.TrimPrefix(uc.LatestVersion, "v")
-		fmt.Fprintf(os.Stderr, "\n[envman] Update available: v%s → %s\n  Run: envman update\n\n", currentVersion, latest)
+	current := strings.TrimPrefix(currentVersion, "v")
+	latest := strings.TrimPrefix(uc.LatestVersion, "v")
+	if latest != "" && latest != current {
+		fmt.Fprintf(os.Stderr, "\n[envman] Update available: v%s → v%s\n  Run: envman update\n\n", current, latest)
 	}
 }
 
-// SpawnUpdateCheck starts a background process to check for updates silently.
+// SpawnUpdateCheck starts a detached background process to check for updates silently.
 func SpawnUpdateCheck(serverURL, binaryPath string, currentVersion string) {
 	self, err := os.Executable()
 	if err != nil {
@@ -161,14 +163,27 @@ func Update(serverURL, currentVersion string) error {
 	}
 
 	if err := downloadAndReplace(downloadURL, self); err != nil {
-		if isPermissionError(err) {
-			fmt.Printf("[envman] Permission denied — retrying with sudo...\n")
-			return sudoReplace(downloadURL, self)
+		if !isPermissionError(err) {
+			return err
 		}
-		return err
+		fmt.Printf("[envman] Permission denied — retrying with sudo...\n")
+		if err := sudoReplace(downloadURL, self); err != nil {
+			return err
+		}
 	}
 
 	fmt.Printf("Updated to v%s successfully.\n", latestClean)
+
+	// Update the cache so the update notice doesn't reappear on the next run.
+	now := time.Now().UnixNano() / int64(time.Millisecond)
+	cacheOut := updateCheck{
+		LatestVersion: latestClean,
+		CurrentBinary: self,
+		CheckedAt:     now,
+	}
+	cacheData, _ := json.Marshal(cacheOut)
+	_ = os.MkdirAll(auth.ConfigDir(), 0700)
+	_ = os.WriteFile(updateCheckFile(), cacheData, 0600)
 	return nil
 }
 
@@ -178,7 +193,8 @@ func downloadAndReplace(downloadURL, targetPath string) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Accept-Encoding", "gzip")
+	// Do NOT set Accept-Encoding: gzip manually — Go's transport auto-adds it
+	// and transparently decompresses the response. Manual header prevents auto-decompress.
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -190,7 +206,7 @@ func downloadAndReplace(downloadURL, targetPath string) error {
 		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
 	}
 
-	// Write to temp file in same dir (for atomic rename)
+	// Write to temp file in same dir as target (for atomic rename on same filesystem).
 	dir := filepath.Dir(targetPath)
 	tmp, err := os.CreateTemp(dir, ".envman-update-*")
 	if err != nil {
@@ -199,7 +215,7 @@ func downloadAndReplace(downloadURL, targetPath string) error {
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath)
 
-	// Progress reporting
+	// Content-Length may be absent when Go's transport decompresses gzip transparently.
 	var total int64
 	if cl := resp.Header.Get("Content-Length"); cl != "" {
 		if n, err := strconv.ParseInt(cl, 10, 64); err == nil {
@@ -207,7 +223,20 @@ func downloadAndReplace(downloadURL, targetPath string) error {
 		}
 	}
 
-	pr := &progressReader{r: resp.Body, total: total}
+	// If the server sends Content-Encoding: gzip without Go's transport handling it
+	// (e.g. caller set Accept-Encoding manually elsewhere), decompress explicitly.
+	var bodyReader io.Reader = resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gz, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return fmt.Errorf("gzip reader: %w", err)
+		}
+		defer gz.Close()
+		total = 0 // compressed Content-Length no longer meaningful
+		bodyReader = gz
+	}
+
+	pr := &progressReader{r: bodyReader, total: total}
 	if _, err := io.Copy(tmp, pr); err != nil {
 		tmp.Close()
 		return fmt.Errorf("write: %w", err)
@@ -215,12 +244,10 @@ func downloadAndReplace(downloadURL, targetPath string) error {
 	tmp.Close()
 	fmt.Println()
 
-	// Make executable
 	if err := os.Chmod(tmpPath, 0755); err != nil {
 		return fmt.Errorf("chmod: %w", err)
 	}
 
-	// Atomic replace
 	if err := os.Rename(tmpPath, targetPath); err != nil {
 		return err
 	}
@@ -228,7 +255,6 @@ func downloadAndReplace(downloadURL, targetPath string) error {
 }
 
 func sudoReplace(downloadURL, targetPath string) error {
-	// Download to temp, then sudo mv
 	tmp, err := os.CreateTemp("", "envman-update-*")
 	if err != nil {
 		return err
@@ -238,14 +264,24 @@ func sudoReplace(downloadURL, targetPath string) error {
 
 	client := &http.Client{Timeout: 5 * time.Minute}
 	req, _ := http.NewRequest("GET", downloadURL, nil)
-	req.Header.Set("Accept-Encoding", "gzip")
+	// Do NOT set Accept-Encoding: gzip manually — same reason as downloadAndReplace.
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	pr := &progressReader{r: resp.Body}
+	var bodyReader io.Reader = resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gz, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return fmt.Errorf("gzip reader: %w", err)
+		}
+		defer gz.Close()
+		bodyReader = gz
+	}
+
+	pr := &progressReader{r: bodyReader}
 	if _, err := io.Copy(tmp, pr); err != nil {
 		tmp.Close()
 		return err
