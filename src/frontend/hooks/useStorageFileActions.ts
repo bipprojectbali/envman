@@ -67,6 +67,11 @@ export function useStorageFileActions(file: StorageObject, slug: string) {
     if (url) window.open(url, '_blank')
   }
 
+  /** Isi cache dari luar (misal dari thumbnail fetch) agar drag-to-download tidak perlu fetch ulang. */
+  function setPresignedCache(url: string) {
+    presignedCache.current = { url, at: Date.now() }
+  }
+
   return {
     copied,
     previewOpen,
@@ -76,6 +81,7 @@ export function useStorageFileActions(file: StorageObject, slug: string) {
     handleDownload,
     handleDragStart,
     prefetchPresigned,
+    setPresignedCache,
     canPreview: isPreviewable(file.mimeType, file.path),
     canCopy: isTextFile(file.mimeType, file.path),
   }

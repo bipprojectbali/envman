@@ -98,6 +98,14 @@ export function minioPresign(
   })
 }
 
+/** Copy object dari srcKey ke destKey (dipakai untuk rename). Baca ke memory lalu tulis ulang. */
+export async function minioCopy(srcKey: string, destKey: string, mimeType: string): Promise<void> {
+  const client = getMinioClient()
+  if (!client) throw new Error('MinIO tidak dikonfigurasi')
+  const data = await client.file(srcKey).arrayBuffer()
+  await client.write(destKey, data, { type: mimeType })
+}
+
 /** Build MinIO key dari projectId + path. */
 export function buildMinioKey(projectId: string, path: string): string {
   return `${projectId}/${path}`

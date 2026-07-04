@@ -1,35 +1,54 @@
-import { ActionIcon, Badge, Card, Group, Image, SimpleGrid, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core'
-import { TbCheck, TbCopy, TbDownload, TbEye, TbEyeOff, TbFile, TbFileSearch, TbFolder, TbShare2, TbTrash } from 'react-icons/tb'
+import { ActionIcon, Badge, Card, Group, Image, Modal, SimpleGrid, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core'
+import { useEffect, useState } from 'react'
+import { TbCheck, TbCopy, TbDownload, TbEye, TbEyeOff, TbFileSearch, TbFolder, TbPencil, TbShare2, TbTrash } from 'react-icons/tb'
+import { apiFetch } from '@/frontend/lib/api'
 import { useStorageFileActions } from '@/frontend/hooks/useStorageFileActions'
-import { fmtBytes } from '@/frontend/lib/storage-format'
+import { fmtBytes, getFileIcon } from '@/frontend/lib/storage-format'
 import { StorageFileDrawer } from './StorageFileDrawer'
+import { StorageRenameModal } from './StorageRenameModal'
 
 interface StorageObject {
   id: string; path: string; size: number; mimeType: string
   isPublic: boolean; tags: string[]; description: string | null
 }
 interface FileCardProps {
-  file: StorageObject; slug: string; isOwner: boolean
-  onTogglePublic: () => void; onDelete: () => void
+  file: StorageObject; slug: string; isOwner: boolean; canEdit: boolean
+  onTogglePublic: () => void; onDelete: () => void; onRename: () => void
 }
-interface FolderCardProps {
-  name: string; onClick: () => void
-}
+interface FolderCardProps { name: string; onClick: () => void }
 interface GridProps {
-  slug: string; isOwner: boolean; folders: string[]; files: StorageObject[]; prefix: string
+  slug: string; isOwner: boolean; canEdit: boolean; folders: string[]; files: StorageObject[]; prefix: string
   onFolderClick: (path: string) => void
   onTogglePublic: (path: string, isPublic: boolean) => void
   onDelete: (path: string) => void
+  onRename: () => void
 }
 
-function FileCard({ file, slug, isOwner, onTogglePublic, onDelete }: FileCardProps) {
+function FileCard({ file, slug, isOwner, canEdit, onTogglePublic, onDelete, onRename }: FileCardProps) {
   const { copied, previewOpen, setPreviewOpen, handleShare, handleCopyContent, handleDownload,
-    handleDragStart, prefetchPresigned, canPreview, canCopy } = useStorageFileActions(file, slug)
+    handleDragStart, prefetchPresigned, setPresignedCache, canPreview, canCopy } = useStorageFileActions(file, slug)
+  const [renameOpen, setRenameOpen] = useState(false)
 
   const name = file.path.split('/').pop() ?? file.path
   const ext = name.includes('.') ? name.split('.').pop()?.toUpperCase() : null
   const isImg = file.mimeType.startsWith('image/')
-  const publicThumb = file.isPublic && isImg ? `/api/public/storage/${slug}/${file.path}` : null
+  const FileIcon = getFileIcon(file.mimeType, file.path)
+
+  // Thumbnail: publik pakai permanent URL langsung; privat fetch presigned saat mount
+  const [thumbUrl, setThumbUrl] = useState<string | null>(
+    file.isPublic && isImg ? `/api/public/storage/${slug}/${file.path}` : null
+  )
+  useEffect(() => {
+    if (!isImg || file.isPublic || thumbUrl) return
+    apiFetch<{ url: string }>(`/api/envman/projects/${slug}/storage/download?path=${encodeURIComponent(file.path)}`)
+      .then((res) => {
+        if (res?.url) {
+          setThumbUrl(res.url)
+          setPresignedCache(res.url) // warmup cache drag-to-download sekalian
+        }
+      })
+      .catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -39,10 +58,12 @@ function FileCard({ file, slug, isOwner, onTogglePublic, onDelete }: FileCardPro
           style={{ cursor: canPreview ? 'pointer' : undefined, display: 'flex', alignItems: 'center',
             justifyContent: 'center', height: 90,
             background: 'var(--mantine-color-default-hover)', overflow: 'hidden' }}>
-          {publicThumb ? (
-            <Image src={publicThumb} h={90} fit="cover" />
+          {thumbUrl ? (
+            <Image src={thumbUrl} h={90} fit="cover" />
           ) : (
-            <ThemeIcon size={36} variant="light" color="gray" radius="xl"><TbFile size={18} /></ThemeIcon>
+            <ThemeIcon size={36} variant="light" color="gray" radius="xl">
+              <FileIcon size={18} />
+            </ThemeIcon>
           )}
         </Card.Section>
 
@@ -78,6 +99,13 @@ function FileCard({ file, slug, isOwner, onTogglePublic, onDelete }: FileCardPro
           <Tooltip label="Download">
             <ActionIcon size="xs" variant="subtle" onClick={handleDownload}><TbDownload size={11} /></ActionIcon>
           </Tooltip>
+          {canEdit && (
+            <Tooltip label="Rename">
+              <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setRenameOpen(true)}>
+                <TbPencil size={11} />
+              </ActionIcon>
+            </Tooltip>
+          )}
           {isOwner && (
             <Tooltip label={file.isPublic ? 'Set private' : 'Set publik'}>
               <ActionIcon size="xs" variant="subtle" color={file.isPublic ? 'green' : 'gray'} onClick={onTogglePublic}>
@@ -94,6 +122,10 @@ function FileCard({ file, slug, isOwner, onTogglePublic, onDelete }: FileCardPro
       </Card>
 
       <StorageFileDrawer file={file} slug={slug} opened={previewOpen} onClose={() => setPreviewOpen(false)} />
+
+      <Modal opened={renameOpen} onClose={() => setRenameOpen(false)} title="Rename File" size="sm">
+        <StorageRenameModal slug={slug} file={file} onSuccess={onRename} onClose={() => setRenameOpen(false)} />
+      </Modal>
     </>
   )
 }
@@ -110,7 +142,7 @@ function FolderCard({ name, onClick }: FolderCardProps) {
   )
 }
 
-export function StorageFileGrid({ slug, isOwner, folders, files, prefix, onFolderClick, onTogglePublic, onDelete }: GridProps) {
+export function StorageFileGrid({ slug, isOwner, canEdit, folders, files, prefix, onFolderClick, onTogglePublic, onDelete, onRename }: GridProps) {
   return (
     <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
       {folders.map((folder) => {
@@ -118,9 +150,10 @@ export function StorageFileGrid({ slug, isOwner, folders, files, prefix, onFolde
         return <FolderCard key={folderPath} name={folder} onClick={() => onFolderClick(folderPath)} />
       })}
       {files.map((f) => (
-        <FileCard key={f.id} file={f} slug={slug} isOwner={isOwner}
+        <FileCard key={f.id} file={f} slug={slug} isOwner={isOwner} canEdit={canEdit}
           onTogglePublic={() => onTogglePublic(f.path, f.isPublic)}
-          onDelete={() => onDelete(f.path)} />
+          onDelete={() => onDelete(f.path)}
+          onRename={onRename} />
       ))}
     </SimpleGrid>
   )

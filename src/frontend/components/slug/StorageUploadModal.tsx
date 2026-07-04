@@ -1,12 +1,13 @@
 import { Box, Button, Code, FileInput, Group, Image, Progress, ScrollArea, Stack, TagsInput, Text, TextInput, Textarea } from '@mantine/core'
 import { useEffect, useRef, useState } from 'react'
 import { TbClipboard, TbCloudUpload } from 'react-icons/tb'
-import { fmtBytes, isTextFile } from '@/frontend/lib/storage-format'
+import { fmtBytes, isTextFile, suggestNonConflictPath } from '@/frontend/lib/storage-format'
 
 interface Props {
   slug: string
   prefix: string
   defaultFile?: File
+  existingPaths?: string[]
   onSuccess: () => void
   onClose: () => void
 }
@@ -25,7 +26,7 @@ function fmtEta(sec: number): string {
   return `~${(sec / 3600).toFixed(1)} jam`
 }
 
-export function StorageUploadModal({ slug, prefix, defaultFile, onSuccess, onClose }: Props) {
+export function StorageUploadModal({ slug, prefix, defaultFile, existingPaths, onSuccess, onClose }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [path, setPath] = useState(prefix ? prefix + '/' : '')
   const [description, setDescription] = useState('')
@@ -41,7 +42,10 @@ export function StorageUploadModal({ slug, prefix, defaultFile, onSuccess, onClo
 
   function handleFileChange(f: File | null) {
     setFile(f)
-    if (f && !path.trim()) setPath(prefix ? `${prefix}/${f.name}` : f.name)
+    if (f && !path.trim()) {
+      const base = prefix ? `${prefix}/${f.name}` : f.name
+      setPath(suggestNonConflictPath(base, existingPaths ?? []))
+    }
 
     // Reset preview
     setPreviewUrl(null)

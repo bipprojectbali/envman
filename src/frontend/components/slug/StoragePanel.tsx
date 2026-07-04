@@ -157,9 +157,9 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
             {(!data?.folders.length && !data?.files.length) ? (
               <Text size="sm" c="dimmed" ta="center" py="xl">Storage kosong. Upload file pertama.</Text>
             ) : (
-              <StorageFileGrid slug={slug} isOwner={isOwner}
+              <StorageFileGrid slug={slug} isOwner={isOwner} canEdit={canEdit}
                 folders={data?.folders ?? []} files={data?.files ?? []} prefix={prefix}
-                onFolderClick={setPrefix} onTogglePublic={togglePublic} onDelete={handleDelete} />
+                onFolderClick={setPrefix} onTogglePublic={togglePublic} onDelete={handleDelete} onRename={invalidate} />
             )}
           </>
         ) : (
@@ -176,9 +176,10 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
               )
             })}
             {data?.files.map((f) => (
-              <StorageFileRow key={f.id} file={f} slug={slug} isOwner={isOwner}
+              <StorageFileRow key={f.id} file={f} slug={slug} isOwner={isOwner} canEdit={canEdit}
                 onTogglePublic={() => togglePublic(f.path, f.isPublic)}
-                onDelete={() => handleDelete(f.path)} />
+                onDelete={() => handleDelete(f.path)}
+                onRename={invalidate} />
             ))}
             {!data?.folders.length && !data?.files.length && (
               <Text size="sm" c="dimmed" ta="center" py="xl">Storage kosong. Upload file pertama.</Text>
@@ -189,6 +190,7 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
 
       <Modal opened={uploadOpen} onClose={closeModal} title="Upload File" size="md">
         <StorageUploadModal slug={slug} prefix={prefix} defaultFile={droppedFile ?? undefined}
+          existingPaths={data?.files.map((f) => f.path)}
           onSuccess={invalidate} onClose={closeModal} />
       </Modal>
     </Stack>
