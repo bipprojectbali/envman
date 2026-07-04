@@ -1,10 +1,10 @@
 import {
-  Anchor, Box, Breadcrumbs, Button, Group, Modal,
+  Alert, Anchor, Box, Breadcrumbs, Button, Group, Modal,
   Progress, Skeleton, Stack, Text, ThemeIcon, Tooltip,
 } from '@mantine/core'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbFolderSymlink, TbLayoutGrid, TbList, TbTrash } from 'react-icons/tb'
+import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbFolderSymlink, TbInfoCircle, TbLayoutGrid, TbList, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { fmtBytes } from '@/frontend/lib/storage-format'
 import { StorageFileGrid } from './StorageFileCard'
@@ -163,6 +163,18 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
           <Progress value={usedPct} color={usedColor} size="xs" radius="xl" />
         </Box>
       )}
+
+      <Alert variant="light" color="teal" radius="md" p="xs" icon={<TbInfoCircle size={15} />}
+        styles={{ message: { fontSize: 'var(--mantine-font-size-xs)' }, body: { gap: 4 } }}>
+        <Stack gap={4}>
+          <Text size="xs">
+            Simpan file per project — gambar, konfigurasi, skrip, dokumen, dsb. Upload via tombol, drag-drop ke panel, atau paste dari clipboard (Ctrl+V / ⌘V).
+          </Text>
+          <Text size="xs" c="dimmed">
+            Pilih banyak file sekaligus dengan checkbox untuk batch pindah atau hapus. Klik file untuk preview. Toggle list/grid via ikon kanan atas. File dengan <strong>isPublic</strong> dapat diakses tanpa login.
+          </Text>
+        </Stack>
+      </Alert>
 
       <Breadcrumbs separator="/" fz="sm">
         <Anchor size="sm" onClick={() => navigatePrefix('')} c={prefix ? 'blue' : 'dimmed'}>root</Anchor>
