@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-07-04
+
+### Fixed
+- **CLI Go — `envman run` crash**: server mengembalikan `args` alias sebagai string, bukan array — Go CLI salah asumsikan `[]string`. Ditambah shell tokenizer (`splitArgs`) yang menangani single/double quotes.
+- **CLI Go — `envman update` binary rusak**: kode secara manual meng-set `Accept-Encoding: gzip` yang menonaktifkan auto-decompress Go HTTP transport. Binary yang tertulis ke disk adalah file gzip mentah (tidak bisa dieksekusi). Difix dengan menghapus header manual — Go transport kini handle gzip secara transparan.
+- **CLI Go — update notice spam**: notice muncul di setiap perintah termasuk `--version` dan `--help`. Difix dengan migrasi ke cobra (`PersistentPreRun` tidak dipanggil untuk `--version`/`--help`).
+- **CLI Go — `--server-wins` tidak bekerja**: implementasi menggunakan duplicate keys di env slice — perilaku tidak terdefinisi. Difix dengan map approach seperti cabang default.
+- **CLI Go — auth resolution di `envman run`**: `Alias()` tidak men-scan sumber `-e` file untuk `ENVMAN_SERVER`/`ENVMAN_TOKEN` — credentials dari file lokal diabaikan.
+- **CLI Go — false positive URL di arg parsing**: `curl https://...` salah terdeteksi sebagai file reference. Difix dengan exclusion untuk skema URL (tanda `//` setelah `:`).
+- **CLI Go — success message hilang setelah sudo update**: `sudoReplace()` tidak punya pesan sukses. Difix dengan restrukturisasi alur `Update()`.
+- **CLI Go — format update notice inkonsisten**: tampil `v0.17.0 → 0.18.0` (tanpa prefix `v`). Difix menjadi `v0.17.0 → v0.18.0`.
+
+### Changed
+- **CLI Go — cobra integration**: `main.go` di-rewrite menggunakan [cobra](https://github.com/spf13/cobra) untuk UX yang lebih baik — structured help per subcommand, `--token` required flag di `login`, shell completion otomatis (`envman completion bash/zsh/fish`), dan error message yang konsisten. Binary size bertambah ~2 MB (7.8 MB → 8 MB, gzip 3 MB).
+
 ## [0.18.0] - 2026-07-04
 
 ### Added
