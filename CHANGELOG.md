@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.19.10] - 2026-07-05
+
+### Added
+- **`storage exec` cache** — binary yang dijalankan via `envman storage exec` kini di-cache di `~/.cache/envman/exec` (mode 0700) dan dipakai ulang selama tidak berubah. Run berulang jadi **instan** (nol transfer byte, hanya request metadata kecil untuk cek kesegaran).
+  - **Otomatis update**: cache tervalidasi via `size` + `updatedAt` dari server. File di-replace di storage → `updatedAt` berubah → binary otomatis di-download ulang (tidak pernah menjalankan versi basi diam-diam).
+  - **Anti-collision**: cache key = `sha256(server \x00 slug \x00 path)` — binary bernama sama di project berbeda (`a:tts-go` vs `b:tts-go`) tidak pernah bertabrakan.
+  - **Prune LRU**: total cache dibatasi 500 MB, entri terlama dihapus.
+  - **Flag baru**: `--offline` (pakai cache tanpa menghubungi server), `--no-cache` (paksa download ulang, bypass cache).
+
+### Changed
+- **`GET /api/envman/projects/:slug/storage/download`** kini mengembalikan `{url, size, updatedAt}` (sebelumnya `{url}`). Additive — `size` + `updatedAt` diambil dari `ProjectStorageObject` yang sudah ada, dipakai CLI sebagai validator cache.
+
 ## [0.19.9] - 2026-07-05
 
 ### Added
