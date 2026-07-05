@@ -294,7 +294,10 @@ MINIO_ENDPOINT=https://minio.example.com   # atau http://localhost:9000
 MINIO_ACCESS_KEY=...
 MINIO_SECRET_KEY=...
 MINIO_BUCKET=envman
+MINIO_PRESIGN_BASE_URL=http://1.2.3.4:9000  # opsional — URL direct MinIO tanpa Cloudflare untuk presigned PUT URL
 ```
+
+`MINIO_PRESIGN_BASE_URL` dipakai **khusus** untuk presigned PUT URL (CLI upload). Jika MinIO berada di belakang Cloudflare (limit 100 MB), set ke URL yang tidak lewat proxy. Operasi server-side dan download presign tetap memakai `MINIO_ENDPOINT`.
 
 Tanpa keempat var di atas, semua storage endpoint (yang butuh MinIO) return 503. List dan metadata PATCH tetap jalan (query DB saja).
 

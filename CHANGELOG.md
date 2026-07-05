@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.19.7] - 2026-07-05
+
+### Fixed
+- **CLI storage upload — 413 dari Cloudflare pada file besar**: presigned PUT URL yang dihasilkan server mewarisi `MINIO_ENDPOINT` yang berada di belakang Cloudflare (limit 100 MB free/pro). Ditambah env var opsional `MINIO_PRESIGN_BASE_URL` — jika diset ke URL direct MinIO (tidak lewat Cloudflare), presigned URL untuk CLI upload akan mengarah ke URL itu sehingga file besar bisa diupload tanpa terpotong proxy.
+  - Operasi server-side (read/write/delete) tetap memakai `MINIO_ENDPOINT`.
+  - Download (GET presign) tetap via `MINIO_ENDPOINT` — Cloudflare CDN tetap membantu untuk download.
+- **CLI error message 413 lebih informatif**: sebelumnya menampilkan seluruh HTML Cloudflare. Sekarang tampilkan pesan singkat yang menyebut solusi (`MINIO_PRESIGN_BASE_URL`).
+
 ## [0.19.6] - 2026-07-05
 
 ### Added

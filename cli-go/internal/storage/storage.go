@@ -214,8 +214,18 @@ func putToMinio(uploadURL string, r io.Reader, size int64, mimeType string, onPr
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		raw, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("[envman] MinIO HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		msg := strings.TrimSpace(string(raw))
+		// Strip HTML markup — proxy error pages (Cloudflare, nginx) return full HTML
+		if strings.HasPrefix(msg, "<") {
+			switch resp.StatusCode {
+			case 413:
+				msg = "upload ditolak oleh proxy (file terlalu besar). Pastikan MINIO_PRESIGN_BASE_URL diset ke URL direct MinIO yang tidak melewati Cloudflare."
+			default:
+				msg = fmt.Sprintf("proxy returned HTML error page (status %d)", resp.StatusCode)
+			}
+		}
+		return fmt.Errorf("[envman] MinIO HTTP %d: %s", resp.StatusCode, msg)
 	}
 	return nil
 }

@@ -1,4 +1,4 @@
-import { getMinioClient } from './minio'
+import { getMinioClient, getMinioPresignClient } from './minio'
 import { getSettingNumber } from './app-settings'
 
 export const STORAGE_MAX_FILE_MB_DEFAULT = 50
@@ -117,9 +117,13 @@ export function buildMinioKey(projectId: string, path: string): string {
   return `${projectId}/${path}`
 }
 
-/** Generate presigned PUT URL — CLI upload langsung ke MinIO tanpa melewati proxy. */
+/**
+ * Generate presigned PUT URL untuk CLI upload langsung ke MinIO.
+ * Menggunakan MINIO_PRESIGN_BASE_URL jika diset (bypass Cloudflare/proxy).
+ * Fallback ke MINIO_ENDPOINT jika env var tidak ada.
+ */
 export function minioPresignPut(minioKey: string, expiresIn = 3600): string {
-  const client = getMinioClient()
+  const client = getMinioPresignClient()
   if (!client) throw new Error('MinIO tidak dikonfigurasi')
   return client.presign(minioKey, { expiresIn, method: 'PUT' })
 }
