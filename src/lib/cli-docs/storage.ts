@@ -78,20 +78,27 @@ envman storage download myapp:config/nginx.conf | nginx -t -c /dev/stdin
 
 Download stream langsung dari MinIO — tidak melewati server envman (presigned URL).
 
-### Exec — download binary lalu jalankan langsung
+### Exec — download binary lalu jalankan langsung (cached)
 
-Untuk file **binary** (bukan script teks), \`storage exec\` mengunduh ke temp file privat
-(mode 0700), menjalankannya, lalu menghapusnya. Argumen setelah \`--\` diteruskan ke program;
-exit code program dipropagasi sebagai exit code envman.
+Untuk file **binary** (bukan script teks), \`storage exec\` menjalankannya langsung.
+Binary di-cache di \`~/.cache/envman/exec\` (mode 0700) dan dipakai ulang selama tidak
+berubah — run berulang jadi **instan** (hanya request metadata kecil untuk cek kesegaran,
+nol transfer byte). Argumen setelah \`--\` diteruskan; exit code program dipropagasi.
 
 \`\`\`bash
-envman storage exec myapp:bin/tts-go                       # jalankan tanpa argumen
+envman storage exec myapp:bin/tts-go                       # run 1: download+cache; run berikutnya: instan
 envman storage exec myapp:bin/tts-go -- --port 8080        # teruskan argumen
+envman storage exec --offline myapp:bin/tts-go             # pakai cache tanpa hubungi server
+envman storage exec --no-cache myapp:bin/tts-go            # paksa download ulang
 envman -e myapp:prod -- envman storage exec myapp:bin/tts-go  # inject vars + jalankan
 \`\`\`
 
+Cache tervalidasi via \`size\` + \`updatedAt\` dari server — file di-replace di server →
+otomatis download ulang (tidak menjalankan versi basi). Cache dipisah per server+project+path
+(hash), jadi binary bernama sama di project berbeda (mis. \`a:tts-go\` vs \`b:tts-go\`)
+tidak pernah bertabrakan. Total cache dibatasi 500 MB (prune LRU).
+
 Binary tidak bisa di-pipe ke \`| bash\` (hanya script teks yang bisa) — pakai \`exec\` untuk binary.
-Tidak ada yang tertinggal di disk setelah proses selesai.
 
 ### Hapus folder
 

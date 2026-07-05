@@ -85,13 +85,15 @@ export const storageCoreRouter = new Elysia()
 
     const obj = await prisma.projectStorageObject.findUnique({
       where: { projectId_path: { projectId: project.id, path } },
-      select: { minioKey: true, isPublic: true, path: true },
+      select: { minioKey: true, isPublic: true, path: true, size: true, updatedAt: true },
     })
     if (!obj) { set.status = 404; return { error: 'File tidak ditemukan' } }
 
     const filename = obj.path.split('/').pop() ?? obj.path
     const url = minioPresign(obj.minioKey, filename, obj.isPublic)
-    return { url }
+    // size + updatedAt are cache validators for the CLI: `storage exec` reuses a
+    // cached binary when both match, avoiding a full re-download of unchanged files.
+    return { url, size: obj.size, updatedAt: obj.updatedAt.toISOString() }
   })
 
   // ─── Update metadata (EDITOR+; isPublic hanya OWNER) ────────────────────

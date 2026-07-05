@@ -157,6 +157,11 @@ describe('Storage — Download', () => {
     const json = await res.json()
     expect(typeof json.url).toBe('string')
     expect(json.url).toMatch(/^https?:\/\//)
+    // Cache validators untuk `storage exec` — size + updatedAt dari DB
+    expect(typeof json.size).toBe('number')
+    expect(json.size).toBeGreaterThan(0)
+    expect(typeof json.updatedAt).toBe('string')
+    expect(json.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
 
   test('File tidak ada → 404', async () => {
