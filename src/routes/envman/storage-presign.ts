@@ -5,7 +5,7 @@ import { isMinioEnabled } from '../../lib/minio'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
 import {
-  sanitizePath, getUsedBytes, getQuotaBytes, getMaxFileSizeBytes,
+  sanitizePath, getUsedBytes, getQuotaBytes, getMaxFileSizeBytesForProject,
   buildMinioKey, minioPresignPut,
 } from '../../lib/storage-service'
 
@@ -26,11 +26,11 @@ export const storagePresignRouter = new Elysia()
 
     const project = await prisma.project.findFirst({
       where: { slug: params.slug, ...notDeleted },
-      select: { id: true, storageQuotaMb: true },
+      select: { id: true, storageQuotaMb: true, storageMaxFileMb: true },
     })
     if (!project) { set.status = 404; return { error: 'Project tidak ditemukan' } }
 
-    const maxFileBytes = await getMaxFileSizeBytes()
+    const maxFileBytes = await getMaxFileSizeBytesForProject(project.storageMaxFileMb)
     if (size > maxFileBytes) {
       set.status = 413
       return { error: `File terlalu besar (maks ${Math.round(maxFileBytes / 1024 / 1024)} MB)` }

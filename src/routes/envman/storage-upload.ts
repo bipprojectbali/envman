@@ -5,7 +5,7 @@ import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
 import {
   buildMinioKey,
-  getMaxFileSizeBytes,
+  getMaxFileSizeBytesForProject,
   getQuotaBytes,
   getUsedBytes,
   minioDelete,
@@ -33,7 +33,7 @@ export const storageUploadRouter = new Elysia()
 
     const project = await prisma.project.findFirst({
       where: { slug: params.slug, ...notDeleted },
-      select: { id: true, storageQuotaMb: true },
+      select: { id: true, storageQuotaMb: true, storageMaxFileMb: true },
     })
     if (!project) { set.status = 404; return { error: 'Project tidak ditemukan' } }
 
@@ -58,7 +58,7 @@ export const storageUploadRouter = new Elysia()
     }
 
     // Validasi ukuran file sebelum baca ke memory
-    const maxBytes = await getMaxFileSizeBytes()
+    const maxBytes = await getMaxFileSizeBytesForProject(project.storageMaxFileMb)
     if (file.size > maxBytes) {
       set.status = 413
       return { error: `Ukuran file melebihi batas ${Math.round(maxBytes / 1024 / 1024)} MB` }

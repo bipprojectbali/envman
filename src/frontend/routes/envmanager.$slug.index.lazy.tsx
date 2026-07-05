@@ -58,6 +58,7 @@ function ProjectDetailPage() {
   const myRole: string = project?.myRole ?? 'VIEWER'
   const canEdit = myRole === 'OWNER' || myRole === 'EDITOR'
   const isOwner = myRole === 'OWNER'
+  const isSuperAdmin = sessionData?.user?.role === 'SUPER_ADMIN'
 
   return (
     <Box>
@@ -126,7 +127,7 @@ function ProjectDetailPage() {
           </Tabs.Panel>
           <Tabs.Panel value="storage">
             <Paper withBorder p="md" radius="md">
-              <StoragePanel slug={slug} isOwner={isOwner} canEdit={canEdit} />
+              <StoragePanel slug={slug} isOwner={isOwner} canEdit={canEdit} isSuperAdmin={isSuperAdmin} />
             </Paper>
           </Tabs.Panel>
         </Tabs>

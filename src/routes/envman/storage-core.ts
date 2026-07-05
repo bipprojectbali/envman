@@ -17,7 +17,7 @@ export const storageCoreRouter = new Elysia()
 
     const project = await prisma.project.findFirst({
       where: { slug: params.slug, ...notDeleted },
-      select: { id: true, storageQuotaMb: true },
+      select: { id: true, storageQuotaMb: true, storageMaxFileMb: true },
     })
     if (!project) { set.status = 404; return { error: 'Project tidak ditemukan' } }
 
@@ -62,6 +62,7 @@ export const storageCoreRouter = new Elysia()
       folders: [...folders].sort(),
       files,
       usage: { usedBytes, quotaBytes },
+      limits: { storageMaxFileMb: project.storageMaxFileMb, storageQuotaMb: project.storageQuotaMb },
     }
   })
 

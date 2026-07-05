@@ -154,6 +154,13 @@ export const projectsCoreRouter = new Elysia()
           : body?.cardColor === null
             ? { cardColor: null }
             : {}),
+        // Storage limits: hanya SUPER_ADMIN yang boleh ubah; null = reset ke global default.
+        ...(auth.role === 'SUPER_ADMIN' && 'storageMaxFileMb' in (body ?? {})
+          ? { storageMaxFileMb: body.storageMaxFileMb === null ? null : Number(body.storageMaxFileMb) || null }
+          : {}),
+        ...(auth.role === 'SUPER_ADMIN' && 'storageQuotaMb' in (body ?? {})
+          ? { storageQuotaMb: body.storageQuotaMb === null ? null : Number(body.storageQuotaMb) || null }
+          : {}),
       },
     })
     await invalidateProjectCaches(params.slug)

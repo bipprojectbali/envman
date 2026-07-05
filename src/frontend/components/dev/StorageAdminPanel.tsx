@@ -1,7 +1,9 @@
-import { Alert, Badge, Button, Code, Group, Paper, Stack, Text, Title } from '@mantine/core'
+import { Alert, Badge, Button, Code, Group, NumberInput, Paper, Stack, Text, Title } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { TbAlertCircle, TbBucket, TbCheck, TbRefresh } from 'react-icons/tb'
+import { useState } from 'react'
+import { TbAlertCircle, TbBucket, TbCheck, TbDeviceFloppy, TbRefresh } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
+import { parseSettings } from './settings-types'
 
 type StorageStatus = {
   configured: boolean
@@ -18,6 +20,37 @@ export function StorageAdminPanel() {
     queryKey: ['admin', 'storage', 'status'],
     queryFn: () => apiFetch('/api/admin/storage/status'),
     staleTime: 10_000,
+  })
+
+  const { data: rawSettings } = useQuery<Record<string, string>>({
+    queryKey: ['settings'],
+    queryFn: () => apiFetch('/api/envman/settings'),
+    staleTime: 30_000,
+  })
+  const settings = rawSettings ? parseSettings(rawSettings) : null
+
+  const [maxFileMb, setMaxFileMb] = useState<number | string>('')
+  const [quotaMb, setQuotaMb] = useState<number | string>('')
+
+  // Sync state saat settings dimuat pertama kali
+  const [limitsSynced, setLimitsSynced] = useState(false)
+  if (settings && !limitsSynced) {
+    setMaxFileMb(settings.storage_max_file_mb)
+    setQuotaMb(settings.storage_default_quota_mb)
+    setLimitsSynced(true)
+  }
+
+  const saveLimits = useMutation({
+    mutationFn: () =>
+      apiFetch('/api/envman/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          { key: 'storage_max_file_mb', value: String(maxFileMb) },
+          { key: 'storage_default_quota_mb', value: String(quotaMb) },
+        ]),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
 
   const ensure = useMutation({
@@ -115,6 +148,48 @@ export function StorageAdminPanel() {
           Tambahkan <Code>MINIO_ENDPOINT</Code>, <Code>MINIO_ACCESS_KEY</Code>, <Code>MINIO_SECRET_KEY</Code>, dan <Code>MINIO_BUCKET</Code> ke file <Code>.env</Code>, lalu restart server.
         </Alert>
       )}
+
+      <Paper withBorder p="md" radius="md">
+        <Stack gap="sm">
+          <Text fw={500} size="sm">Batas Storage Default</Text>
+          <Text size="xs" c="dimmed">Berlaku untuk semua project yang tidak punya override per-project. SUPER_ADMIN bisa mengatur override per-project via ikon gear di panel Storage project.</Text>
+          <Group align="flex-end" gap="sm">
+            <NumberInput
+              label="Maks ukuran file (MB)"
+              description="Default: 50 MB"
+              value={maxFileMb}
+              onChange={setMaxFileMb}
+              min={1} max={10240}
+              w={200}
+            />
+            <NumberInput
+              label="Quota per project (MB)"
+              description="Default: 500 MB"
+              value={quotaMb}
+              onChange={setQuotaMb}
+              min={1} max={102400}
+              w={200}
+            />
+            <Button
+              leftSection={<TbDeviceFloppy size={14} />}
+              loading={saveLimits.isPending}
+              onClick={() => saveLimits.mutate()}
+            >
+              Simpan
+            </Button>
+          </Group>
+          {saveLimits.isSuccess && (
+            <Alert icon={<TbCheck size={14} />} color="green" title="Tersimpan" p="xs">
+              Batas storage default berhasil diupdate.
+            </Alert>
+          )}
+          {saveLimits.isError && (
+            <Alert icon={<TbAlertCircle size={14} />} color="red" title="Gagal simpan" p="xs">
+              {(saveLimits.error as Error)?.message ?? 'Unknown error'}
+            </Alert>
+          )}
+        </Stack>
+      </Paper>
     </Stack>
   )
 }

@@ -284,6 +284,7 @@ model Project {
   updatedAt   DateTime  @updatedAt
 
   storageQuotaMb    Int?      // null = pakai AppSetting storage_default_quota_mb (default 500)
+  storageMaxFileMb  Int?      // null = pakai AppSetting storage_max_file_mb (default 50)
 
   members           ProjectMember[]
   environments      Environment[]

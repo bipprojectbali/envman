@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.19.6] - 2026-07-05
+
+### Added
+- **Batas storage per-project**: SUPER_ADMIN bisa mengatur `storageMaxFileMb` (maks ukuran file) dan `storageQuotaMb` (quota) per-project secara individual, menggantikan batas global untuk project tersebut. Project yang tidak diatur mengikuti batas default global.
+  - UI: ikon gear di panel Storage (hanya terlihat SUPER_ADMIN) membuka modal pengaturan batas per-project. Kosongkan field untuk kembali ke default global.
+  - Batas default global kini bisa diubah dari `/dev > Storage` — section "Batas Storage Default" dengan input `Maks ukuran file` dan `Quota per project`.
+  - Server: `PATCH /api/envman/projects/:slug` (SUPER_ADMIN) menerima `storageMaxFileMb` dan `storageQuotaMb`.
+  - DB: kolom `storageMaxFileMb Int?` baru di tabel `project` (nullable = ikuti global default).
+
 ## [0.19.5] - 2026-07-05
 
 ### Fixed

@@ -35,7 +35,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (import `{ prisma }`
 - `Ticket` (id, title, description, status, priority, route, reporterId, assigneeId, timestamps, closedAt)
 - `TicketComment` (id, ticketId, authorId, authorTag, body, createdAt)
 - `TicketEvidence` (id, ticketId, kind, url, note, createdAt)
-- `Project` (id, slug, name, description, tags[], icon?, color?, cardColor?, timestamps) — `icon` = nama Tabler icon (mis. `TbCloud`) untuk avatar, `color` = nama warna Mantine (mis. `grape`) untuk bg avatar, `cardColor` = nama warna Mantine untuk tint tipis background card; semua nullable, null = fallback (inisial nama / warna-by-role / tanpa tint). Divalidasi server terhadap registry (`src/lib/project-avatar.ts`).
+- `Project` (id, slug, name, description, tags[], icon?, color?, cardColor?, storageQuotaMb?, storageMaxFileMb?, timestamps) — `icon` = nama Tabler icon (mis. `TbCloud`) untuk avatar, `color` = nama warna Mantine (mis. `grape`) untuk bg avatar, `cardColor` = nama warna Mantine untuk tint tipis background card; semua nullable, null = fallback (inisial nama / warna-by-role / tanpa tint). Divalidasi server terhadap registry (`src/lib/project-avatar.ts`). `storageQuotaMb`/`storageMaxFileMb`: override batas storage per-project (SUPER_ADMIN), `null` = pakai global default AppSetting.
 - `Environment` (id, name, tags[], projectId, createdAt) — unique(projectId, name)
 - `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
@@ -309,11 +309,14 @@ Tanpa keempat var di atas, semua storage endpoint (yang butuh MinIO) return 503.
 | Delete file | OWNER only |
 | Public download (no auth) | `isPublic = true` |
 
-### Storage Limits (via AppSetting)
+### Storage Limits (via AppSetting + per-project override)
 
-- `storage_max_file_mb` — default 50 MB per file
-- `storage_default_quota_mb` — default 500 MB per project
-- `Project.storageQuotaMb` — override per-project (SUPER_ADMIN); `null` = pakai default
+- `storage_max_file_mb` — global default maks file 50 MB; diubah via `/dev > Storage`
+- `storage_default_quota_mb` — global default quota 500 MB per project; diubah via `/dev > Storage`
+- `Project.storageQuotaMb` — override quota per-project (SUPER_ADMIN); `null` = pakai global default
+- `Project.storageMaxFileMb` — override maks file per-project (SUPER_ADMIN); `null` = pakai global default
+- Resolusi efektif: `project.storageMaxFileMb ?? globalSetting` — `getMaxFileSizeBytesForProject()` di `storage-service.ts`
+- UI: ikon gear di panel Storage (SUPER_ADMIN only) → `StorageSettingsModal`; defaults di `/dev > Storage` → `StorageAdminPanel`
 
 ### MinIO Object Cleanup
 

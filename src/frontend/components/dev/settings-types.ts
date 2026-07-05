@@ -5,6 +5,8 @@ export interface Settings {
   token_activity_log_vars_fetch: boolean
   token_activity_retention_days: number
   token_activity_cap_per_token: number
+  storage_max_file_mb: number
+  storage_default_quota_mb: number
 }
 
 export interface ActivityStats {
@@ -23,6 +25,8 @@ export function parseSettings(raw: Record<string, string>): Settings {
     token_activity_log_vars_fetch: raw.token_activity_log_vars_fetch !== 'false',
     token_activity_retention_days: Number(raw.token_activity_retention_days ?? '30') || 30,
     token_activity_cap_per_token: Number(raw.token_activity_cap_per_token ?? '1000') || 1000,
+    storage_max_file_mb: Number(raw.storage_max_file_mb ?? '50') || 50,
+    storage_default_quota_mb: Number(raw.storage_default_quota_mb ?? '500') || 500,
   }
 }
 

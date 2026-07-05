@@ -31,6 +31,12 @@ export async function getMaxFileSizeBytes(): Promise<number> {
   return maxMb * 1024 * 1024
 }
 
+/** Resolusi efektif: per-project override jika diset, fallback ke global AppSetting. */
+export async function getMaxFileSizeBytesForProject(projectMaxFileMb: number | null): Promise<number> {
+  if (projectMaxFileMb !== null) return projectMaxFileMb * 1024 * 1024
+  return getMaxFileSizeBytes()
+}
+
 /** Ambil total size bytes yang sudah terpakai project (fresh dari DB). */
 export async function getUsedBytes(projectId: string): Promise<number> {
   const { prisma } = await import('./db')

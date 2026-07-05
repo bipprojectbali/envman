@@ -2,9 +2,10 @@ import {
   ActionIcon, Alert, Anchor, Box, Breadcrumbs, Button, Group, Modal,
   Progress, Skeleton, Stack, Text, ThemeIcon, Tooltip,
 } from '@mantine/core'
+
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbFolderPlus, TbFolderSymlink, TbInfoCircle, TbLayoutGrid, TbList, TbTrash } from 'react-icons/tb'
+import { TbChevronLeft, TbChevronRight, TbCloudUpload, TbFile, TbFolder, TbFolderPlus, TbFolderSymlink, TbInfoCircle, TbLayoutGrid, TbList, TbSettings, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { collectFilesFromEntry, filesFromInput, type CollectedFile } from '@/frontend/lib/folder-upload-utils'
 import { fmtBytes } from '@/frontend/lib/storage-format'
@@ -12,6 +13,7 @@ import { StorageFileGrid } from './StorageFileCard'
 import { StorageFileRow } from './StorageFileRow'
 import { StorageFolderUploadModal } from './StorageFolderUploadModal'
 import { StorageMoveModal } from './StorageMoveModal'
+import { StorageSettingsModal } from './StorageSettingsModal'
 import { StorageUploadModal } from './StorageUploadModal'
 
 interface StorageObject {
@@ -25,9 +27,9 @@ interface StorageData {
   totalFiles: number; page: number; pageSize: number
 }
 
-interface Props { slug: string; isOwner: boolean; canEdit: boolean }
+interface Props { slug: string; isOwner: boolean; canEdit: boolean; isSuperAdmin?: boolean }
 
-export function StoragePanel({ slug, isOwner, canEdit }: Props) {
+export function StoragePanel({ slug, isOwner, canEdit, isSuperAdmin }: Props) {
   const [prefix, setPrefix] = useState('')
   const [page, setPage] = useState(1)
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -36,6 +38,7 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [folderUploadOpen, setFolderUploadOpen] = useState(false)
   const [folderDropped, setFolderDropped] = useState<CollectedFile[]>([])
+  const [storageSettingsOpen, setStorageSettingsOpen] = useState(false)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() =>
@@ -166,6 +169,13 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
               {viewMode === 'list' ? <TbLayoutGrid size={14} /> : <TbList size={14} />}
             </Button>
           </Tooltip>
+          {isSuperAdmin && (
+            <Tooltip label="Atur batas storage project">
+              <Button size="xs" variant="subtle" color="gray" px={6} onClick={() => setStorageSettingsOpen(true)}>
+                <TbSettings size={14} />
+              </Button>
+            </Tooltip>
+          )}
           {canEdit && (
             <>
               <Button size="xs" variant="light" leftSection={<TbCloudUpload size={13} />} onClick={() => setUploadOpen(true)}>
@@ -343,6 +353,8 @@ export function StoragePanel({ slug, isOwner, canEdit }: Props) {
           onSuccess={() => { clearSelection(); invalidate() }}
           onClose={() => setMoveOpen(false)} />
       </Modal>
+
+      <StorageSettingsModal slug={slug} opened={storageSettingsOpen} onClose={() => setStorageSettingsOpen(false)} />
     </Stack>
   )
 }
