@@ -1,5 +1,8 @@
 # envman — CLAUDE.md
 
+> **⚠️ BACA DULU — CLI ada di Go, bukan TypeScript.**
+> CLI envman ditulis dalam **Go** di `cli-go/` (entry `cli-go/cmd/envman/main.go`). CLI TypeScript lama (`src/cli.ts`, `src/cli/`) **SUDAH DIHAPUS** — jangan cari/rujuk/edit `src/cli*`, tidak ada lagi. Semua perubahan CLI di `cli-go/` (`go build`, `go test ./...`). `src/` adalah **server + frontend saja**. Detail: section [CLI](#cli) & memory `cli-go-migration`.
+
 ## Runtime
 
 Gunakan Bun di seluruh stack. `bun <file>` / `bun test` / `bun install` / `bunx <pkg>`. Bun auto-load `.env` — jangan pakai dotenv. Sebelum install npm package, cek apakah ada Bun native API.
