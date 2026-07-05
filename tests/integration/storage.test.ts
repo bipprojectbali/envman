@@ -207,6 +207,97 @@ describe('Storage — Delete', () => {
   })
 })
 
+describe('Storage — Multipart Upload', () => {
+  test('Init multipart mengembalikan uploadId + chunkSize (auth EDITOR)', async () => {
+    // Set per-project limit tinggi dulu agar 200 MB masuk dalam kuota
+    await prisma.project.update({ where: { slug: projectSlug }, data: { storageMaxFileMb: 500 } })
+
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage/multipart/init`, {
+      method: 'POST',
+      headers: { cookie: `session=${editorToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'multipart/bigfile.bin', size: 200 * 1024 * 1024, mimeType: 'application/octet-stream' }),
+    }))
+
+    // Reset limit
+    await prisma.project.update({ where: { slug: projectSlug }, data: { storageMaxFileMb: null } })
+
+    // MinIO tidak dikonfigurasi di test → 503, atau kalau dikonfigurasi → 200
+    if (!MINIO_ENABLED) {
+      expect(res.status).toBe(503)
+      return
+    }
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(typeof json.uploadId).toBe('string')
+    expect(typeof json.minioKey).toBe('string')
+    expect(json.chunkSize).toBe(50 * 1024 * 1024)
+    expect(json.totalParts).toBe(4)
+  })
+
+  test('Init multipart ditolak untuk VIEWER', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage/multipart/init`, {
+      method: 'POST',
+      headers: { cookie: `session=${viewerToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'multipart/test.bin', size: 100 * 1024 * 1024, mimeType: 'application/octet-stream' }),
+    }))
+    expect(res.status).toBe(403)
+  })
+
+  test('Init multipart tanpa auth → 401', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage/multipart/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'multipart/test.bin', size: 100 * 1024 * 1024, mimeType: 'application/octet-stream' }),
+    }))
+    expect(res.status).toBe(401)
+  })
+
+  test('Part tanpa uploadId/minioKey → 400', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage/multipart/part?partNumber=1`, {
+      method: 'POST',
+      headers: { cookie: `session=${editorToken}`, 'Content-Type': 'application/octet-stream' },
+      body: new Uint8Array(1024),
+    }))
+    expect(res.status).toBe(400)
+  })
+
+  test('Complete tanpa parts → 400', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage/multipart/complete`, {
+      method: 'POST',
+      headers: { cookie: `session=${editorToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'multipart/test.bin', uploadId: 'fake', minioKey: `nonexistent/path`, parts: [], size: 100, mimeType: 'application/octet-stream' }),
+    }))
+    expect(res.status).toBe(400)
+  })
+
+  test('minioKey dari project berbeda → 400', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage/multipart/complete`, {
+      method: 'POST',
+      headers: { cookie: `session=${editorToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: 'multipart/test.bin',
+        uploadId: 'fake-id',
+        minioKey: 'different-project-id/test.bin',  // Bukan milik project ini
+        parts: [{ partNumber: 1, etag: 'abc' }],
+        size: 1024,
+        mimeType: 'application/octet-stream',
+      }),
+    }))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/minioKey/)
+  })
+
+  test('Abort tanpa minioKey → 400', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage/multipart/abort`, {
+      method: 'DELETE',
+      headers: { cookie: `session=${editorToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uploadId: 'fake' }),
+    }))
+    expect(res.status).toBe(400)
+  })
+})
+
 describe('Storage — Per-project Limits', () => {
   test('SUPER_ADMIN bisa set storageMaxFileMb via PATCH project', async () => {
     const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}`, {

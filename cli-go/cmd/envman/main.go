@@ -362,9 +362,22 @@ func storageUploadCmd() *cobra.Command {
 
 			target := storage.RemotePath(localPath, remotePath)
 			name := filepath.Base(localPath)
-			result, err := storage.Upload(cfg, slug, localPath, target, func(written, total int64, elapsed time.Duration) {
-				renderProgress(name, written, total, elapsed)
-			})
+
+			var result *storage.UploadResult
+			if stat.Size() > storage.MultipartThreshold {
+				// File besar: chunked multipart upload melalui server → MinIO.
+				// Setiap chunk ≤ 50 MB sehingga aman melewati Cloudflare (100 MB limit).
+				// Upload yang terputus bisa dilanjutkan dengan perintah yang sama.
+				fmt.Fprintf(os.Stderr, "[envman] File besar (%s) — memakai chunked upload (%d chunk × 50 MB)\n",
+					storage.FmtBytes(stat.Size()), (stat.Size()+storage.MultipartThreshold-1)/storage.MultipartThreshold)
+				result, err = storage.UploadMultipart(cfg, slug, localPath, target, func(written, total int64, elapsed time.Duration) {
+					renderProgress(name, written, total, elapsed)
+				})
+			} else {
+				result, err = storage.Upload(cfg, slug, localPath, target, func(written, total int64, elapsed time.Duration) {
+					renderProgress(name, written, total, elapsed)
+				})
+			}
 			clearProgress()
 			if err != nil {
 				return err

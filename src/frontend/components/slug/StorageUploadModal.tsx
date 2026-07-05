@@ -1,7 +1,8 @@
-import { Box, Button, Code, FileInput, Group, Image, Progress, ScrollArea, Stack, TagsInput, Text, TextInput, Textarea } from '@mantine/core'
+import { Badge, Box, Button, Code, FileInput, Group, Image, Progress, ScrollArea, Stack, TagsInput, Text, TextInput, Textarea } from '@mantine/core'
 import { useEffect, useRef, useState } from 'react'
 import { TbClipboard, TbCloudUpload } from 'react-icons/tb'
 import { fmtBytes, isTextFile, suggestNonConflictPath } from '@/frontend/lib/storage-format'
+import { MULTIPART_THRESHOLD, useChunkedUpload } from '@/frontend/hooks/useChunkedUpload'
 
 interface Props {
   slug: string
@@ -40,19 +41,18 @@ export function StorageUploadModal({ slug, prefix, defaultFile, existingPaths, o
   const xhrRef = useRef<XMLHttpRequest | null>(null)
   const fileChangeRef = useRef<(f: File | null) => void>(() => {})
 
+  const chunked = useChunkedUpload(slug)
+  const isLargeFile = (file?.size ?? 0) > MULTIPART_THRESHOLD
+
   function handleFileChange(f: File | null) {
     setFile(f)
-    // Auto-fill filename jika path kosong atau hanya berisi prefix (berakhiran '/')
     if (f && (!path.trim() || path.trim().endsWith('/'))) {
       const base = prefix ? `${prefix}/${f.name}` : f.name
       setPath(suggestNonConflictPath(base, existingPaths ?? []))
     }
-
-    // Reset preview
     setPreviewUrl(null)
     setPreviewText(null)
     if (!f) return
-
     if (f.type.startsWith('image/')) {
       const url = URL.createObjectURL(f)
       setPreviewUrl(url)
@@ -61,18 +61,14 @@ export function StorageUploadModal({ slug, prefix, defaultFile, existingPaths, o
     }
   }
 
-  // Pre-fill file saat dibuka via drag & drop
   useEffect(() => { if (defaultFile) handleFileChange(defaultFile) }, [])  // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Revoke object URL saat file berganti atau modal unmount
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
 
-  // Keep ref current so paste handler (closed over empty deps) sees latest state
   fileChangeRef.current = handleFileChange
 
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
-      if (loading) return
+      if (loading || chunked.uploading) return
       const fileItem = Array.from(e.clipboardData?.items ?? []).find((i) => i.kind === 'file')
       if (!fileItem) return
       const pasted = fileItem.getAsFile()
@@ -85,24 +81,29 @@ export function StorageUploadModal({ slug, prefix, defaultFile, existingPaths, o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function handleUpload() {
-    if (!file) return
-    const finalPath = (path.trim() || file.name).replace(/^\/+/, '')
-    if (!finalPath) { setError('Path tidak boleh kosong'); return }
+  // ── Upload besar — chunked multipart ──────────────────────────────────────
+  async function handleChunkedUpload(finalPath: string) {
+    try {
+      await chunked.upload(file!, finalPath, { description: description || undefined, tags: tags.length ? tags : undefined })
+      onSuccess()
+      onClose()
+    } catch (e) {
+      setError((e as Error).message)
+      setLoading(false)
+    }
+  }
 
-    setLoading(true)
-    setError(null)
-    setProgress(null)
-    startRef.current = Date.now()
-
+  // ── Upload biasa — XHR ke /storage/upload ─────────────────────────────────
+  function handleXhrUpload(finalPath: string) {
     const fd = new FormData()
-    fd.append('file', file)
+    fd.append('file', file!)
     fd.append('path', finalPath)
     if (description) fd.append('description', description)
     if (tags.length) fd.append('tags', tags.join(','))
 
     const xhr = new XMLHttpRequest()
     xhrRef.current = xhr
+    startRef.current = Date.now()
 
     xhr.upload.addEventListener('progress', (e) => {
       if (!e.lengthComputable) return
@@ -128,22 +129,50 @@ export function StorageUploadModal({ slug, prefix, defaultFile, existingPaths, o
     xhr.send(fd)
   }
 
+  function handleUpload() {
+    if (!file) return
+    const finalPath = (path.trim() || file.name).replace(/^\/+/, '')
+    if (!finalPath) { setError('Path tidak boleh kosong'); return }
+    setLoading(true)
+    setError(null)
+    setProgress(null)
+
+    if (isLargeFile) {
+      handleChunkedUpload(finalPath)
+    } else {
+      handleXhrUpload(finalPath)
+    }
+  }
+
   function handleCancel() {
-    if (loading) xhrRef.current?.abort()
+    if (chunked.uploading) {
+      chunked.abort()
+    } else if (loading) {
+      xhrRef.current?.abort()
+    }
     onClose()
   }
+
+  const isUploading = loading || chunked.uploading
+  const chunkedProg = chunked.progress
 
   return (
     <Stack gap="sm">
       <FileInput label="File" placeholder="Pilih file" required value={file} onChange={handleFileChange}
         description={
           <Group gap={4}>
-            <Text size="xs" c="dimmed" inherit>Maks 50 MB per file —</Text>
+            <Text size="xs" c="dimmed" inherit>File &gt;50 MB otomatis memakai upload chunked —</Text>
             <TbClipboard size={11} />
             <Text size="xs" c="dimmed" inherit>Ctrl+V / ⌘V untuk paste gambar atau file</Text>
           </Group>
         }
-        disabled={loading} />
+        disabled={isUploading} />
+
+      {isLargeFile && file && (
+        <Badge variant="light" color="orange" size="sm">
+          Upload chunked aktif ({Math.ceil(file.size / MULTIPART_THRESHOLD)} chunk × 50 MB)
+        </Badge>
+      )}
 
       {previewUrl && (
         <Image src={previewUrl} mah={200} fit="contain" radius="md"
@@ -158,13 +187,14 @@ export function StorageUploadModal({ slug, prefix, defaultFile, existingPaths, o
       )}
 
       <TextInput label="Path di storage" placeholder="folder/nama-file.ext" required
-        value={path} onChange={(e) => setPath(e.target.value)} disabled={loading}
+        value={path} onChange={(e) => setPath(e.target.value)} disabled={isUploading}
         description="Path relatif dalam project storage. Contoh: assets/logo.png" />
       <Textarea label="Deskripsi" placeholder="Opsional" value={description}
-        onChange={(e) => setDescription(e.target.value)} rows={2} disabled={loading} />
-      <TagsInput label="Tags" placeholder="Tambah tag" value={tags} onChange={setTags} disabled={loading} />
+        onChange={(e) => setDescription(e.target.value)} rows={2} disabled={isUploading} />
+      <TagsInput label="Tags" placeholder="Tambah tag" value={tags} onChange={setTags} disabled={isUploading} />
 
-      {progress && (
+      {/* Progress — XHR (file kecil) */}
+      {progress && !chunkedProg && (
         <Box>
           <Progress value={progress.percent} animated size="md" mb={6} />
           <Group justify="space-between">
@@ -177,12 +207,32 @@ export function StorageUploadModal({ slug, prefix, defaultFile, existingPaths, o
         </Box>
       )}
 
-      {error && <Text size="xs" c="red">{error}</Text>}
+      {/* Progress — chunked (file besar) */}
+      {chunkedProg && (
+        <Box>
+          <Progress value={chunkedProg.percent} animated size="md" mb={6} />
+          <Group justify="space-between">
+            <Group gap="xs">
+              <Badge variant="light" color="grape" size="xs">
+                Chunk {chunkedProg.currentPart}/{chunkedProg.totalParts}
+              </Badge>
+              <Text size="xs" c="dimmed">{fmtBytes(chunkedProg.loaded)} / {fmtBytes(chunkedProg.total)} ({chunkedProg.percent}%)</Text>
+            </Group>
+            <Group gap="xs">
+              {chunkedProg.speedBps > 0 && <Text size="xs" c="dimmed">{fmtBytes(chunkedProg.speedBps)}/s</Text>}
+              {chunkedProg.etaSec !== null && <Text size="xs" c="dimmed">{fmtEta(chunkedProg.etaSec)}</Text>}
+            </Group>
+          </Group>
+        </Box>
+      )}
+
+      {(error || chunked.error) && <Text size="xs" c="red">{error ?? chunked.error}</Text>}
+
       <Group justify="flex-end">
         <Button variant="subtle" color="gray" onClick={handleCancel}>
-          {loading ? 'Batalkan Upload' : 'Batal'}
+          {isUploading ? 'Batalkan Upload' : 'Batal'}
         </Button>
-        <Button leftSection={<TbCloudUpload size={14} />} onClick={handleUpload} loading={loading} disabled={!file || loading}>
+        <Button leftSection={<TbCloudUpload size={14} />} onClick={handleUpload} loading={isUploading} disabled={!file || isUploading}>
           Upload
         </Button>
       </Group>

@@ -337,17 +337,20 @@ Tanpa keempat var di atas, semua storage endpoint (yang butuh MinIO) return 503.
 
 - `src/lib/minio.ts` — `Bun.S3Client` singleton (lazy-init)
 - `src/lib/storage-service.ts` — `sanitizePath`, `getQuotaBytes`, `minioUpload`, `minioDelete`, `minioDeleteProject`, `minioPresign`, `buildMinioKey`
+- `src/lib/s3-multipart.ts` — AWS SigV4 signing + S3 multipart ops (`createMultipartUpload`, `uploadPart`, `completeMultipartUpload`, `abortMultipartUpload`). Tanpa npm package tambahan. `MULTIPART_CHUNK_SIZE = 50 MB`.
 - `src/routes/envman/storage-core.ts` — list, download, meta PATCH, delete
-- `src/routes/envman/storage-upload.ts` — upload handler
+- `src/routes/envman/storage-upload.ts` — upload handler (file ≤ 50 MB via server form)
+- `src/routes/envman/storage-multipart.ts` — chunked upload (file > 50 MB): `POST /multipart/init → {uploadId, minioKey, chunkSize, totalParts}`, `POST /multipart/part?uploadId&minioKey&partNumber → {etag}`, `POST /multipart/complete → {ok, object}`, `DELETE /multipart/abort → {ok}`. Validasi minioKey prefix per-project di setiap endpoint.
 - `src/routes/public-storage.ts` — public redirect endpoint
 - `src/routes/envman/storage-rename.ts` — rename handler (EDITOR+)
 - `src/routes/envman/storage-move.ts` — batch move handler (EDITOR+); body `{paths[], targetFolder}` → `{ok, moved, errors}`
 - `src/frontend/components/slug/StoragePanel.tsx` — breadcrumb tree UI; drag-drop upload; list/grid toggle; **multi-select** dengan action bar (Pindah / Hapus); selection reset saat prefix berubah
-- `src/frontend/components/slug/StorageUploadModal.tsx` — upload modal; clipboard paste; file preview; `defaultFile` prop untuk pre-fill dari drag-drop
+- `src/frontend/components/slug/StorageUploadModal.tsx` — upload modal; clipboard paste; file preview; `defaultFile` prop untuk pre-fill dari drag-drop. File ≤50 MB: XHR ke `/storage/upload`. File >50 MB: `useChunkedUpload` hook (chunked multipart), progress per-chunk dengan badge "Chunk N/M".
 - `src/frontend/components/slug/StorageFileRow.tsx` — baris list view; checkbox (visible on hover/selection); draggable → drag-to-download (Chrome/Edge); props: `selected`, `selectionMode`, `onSelect`
 - `src/frontend/components/slug/StorageFileCard.tsx` — grid card view; checkbox overlay (top-left); outline saat selected; thumbnail public image; `StorageFileGrid` component; props: `selected`, `selectionMode`, `onSelect`
 - `src/frontend/components/slug/StorageMoveModal.tsx` — modal pindah file batch; text input target folder; error partial (sebagian berhasil)
 - `src/frontend/hooks/useStorageFileActions.ts` — shared hook: share, copy content, download, drag-to-download, presigned cache (4 mnt)
+- `src/frontend/hooks/useChunkedUpload.ts` — hook untuk chunked multipart upload via multipart endpoints. `MULTIPART_THRESHOLD = 50 MB`. Expose: `upload(file, path, opts)`, `abort()`, `uploading`, `progress` (`ChunkedProgress`). Abort bersihkan sesi MinIO via DELETE /abort.
 
 ---
 
@@ -441,7 +444,7 @@ Endpoint yang di-cover:
 
 **Tidak di-cover (sengaja):** endpoint vars (jangan cache env vars), session, list endpoint, dan binary download `/download/cli/:platform` (sudah version-gated via `/download/cli/version`).
 
-**Storage (Project Storage):** `GET /api/envman/projects/:slug/storage` (VIEWER+; `?prefix=` untuk tree navigation) · `POST .../storage/upload` (EDITOR+; multipart/form-data: `file`, `path`, `description?`, `tags?`) · `GET .../storage/download?path=` (VIEWER+; kembalikan presigned URL MinIO) · `PATCH .../storage/meta` (EDITOR+; body `{path, description?, tags?, isPublic?}`; `isPublic` hanya OWNER) · `PATCH .../storage/rename` (EDITOR+; body `{oldPath, newName}`) · `PATCH .../storage/move` (EDITOR+; batch: body `{paths[], targetFolder}` → `{ok, moved, errors[]}`) · `DELETE .../storage?path=` (OWNER). **Public (no auth):** `GET /api/public/storage/:slug/:path` (redirect 302 ke presigned URL; 404 jika private/tidak ada). Lihat section [Project Storage](#project-storage).
+**Storage (Project Storage):** `GET /api/envman/projects/:slug/storage` (VIEWER+; `?prefix=` untuk tree navigation) · `POST .../storage/upload` (EDITOR+; multipart/form-data: `file`, `path`, `description?`, `tags?`; cocok untuk file ≤50 MB) · `GET .../storage/download?path=` (VIEWER+; kembalikan presigned URL MinIO) · `PATCH .../storage/meta` (EDITOR+; body `{path, description?, tags?, isPublic?}`; `isPublic` hanya OWNER) · `PATCH .../storage/rename` (EDITOR+; body `{oldPath, newName}`) · `PATCH .../storage/move` (EDITOR+; batch: body `{paths[], targetFolder}` → `{ok, moved, errors[]}`) · `DELETE .../storage?path=` (OWNER). **Public (no auth):** `GET /api/public/storage/:slug/:path` (redirect 302 ke presigned URL; 404 jika private/tidak ada). **Chunked (file >50 MB):** `POST .../storage/multipart/init` body `{path, size, mimeType}` → `{uploadId, minioKey, chunkSize, totalParts}` · `POST .../storage/multipart/part?uploadId&minioKey&partNumber` body=chunk bytes → `{etag}` · `POST .../storage/multipart/complete` body `{path, uploadId, minioKey, parts[], size, mimeType}` → `{ok, object}` · `DELETE .../storage/multipart/abort` body `{uploadId, minioKey}` → `{ok}`. Setiap endpoint validasi minioKey prefix milik project. Lihat section [Project Storage](#project-storage).
 
 **Settings:** `GET /api/envman/settings` (public, semua setting sebagai key-value map) · `PUT /api/envman/settings` (SUPER_ADMIN, body: `[{key, value}]`) — key yang valid: `user_token_creation` (boolean string), `user_token_max_days` (number string), `storage_max_file_mb` (number string, default 50), `storage_default_quota_mb` (number string, default 500)
 

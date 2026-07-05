@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.19.8] - 2026-07-05
+
+### Added
+- **Chunked multipart upload — CLI + Web UI**: upload file besar (>50 MB) kini dipecah otomatis menjadi chunk 50 MB masing-masing, dikirim melalui server envman → MinIO tanpa melewati batas 100 MB Cloudflare (free/pro).
+  - **CLI**: file >50 MB otomatis memakai multipart. Upload yang terputus (Ctrl+C, koneksi drop) disimpan ke `~/.cache/envman/upload-*.json` — jalankan perintah yang sama untuk melanjutkan dari chunk terakhir. Retry otomatis 3× per chunk dengan backoff eksponensial.
+  - **Web UI**: `StorageUploadModal` mendeteksi file >50 MB dan beralih ke chunked upload via fetch API. Progress menampilkan "Chunk N/M" + bytes total + kecepatan + ETA. Tombol "Batalkan Upload" membersihkan sesi multipart di MinIO.
+  - **Server**: 4 endpoint baru `POST /storage/multipart/init`, `POST /storage/multipart/part`, `POST /storage/multipart/complete`, `DELETE /storage/multipart/abort`. Validasi auth, quota, dan minioKey prefix per-project di setiap endpoint.
+  - **SigV4**: implementasi AWS Signature V4 di `src/lib/s3-multipart.ts` — tanpa npm package tambahan, murni Node.js `crypto`.
+
 ## [0.19.7] - 2026-07-05
 
 ### Fixed
