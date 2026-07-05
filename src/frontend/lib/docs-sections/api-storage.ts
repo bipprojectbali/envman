@@ -187,10 +187,14 @@ GET /api/envman/projects/myapp/storage/download?path=assets/logo.png
 Response:
 
 \`\`\`json
-{ "url": "https://minio.example.com/envman/...?X-Amz-Signature=..." }
+{
+  "url": "https://minio.example.com/envman/...?X-Amz-Signature=...",
+  "size": 24576,
+  "updatedAt": "2026-07-06T10:30:00.000Z"
+}
 \`\`\`
 
-URL private TTL **5 menit** dengan \`Content-Disposition: attachment\`.
+URL private TTL **5 menit** dengan \`Content-Disposition: attachment\`. Field \`size\` + \`updatedAt\` dipakai CLI \`storage exec\` sebagai validator cache (binary tidak di-download ulang selama tidak berubah).
 
 ---
 
@@ -247,9 +251,16 @@ Output: kuota terpakai, daftar folder, daftar file (path, ukuran, MIME, badge pu
 envman storage upload myapp compose.yml                         # path = compose.yml
 envman storage upload myapp ./logo.png --path assets/logo.png  # path eksplisit
 envman storage upload myapp ./dump.sql --path backup/dump.sql
+envman storage upload myapp ./assets/                           # folder rekursif
+
+# Jangan timpa file yang sudah ada (-n / --no-clobber)
+envman storage upload myapp ./logo.png -n                       # file tunggal: error + exit 1 jika sudah ada
+envman storage upload myapp ./assets/ -n                        # folder: lewati yang sudah ada, upload sisanya
 \`\`\`
 
-File dialirkan langsung dari disk ke server — tidak dibuffer ke memori. Aman untuk file besar.
+File dialirkan langsung dari disk ke server — tidak dibuffer ke memori. Aman untuk file besar (>50 MB otomatis chunked multipart, bisa di-resume).
+
+**Default: overwrite** (upsert). Pakai \`--no-clobber\`/\`-n\` untuk mencegah menimpa — file tunggal gagal dengan exit 1, folder melewati file yang sudah ada (seperti \`cp -n\`).
 
 #### Download (Streaming ke Stdout)
 
@@ -265,6 +276,17 @@ envman storage download myapp:backup/dump.sql -o /tmp/dump.sql
 \`\`\`
 
 Download menggunakan presigned MinIO URL — file dialirkan langsung dari MinIO ke stdout tanpa melewati server envman.
+
+#### Exec (Jalankan Binary)
+
+\`\`\`bash
+envman storage exec myapp:bin/tts-go                # download, cache, jalankan
+envman storage exec myapp:bin/tts-go -- --port 8080 # teruskan argumen ke program
+envman storage exec --offline myapp:bin/tts-go      # pakai cache tanpa hubungi server
+envman storage exec --no-cache myapp:bin/tts-go     # paksa download ulang
+\`\`\`
+
+Untuk file **binary** (yang tidak bisa di-pipe ke \`| bash\`). Binary di-cache di \`~/.cache/envman/exec\` (mode 0700) dan dipakai ulang selama tidak berubah — run berulang **instan** (nol transfer byte, hanya cek metadata). Cache tervalidasi via \`size\`+\`updatedAt\`: file di-replace di storage → otomatis download ulang. Exit code program dipropagasi.
 
 ---
 `
