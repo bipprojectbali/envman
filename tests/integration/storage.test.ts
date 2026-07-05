@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { cleanupTestData, createTestApp, createTestSession, prisma, seedTestUser } from '../helpers'
 
+
 // Guard: storage tests hanya jalankan jika MinIO dikonfigurasi
 const MINIO_ENABLED = !!(process.env.MINIO_ENDPOINT && process.env.MINIO_ACCESS_KEY && process.env.MINIO_SECRET_KEY && process.env.MINIO_BUCKET)
 
@@ -8,6 +9,7 @@ const app = createTestApp()
 let ownerToken: string
 let editorToken: string
 let viewerToken: string
+let superAdminToken: string
 let projectSlug: string
 
 beforeAll(async () => {
@@ -15,9 +17,11 @@ beforeAll(async () => {
   const owner = await seedTestUser('storage-owner@test.com', 'pass123', 'StorageOwner', 'ADMIN')
   const editor = await seedTestUser('storage-editor@test.com', 'pass123', 'StorageEditor', 'ADMIN')
   const viewer = await seedTestUser('storage-viewer@test.com', 'pass123', 'StorageViewer', 'USER')
+  const superAdmin = await seedTestUser('storage-superadmin@test.com', 'pass123', 'StorageSuperAdmin', 'SUPER_ADMIN')
   ownerToken = await createTestSession(owner.id)
   editorToken = await createTestSession(editor.id)
   viewerToken = await createTestSession(viewer.id)
+  superAdminToken = await createTestSession(superAdmin.id)
 
   // Buat project + tambah member
   const createRes = await app.handle(new Request('http://localhost/api/envman/projects', {
@@ -200,5 +204,83 @@ describe('Storage — Delete', () => {
       headers: { cookie: `session=${editorToken}` },
     }))
     expect(res.status).toBe(403)
+  })
+})
+
+describe('Storage — Per-project Limits', () => {
+  test('SUPER_ADMIN bisa set storageMaxFileMb via PATCH project', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}`, {
+      method: 'PATCH',
+      headers: { cookie: `session=${superAdminToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storageMaxFileMb: 10 }),
+    }))
+    expect(res.status).toBe(200)
+    const project = await prisma.project.findFirst({ where: { slug: projectSlug } })
+    expect(project?.storageMaxFileMb).toBe(10)
+  })
+
+  test('SUPER_ADMIN bisa set storageQuotaMb via PATCH project', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}`, {
+      method: 'PATCH',
+      headers: { cookie: `session=${superAdminToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storageQuotaMb: 200 }),
+    }))
+    expect(res.status).toBe(200)
+    const project = await prisma.project.findFirst({ where: { slug: projectSlug } })
+    expect(project?.storageQuotaMb).toBe(200)
+  })
+
+  test('OWNER tidak bisa ubah storageMaxFileMb (field diabaikan)', async () => {
+    // Set dulu ke 10 oleh superAdmin, pastikan OWNER tidak bisa overwrite
+    await prisma.project.update({ where: { slug: projectSlug }, data: { storageMaxFileMb: 10 } })
+    await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}`, {
+      method: 'PATCH',
+      headers: { cookie: `session=${ownerToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storageMaxFileMb: 999 }),
+    }))
+    // Field HARUS tetap 10 — perubahan oleh OWNER diabaikan server
+    const project = await prisma.project.findFirst({ where: { slug: projectSlug } })
+    expect(project?.storageMaxFileMb).toBe(10)
+  })
+
+  test('SUPER_ADMIN bisa reset ke null (kembali ke global default)', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}`, {
+      method: 'PATCH',
+      headers: { cookie: `session=${superAdminToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storageMaxFileMb: null }),
+    }))
+    expect(res.status).toBe(200)
+    const project = await prisma.project.findFirst({ where: { slug: projectSlug } })
+    expect(project?.storageMaxFileMb).toBeNull()
+  })
+
+  test('Presign ditolak jika file melebihi per-project storageMaxFileMb', async () => {
+    // Set limit 1 MB
+    await prisma.project.update({ where: { slug: projectSlug }, data: { storageMaxFileMb: 1 } })
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage/presign-upload`, {
+      method: 'POST',
+      headers: { cookie: `session=${editorToken}`, 'Content-Type': 'application/json' },
+      // Kirim size 2 MB — melebihi limit 1 MB
+      body: JSON.stringify({ path: 'large.bin', size: 2 * 1024 * 1024, mimeType: 'application/octet-stream' }),
+    }))
+    expect(res.status).toBe(413)
+    const json = await res.json()
+    expect(json.error).toMatch(/1 MB/)
+  })
+
+  test('GET /storage response menyertakan field limits', async () => {
+    const res = await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage`, {
+      headers: { cookie: `session=${editorToken}` },
+    }))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.limits).toBeDefined()
+    expect('storageMaxFileMb' in json.limits).toBe(true)
+    expect('storageQuotaMb' in json.limits).toBe(true)
+  })
+
+  // Cleanup limit setelah test selesai
+  afterAll(async () => {
+    await prisma.project.update({ where: { slug: projectSlug }, data: { storageMaxFileMb: null, storageQuotaMb: null } })
   })
 })
