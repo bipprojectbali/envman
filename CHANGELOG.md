@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.19.11] - 2026-07-06
+
+### Added
+- **`storage upload --no-clobber` / `-n`** — cegah menimpa file yang sudah ada. Default upload tetap **overwrite** (upsert). Dengan `-n`: file tunggal yang sudah ada → error + exit 1; upload folder → file yang sudah ada dilewati, sisanya tetap diupload (seperti `cp -n`).
+  - Pengecekan berjalan di server (`presign-upload` & `multipart/init`) **sebelum** transfer byte — path yang sudah ada + `noClobber` → `409 {exists:true}`, jadi bandwidth tidak terbuang.
+  - Berlaku untuk file kecil, file besar (chunked multipart), dan upload folder.
+
+### Changed
+- **`POST .../storage/presign-upload`** dan **`POST .../storage/multipart/init`** menerima field opsional `noClobber` (default `false`). Additive — perilaku existing tidak berubah.
+
 ## [0.19.10] - 2026-07-05
 
 ### Added
