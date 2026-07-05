@@ -3,8 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -195,46 +193,6 @@ func whoamiCmd() *cobra.Command {
 			}
 			fmt.Printf("Server: %s\n", cfg.Server)
 			return nil
-		},
-	}
-}
-
-func docsCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "docs",
-		Short: "Print CLI reference to stdout (install, auth, inject, storage, CI/CD, troubleshoot)",
-		Long: `Fetch and print the complete CLI reference.
-
-Covers: install, auth setup, inject vars, file execution,
-alias expansion, storage commands, CI/CD patterns, troubleshooting.
-
-Designed for piping into AI agents, files, or a pager:
-
-  envman docs > context.md
-  envman docs | pbcopy
-  envman docs | less`,
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := auth.Resolve()
-			if err != nil {
-				return err
-			}
-			req, err := http.NewRequest("GET", cfg.Server+"/api/cli-docs.md", nil)
-			if err != nil {
-				return err
-			}
-			req.Header.Set("Authorization", "Bearer "+cfg.Token)
-			client := &http.Client{Timeout: 60 * time.Second}
-			resp, err := client.Do(req)
-			if err != nil {
-				return fmt.Errorf("failed to fetch docs: %w", err)
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return fmt.Errorf("failed to fetch docs (HTTP %d)", resp.StatusCode)
-			}
-			_, err = io.Copy(os.Stdout, resp.Body)
-			return err
 		},
 	}
 }

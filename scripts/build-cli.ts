@@ -18,6 +18,17 @@ const targets = [
 const pkg = await import('../package.json')
 const version = pkg.version
 
+// Regenerate the embedded CLI docs from the single source (src/lib/cli-docs/*)
+// so every released binary ships the latest offline fallback.
+console.log('Generating embedded CLI docs...')
+const genProc = Bun.spawnSync(['bun', 'run', join(import.meta.dir, 'gen-cli-docs.ts')], {
+  stdout: 'inherit', stderr: 'inherit',
+})
+if (genProc.exitCode !== 0) {
+  console.error('Failed to generate CLI docs')
+  process.exit(1)
+}
+
 for (const { goos, goarch, out } of targets) {
   const outFile = join(OUT_DIR, out)
   console.log(`Building ${out}...`)

@@ -554,6 +554,14 @@ envman storage rm <project>:<folder>/                 # OWNER only
 
 **Catatan:** `envman mcp` sudah dihapus dari codebase (MCP deprecated) — tidak ada di CLI Go.
 
+### CLI Docs (`envman docs`) — single source + embed fallback
+
+**Satu sumber tunggal:** `src/lib/cli-docs/*.ts` → dirakit `buildCliDocsMd(origin)` (`src/lib/cli-docs-builder.ts`). Server serve via `GET /api/cli-docs.md` (ETag cache).
+
+`envman docs` (`cli-go`): **fetch server dulu** (`/api/cli-docs.md`) supaya dapat versi terbaru + `origin` asli di contoh. Kalau server tak dapat dihubungi (offline / belum login) → **fallback ke docs embed** di binary (`cli-go/internal/docs/DOCS.md` via `//go:embed`), dengan placeholder `{{SERVER}}` diganti URL server dari config. Notice fallback ke **stderr** (stdout tetap bersih untuk piping).
+
+**DOCS.md di-generate, JANGAN diedit tangan.** Sumbernya tetap `src/lib/cli-docs/*.ts`. Regenerate: `bun run scripts/gen-cli-docs.ts` (juga otomatis jalan di `build:cli` sebelum compile). Drift-guard: `tests/unit/cli-docs-embed.test.ts` gagal kalau DOCS.md tak sinkron dengan sumber.
+
 ### Download
 
 `GET /download/cli/:platform` — content negotiation: `Accept-Encoding: gzip` → return `.gz` (~60% lebih kecil).
