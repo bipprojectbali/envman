@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.19.9] - 2026-07-05
+
+### Added
+- **CLI `storage exec`** — jalankan binary dari storage secara langsung. `envman storage exec <project>:<path>` mengunduh file ke temp file privat (mode 0700), menjalankannya (stdin/stdout/stderr inherit), lalu menghapusnya. Argumen setelah `--` diteruskan ke program; exit code program dipropagasi sebagai exit code envman. Untuk binary yang tidak bisa di-pipe ke `| bash` (berbeda dari `storage download` yang stream ke stdout untuk script teks).
+
+### Removed
+- **CLI TypeScript lama dihapus** — CLI kini sepenuhnya ditulis dalam Go di `cli-go/` (sudah menjadi sumber `build:cli` dan biner `/download/cli/*`). File mati `src/cli.ts` + `src/cli/*` (~1140 baris) beserta test terkait dihapus. Tidak ada perubahan behavior untuk pengguna CLI — biner yang beredar tetap dari `cli-go/`.
+- **Test yatim `envman-mcp-audit`** — menguji endpoint `/api/envman/mcp/audit` yang sudah dihapus bersama MCP; test dihapus.
+
 ## [0.19.8] - 2026-07-05
 
 ### Added
