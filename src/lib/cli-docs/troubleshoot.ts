@@ -54,6 +54,23 @@ export function buildTroubleshootSection(): string {
 ---
 
 \`\`\`
+[envman] chunk N/M gagal setelah 3 percobaan: ...
+Jalankan perintah yang sama untuk melanjutkan.
+\`\`\`
+**Penyebab**: Koneksi ke server envman terputus saat chunked upload (file >50 MB).
+**Fix**: Jalankan perintah upload yang sama persis — CLI otomatis lanjut dari chunk terakhir yang berhasil (state tersimpan di \`~/.cache/envman/upload-*.json\`).
+
+---
+
+\`\`\`
+[envman] File terlalu besar (maks X MB)
+\`\`\`
+**Penyebab**: Ukuran file melebihi batas per-project atau global default.
+**Fix**: Minta SUPER_ADMIN menaikkan batas via Settings project, atau kompres file terlebih dahulu.
+
+---
+
+\`\`\`
 envman: command not found
 \`\`\`
 **Fix**: Pastikan \`/usr/local/bin\` ada di \`PATH\`, atau jalankan dengan path penuh: \`/usr/local/bin/envman\`.
@@ -99,7 +116,7 @@ envman -- <interpreter> project:path/file.ext    # eksekusi file project
 
 envman storage ls <project>                       # list files
 envman storage ls <project> --prefix folder/
-envman storage upload <project> <file|dir>        # upload file atau folder (streaming)
+envman storage upload <project> <file|dir>        # upload file atau folder (auto chunked >50 MB)
 envman storage upload <project> <file> --path remote/path
 envman storage upload <project> <dir> --path remote/prefix
 envman storage download <project>:<path>          # download ke stdout

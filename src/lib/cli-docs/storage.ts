@@ -36,7 +36,20 @@ envman storage upload myapp ./assets/              # → assets/logo.png, assets
 envman storage upload myapp ./dist/ --path static  # → static/index.html, static/bundle.js, ...
 \`\`\`
 
-Upload **streaming** dari disk ke server — tidak di-buffer ke memori. Aman untuk file besar. Upload folder menampilkan progress \`[N/total]\` per file.
+**File ≤ 50 MB** — upload langsung via server, progress bar realtime.
+
+**File > 50 MB** — otomatis memakai **chunked multipart upload**: file dipecah jadi chunk 50 MB, dikirim satu per satu melalui server → MinIO. Aman melewati Cloudflare (batas 100 MB per request tidak berlaku karena setiap chunk kecil).
+
+Fitur resume: jika koneksi putus atau Ctrl+C, state disimpan ke \`~/.cache/envman/upload-*.json\`. Jalankan perintah yang sama untuk melanjutkan dari chunk terakhir — tidak perlu mulai dari awal.
+
+\`\`\`bash
+# File besar — CLI otomatis pakai chunked (tidak perlu flag khusus)
+envman storage upload myapp ./model-weights.bin --path ml/weights.bin
+# [envman] File besar (2.1 GB) — memakai chunked upload (43 chunk × 50 MB)
+# weights.bin  [████████░░░░░░░░░░░░]  38%  800.0/2100.0 MB  12.3 MB/s  ~1m51s
+\`\`\`
+
+Upload folder menampilkan progress \`[N/total]\` per file.
 
 ### Download — streaming ke stdout
 
