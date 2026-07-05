@@ -1,11 +1,11 @@
 package storage
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,8 +17,8 @@ import (
 	"github.com/bipprojectbali/envman/cli/internal/auth"
 )
 
-// uploadClient uses a longer timeout for potentially large file uploads.
-var uploadClient = &http.Client{Timeout: 5 * time.Minute}
+// minioUploadClient allows up to 60 min for large direct-to-MinIO uploads.
+var minioUploadClient = &http.Client{Timeout: 60 * time.Minute}
 
 // ProgressFunc is called during streaming operations.
 // written = bytes transferred so far, total = expected total (-1 if unknown), elapsed = time since start.
@@ -122,8 +122,16 @@ func List(cfg *auth.Config, slug, prefix string, page int) (*ListResult, error) 
 	return &result, nil
 }
 
-// Upload streams a local file to the server without buffering the entire file in memory.
-// Uses io.Pipe so the multipart body is written and read concurrently.
+// presignResponse is returned by POST /storage/presign-upload.
+type presignResponse struct {
+	UploadURL string `json:"uploadUrl"`
+	MinioKey  string `json:"minioKey"`
+	Path      string `json:"path"`
+	ProjectID string `json:"projectId"`
+}
+
+// Upload uploads a local file using a presigned MinIO PUT URL.
+// The CLI PUTs directly to MinIO — no reverse-proxy timeout.
 // onProgress is optional — pass nil to disable progress reporting.
 func Upload(cfg *auth.Config, slug, localFile, remotePath string, onProgress ProgressFunc) (*UploadResult, error) {
 	f, err := os.Open(localFile)
@@ -137,64 +145,154 @@ func Upload(cfg *auth.Config, slug, localFile, remotePath string, onProgress Pro
 		fileSize = info.Size()
 	}
 
-	pr, pw := io.Pipe()
-	mw := multipart.NewWriter(pw)
-	contentType := mw.FormDataContentType() // must be captured before goroutine closes mw
+	mimeType := detectMIME(localFile)
 
-	go func() {
-		part, ferr := mw.CreateFormFile("file", filepath.Base(localFile))
-		if ferr != nil {
-			pw.CloseWithError(ferr)
-			return
-		}
-		var src io.Reader = f
-		if onProgress != nil {
-			src = newProgressReader(f, fileSize, onProgress)
-		}
-		if _, ferr = io.Copy(part, src); ferr != nil {
-			pw.CloseWithError(ferr)
-			return
-		}
-		if ferr = mw.WriteField("path", remotePath); ferr != nil {
-			pw.CloseWithError(ferr)
-			return
-		}
-		mw.Close()
-		pw.Close()
-	}()
+	// Step 1 — ask server for presigned PUT URL (validates quota, auth).
+	presign, err := requestPresign(cfg, slug, remotePath, fileSize, mimeType)
+	if err != nil {
+		return nil, err
+	}
 
-	apiPath := fmt.Sprintf("/api/envman/projects/%s/storage/upload", url.PathEscape(slug))
-	req, err := http.NewRequest("POST", cfg.Server+apiPath, pr)
+	// Step 2 — PUT directly to MinIO, bypassing the reverse proxy.
+	if err := putToMinio(presign.UploadURL, f, fileSize, mimeType, onProgress); err != nil {
+		return nil, err
+	}
+
+	// Step 3 — tell server to register the object in DB.
+	return confirmUpload(cfg, slug, remotePath, presign.MinioKey, fileSize, mimeType)
+}
+
+// requestPresign asks the server to issue a presigned MinIO PUT URL.
+func requestPresign(cfg *auth.Config, slug, remotePath string, size int64, mimeType string) (*presignResponse, error) {
+	apiPath := fmt.Sprintf("/api/envman/projects/%s/storage/presign-upload", url.PathEscape(slug))
+	payload, _ := json.Marshal(map[string]any{"path": remotePath, "size": size, "mimeType": mimeType})
+	req, err := http.NewRequest("POST", cfg.Server+apiPath, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.Token)
-	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := uploadClient.Do(req)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("[envman] upload failed: %w", err)
+		return nil, fmt.Errorf("[envman] presign request: %w", err)
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errPayload struct {
-			Error string `json:"error"`
+	if resp.StatusCode != http.StatusOK {
+		var e struct{ Error string `json:"error"` }
+		_ = json.Unmarshal(body, &e)
+		if e.Error == "" {
+			e.Error = http.StatusText(resp.StatusCode)
 		}
-		_ = json.Unmarshal(body, &errPayload)
-		msg := errPayload.Error
-		if msg == "" {
-			msg = http.StatusText(resp.StatusCode)
-		}
-		return nil, fmt.Errorf("[envman] %s", msg)
+		return nil, fmt.Errorf("[envman] %s", e.Error)
 	}
-
-	var result UploadResult
+	var result presignResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("[envman] parse upload response: %w", err)
+		return nil, fmt.Errorf("[envman] parse presign response: %w", err)
 	}
 	return &result, nil
+}
+
+// putToMinio uploads directly to a MinIO presigned PUT URL with optional progress.
+func putToMinio(uploadURL string, r io.Reader, size int64, mimeType string, onProgress ProgressFunc) error {
+	var src io.Reader = r
+	if onProgress != nil {
+		src = newProgressReader(r, size, onProgress)
+	}
+	req, err := http.NewRequest("PUT", uploadURL, src)
+	if err != nil {
+		return err
+	}
+	req.ContentLength = size
+	req.Header.Set("Content-Type", mimeType)
+
+	resp, err := minioUploadClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("[envman] MinIO upload failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("[envman] MinIO HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	}
+	return nil
+}
+
+// confirmUpload registers the uploaded object in the server DB.
+func confirmUpload(cfg *auth.Config, slug, path, minioKey string, size int64, mimeType string) (*UploadResult, error) {
+	apiPath := fmt.Sprintf("/api/envman/projects/%s/storage/confirm-upload", url.PathEscape(slug))
+	payload, _ := json.Marshal(map[string]any{
+		"path": path, "minioKey": minioKey, "size": size, "mimeType": mimeType,
+	})
+	req, err := http.NewRequest("POST", cfg.Server+apiPath, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("[envman] confirm upload: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		var e struct{ Error string `json:"error"` }
+		_ = json.Unmarshal(body, &e)
+		if e.Error == "" {
+			e.Error = http.StatusText(resp.StatusCode)
+		}
+		return nil, fmt.Errorf("[envman] %s", e.Error)
+	}
+	var result UploadResult
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("[envman] parse confirm response: %w", err)
+	}
+	return &result, nil
+}
+
+// detectMIME guesses a MIME type from the file extension.
+func detectMIME(filename string) string {
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".svg":
+		return "image/svg+xml"
+	case ".pdf":
+		return "application/pdf"
+	case ".txt", ".md":
+		return "text/plain"
+	case ".html", ".htm":
+		return "text/html"
+	case ".json":
+		return "application/json"
+	case ".yml", ".yaml":
+		return "application/yaml"
+	case ".sh", ".bash":
+		return "application/x-sh"
+	case ".tar":
+		return "application/x-tar"
+	case ".gz", ".tgz":
+		return "application/gzip"
+	case ".zip":
+		return "application/zip"
+	case ".mp4":
+		return "video/mp4"
+	case ".mp3":
+		return "audio/mpeg"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 // UploadDir walks localDir recursively and uploads every file under it.

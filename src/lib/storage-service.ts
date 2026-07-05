@@ -110,3 +110,10 @@ export async function minioCopy(srcKey: string, destKey: string, mimeType: strin
 export function buildMinioKey(projectId: string, path: string): string {
   return `${projectId}/${path}`
 }
+
+/** Generate presigned PUT URL — CLI upload langsung ke MinIO tanpa melewati proxy. */
+export function minioPresignPut(minioKey: string, expiresIn = 3600): string {
+  const client = getMinioClient()
+  if (!client) throw new Error('MinIO tidak dikonfigurasi')
+  return client.presign(minioKey, { expiresIn, method: 'PUT' })
+}

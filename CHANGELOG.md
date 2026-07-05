@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.19.5] - 2026-07-05
+
+### Fixed
+- **CLI storage upload — Gateway Timeout pada file besar**: upload sebelumnya melewati reverse proxy (envman server) sehingga file >~50 MB terpotong timeout proxy. Sekarang CLI minta presigned PUT URL ke server (< 1 detik), lalu upload langsung ke MinIO tanpa melewati proxy — tidak ada batas waktu praktis. Progress bar tetap berjalan.
+  - Server: `POST /storage/presign-upload` (issue presigned PUT URL + validasi quota) + `POST /storage/confirm-upload` (daftarkan ke DB setelah upload selesai).
+  - CLI: tiga langkah atomis — presign → PUT MinIO → confirm.
+
 ## [0.19.4] - 2026-07-05
 
 ### Changed
