@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,6 +30,12 @@ func main() {
 	}
 
 	if err := buildRootCmd().Execute(); err != nil {
+		// A binary run via `storage exec` that exits non-zero should propagate
+		// its own exit code, not a generic 1, and not print a duplicate error.
+		var exitErr *storage.ExitError
+		if errors.As(err, &exitErr) {
+			os.Exit(exitErr.Code)
+		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -286,7 +293,43 @@ Download streams to stdout by default — composable with pipes:
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
-	cmd.AddCommand(storageLsCmd(), storageUploadCmd(), storageDownloadCmd(), storageRmCmd())
+	cmd.AddCommand(storageLsCmd(), storageUploadCmd(), storageDownloadCmd(), storageExecCmd(), storageRmCmd())
+	return cmd
+}
+
+func storageExecCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "exec <project>:<path> [-- args...]",
+		Short: "Download a binary from storage and run it directly",
+		Long: `Download an executable from project storage into a private temp file
+(mode 0700), run it, then remove it. Nothing is left on disk.
+
+Arguments after -- are passed through to the program. The program's exit
+code is propagated as envman's exit code.`,
+		Example: "  envman storage exec tts:tts-go\n" +
+			"  envman storage exec tts:tts-go -- --port 8080\n" +
+			"  envman -e tts:prod -- envman storage exec tts:tts-go",
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return err
+			}
+			slug, remotePath, err := storage.ParseRef(args[0])
+			if err != nil {
+				return err
+			}
+			// With SetInterspersed(false) cobra keeps the "--" separator as a
+			// positional arg — strip it so it isn't forwarded to the program.
+			passthrough := args[1:]
+			if len(passthrough) > 0 && passthrough[0] == "--" {
+				passthrough = passthrough[1:]
+			}
+			return storage.Exec(cfg, slug, remotePath, passthrough)
+		},
+	}
+	// Pass flags after the ref straight to the child program, not to cobra.
+	cmd.Flags().SetInterspersed(false)
 	return cmd
 }
 

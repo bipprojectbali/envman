@@ -218,7 +218,7 @@ Files & aliases tetap accessible di project level (bukan filtered out), tapi yan
 
 ### CLI Behavior
 
-`apiFetch()` di `src/cli.ts` detect 403 dengan `deniedEnvs` array → cetak `[envman] Akses ditolak untuk env: <project:env>, ...` lalu exit 1. User di-arahkan kontak OWNER project.
+`FetchJSON()` di `cli-go/internal/api/api.go` detect 403 dengan `deniedEnvs` array → cetak `[envman] Akses ditolak untuk env: <project:env>, ...` lalu exit 1. User di-arahkan kontak OWNER project.
 
 ### UI
 
@@ -511,7 +511,14 @@ React 19 + Vite 8 (middleware mode dev). File-based routing: TanStack Router.
 
 ## CLI
 
-Standalone binary. Entry: `src/cli.ts`. Build: `bun run build:cli` → `dist/cli/envman-{platform}` + `.gz`.
+**CLI ditulis dalam Go**, bukan TypeScript. Sumber: `cli-go/` (module `github.com/bipprojectbali/envman/cli`).
+
+- Entry: `cli-go/cmd/envman/main.go` (cobra root + subcommands)
+- Packages: `cli-go/internal/{auth,api,run,storage,cache,update,envparser}`
+- Build: `bun run build:cli` (`scripts/build-cli.ts` → cross-compile `go build` semua platform) → `dist/cli/envman-{platform}` + `.gz`
+- Test: `cd cli-go && go test ./...`
+
+**⚠️ CLI TypeScript lama (`src/cli.ts`, `src/cli/`) SUDAH DIHAPUS.** Digantikan penuh oleh `cli-go/`. Jangan cari/rujuk `src/cli*` — tidak ada lagi. Semua perubahan CLI dilakukan di `cli-go/`.
 
 ### Auth Resolution (priority: high → low)
 
@@ -528,10 +535,21 @@ envman login <server-url> --token <token>
 envman logout
 envman whoami
 envman docs
+envman update
 envman run [-e <source>]... <project>:<alias>
 envman [options] -- <command>
-envman mcp [--write] [--debug]
+
+# Storage (MinIO-backed project files)
+envman storage ls <project>[:prefix]
+envman storage upload <project> <file|dir> [remote-path]
+envman storage download <project>:<path> [-o file]   # default: stream ke stdout
+envman storage exec <project>:<path> [-- args...]     # download binary → jalankan → hapus
+envman storage rm <project>:<folder>/                 # OWNER only
 ```
+
+`storage exec` untuk **binary** (yang tak bisa di-pipe ke `| bash`): unduh ke temp file 0700, jalankan (stdin/stdout/stderr inherit), lalu hapus. Argumen setelah `--` diteruskan; exit code program dipropagasi. Impl: `cli-go/internal/storage/exec.go` (`Exec` + tipe `ExitError`, di-handle di `main()` untuk propagasi exit code).
+
+**Catatan:** `envman mcp` sudah dihapus dari codebase (MCP deprecated) — tidak ada di CLI Go.
 
 ### Download
 
@@ -572,7 +590,7 @@ Bun scripts bisa langsung import npm tanpa `node_modules` — CLI auto-pass `--i
 
 ### Response Caching
 
-`apiFetch(cfg, path, opts?)` di `src/cli.ts` punya conditional cache **opt-in** (`opts.cache=true`, default `false`). Saat aktif: baca cache `(server, path)` → kirim `If-None-Match: <etag>` → kalau server balas `304` sajikan body dari disk; kalau `200 + ETag` tulis cache. Implementasi disk cache: `src/cli/response-cache.ts`.
+`FetchJSON(cfg, path, useCache)` di `cli-go/internal/api/api.go` punya conditional cache **opt-in** (`useCache=true`). Saat aktif: baca cache `(server, path)` → kirim `If-None-Match: <etag>` → kalau server balas `304` sajikan body dari disk; kalau `200 + ETag` tulis cache. Implementasi disk cache: `cli-go/internal/cache/cache.go`.
 
 - Cache dir: `~/.config/envman/cache/`, nama file `sha256(server+path).base64url.json`, ditulis atomik (tmp+rename) **mode 0600** (body bisa berisi konten file project).
 - `pruneIfNeeded()` batasi ≤200 entri (hapus tertua by mtime).

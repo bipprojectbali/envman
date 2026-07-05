@@ -78,6 +78,21 @@ envman storage download myapp:config/nginx.conf | nginx -t -c /dev/stdin
 
 Download stream langsung dari MinIO — tidak melewati server envman (presigned URL).
 
+### Exec — download binary lalu jalankan langsung
+
+Untuk file **binary** (bukan script teks), \`storage exec\` mengunduh ke temp file privat
+(mode 0700), menjalankannya, lalu menghapusnya. Argumen setelah \`--\` diteruskan ke program;
+exit code program dipropagasi sebagai exit code envman.
+
+\`\`\`bash
+envman storage exec myapp:bin/tts-go                       # jalankan tanpa argumen
+envman storage exec myapp:bin/tts-go -- --port 8080        # teruskan argumen
+envman -e myapp:prod -- envman storage exec myapp:bin/tts-go  # inject vars + jalankan
+\`\`\`
+
+Binary tidak bisa di-pipe ke \`| bash\` (hanya script teks yang bisa) — pakai \`exec\` untuk binary.
+Tidak ada yang tertinggal di disk setelah proses selesai.
+
 ### Hapus folder
 
 \`\`\`bash
