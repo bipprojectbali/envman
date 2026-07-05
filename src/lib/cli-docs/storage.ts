@@ -34,7 +34,13 @@ envman storage upload myapp ./dist/report.html --path reports/$(date +%F).html
 # Upload seluruh folder (rekursif)
 envman storage upload myapp ./assets/              # → assets/logo.png, assets/sub/icon.svg, ...
 envman storage upload myapp ./dist/ --path static  # → static/index.html, static/bundle.js, ...
+
+# Jangan timpa file yang sudah ada (--no-clobber / -n)
+envman storage upload myapp ./logo.png -n          # error + exit 1 jika logo.png sudah ada
+envman storage upload myapp ./assets/ -n           # lewati file yang sudah ada, upload sisanya
 \`\`\`
+
+**Default: overwrite.** Upload ke path yang sudah terisi akan **menimpa** file lama (upsert). Pakai \`--no-clobber\` (\`-n\`) untuk mencegah: file tunggal → error + exit 1; folder → file yang sudah ada dilewati, sisanya tetap diupload (seperti \`cp -n\`).
 
 **File ≤ 50 MB** — upload langsung via server, progress bar realtime.
 

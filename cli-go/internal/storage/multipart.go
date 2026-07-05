@@ -88,9 +88,9 @@ type partResponse struct {
 	Error string `json:"error"`
 }
 
-func initMultipart(cfg *auth.Config, slug, remotePath string, size int64, mimeType string) (*uploadState, error) {
+func initMultipart(cfg *auth.Config, slug, remotePath string, size int64, mimeType string, noClobber bool) (*uploadState, error) {
 	apiURL := fmt.Sprintf("%s/api/envman/projects/%s/storage/multipart/init", cfg.Server, url.PathEscape(slug))
-	payload, _ := json.Marshal(map[string]any{"path": remotePath, "size": size, "mimeType": mimeType})
+	payload, _ := json.Marshal(map[string]any{"path": remotePath, "size": size, "mimeType": mimeType, "noClobber": noClobber})
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewReader(payload))
 	if err != nil {
@@ -108,6 +108,9 @@ func initMultipart(cfg *auth.Config, slug, remotePath string, size int64, mimeTy
 
 	var r initResponse
 	_ = json.Unmarshal(body, &r)
+	if resp.StatusCode == http.StatusConflict {
+		return nil, fmt.Errorf("[envman] %s:%s: %w", slug, remotePath, ErrExists)
+	}
 	if resp.StatusCode != http.StatusOK {
 		if r.Error != "" {
 			return nil, fmt.Errorf("[envman] %s", r.Error)
@@ -208,7 +211,9 @@ func completeMultipart(cfg *auth.Config, slug string, state *uploadState) (*Uplo
 
 	var result UploadResult
 	if err := json.Unmarshal(body, &result); err != nil || resp.StatusCode != http.StatusOK {
-		var e struct{ Error string `json:"error"` }
+		var e struct {
+			Error string `json:"error"`
+		}
 		_ = json.Unmarshal(body, &e)
 		if e.Error != "" {
 			return nil, fmt.Errorf("[envman] %s", e.Error)
@@ -224,7 +229,7 @@ func completeMultipart(cfg *auth.Config, slug string, state *uploadState) (*Uplo
 // Each chunk (≤ 50 MB) goes through the envman server → MinIO, bypassing Cloudflare's
 // per-request body limit. State is persisted to ~/.cache/envman/upload-*.json so
 // interrupted uploads can be resumed by re-running the same command.
-func UploadMultipart(cfg *auth.Config, slug, localFile, remotePath string, onProgress ProgressFunc) (*UploadResult, error) {
+func UploadMultipart(cfg *auth.Config, slug, localFile, remotePath string, noClobber bool, onProgress ProgressFunc) (*UploadResult, error) {
 	f, err := os.Open(localFile)
 	if err != nil {
 		return nil, fmt.Errorf("[envman] open %s: %w", localFile, err)
@@ -246,7 +251,7 @@ func UploadMultipart(cfg *auth.Config, slug, localFile, remotePath string, onPro
 			len(saved.Completed)+1, saved.TotalParts)
 		state = saved
 	} else {
-		state, err = initMultipart(cfg, slug, remotePath, fileSize, mimeType)
+		state, err = initMultipart(cfg, slug, remotePath, fileSize, mimeType, noClobber)
 		if err != nil {
 			return nil, err
 		}

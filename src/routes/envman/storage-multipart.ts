@@ -17,6 +17,7 @@ import {
   getQuotaBytes,
   getUsedBytes,
   sanitizePath,
+  storageObjectExists,
 } from '../../lib/storage-service'
 
 export const storageMultipartRouter = new Elysia()
@@ -30,7 +31,7 @@ export const storageMultipartRouter = new Elysia()
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Akses ditolak (butuh EDITOR atau OWNER)' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 
-    const { path: rawPath, size, mimeType } = (body ?? {}) as { path?: string; size?: number; mimeType?: string }
+    const { path: rawPath, size, mimeType, noClobber } = (body ?? {}) as { path?: string; size?: number; mimeType?: string; noClobber?: boolean }
     const path = sanitizePath(rawPath ?? '')
     if (!path) { set.status = 400; return { error: 'Path tidak valid' } }
     if (typeof size !== 'number' || size <= 0) { set.status = 400; return { error: 'Size harus number > 0' } }
@@ -40,6 +41,12 @@ export const storageMultipartRouter = new Elysia()
       select: { id: true, storageQuotaMb: true, storageMaxFileMb: true },
     })
     if (!project) { set.status = 404; return { error: 'Project tidak ditemukan' } }
+
+    // --no-clobber: tolak jika path sudah terisi (cek sebelum inisiasi multipart).
+    if (noClobber && await storageObjectExists(project.id, path)) {
+      set.status = 409
+      return { error: `File "${path}" sudah ada`, exists: true }
+    }
 
     const maxFileBytes = await getMaxFileSizeBytesForProject(project.storageMaxFileMb)
     if (size > maxFileBytes) {

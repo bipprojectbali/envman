@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -130,10 +131,15 @@ type presignResponse struct {
 	ProjectID string `json:"projectId"`
 }
 
+// ErrExists is returned when --no-clobber is set and the target path already
+// exists (server responds 409). Callers can detect it via errors.Is.
+var ErrExists = errors.New("file sudah ada di storage")
+
 // Upload uploads a local file using a presigned MinIO PUT URL.
 // The CLI PUTs directly to MinIO — no reverse-proxy timeout.
 // onProgress is optional — pass nil to disable progress reporting.
-func Upload(cfg *auth.Config, slug, localFile, remotePath string, onProgress ProgressFunc) (*UploadResult, error) {
+// noClobber=true makes the server reject an existing path with ErrExists.
+func Upload(cfg *auth.Config, slug, localFile, remotePath string, noClobber bool, onProgress ProgressFunc) (*UploadResult, error) {
 	f, err := os.Open(localFile)
 	if err != nil {
 		return nil, fmt.Errorf("[envman] open %s: %w", localFile, err)
@@ -147,8 +153,8 @@ func Upload(cfg *auth.Config, slug, localFile, remotePath string, onProgress Pro
 
 	mimeType := detectMIME(localFile)
 
-	// Step 1 — ask server for presigned PUT URL (validates quota, auth).
-	presign, err := requestPresign(cfg, slug, remotePath, fileSize, mimeType)
+	// Step 1 — ask server for presigned PUT URL (validates quota, auth, clobber).
+	presign, err := requestPresign(cfg, slug, remotePath, fileSize, mimeType, noClobber)
 	if err != nil {
 		return nil, err
 	}
@@ -163,9 +169,9 @@ func Upload(cfg *auth.Config, slug, localFile, remotePath string, onProgress Pro
 }
 
 // requestPresign asks the server to issue a presigned MinIO PUT URL.
-func requestPresign(cfg *auth.Config, slug, remotePath string, size int64, mimeType string) (*presignResponse, error) {
+func requestPresign(cfg *auth.Config, slug, remotePath string, size int64, mimeType string, noClobber bool) (*presignResponse, error) {
 	apiPath := fmt.Sprintf("/api/envman/projects/%s/storage/presign-upload", url.PathEscape(slug))
-	payload, _ := json.Marshal(map[string]any{"path": remotePath, "size": size, "mimeType": mimeType})
+	payload, _ := json.Marshal(map[string]any{"path": remotePath, "size": size, "mimeType": mimeType, "noClobber": noClobber})
 	req, err := http.NewRequest("POST", cfg.Server+apiPath, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
@@ -180,6 +186,9 @@ func requestPresign(cfg *auth.Config, slug, remotePath string, size int64, mimeT
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 
+	if resp.StatusCode == http.StatusConflict {
+		return nil, fmt.Errorf("[envman] %s:%s: %w", slug, remotePath, ErrExists)
+	}
 	if resp.StatusCode != http.StatusOK {
 		var e struct {
 			Error string `json:"error"`
@@ -313,7 +322,9 @@ func detectMIME(filename string) string {
 // Each file's remote path is: remotePrefix + "/" + relative-path-from-localDir.
 // If remotePrefix is empty, files are uploaded at the top level.
 // verbose is an optional writer for per-file progress lines (pass nil to suppress).
-func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, verbose io.Writer) error {
+// With noClobber, files that already exist on the server are skipped (like
+// `cp -n`) rather than aborting the whole directory upload.
+func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, noClobber bool, verbose io.Writer) error {
 	var files []string
 	err := filepath.WalkDir(localDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -330,6 +341,7 @@ func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, verbose io
 	if len(files) == 0 {
 		return fmt.Errorf("[envman] directory %s is empty", localDir)
 	}
+	uploaded, skipped := 0, 0
 	for i, f := range files {
 		rel, _ := filepath.Rel(localDir, f)
 		remotePath := filepath.ToSlash(rel)
@@ -339,19 +351,31 @@ func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, verbose io
 		if verbose != nil {
 			fmt.Fprintf(verbose, "[%d/%d] %-50s", i+1, len(files), remotePath)
 		}
-		result, err := Upload(cfg, slug, f, remotePath, nil)
+		result, err := Upload(cfg, slug, f, remotePath, noClobber, nil)
 		if err != nil {
+			if noClobber && errors.Is(err, ErrExists) {
+				skipped++
+				if verbose != nil {
+					fmt.Fprintln(verbose, " dilewati (sudah ada)")
+				}
+				continue
+			}
 			if verbose != nil {
 				fmt.Fprintln(verbose, " gagal")
 			}
 			return fmt.Errorf("[envman] upload %s: %w", rel, err)
 		}
+		uploaded++
 		if verbose != nil {
 			fmt.Fprintf(verbose, " %s ✓\n", FmtBytes(result.Object.Size))
 		}
 	}
 	if verbose != nil {
-		fmt.Fprintf(verbose, "\nSelesai: %d file diupload ke %s/\n", len(files), remotePrefix)
+		if skipped > 0 {
+			fmt.Fprintf(verbose, "\nSelesai: %d diupload, %d dilewati ke %s/\n", uploaded, skipped, remotePrefix)
+		} else {
+			fmt.Fprintf(verbose, "\nSelesai: %d file diupload ke %s/\n", uploaded, remotePrefix)
+		}
 	}
 	return nil
 }

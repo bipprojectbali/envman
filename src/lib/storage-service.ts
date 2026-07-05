@@ -47,6 +47,16 @@ export async function getUsedBytes(projectId: string): Promise<number> {
   return agg._sum.size ?? 0
 }
 
+/** True jika sudah ada object di (projectId, path). Dipakai guard --no-clobber. */
+export async function storageObjectExists(projectId: string, path: string): Promise<boolean> {
+  const { prisma } = await import('./db')
+  const existing = await prisma.projectStorageObject.findUnique({
+    where: { projectId_path: { projectId, path } },
+    select: { id: true },
+  })
+  return existing !== null
+}
+
 // ─── MinIO operations ──────────────────────────────────────────────────────
 
 /** Upload buffer ke MinIO. Throw jika client tidak dikonfigurasi. */
