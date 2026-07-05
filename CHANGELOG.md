@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.19.12] - 2026-07-06
+
+### Added
+- **`envman docs` offline fallback** — dokumentasi CLI kini di-embed ke binary (`//go:embed`). `envman docs` tetap mengambil versi terbaru dari server (`/api/cli-docs.md`) bila terjangkau; saat offline atau belum login, otomatis mencetak dokumentasi bawaan (placeholder `{{SERVER}}` diganti URL server dari config). Notice offline ke stderr — stdout tetap bersih untuk piping.
+  - Sumber tunggal tetap `src/lib/cli-docs/*.ts`. `cli-go/internal/docs/DOCS.md` **di-generate** (`scripts/gen-cli-docs.ts`, otomatis di `build:cli`), tidak diedit tangan; unit test `cli-docs-embed` menjaga agar tidak drift dari sumber.
+
+### Changed
+- **Docs web** (`api-storage.ts`) disinkronkan dengan fitur terbaru: `storage exec` (cache), response download `{url, size, updatedAt}`, dan `upload --no-clobber`.
+- **CLAUDE.md**: peringatan di paling atas bahwa CLI ada di `cli-go/` (bukan `src/cli`), untuk mencegah kesalahpahaman entrypoint.
+
+### Internal
+- `cli-go/cmd/envman/main.go` dipecah — grup storage subcommand → `storage_cmd.go`, docs command → `docs_cmd.go` (menjaga batas file health). Tanpa perubahan behavior.
+
 ## [0.19.11] - 2026-07-06
 
 ### Added
