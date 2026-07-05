@@ -181,7 +181,9 @@ func requestPresign(cfg *auth.Config, slug, remotePath string, size int64, mimeT
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		var e struct{ Error string `json:"error"` }
+		var e struct {
+			Error string `json:"error"`
+		}
 		_ = json.Unmarshal(body, &e)
 		if e.Error == "" {
 			e.Error = http.StatusText(resp.StatusCode)
@@ -251,7 +253,9 @@ func confirmUpload(cfg *auth.Config, slug, path, minioKey string, size int64, mi
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		var e struct{ Error string `json:"error"` }
+		var e struct {
+			Error string `json:"error"`
+		}
 		_ = json.Unmarshal(body, &e)
 		if e.Error == "" {
 			e.Error = http.StatusText(resp.StatusCode)
@@ -398,25 +402,33 @@ func DeleteFolder(cfg *auth.Config, slug, prefix string) (int, error) {
 	return result.Deleted, nil
 }
 
-// Download fetches a file and streams it to out.
-// It resolves the presigned URL from the server, then streams directly from MinIO.
-// onProgress is optional — pass nil when streaming to stdout (pipe mode).
-func Download(cfg *auth.Config, slug, remotePath string, out io.Writer, onProgress ProgressFunc) error {
+// DownloadInfo carries the presigned URL plus cache validators from the server.
+// Size/UpdatedAt come from the DB (ProjectStorageObject) and let `storage exec`
+// reuse a cached binary without re-downloading unchanged files.
+type DownloadInfo struct {
+	URL       string `json:"url"`
+	Size      int64  `json:"size"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// resolveDownload asks the server for a presigned URL + cache validators.
+func resolveDownload(cfg *auth.Config, slug, remotePath string) (*DownloadInfo, error) {
 	apiPath := fmt.Sprintf("/api/envman/projects/%s/storage/download?path=%s",
 		url.PathEscape(slug), url.QueryEscape(remotePath))
+	var info DownloadInfo
+	if err := api.FetchJSON(cfg, apiPath, &info); err != nil {
+		return nil, err
+	}
+	if info.URL == "" {
+		return nil, fmt.Errorf("[envman] server returned empty download URL")
+	}
+	return &info, nil
+}
 
-	var dlResp struct {
-		URL string `json:"url"`
-	}
-	if err := api.FetchJSON(cfg, apiPath, &dlResp); err != nil {
-		return err
-	}
-	if dlResp.URL == "" {
-		return fmt.Errorf("[envman] server returned empty download URL")
-	}
-
+// streamFrom streams a presigned URL to out, reporting progress if onProgress != nil.
+func streamFrom(presignedURL string, out io.Writer, onProgress ProgressFunc) error {
 	// Stream directly from MinIO — no auth header (presigned URL is self-authenticating).
-	resp, err := http.Get(dlResp.URL) //nolint:noctx
+	resp, err := http.Get(presignedURL) //nolint:noctx
 	if err != nil {
 		return fmt.Errorf("[envman] download failed: %w", err)
 	}
@@ -440,4 +452,15 @@ func Download(cfg *auth.Config, slug, remotePath string, out io.Writer, onProgre
 		return fmt.Errorf("[envman] stream failed: %w", err)
 	}
 	return nil
+}
+
+// Download fetches a file and streams it to out.
+// It resolves the presigned URL from the server, then streams directly from MinIO.
+// onProgress is optional — pass nil when streaming to stdout (pipe mode).
+func Download(cfg *auth.Config, slug, remotePath string, out io.Writer, onProgress ProgressFunc) error {
+	info, err := resolveDownload(cfg, slug, remotePath)
+	if err != nil {
+		return err
+	}
+	return streamFrom(info.URL, out, onProgress)
 }

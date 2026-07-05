@@ -298,16 +298,22 @@ Download streams to stdout by default — composable with pipes:
 }
 
 func storageExecCmd() *cobra.Command {
+	var offline, noCache bool
 	cmd := &cobra.Command{
 		Use:   "exec <project>:<path> [-- args...]",
-		Short: "Download a binary from storage and run it directly",
-		Long: `Download an executable from project storage into a private temp file
-(mode 0700), run it, then remove it. Nothing is left on disk.
+		Short: "Download a binary from storage and run it directly (cached)",
+		Long: `Run an executable from project storage. The binary is cached at
+~/.cache/envman/exec (mode 0700) and reused when unchanged, so repeat runs are
+instant — only a small metadata request hits the server to check freshness.
 
 Arguments after -- are passed through to the program. The program's exit
-code is propagated as envman's exit code.`,
+code is propagated as envman's exit code.
+
+  --offline    run the cached binary without contacting the server
+  --no-cache   force a fresh download; do not read or write the cache`,
 		Example: "  envman storage exec tts:tts-go\n" +
 			"  envman storage exec tts:tts-go -- --port 8080\n" +
+			"  envman storage exec --offline tts:tts-go\n" +
 			"  envman -e tts:prod -- envman storage exec tts:tts-go",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -325,11 +331,16 @@ code is propagated as envman's exit code.`,
 			if len(passthrough) > 0 && passthrough[0] == "--" {
 				passthrough = passthrough[1:]
 			}
-			return storage.Exec(cfg, slug, remotePath, passthrough)
+			return storage.Exec(cfg, slug, remotePath, passthrough, storage.ExecOptions{
+				Offline: offline,
+				NoCache: noCache,
+			})
 		},
 	}
 	// Pass flags after the ref straight to the child program, not to cobra.
 	cmd.Flags().SetInterspersed(false)
+	cmd.Flags().BoolVar(&offline, "offline", false, "Run cached binary without contacting the server")
+	cmd.Flags().BoolVar(&noCache, "no-cache", false, "Force fresh download, bypass cache")
 	return cmd
 }
 
