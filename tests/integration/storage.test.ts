@@ -89,6 +89,40 @@ describe('Storage — Upload', () => {
   })
 })
 
+describe('Storage — Presign no-clobber', () => {
+  const presign = (token: string, path: string, noClobber: boolean) =>
+    app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/storage/presign-upload`, {
+      method: 'POST',
+      headers: { cookie: `session=${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, size: 10, mimeType: 'application/octet-stream', noClobber }),
+    }))
+
+  test('noClobber=true + path sudah ada → 409 exists', async () => {
+    if (!MINIO_ENABLED) return
+    // Pastikan file ada dulu
+    await app.handle(makeUploadRequest(editorToken, 'nc/existing.bin', makeFile('existing.bin', 'data')))
+    const res = await presign(editorToken, 'nc/existing.bin', true)
+    expect(res.status).toBe(409)
+    const json = await res.json()
+    expect(json.exists).toBe(true)
+  })
+
+  test('noClobber=true + path baru → 200 (boleh upload)', async () => {
+    if (!MINIO_ENABLED) return
+    const res = await presign(editorToken, 'nc/brand-new.bin', true)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(typeof json.uploadUrl).toBe('string')
+  })
+
+  test('noClobber=false + path sudah ada → 200 (overwrite, default)', async () => {
+    if (!MINIO_ENABLED) return
+    await app.handle(makeUploadRequest(editorToken, 'nc/over.bin', makeFile('over.bin', 'data')))
+    const res = await presign(editorToken, 'nc/over.bin', false)
+    expect(res.status).toBe(200)
+  })
+})
+
 describe('Storage — List', () => {
   test('VIEWER bisa list storage', async () => {
     if (!MINIO_ENABLED) return

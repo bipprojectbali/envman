@@ -388,11 +388,18 @@ func storageLsCmd() *cobra.Command {
 
 func storageUploadCmd() *cobra.Command {
 	var remotePath string
+	var noClobber bool
 	cmd := &cobra.Command{
 		Use:   "upload <project> <file|dir>",
 		Short: "Upload a file or folder to project storage (streaming)",
+		Long: `Upload a file or folder to project storage.
+
+By default an existing file at the same path is overwritten. Pass --no-clobber
+(-n) to refuse overwriting: a single file errors if it exists, and a folder
+upload skips existing files and continues with the rest.`,
 		Example: "  envman storage upload myapp compose.yml\n" +
 			"  envman storage upload myapp ./logo.png --path assets/logo.png\n" +
+			"  envman storage upload myapp ./logo.png -n         # jangan timpa jika sudah ada\n" +
 			"  envman storage upload myapp ./assets/\n" +
 			"  envman storage upload myapp ./dist/ --path static/dist",
 		Args: cobra.ExactArgs(2),
@@ -411,7 +418,7 @@ func storageUploadCmd() *cobra.Command {
 
 			if stat.IsDir() {
 				prefix := storage.RemotePath(localPath, remotePath)
-				return storage.UploadDir(cfg, slug, localPath, prefix, os.Stderr)
+				return storage.UploadDir(cfg, slug, localPath, prefix, noClobber, os.Stderr)
 			}
 
 			target := storage.RemotePath(localPath, remotePath)
@@ -424,16 +431,19 @@ func storageUploadCmd() *cobra.Command {
 				// Upload yang terputus bisa dilanjutkan dengan perintah yang sama.
 				fmt.Fprintf(os.Stderr, "[envman] File besar (%s) — memakai chunked upload (%d chunk × 50 MB)\n",
 					storage.FmtBytes(stat.Size()), (stat.Size()+storage.MultipartThreshold-1)/storage.MultipartThreshold)
-				result, err = storage.UploadMultipart(cfg, slug, localPath, target, func(written, total int64, elapsed time.Duration) {
+				result, err = storage.UploadMultipart(cfg, slug, localPath, target, noClobber, func(written, total int64, elapsed time.Duration) {
 					renderProgress(name, written, total, elapsed)
 				})
 			} else {
-				result, err = storage.Upload(cfg, slug, localPath, target, func(written, total int64, elapsed time.Duration) {
+				result, err = storage.Upload(cfg, slug, localPath, target, noClobber, func(written, total int64, elapsed time.Duration) {
 					renderProgress(name, written, total, elapsed)
 				})
 			}
 			clearProgress()
 			if err != nil {
+				if noClobber && errors.Is(err, storage.ErrExists) {
+					return fmt.Errorf("[envman] %s:%s sudah ada — hapus --no-clobber untuk menimpa", slug, target)
+				}
 				return err
 			}
 			fmt.Fprintf(os.Stderr, "Uploaded: %s (%s)\n", result.Object.Path, storage.FmtBytes(result.Object.Size))
@@ -441,6 +451,7 @@ func storageUploadCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&remotePath, "path", "", "Remote path or prefix (default: basename of local file/dir)")
+	cmd.Flags().BoolVarP(&noClobber, "no-clobber", "n", false, "Refuse to overwrite existing files (skip existing in folder upload)")
 	return cmd
 }
 
