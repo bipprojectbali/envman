@@ -10,10 +10,10 @@ Env target bisa **meminjam vars dari env lain** secara referensi live — bukan 
 - Import dengan \`order\` lebih besar menang atas import dengan \`order\` lebih kecil.
 - **Akses dicek saat resolve**, bukan saat setup link. Tiap baca: source env yang denied → var-nya di-skip + dicatat di \`deniedImports[]\` (tidak silent).
 - **Secret**: reveal/mask mengikuti akses caller di **source env** (OWNER/EDITOR bisa reveal, VIEWER → \`***\`).
+- **Per-key whitelist** (\`keys[]\`): kosong = semua key source ikut; ada isi = hanya key itu. Whitelist **ketat** — key baru di source tidak ikut otomatis sampai ditambah ke \`keys\`.
 
 ### Batasan MVP
 
-- Tidak ada per-key filter (import semua key dari source)
 - Tidak ada transitive import (multi-level)
 - Tidak ada per-import override value
 
@@ -24,6 +24,7 @@ Env target bisa **meminjam vars dari env lain** secara referensi live — bukan 
 | Operasi | Syarat |
 |---------|--------|
 | Buat link (POST) | OWNER env **target** + akses ≥VIEWER di env **source** |
+| Ubah whitelist key (PATCH) | OWNER env target |
 | Hapus link (DELETE) | OWNER env target |
 | List links (GET) | OWNER env target |
 
@@ -39,6 +40,7 @@ Prefix: \`/api/envman/projects/:slug/environments/:envName/imports\`
 |--------|------|-----------|
 | \`GET\` | \`.../imports\` | List semua live-link env ini |
 | \`POST\` | \`.../imports\` | Buat link baru (OWNER target + akses source) |
+| \`PATCH\` | \`.../imports/:id\` | Ubah whitelist \`keys\` link |
 | \`DELETE\` | \`.../imports/:id\` | Hapus link |
 
 ---
@@ -57,6 +59,7 @@ Response:
     {
       "id": "...",
       "order": 1,
+      "keys": ["DB_HOST", "REDIS_URL"],
       "sourceProject": "infra",
       "sourceProjectName": "Infrastructure",
       "sourceEnv": "base",
@@ -71,7 +74,7 @@ Response:
 ### POST — Buat Link
 
 \`\`\`json
-{ "sourceProject": "infra", "sourceEnv": "base" }
+{ "sourceProject": "infra", "sourceEnv": "base", "keys": ["DB_HOST"] }
 \`\`\`
 
 Response \`201\`:
@@ -82,6 +85,20 @@ Response \`201\`:
 
 - \`order\` = max order existing + 1 (import terakhir menang)
 - Caller wajib punya akses ≥VIEWER ke source env — jika denied → 403
+- \`keys\` opsional: array key yang mau di-import. Kosong/absen = **semua** key source. Whitelist ketat (key baru tidak ikut otomatis).
+
+---
+
+### PATCH — Ubah Whitelist Key
+
+\`\`\`json
+{ "keys": ["DB_HOST", "REDIS_URL"] }
+\`\`\`
+
+Response \`200\`: \`{ "ok": true, "keys": ["DB_HOST", "REDIS_URL"] }\`
+
+- \`keys: []\` → kembali import **semua** key source.
+- Non-array / elemen bukan string → 400.
 
 ---
 
@@ -95,7 +112,7 @@ Response \`201\`:
   "imported": [
     { "key": "DB_HOST", "value": "db.infra.internal", "isSecret": false, "sourceProject": "infra", "sourceEnv": "base" }
   ],
-  "importedKeys": ["DB_HOST", "REDIS_URL"],
+  "importedKeys": ["DB_HOST"],
   "deniedImports": []
 }
 \`\`\`

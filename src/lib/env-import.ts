@@ -54,7 +54,10 @@ export async function resolveImportedVars(
       where: { environmentId: imp.sourceEnv.id, isDisabled: false },
       orderBy: { key: 'asc' },
     })
-    for (const v of sourceVars) {
+    // Whitelist ketat: kosong = semua key ikut; ada isi = hanya key terpilih.
+    // Key baru di source tidak ikut otomatis sampai ditambah ke whitelist.
+    const filtered = imp.keys.length > 0 ? sourceVars.filter((v) => imp.keys.includes(v.key)) : sourceVars
+    for (const v of filtered) {
       vars.push({
         key: v.key,
         value: v.isSecret ? (canReadSecrets ? decryptSecret(v.value) : '***') : v.value,

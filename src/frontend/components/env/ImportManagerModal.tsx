@@ -14,13 +14,15 @@ import {
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { TbInfoCircle, TbLink, TbTrash } from 'react-icons/tb'
+import { TbInfoCircle, TbLink, TbPencil, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { ImportKeyPicker } from './ImportKeyPicker'
 
 interface ImportLink {
   id: string
   order: number
+  keys: string[]
   sourceProject: string
   sourceProjectName: string
   sourceEnv: string
@@ -46,6 +48,9 @@ export function ImportManagerModal({ opened, onClose, slug, env }: ImportManager
   const qc = useQueryClient()
   const [srcProject, setSrcProject] = useState<string | null>(null)
   const [srcEnv, setSrcEnv] = useState<string | null>(null)
+  const [srcKeys, setSrcKeys] = useState<string[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editKeys, setEditKeys] = useState<string[]>([])
 
   const { data: importsData, isLoading: importsLoading } = useQuery({
     queryKey: ['envman', 'imports', slug, env],
@@ -81,12 +86,27 @@ export function ImportManagerModal({ opened, onClose, slug, env }: ImportManager
     mutationFn: () =>
       apiFetch(`/api/envman/projects/${slug}/environments/${env}/imports`, {
         method: 'POST',
-        body: JSON.stringify({ sourceProject: srcProject, sourceEnv: srcEnv }),
+        body: JSON.stringify({ sourceProject: srcProject, sourceEnv: srcEnv, keys: srcKeys }),
       }),
     onSuccess: () => {
       notifyOk('Import ditambahkan')
       setSrcProject(null)
       setSrcEnv(null)
+      setSrcKeys([])
+      invalidate()
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  const updateImport = useMutation({
+    mutationFn: (v: { id: string; keys: string[] }) =>
+      apiFetch(`/api/envman/projects/${slug}/environments/${env}/imports/${v.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ keys: v.keys }),
+      }),
+    onSuccess: () => {
+      notifyOk('Whitelist key diperbarui')
+      setEditingId(null)
       invalidate()
     },
     onError: (e) => notifyErr(e),
@@ -112,41 +132,51 @@ export function ImportManagerModal({ opened, onClose, slug, env }: ImportManager
           </Text>
         </Alert>
 
-        <Group align="flex-end" gap="xs" wrap="nowrap">
-          <Select
-            label="Project source"
-            placeholder="Pilih project"
-            data={projectOptions}
-            value={srcProject}
-            onChange={(v) => {
-              setSrcProject(v)
-              setSrcEnv(null)
-            }}
-            searchable
-            style={{ flex: 1 }}
-            size="xs"
-          />
-          <Select
-            label="Env source"
-            placeholder="Pilih env"
-            data={envOptions}
-            value={srcEnv}
-            onChange={setSrcEnv}
-            disabled={!srcProject}
-            searchable
-            style={{ flex: 1 }}
-            size="xs"
-          />
+        <Stack gap="xs">
+          <Group align="flex-end" gap="xs" wrap="nowrap">
+            <Select
+              label="Project source"
+              placeholder="Pilih project"
+              data={projectOptions}
+              value={srcProject}
+              onChange={(v) => {
+                setSrcProject(v)
+                setSrcEnv(null)
+                setSrcKeys([])
+              }}
+              searchable
+              style={{ flex: 1 }}
+              size="xs"
+            />
+            <Select
+              label="Env source"
+              placeholder="Pilih env"
+              data={envOptions}
+              value={srcEnv}
+              onChange={(v) => {
+                setSrcEnv(v)
+                setSrcKeys([])
+              }}
+              disabled={!srcProject}
+              searchable
+              style={{ flex: 1 }}
+              size="xs"
+            />
+          </Group>
+          {srcProject && srcEnv && (
+            <ImportKeyPicker slug={srcProject} env={srcEnv} selected={srcKeys} onChange={setSrcKeys} />
+          )}
           <Button
             leftSection={<TbLink size={14} />}
             onClick={() => addImport.mutate()}
             loading={addImport.isPending}
             disabled={!srcProject || !srcEnv}
             size="xs"
+            style={{ alignSelf: 'flex-start' }}
           >
-            Link
+            Link{srcKeys.length > 0 ? ` ${srcKeys.length} key` : ' semua'}
           </Button>
-        </Group>
+        </Stack>
 
         <Stack gap={6}>
           <Text fz="xs" c="dimmed" fw={600}>
@@ -162,25 +192,62 @@ export function ImportManagerModal({ opened, onClose, slug, env }: ImportManager
             </Text>
           ) : (
             imports.map((imp) => (
-              <Group key={imp.id} justify="space-between" wrap="nowrap" gap="xs">
-                <Group gap={6} wrap="nowrap">
-                  <Badge size="sm" variant="light" color="grape" leftSection={<TbLink size={10} />}>
-                    {imp.sourceProject}:{imp.sourceEnv}
-                  </Badge>
-                  <Code fz={10}>{imp.sourceProjectName}</Code>
+              <Stack key={imp.id} gap={4}>
+                <Group justify="space-between" wrap="nowrap" gap="xs">
+                  <Group gap={6} wrap="nowrap">
+                    <Badge size="sm" variant="light" color="grape" leftSection={<TbLink size={10} />}>
+                      {imp.sourceProject}:{imp.sourceEnv}
+                    </Badge>
+                    <Code fz={10}>{imp.sourceProjectName}</Code>
+                    <Badge size="xs" variant="outline" color={imp.keys.length > 0 ? 'blue' : 'gray'}>
+                      {imp.keys.length > 0 ? `${imp.keys.length} key` : 'semua key'}
+                    </Badge>
+                  </Group>
+                  <Group gap={2} wrap="nowrap">
+                    <Tooltip label="Ubah key yang di-import">
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color="blue"
+                        onClick={() => {
+                          setEditingId(editingId === imp.id ? null : imp.id)
+                          setEditKeys(imp.keys)
+                        }}
+                      >
+                        <TbPencil size={13} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Hapus link">
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color="red"
+                        loading={removeImport.isPending && removeImport.variables === imp.id}
+                        onClick={() => removeImport.mutate(imp.id)}
+                      >
+                        <TbTrash size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
                 </Group>
-                <Tooltip label="Hapus link">
-                  <ActionIcon
-                    size="sm"
-                    variant="subtle"
-                    color="red"
-                    loading={removeImport.isPending && removeImport.variables === imp.id}
-                    onClick={() => removeImport.mutate(imp.id)}
-                  >
-                    <TbTrash size={14} />
-                  </ActionIcon>
-                </Tooltip>
-              </Group>
+                {editingId === imp.id && (
+                  <Stack gap={6} pl="sm" style={{ borderLeft: '2px solid var(--mantine-color-blue-light)' }}>
+                    <ImportKeyPicker slug={imp.sourceProject} env={imp.sourceEnv} selected={editKeys} onChange={setEditKeys} />
+                    <Group gap="xs">
+                      <Button
+                        size="xs"
+                        loading={updateImport.isPending}
+                        onClick={() => updateImport.mutate({ id: imp.id, keys: editKeys })}
+                      >
+                        Simpan
+                      </Button>
+                      <Button size="xs" variant="subtle" color="gray" onClick={() => setEditingId(null)}>
+                        Batal
+                      </Button>
+                    </Group>
+                  </Stack>
+                )}
+              </Stack>
             ))
           )}
         </Stack>

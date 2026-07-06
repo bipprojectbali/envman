@@ -11,6 +11,20 @@ function getIp(request: Request): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown'
 }
 
+// Normalisasi whitelist keys dari body: array of string non-kosong, di-dedup & di-trim.
+// undefined/null → [] (semua key ikut). Non-array atau elemen non-string → null (invalid).
+function parseKeys(raw: unknown): string[] | null {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw)) return null
+  const out: string[] = []
+  for (const k of raw) {
+    if (typeof k !== 'string') return null
+    const trimmed = k.trim()
+    if (trimmed && !out.includes(trimmed)) out.push(trimmed)
+  }
+  return out
+}
+
 // Cari environment by slug + name (notDeleted project). Null = salah satu tidak ada.
 async function findEnv(slug: string, envName: string) {
   const project = await prisma.project.findFirst({ where: { slug, ...notDeleted } })
@@ -48,6 +62,7 @@ export const envImportsRouter = new Elysia()
       imports: imports.map((i) => ({
         id: i.id,
         order: i.order,
+        keys: i.keys,
         sourceProject: i.sourceEnv.project.slug,
         sourceProjectName: i.sourceEnv.project.name,
         sourceEnv: i.sourceEnv.name,
@@ -63,13 +78,20 @@ export const envImportsRouter = new Elysia()
     const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
     if (access !== 'OWNER') return forbidden(set)
 
-    const body = (await request.json().catch(() => null)) as { sourceProject?: unknown; sourceEnv?: unknown } | null
+    const body = (await request.json().catch(() => null)) as
+      | { sourceProject?: unknown; sourceEnv?: unknown; keys?: unknown }
+      | null
     if (!body || typeof body.sourceProject !== 'string' || typeof body.sourceEnv !== 'string') {
       set.status = 400
       return { error: 'sourceProject dan sourceEnv wajib diisi' }
     }
     const sourceProject = body.sourceProject
     const sourceEnvName = body.sourceEnv
+    const keys = parseKeys(body.keys)
+    if (keys === null) {
+      set.status = 400
+      return { error: 'keys harus berupa array of string' }
+    }
 
     const target = await findEnv(params.slug, params.envName)
     if (!target) {
@@ -111,18 +133,60 @@ export const envImportsRouter = new Elysia()
         targetEnvId: target.env.id,
         sourceEnvId: source.env.id,
         order: (max._max.order ?? -1) + 1,
+        keys,
         createdById: caller.userId,
       },
     })
 
+    const keysSuffix = keys.length > 0 ? ` keys=[${keys.join(',')}]` : ''
     audit(
       caller.userId,
       'ENV_IMPORT_ADDED',
-      `${params.slug}/${params.envName} <- ${sourceProject}/${sourceEnvName}`,
+      `${params.slug}/${params.envName} <- ${sourceProject}/${sourceEnvName}${keysSuffix}`,
       getIp(request),
     )
     await invalidateProjectCaches(params.slug, [caller.userId])
     return { ok: true, id: created.id, order: created.order }
+  })
+
+  // PATCH .../imports/:id — ubah whitelist keys link existing (OWNER target)
+  .patch('/api/envman/projects/:slug/environments/:envName/imports/:id', async ({ request, params, set }) => {
+    const caller = await requireEnvAuth(request)
+    if (!caller) return unauthorized(set)
+    const access = await getEnvironmentAccess(caller.userId, caller.role, params.slug, params.envName)
+    if (access !== 'OWNER') return forbidden(set)
+
+    const body = (await request.json().catch(() => null)) as { keys?: unknown } | null
+    const keys = parseKeys(body?.keys)
+    if (keys === null) {
+      set.status = 400
+      return { error: 'keys harus berupa array of string' }
+    }
+
+    const target = await findEnv(params.slug, params.envName)
+    if (!target) {
+      set.status = 404
+      return { error: 'Environment tidak ditemukan' }
+    }
+    const link = await prisma.envImport.findUnique({
+      where: { id: params.id },
+      include: { sourceEnv: { select: { name: true, project: { select: { slug: true } } } } },
+    })
+    if (!link || link.targetEnvId !== target.env.id) {
+      set.status = 404
+      return { error: 'Import tidak ditemukan' }
+    }
+
+    await prisma.envImport.update({ where: { id: params.id }, data: { keys } })
+    const keysSuffix = keys.length > 0 ? ` keys=[${keys.join(',')}]` : ' keys=[all]'
+    audit(
+      caller.userId,
+      'ENV_IMPORT_UPDATED',
+      `${params.slug}/${params.envName} <- ${link.sourceEnv.project.slug}/${link.sourceEnv.name}${keysSuffix}`,
+      getIp(request),
+    )
+    await invalidateProjectCaches(params.slug, [caller.userId])
+    return { ok: true, keys }
   })
 
   // DELETE .../imports/:id — hapus link (OWNER target)
