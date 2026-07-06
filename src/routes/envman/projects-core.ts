@@ -21,6 +21,7 @@ export const projectsCoreRouter = new Elysia()
     const include = {
       members: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
       environments: { select: { name: true }, orderBy: { name: 'asc' as const } },
+      createdBy: { select: { id: true, name: true, email: true, image: true } },
       _count: { select: { environments: true } },
     }
     const projects = await withCache(cacheKeys.projectList(caller.userId), 60, () =>
@@ -67,6 +68,7 @@ export const projectsCoreRouter = new Elysia()
         name: body.name,
         description: body.description ?? null,
         tags: Array.isArray(body.tags) ? body.tags : [],
+        createdById: auth.userId,
         members: { create: { userId: auth.userId, role: 'OWNER' } },
       },
     })

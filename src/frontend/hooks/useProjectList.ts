@@ -17,9 +17,16 @@ export interface Project {
   color?: string | null
   cardColor?: string | null
   createdAt?: string
+  createdById?: string | null
+  createdBy?: { id: string; name: string; email: string; image?: string | null } | null
   myRole: 'OWNER' | 'EDITOR' | 'VIEWER'
   _count: { environments: number }
   members?: { id: string }[]
+}
+
+export interface ProjectCreator {
+  id: string
+  name: string
 }
 
 type SortKey = 'recent' | 'name' | 'envs'
@@ -116,8 +123,10 @@ export function useProjectList() {
   })
 
   const projects: Project[] = data?.projects ?? []
+  const currentUserId = sessionData?.user?.id
+  const isSuperAdmin = sessionData?.user?.role === 'SUPER_ADMIN'
 
-  const filters = useProjectFilters(projects)
+  const filters = useProjectFilters(projects, currentUserId)
   const {
     view,
     setView,
@@ -133,6 +142,9 @@ export function useProjectList() {
     setGroupByTag,
     statusFilter,
     setStatusFilter,
+    creatorScope,
+    setCreatorScope,
+    allCreators,
     page,
     setPage,
     searchRef,
@@ -210,6 +222,11 @@ export function useProjectList() {
     setGroupByTag,
     statusFilter,
     setStatusFilter,
+    creatorScope,
+    setCreatorScope,
+    allCreators,
+    isSuperAdmin,
+    currentUserId,
     page,
     setPage,
     searchRef,

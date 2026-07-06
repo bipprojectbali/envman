@@ -49,6 +49,7 @@ function ProjectListPage() {
     form, setForm, slugManual, setSlugManual,
     view, setView, search, setSearch, tagFilter, setTagFilter, sort, setSort,
     pinned, setPinned, groupByTag, setGroupByTag, statusFilter, setStatusFilter,
+    creatorScope, setCreatorScope, allCreators, isSuperAdmin,
     page, setPage, searchRef,
     projects, isLoading, isError, error, refetch,
     createProject, editProject, toggleActive,
@@ -110,6 +111,8 @@ function ProjectListPage() {
           sort={sort} setSort={setSort}
           groupByTag={groupByTag} setGroupByTag={setGroupByTag}
           statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+          creatorScope={creatorScope} setCreatorScope={setCreatorScope}
+          allCreators={allCreators} isSuperAdmin={isSuperAdmin}
           filtered={filtered} projects={projects}
           hasFilter={hasFilter} resetFilter={resetFilter}
         />

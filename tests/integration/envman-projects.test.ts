@@ -61,6 +61,30 @@ describe('POST /api/envman/projects', () => {
     expect(member?.role).toBe('OWNER')
   })
 
+  test('project baru mencatat createdById = pembuat', async () => {
+    const res = await app.handle(new Request('http://localhost/api/envman/projects', {
+      method: 'POST',
+      headers: authHeader(adminToken),
+      body: JSON.stringify({ slug: 'creator-proj', name: 'Creator Project' }),
+    }))
+    expect(res.status).toBe(200)
+    const created = await prisma.project.findUnique({ where: { slug: 'creator-proj' }, select: { createdById: true } })
+    expect(created?.createdById).toBe(adminId)
+  })
+
+  test('list membawa createdBy object untuk tiap project', async () => {
+    const res = await app.handle(new Request('http://localhost/api/envman/projects', {
+      headers: authHeader(adminToken),
+    }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    const proj = body.projects.find((p: any) => p.slug === 'creator-proj')
+    expect(proj).toBeDefined()
+    expect(proj.createdById).toBe(adminId)
+    expect(proj.createdBy?.id).toBe(adminId)
+    expect(proj.createdBy?.name).toBe('ProjAdmin')
+  })
+
   test('slug duplikat returns 400', async () => {
     const res = await app.handle(new Request('http://localhost/api/envman/projects', {
       method: 'POST',
