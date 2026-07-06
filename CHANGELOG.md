@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.19.15] - 2026-07-06
+
+### Changed
+- **Matrix akses anggota lebih bersih** — badge role (OWNER/EDITOR/dll) di tiap sel dihilangkan karena redundan (tombol aktif sudah berwarna, project role sudah tampil di kolom nama). Diganti **legenda arti** sekali di atas tabel (`~ V E O ✕`). Sel yang diblokir (denied) diberi background merah tipis + ikon gembok agar sinyal keamanan tetap terlihat sekilas.
+
 ## [0.19.14] - 2026-07-06
 
 ### Added
