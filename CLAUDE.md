@@ -181,6 +181,7 @@ Env target meminjam vars dari env lain (boleh lintas project) secara **referensi
 ### Semantik
 
 - **Layered merge**: `imports (order asc, besar menang) → local`. **Var lokal SELALU menang per-key**. Imported yang key-nya ada lokal di-suppress.
+- **Per-key whitelist** (`EnvImport.keys String[]`): kosong `[]` = **semua** var source ikut (default, backward-compatible); ada isi = **hanya** key itu yang di-resolve. Whitelist **ketat** — key baru di source **tidak ikut otomatis** sampai ditambah manual. Filter di `resolveImportedVars()` (setelah cek akses), otomatis menyebar ke `GET vars` + `vars/export`.
 - **Akses dicek saat resolve**: tiap source env panggil `getEnvironmentAccess(caller, ...)`. `null` → var di-skip + dicatat di `deniedImports[]` (warning eksplisit, tidak silent).
 - **Secret**: reveal/mask pakai akses caller di **SOURCE env**. MASTER_KEY global → decrypt lintas project valid.
 - **Cycle detection saat save** (`wouldCreateCycle`) → tolak A→B→A (400).
@@ -198,14 +199,14 @@ Env target meminjam vars dari env lain (boleh lintas project) secara **referensi
 
 ### UI
 
-Halaman vars: baris imported **read-only** (badge grape `from <proj>:<env>`, secret tetap reveal sesuai akses). Var lokal yang key-nya ∈ `importedKeys` → badge `overrides`. `deniedImports` → Alert warning kuning. Tombol kelola (`TbLink`, grape) OWNER-only → `ImportManagerModal.tsx` (`?importMgr=true`).
+Halaman vars: baris imported **read-only** (badge grape `from <proj>:<env>`, secret tetap reveal sesuai akses). Var lokal yang key-nya ∈ `importedKeys` → badge `overrides`. `deniedImports` → Alert warning kuning. Tombol kelola (`TbLink`, grape) OWNER-only → `ImportManagerModal.tsx` (`?importMgr=true`). Saat tambah/edit link, `ImportKeyPicker.tsx` (fetch key source via `GET vars`) pilih subset key + "pilih semua/kosongkan"; badge `N key`/`semua key` per link + tombol edit (PATCH).
 
 ### Audit & Cache
 
-- `ENV_IMPORT_ADDED`/`ENV_IMPORT_REMOVED` detail `<slug>/<env> <- <srcSlug>/<srcEnv>`.
+- `ENV_IMPORT_ADDED`/`ENV_IMPORT_REMOVED`/`ENV_IMPORT_UPDATED` detail `<slug>/<env> <- <srcSlug>/<srcEnv>` (+ suffix ` keys=[...]`/` keys=[all]` bila whitelist di-set).
 - Invalidate `invalidateProjectCaches(slug)` + `projectDetail(slug)`. **Hasil resolve vars TIDAK di-cache**.
 
-**Deferred (TODO):** per-key filter, transitive import, per-import override value — belum diimplementasi.
+**Deferred (TODO):** transitive import, per-import override value — belum diimplementasi.
 
 ---
 
@@ -284,7 +285,7 @@ Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()` di
 
 **Env Members (OWNER):** `GET .../environments/:envName/members` (list + envRole `inherit`/`denied`/role + `effectiveRole`) · `PUT .../members/:userId` `{role}` · `DELETE .../members/:userId` (reset inherit). Last-owner-of-env protection.
 
-**Env Imports (OWNER target):** `GET .../environments/:envName/imports` · `POST .../imports` `{sourceProject, sourceEnv}` (403/400/404/409/cycle) · `DELETE .../imports/:id`. Audit `ENV_IMPORT_ADDED`/`_REMOVED`.
+**Env Imports (OWNER target):** `GET .../environments/:envName/imports` (bawa `keys[]` per link) · `POST .../imports` `{sourceProject, sourceEnv, keys?}` (403/400/404/409/cycle; `keys` opsional array string, kosong/absen = semua) · `PATCH .../imports/:id` `{keys}` (ubah whitelist, 400 jika bukan array string) · `DELETE .../imports/:id`. Audit `ENV_IMPORT_ADDED`/`_UPDATED`/`_REMOVED`.
 
 **Access Matrix (OWNER):** `GET .../projects/:slug/access-matrix` — single fetch `{project, environments[{name, tags}], members[{userId, user, projectRole, envAccess}]}`. Cached 60s (`cacheKeys.projectAccessMatrix`), auto-invalidate. Bulk action FE = fan-out `Promise.allSettled` atas PATCH/PUT existing, last-owner per-item, partial failure aggregate (`src/frontend/lib/bulk.ts`). `MembersMatrixView` + toolbar `MatrixFilterBar` (cari anggota/env, filter tag env; "Pilih semua" hanya yang lolos filter).
 

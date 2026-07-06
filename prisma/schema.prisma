@@ -350,6 +350,7 @@ model EnvImport {
   targetEnvId String
   sourceEnvId String
   order       Int      @default(0)
+  keys        String[] @default([]) // whitelist key yang di-import; kosong = semua var source ikut
   createdById String
   createdAt   DateTime @default(now())
 

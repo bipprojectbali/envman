@@ -232,6 +232,119 @@ describe('Resolve di vars list (UI)', () => {
   })
 })
 
+describe('Per-key filter (whitelist)', () => {
+  const pkSource = 'pk-source'
+  const pkTarget = 'pk-target'
+  let linkId: string
+
+  test('setup project + env untuk per-key', async () => {
+    await createProject(ownerToken, pkSource, 'PK Source')
+    await createProject(ownerToken, pkTarget, 'PK Target')
+    const src = await prisma.project.findUnique({ where: { slug: pkSource } })
+    const tgt = await prisma.project.findUnique({ where: { slug: pkTarget } })
+    const srcEnv = await prisma.environment.create({ data: { name: 'stg', projectId: src!.id } })
+    await prisma.envVar.createMany({
+      data: [
+        { key: 'GOOGLE_API', value: 'gapi', environmentId: srcEnv.id },
+        { key: 'GOOGLE_ID', value: 'gid', environmentId: srcEnv.id },
+        { key: 'NOISE_ONE', value: 'n1', environmentId: srcEnv.id },
+        { key: 'NOISE_TWO', value: 'n2', environmentId: srcEnv.id },
+      ],
+    })
+    await prisma.environment.create({ data: { name: 'prod', projectId: tgt!.id } })
+    expect(true).toBe(true)
+  })
+
+  test('POST dengan keys subset → hanya key itu ter-resolve', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${pkTarget}/environments/prod/imports`, {
+        method: 'POST',
+        headers: authHeader(ownerToken),
+        body: JSON.stringify({ sourceProject: pkSource, sourceEnv: 'stg', keys: ['GOOGLE_API', 'GOOGLE_ID'] }),
+      }),
+    )
+    expect(res.status).toBe(200)
+    linkId = (await res.json()).id
+
+    const exp = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${pkTarget}/environments/prod/vars/export`, {
+        headers: authHeader(ownerToken),
+      }),
+    )
+    const body = await exp.json()
+    expect(body.vars.GOOGLE_API).toBe('gapi')
+    expect(body.vars.GOOGLE_ID).toBe('gid')
+    expect(body.vars.NOISE_ONE).toBeUndefined() // di luar whitelist → tak ikut
+    expect(body.vars.NOISE_TWO).toBeUndefined()
+  })
+
+  test('GET list membawa field keys', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${pkTarget}/environments/prod/imports`, {
+        headers: authHeader(ownerToken),
+      }),
+    )
+    const body = await res.json()
+    expect(body.imports[0].keys).toEqual(['GOOGLE_API', 'GOOGLE_ID'])
+  })
+
+  test('key baru di source TIDAK ikut otomatis (semantik ketat)', async () => {
+    const src = await prisma.project.findUnique({ where: { slug: pkSource } })
+    const srcEnv = await prisma.environment.findFirst({ where: { name: 'stg', projectId: src!.id } })
+    await prisma.envVar.create({ data: { key: 'GOOGLE_SECRET', value: 'newkey', environmentId: srcEnv!.id } })
+
+    const exp = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${pkTarget}/environments/prod/vars/export`, {
+        headers: authHeader(ownerToken),
+      }),
+    )
+    const body = await exp.json()
+    expect(body.vars.GOOGLE_SECRET).toBeUndefined() // key baru tak masuk whitelist → di-skip
+  })
+
+  test('PATCH keys=[] → kembali semua key ikut', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${pkTarget}/environments/prod/imports/${linkId}`, {
+        method: 'PATCH',
+        headers: authHeader(ownerToken),
+        body: JSON.stringify({ keys: [] }),
+      }),
+    )
+    expect(res.status).toBe(200)
+
+    const exp = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${pkTarget}/environments/prod/vars/export`, {
+        headers: authHeader(ownerToken),
+      }),
+    )
+    const body = await exp.json()
+    expect(body.vars.NOISE_ONE).toBe('n1') // sekarang semua ikut
+    expect(body.vars.GOOGLE_SECRET).toBe('newkey')
+  })
+
+  test('PATCH keys invalid (bukan array) → 400', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${pkTarget}/environments/prod/imports/${linkId}`, {
+        method: 'PATCH',
+        headers: authHeader(ownerToken),
+        body: JSON.stringify({ keys: 'GOOGLE_API' }),
+      }),
+    )
+    expect(res.status).toBe(400)
+  })
+
+  test('PATCH non-OWNER → 403', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${pkTarget}/environments/prod/imports/${linkId}`, {
+        method: 'PATCH',
+        headers: authHeader(outsiderToken),
+        body: JSON.stringify({ keys: [] }),
+      }),
+    )
+    expect(res.status).toBe(403)
+  })
+})
+
 describe('Cascade delete', () => {
   test('hapus source env → import otomatis hilang, resolve tidak error', async () => {
     const source = await prisma.project.findUnique({ where: { slug: sourceSlug } })
