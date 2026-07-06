@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.19.14] - 2026-07-06
+
+### Added
+- **Filter di matrix akses anggota** — halaman project > tab Members (matrix view) kini punya toolbar filter: cari anggota (filter baris by nama/email), cari environment, dan filter tag environment (filter kolom). "Pilih semua" dan penghitung hanya menyentuh anggota yang lolos filter, sehingga bulk action tidak mengenai anggota yang tersembunyi. Dropdown tag hanya muncul jika ada env ber-tag.
+
+### Changed
+- **`GET /api/envman/projects/:slug/access-matrix`** kini mengembalikan `environments[].tags` (additive) untuk mendukung filter tag di matrix.
+
 ## [0.19.13] - 2026-07-06
 
 ### Added
