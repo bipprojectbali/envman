@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.19.18] - 2026-07-06
+
+### Added
+- **Import env per-key (whitelist)** — saat me-link vars dari env lain, kini bisa memilih **sebagian key saja** atau semua. Contoh: env `base-stg` punya 10 var, tapi project `hipmi` cukup menarik `GOOGLE_API` + `GOOGLE_ID` — sisanya tidak ikut. Tanpa pilih apa pun = semua key ikut (perilaku lama, kompatibel). Whitelist bersifat **ketat**: key baru yang muncul di env source **tidak ikut otomatis** sampai ditambahkan manual. Link yang sudah ada bisa diubah whitelist-nya kapan saja lewat tombol edit (tanpa hapus-buat ulang).
+- **Tombol "copy value saja"** di halaman vars — di samping tombol copy `KEY=value` yang sudah ada, kini ada tombol untuk menyalin **nilai mentahnya saja** (tanpa prefix `KEY=`). Tersedia di tabel desktop, baris imported, dan kartu mobile.
+
 ## [0.19.17] - 2026-07-06
 
 ### Fixed
