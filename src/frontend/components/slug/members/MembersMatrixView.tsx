@@ -1,9 +1,11 @@
 import { ActionIcon, Badge, Box, Checkbox, Group, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { TbLock } from 'react-icons/tb'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { MatrixFilterBar } from './MatrixFilterBar'
 import { type AccessMatrix, type EnvRole, effectiveColor, type ProjectRole, roleColor } from './types'
 
 export function MembersMatrixView({
@@ -20,12 +22,38 @@ export function MembersMatrixView({
   selectableIds?: Set<string>
 }) {
   const qc = useQueryClient()
+  const [memberQuery, setMemberQuery] = useState('')
+  const [envQuery, setEnvQuery] = useState('')
+  const [envTag, setEnvTag] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['envman', 'access-matrix', slug],
     queryFn: () => apiFetch<AccessMatrix>(`/api/envman/projects/${slug}/access-matrix`),
     staleTime: 30_000,
   })
+
+  // Tag env unik untuk dropdown filter kolom.
+  const envTagOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of data?.environments ?? []) for (const t of e.tags ?? []) set.add(t)
+    return [...set].sort().map((t) => ({ value: t, label: t }))
+  }, [data])
+
+  // Filter baris (anggota) by nama/email, dan kolom (env) by nama + tag.
+  const filteredMembers = useMemo(() => {
+    const q = memberQuery.trim().toLowerCase()
+    if (!q) return data?.members ?? []
+    return (data?.members ?? []).filter(
+      (m) => m.user.name.toLowerCase().includes(q) || m.user.email.toLowerCase().includes(q),
+    )
+  }, [data, memberQuery])
+
+  const filteredEnvs = useMemo(() => {
+    const q = envQuery.trim().toLowerCase()
+    return (data?.environments ?? []).filter(
+      (e) => (!q || e.name.toLowerCase().includes(q)) && (!envTag || (e.tags ?? []).includes(envTag)),
+    )
+  }, [data, envQuery, envTag])
 
   const setEnvRoleMutation = useMutation({
     mutationFn: ({ userId, envName, role }: { userId: string; envName: string; role: EnvRole }) =>
@@ -64,10 +92,12 @@ export function MembersMatrixView({
     )
   }
 
-  const allMemberIds = data.members.map((m) => m.userId)
+  // "Pilih semua" hanya menyentuh anggota yang lolos filter (terlihat).
+  const allMemberIds = filteredMembers.map((m) => m.userId)
   const selectableList = selectableIds ? allMemberIds.filter((id) => selectableIds.has(id)) : allMemberIds
   const allSelected = selectableList.length > 0 && selectableList.every((id) => selected.has(id))
   const someSelected = selectableList.some((id) => selected.has(id)) && !allSelected
+  const hasFilter = memberQuery.trim() !== '' || envQuery.trim() !== '' || envTag !== null
 
   const cellWidth = 140
   const memberColWidth = 220
@@ -82,6 +112,22 @@ export function MembersMatrixView({
 
   return (
     <Stack gap="xs">
+      <MatrixFilterBar
+        memberQuery={memberQuery}
+        setMemberQuery={setMemberQuery}
+        envQuery={envQuery}
+        setEnvQuery={setEnvQuery}
+        envTag={envTag}
+        setEnvTag={setEnvTag}
+        envTagOptions={envTagOptions}
+        hasFilter={hasFilter}
+        onReset={() => {
+          setMemberQuery('')
+          setEnvQuery('')
+          setEnvTag(null)
+        }}
+      />
+
       <Group justify="space-between" align="center">
         <Checkbox
           size="xs"
@@ -90,17 +136,19 @@ export function MembersMatrixView({
           onChange={() => onToggleAll(selectableList)}
           label={
             <Text size="xs" fw={600}>
-              {allSelected ? 'Batal semua' : `Pilih semua (${data.members.length})`}
+              {allSelected ? 'Batal semua' : `Pilih semua (${filteredMembers.length})`}
             </Text>
           }
         />
         <Text size="xs" c="dimmed">
-          {data.members.length} user × {data.environments.length} env
+          {hasFilter
+            ? `${filteredMembers.length}/${data.members.length} user · ${filteredEnvs.length}/${data.environments.length} env`
+            : `${data.members.length} user × ${data.environments.length} env`}
         </Text>
       </Group>
 
       <ScrollArea type="auto" offsetScrollbars>
-        <Box style={{ minWidth: memberColWidth + cellWidth * data.environments.length }}>
+        <Box style={{ minWidth: memberColWidth + cellWidth * filteredEnvs.length }}>
           {/* Header */}
           <Group
             gap={0}
@@ -122,7 +170,7 @@ export function MembersMatrixView({
                 Anggota
               </Text>
             </Box>
-            {data.environments.map((env) => (
+            {filteredEnvs.map((env) => (
               <Box
                 key={env.name}
                 style={{
@@ -140,7 +188,7 @@ export function MembersMatrixView({
           </Group>
 
           {/* Rows */}
-          {data.members.map((m) => (
+          {filteredMembers.map((m) => (
             <Group
               key={m.userId}
               gap={0}
@@ -179,7 +227,7 @@ export function MembersMatrixView({
                   </Group>
                 </Box>
               </Group>
-              {data.environments.map((env) => {
+              {filteredEnvs.map((env) => {
                 const cell = m.envAccess[env.name]
                 const eff: ProjectRole | 'DENIED' = cell?.effectiveRole ?? 'DENIED'
                 const isDenied = cell?.effectiveRole === null

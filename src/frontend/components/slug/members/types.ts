@@ -16,7 +16,7 @@ export interface AvailableUser {
 
 export interface AccessMatrix {
   project: { slug: string; name: string }
-  environments: { name: string }[]
+  environments: { name: string; tags: string[] }[]
   members: AccessMatrixMember[]
 }
 

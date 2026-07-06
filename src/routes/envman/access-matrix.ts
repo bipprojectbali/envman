@@ -24,6 +24,7 @@ export const accessMatrixRouter = new Elysia()
             select: {
               id: true,
               name: true,
+              tags: true,
               members: { select: { userId: true, role: true } },
             },
             orderBy: { name: 'asc' },
@@ -35,7 +36,7 @@ export const accessMatrixRouter = new Elysia()
         },
       })
       if (!project) return null
-      const environments = project.environments.map((e) => ({ name: e.name }))
+      const environments = project.environments.map((e) => ({ name: e.name, tags: e.tags }))
       const members = project.members.map((pm) => {
         const envAccess: Record<string, { envRole: EnvRoleInput; effectiveRole: ProjectRole | null }> = {}
         for (const env of project.environments) {
