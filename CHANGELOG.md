@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.19.13] - 2026-07-06
+
+### Added
+- **Filter project berdasarkan pembuat** — halaman `/envmanager` punya dropdown "Pembuat": *Semua* / *Dibuat oleh saya*. Untuk SUPER_ADMIN, dropdown juga menampilkan daftar user pembuat sehingga bisa memantau project yang dibuat tiap user. Pilihan tersimpan (localStorage), jadi bertahan setelah reload.
+- **Kolom `Project.createdById`** — setiap project baru mencatat pembuatnya. Project lama di-backfill ke OWNER paling awal saat migrasi. FK `ON DELETE SET NULL` (hapus user tidak menghapus project).
+
+### Changed
+- **`GET /api/envman/projects`** kini mengembalikan `createdById` + `createdBy` (`{id, name, email, image}`) per project (additive, bentuk response lain tidak berubah). `POST` mengisi `createdById` = pembuat.
+
+### Database
+- Migration `20260706000600_add_project_created_by` — tambah kolom `createdById` + index + FK, backfill project existing. Idempotent, jalan otomatis saat startup.
+
 ## [0.19.12] - 2026-07-06
 
 ### Added
