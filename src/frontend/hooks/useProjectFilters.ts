@@ -5,7 +5,7 @@ import { SORT_OPTIONS } from './useProjectList'
 
 const PAGE_SIZE = 24
 
-export function useProjectFilters(projects: Project[]) {
+export function useProjectFilters(projects: Project[], currentUserId?: string) {
   const [view, setView] = useLocalStorage<'grid' | 'list'>({ key: 'envman:projects:view', defaultValue: 'grid' })
   const [search, setSearch] = useLocalStorage({ key: 'envman:projects:search', defaultValue: '' })
   const [tagFilter, setTagFilter] = useLocalStorage<string[]>({ key: 'envman:projects:tagFilter', defaultValue: [] })
@@ -14,6 +14,11 @@ export function useProjectFilters(projects: Project[]) {
   const [groupByTag, setGroupByTag] = useLocalStorage<boolean>({ key: 'envman:projects:groupByTag', defaultValue: true })
   const [statusFilter, setStatusFilter] = useLocalStorage<'all' | 'active' | 'inactive'>({
     key: 'envman:projects:statusFilter',
+    defaultValue: 'all',
+  })
+  // creatorScope: 'all' | 'mine' | '<userId>' — filter berdasarkan pembuat project.
+  const [creatorScope, setCreatorScope] = useLocalStorage<string>({
+    key: 'envman:projects:creatorScope',
     defaultValue: 'all',
   })
 
@@ -28,6 +33,25 @@ export function useProjectFilters(projects: Project[]) {
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([value, count]) => ({ value, label: `${value} (${count})` }))
   }, [projects])
+
+  // Pembuat unik (untuk dropdown SUPER_ADMIN). Hitung jumlah project per pembuat.
+  const allCreators = useMemo(() => {
+    const counts = new Map<string, { name: string; count: number }>()
+    for (const p of projects) {
+      if (!p.createdBy) continue
+      const prev = counts.get(p.createdBy.id)
+      counts.set(p.createdBy.id, { name: p.createdBy.name, count: (prev?.count ?? 0) + 1 })
+    }
+    return [...counts.entries()]
+      .map(([id, { name, count }]) => ({ value: id, label: `${name} (${count})` }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [projects])
+
+  // Fallback: creatorScope menunjuk userId yang tak lagi punya project → anggap 'all'.
+  const effectiveCreatorScope =
+    creatorScope === 'all' || creatorScope === 'mine' || allCreators.some((c) => c.value === creatorScope)
+      ? creatorScope
+      : 'all'
 
   const filtered = useMemo(() => {
     let result = projects
@@ -44,11 +68,13 @@ export function useProjectFilters(projects: Project[]) {
     if (tagFilter.length > 0) result = result.filter((p) => tagFilter.every((t) => (p.tags ?? []).includes(t)))
     if (statusFilter === 'active') result = result.filter((p) => p.isActive)
     if (statusFilter === 'inactive') result = result.filter((p) => !p.isActive)
+    if (effectiveCreatorScope === 'mine') result = result.filter((p) => p.createdById === currentUserId)
+    else if (effectiveCreatorScope !== 'all') result = result.filter((p) => p.createdById === effectiveCreatorScope)
     const sorted = [...result]
     if (sort === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name))
     else if (sort === 'envs') sorted.sort((a, b) => b._count.environments - a._count.environments)
     return sorted
-  }, [projects, debouncedSearch, tagFilter, statusFilter, sort])
+  }, [projects, debouncedSearch, tagFilter, statusFilter, sort, effectiveCreatorScope, currentUserId])
 
   const groups = useMemo(() => {
     const sortGroup = (arr: Project[]) =>
@@ -78,15 +104,17 @@ export function useProjectFilters(projects: Project[]) {
     [groups, paginatedSlugs],
   )
 
-  const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0 || statusFilter !== 'all'
+  const hasFilter =
+    debouncedSearch.trim().length > 0 || tagFilter.length > 0 || statusFilter !== 'all' || effectiveCreatorScope !== 'all'
   const togglePin = (slug: string) =>
     setPinned((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]))
   const addTagFilter = (tag: string) => setTagFilter((prev) => (prev.includes(tag) ? prev : [...prev, tag]))
-  const resetFilter = () => { setSearch(''); setTagFilter([]); setStatusFilter('all') }
+  const resetFilter = () => { setSearch(''); setTagFilter([]); setStatusFilter('all'); setCreatorScope('all') }
 
   return {
     view, setView, search, setSearch, tagFilter, setTagFilter, sort, setSort,
     pinned, setPinned, groupByTag, setGroupByTag, statusFilter, setStatusFilter,
+    creatorScope: effectiveCreatorScope, setCreatorScope, allCreators,
     page, setPage, searchRef,
     allTags, filtered, paginatedGroups, totalPages, hasFilter,
     togglePin, addTagFilter, resetFilter,

@@ -66,6 +66,7 @@ model User {
   projectFiles          ProjectFile[]   @relation("ProjectFileAuthor")
   gists                 Gist[]
   storageUploads        ProjectStorageObject[]
+  createdProjects       Project[]             @relation("ProjectCreator")
 
   @@map("user")
 }
@@ -286,6 +287,9 @@ model Project {
   storageQuotaMb    Int?      // null = pakai AppSetting storage_default_quota_mb (default 500)
   storageMaxFileMb  Int?      // null = pakai AppSetting storage_max_file_mb (default 50)
 
+  createdById String?   // user pembuat project; null untuk project lama tanpa data pembuat
+  createdBy   User?     @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
   members           ProjectMember[]
   environments      Environment[]
   portainerConfigs  PortainerConfig[]
@@ -295,6 +299,7 @@ model Project {
   storageObjects    ProjectStorageObject[]
 
   @@index([deletedAt])
+  @@index([createdById])
   @@map("project")
 }
 

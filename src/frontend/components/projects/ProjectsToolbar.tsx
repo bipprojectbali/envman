@@ -1,6 +1,6 @@
 import { ActionIcon, Button, Group, SegmentedControl, Select, Stack, Text, TextInput, Tooltip } from '@mantine/core'
 import type { RefObject } from 'react'
-import { TbArrowsSort, TbLayoutGrid, TbLayoutList, TbSearch, TbTag, TbX } from 'react-icons/tb'
+import { TbArrowsSort, TbLayoutGrid, TbLayoutList, TbSearch, TbTag, TbUser, TbX } from 'react-icons/tb'
 import { MultiSelectChips, MultiSelectChipsRow } from '@/frontend/components/MultiSelectChips'
 import { SORT_OPTIONS } from '@/frontend/hooks/useProjectList'
 import { tagColor } from '@/frontend/lib/project-utils'
@@ -22,13 +22,23 @@ interface Props {
   setGroupByTag: (fn: (v: boolean) => boolean) => void
   statusFilter: 'all' | 'active' | 'inactive'
   setStatusFilter: (v: 'all' | 'active' | 'inactive') => void
+  creatorScope: string
+  setCreatorScope: (v: string) => void
+  allCreators: { value: string; label: string }[]
+  isSuperAdmin: boolean
   filtered: any[]
   projects: any[]
   hasFilter: boolean
   resetFilter: () => void
 }
 
-export function ProjectsToolbar({ search, setSearch, searchRef, view, setView, allTags, tagFilter, setTagFilter, sort, setSort, groupByTag, setGroupByTag, statusFilter, setStatusFilter, filtered, projects, hasFilter, resetFilter }: Props) {
+export function ProjectsToolbar({ search, setSearch, searchRef, view, setView, allTags, tagFilter, setTagFilter, sort, setSort, groupByTag, setGroupByTag, statusFilter, setStatusFilter, creatorScope, setCreatorScope, allCreators, isSuperAdmin, filtered, projects, hasFilter, resetFilter }: Props) {
+  // Opsi dropdown pembuat: Semua + Milik saya, lalu (SUPER_ADMIN) daftar user pembuat.
+  const creatorOptions = [
+    { value: 'all', label: 'Semua pembuat' },
+    { value: 'mine', label: 'Dibuat oleh saya' },
+    ...(isSuperAdmin ? allCreators : []),
+  ]
   return (
     <Stack gap="xs" mb="md">
       <TextInput
@@ -70,6 +80,18 @@ export function ProjectsToolbar({ search, setSearch, searchRef, view, setView, a
         <Select size="sm" data={SORT_OPTIONS} value={sort} onChange={(v) => v && setSort(v as typeof sort)} leftSection={<TbArrowsSort size={14} />} allowDeselect={false} w={155} radius="md" />
         <SegmentedControl size="xs" value={statusFilter} onChange={(v) => setStatusFilter(v as 'all' | 'active' | 'inactive')}
           data={[{ value: 'all', label: 'Semua' }, { value: 'active', label: 'Aktif' }, { value: 'inactive', label: 'Nonaktif' }]} radius="md" />
+        <Select
+          size="sm"
+          data={creatorOptions}
+          value={creatorScope}
+          onChange={(v) => v && setCreatorScope(v)}
+          leftSection={<TbUser size={14} />}
+          allowDeselect={false}
+          w={isSuperAdmin ? 190 : 160}
+          radius="md"
+          aria-label="Filter berdasarkan pembuat"
+          comboboxProps={{ withinPortal: true }}
+        />
       </Group>
       {tagFilter.length > 0 && (
         <Group gap={6} wrap="wrap" align="center">
