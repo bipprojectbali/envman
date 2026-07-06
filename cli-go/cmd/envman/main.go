@@ -225,7 +225,7 @@ The alias defines the full command including any -e sources.
 Extra -e flags you pass here are merged in (alias sources take precedence).`,
 		Example: `  envman run myapp:deploy
   envman run -e .env.local myapp:deploy
-  envman run myapp:deploy -- --verbose`,
+  envman run myapp:deploy --resume --verbose`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ref := args[0]
@@ -234,6 +234,10 @@ Extra -e flags you pass here are merged in (alias sources take precedence).`,
 		},
 	}
 	cmd.Flags().StringArrayVarP(&sources, "env", "e", nil, "Additional source: `project:env` or local file")
+	// Stop flag parsing after the alias ref so trailing flags (e.g. --resume) pass
+	// through to the expanded command instead of being rejected as unknown flags.
+	// Own flags (-e/--server-wins) must precede the ref, matching every help example.
+	cmd.Flags().SetInterspersed(false)
 	return cmd
 }
 

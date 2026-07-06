@@ -269,12 +269,17 @@ envman run myapp:deploy              # ekspansi alias "deploy"
 envman run myapp:migrate             # ekspansi alias "migrate"
 envman run myapp:seed                # ekspansi alias "seed"
 
-# Extra -e di-merge (alias sources menang — posisi terakhir)
+# Extra -e di-merge (alias sources menang — posisi terakhir).
+# -e wajib SEBELUM ref alias.
 envman run -e .env.local myapp:deploy
 
-# Args tambahan setelah --
+# Flag tambahan setelah ref diteruskan langsung ke command alias
+envman run myapp:deploy --dry-run
+envman run claude:malik-opus --resume
+envman run myapp:seed --count 50 --reset
+
+# -- masih valid sebagai pemisah eksplisit (mis. arg yang bentrok dengan flag envman)
 envman run myapp:deploy -- --dry-run
-envman run myapp:seed -- --count 50 --reset
 
 # Auth via file
 envman run -e .env.secrets myapp:deploy
