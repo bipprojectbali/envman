@@ -11,6 +11,7 @@ import {
 } from '@mantine/core'
 import {
   TbCheck,
+  TbClipboard,
   TbCopy,
   TbLock,
   TbLockOpen,
@@ -130,6 +131,13 @@ export function VarCardActionRow({ v, canEdit, toggleDisabled, startEdit, delete
         {({ copied, copy }) => (
           <ActionIcon size={32} variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
             {copied ? <TbCheck size={15} /> : <TbCopy size={15} />}
+          </ActionIcon>
+        )}
+      </CopyButton>
+      <CopyButton value={v.value}>
+        {({ copied, copy }) => (
+          <ActionIcon size={32} variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+            {copied ? <TbCheck size={15} /> : <TbClipboard size={15} />}
           </ActionIcon>
         )}
       </CopyButton>

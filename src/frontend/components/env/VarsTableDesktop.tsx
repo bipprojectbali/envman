@@ -12,6 +12,7 @@ import {
 } from '@mantine/core'
 import {
   TbCheck,
+  TbClipboard,
   TbCopy,
   TbEye,
   TbEyeOff,
@@ -160,6 +161,15 @@ export function VarsTableDesktop({
                         </Tooltip>
                       )}
                     </CopyButton>
+                    <CopyButton value={v.value}>
+                      {({ copied, copy }) => (
+                        <Tooltip label={copied ? 'Tersalin!' : 'Copy value saja'}>
+                          <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                            {copied ? <TbCheck size={13} /> : <TbClipboard size={13} />}
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </CopyButton>
                     <VarActionButtons v={v} canEdit={canEdit} toggleDisabled={toggleDisabled} startEdit={startEdit} deleteVar={deleteVar} />
                   </Group>
                 </Table.Td>
@@ -203,15 +213,26 @@ export function VarsTableDesktop({
               </Table.Td>
               <Table.Td><Text fz={10} c="dimmed" style={{ whiteSpace: 'nowrap' }}>—</Text></Table.Td>
               <Table.Td>
-                <CopyButton value={toEnvLine(v)}>
-                  {({ copied, copy }) => (
-                    <Tooltip label={copied ? 'Tersalin!' : 'Copy KEY=value'}>
-                      <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
-                        {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </CopyButton>
+                <Group gap={4} wrap="nowrap">
+                  <CopyButton value={toEnvLine(v)}>
+                    {({ copied, copy }) => (
+                      <Tooltip label={copied ? 'Tersalin!' : 'Copy KEY=value'}>
+                        <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                          {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </CopyButton>
+                  <CopyButton value={v.value}>
+                    {({ copied, copy }) => (
+                      <Tooltip label={copied ? 'Tersalin!' : 'Copy value saja'}>
+                        <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                          {copied ? <TbCheck size={13} /> : <TbClipboard size={13} />}
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </CopyButton>
+                </Group>
               </Table.Td>
             </Table.Tr>
           ))}
