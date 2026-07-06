@@ -6,7 +6,8 @@ import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { MatrixFilterBar } from './MatrixFilterBar'
-import { type AccessMatrix, type EnvRole, effectiveColor, type ProjectRole, roleColor } from './types'
+import { MatrixLegend } from './MatrixLegend'
+import { type AccessMatrix, type EnvRole, roleColor } from './types'
 
 export function MembersMatrixView({
   slug,
@@ -147,6 +148,9 @@ export function MembersMatrixView({
         </Text>
       </Group>
 
+      {/* Legenda arti simbol — menggantikan badge role di tiap cell */}
+      <MatrixLegend />
+
       <ScrollArea type="auto" offsetScrollbars>
         <Box style={{ minWidth: memberColWidth + cellWidth * filteredEnvs.length }}>
           {/* Header */}
@@ -229,7 +233,6 @@ export function MembersMatrixView({
               </Group>
               {filteredEnvs.map((env) => {
                 const cell = m.envAccess[env.name]
-                const eff: ProjectRole | 'DENIED' = cell?.effectiveRole ?? 'DENIED'
                 const isDenied = cell?.effectiveRole === null
                 return (
                   <Box
@@ -238,42 +241,41 @@ export function MembersMatrixView({
                       width: cellWidth,
                       padding: 6,
                       borderLeft: '1px solid var(--mantine-color-default-border)',
+                      // Tint merah tipis menandai env yang diblokir (denied) — sinyal
+                      // keamanan tetap terlihat sekilas tanpa badge per-cell.
+                      background: isDenied ? 'var(--mantine-color-red-light)' : undefined,
                     }}
                   >
-                    <Stack gap={4} align="center">
-                      <Badge
-                        size="xs"
-                        fullWidth
-                        variant={isDenied ? 'filled' : 'light'}
-                        color={effectiveColor[eff] ?? 'gray'}
-                        leftSection={isDenied ? <TbLock size={9} /> : null}
-                      >
-                        {eff}
-                      </Badge>
-                      <Group gap={2} wrap="nowrap">
-                        {ROLE_BTNS.map((btn) => {
-                          const current = cell?.envRole ?? 'denied'
-                          const isActive = current === btn.value
-                          return (
-                            <Tooltip key={btn.value} label={btn.label} withArrow fz="xs">
-                              <ActionIcon
-                                size={18}
-                                variant={isActive ? 'filled' : 'subtle'}
-                                color={isActive ? btn.color : 'gray'}
-                                disabled={setEnvRoleMutation.isPending}
-                                onClick={() => {
-                                  if (!isActive)
-                                    setEnvRoleMutation.mutate({ userId: m.userId, envName: env.name, role: btn.value })
-                                }}
-                                style={{ fontSize: 10, fontWeight: 700 }}
-                              >
-                                {btn.short}
-                              </ActionIcon>
-                            </Tooltip>
-                          )
-                        })}
-                      </Group>
-                    </Stack>
+                    <Group gap={2} wrap="nowrap" justify="center">
+                      {isDenied && (
+                        <Tooltip label="Akses diblokir di env ini" withArrow fz="xs">
+                          <Text span c="red" style={{ display: 'flex', alignItems: 'center' }}>
+                            <TbLock size={11} />
+                          </Text>
+                        </Tooltip>
+                      )}
+                      {ROLE_BTNS.map((btn) => {
+                        const current = cell?.envRole ?? 'denied'
+                        const isActive = current === btn.value
+                        return (
+                          <Tooltip key={btn.value} label={btn.label} withArrow fz="xs">
+                            <ActionIcon
+                              size={18}
+                              variant={isActive ? 'filled' : 'subtle'}
+                              color={isActive ? btn.color : 'gray'}
+                              disabled={setEnvRoleMutation.isPending}
+                              onClick={() => {
+                                if (!isActive)
+                                  setEnvRoleMutation.mutate({ userId: m.userId, envName: env.name, role: btn.value })
+                              }}
+                              style={{ fontSize: 10, fontWeight: 700 }}
+                            >
+                              {btn.short}
+                            </ActionIcon>
+                          </Tooltip>
+                        )
+                      })}
+                    </Group>
                   </Box>
                 )
               })}
