@@ -46,9 +46,9 @@ beforeAll(async () => {
   const project = await prisma.project.findUnique({ where: { slug: projectSlug } })
   await prisma.projectMember.create({ data: { projectId: project!.id, userId: editorId, role: 'EDITOR' } })
   await prisma.projectMember.create({ data: { projectId: project!.id, userId: viewerId, role: 'VIEWER' } })
-  await prisma.environment.create({ data: { name: 'prod', projectId: project!.id } })
+  await prisma.environment.create({ data: { name: 'prod', projectId: project!.id, tags: ['critical', 'live'] } })
   await prisma.environment.create({ data: { name: 'dev', projectId: project!.id } })
-  await prisma.environment.create({ data: { name: 'staging', projectId: project!.id } })
+  await prisma.environment.create({ data: { name: 'staging', projectId: project!.id, tags: ['live'] } })
 })
 
 afterAll(async () => {
@@ -79,6 +79,20 @@ describe('GET /api/envman/projects/:slug/access-matrix', () => {
     const viewerRow = body.members.find((m: { userId: string }) => m.userId === viewerId)
     expect(viewerRow.projectRole).toBe('VIEWER')
     expect(viewerRow.envAccess.prod.effectiveRole).toBe('VIEWER')
+  })
+
+  test('environments membawa tags untuk filter kolom (matrix filter)', async () => {
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${projectSlug}/access-matrix`, {
+        headers: authHeader(ownerToken),
+      }),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    const prod = body.environments.find((e: { name: string }) => e.name === 'prod')
+    expect(prod.tags.sort()).toEqual(['critical', 'live'])
+    const dev = body.environments.find((e: { name: string }) => e.name === 'dev')
+    expect(dev.tags).toEqual([])
   })
 
   test('SUPER_ADMIN can access matrix on any project', async () => {
