@@ -40,6 +40,16 @@ export function MembersMatrixView({
     return [...set].sort().map((t) => ({ value: t, label: t }))
   }, [data])
 
+  // Saran autocomplete: nama anggota & nama env (ketik bebas tetap didukung).
+  const memberOptions = useMemo(
+    () => [...new Set((data?.members ?? []).map((m) => m.user.name))].sort(),
+    [data],
+  )
+  const envOptions = useMemo(
+    () => (data?.environments ?? []).map((e) => e.name).sort(),
+    [data],
+  )
+
   // Filter baris (anggota) by nama/email, dan kolom (env) by nama + tag.
   const filteredMembers = useMemo(() => {
     const q = memberQuery.trim().toLowerCase()
@@ -121,6 +131,8 @@ export function MembersMatrixView({
         envTag={envTag}
         setEnvTag={setEnvTag}
         envTagOptions={envTagOptions}
+        memberOptions={memberOptions}
+        envOptions={envOptions}
         hasFilter={hasFilter}
         onReset={() => {
           setMemberQuery('')

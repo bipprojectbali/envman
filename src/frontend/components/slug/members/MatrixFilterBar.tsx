@@ -1,7 +1,8 @@
-import { ActionIcon, Group, Select, TextInput } from '@mantine/core'
+import { ActionIcon, Autocomplete, Group, Select } from '@mantine/core'
 import { TbSearch, TbTag, TbX } from 'react-icons/tb'
 
 // Toolbar filter untuk MembersMatrixView: cari anggota (baris), cari env + tag (kolom).
+// Search anggota & env pakai Autocomplete — ketik bebas + saran dropdown dari data.
 export function MatrixFilterBar({
   memberQuery,
   setMemberQuery,
@@ -10,6 +11,8 @@ export function MatrixFilterBar({
   envTag,
   setEnvTag,
   envTagOptions,
+  memberOptions,
+  envOptions,
   hasFilter,
   onReset,
 }: {
@@ -20,17 +23,20 @@ export function MatrixFilterBar({
   envTag: string | null
   setEnvTag: (v: string | null) => void
   envTagOptions: { value: string; label: string }[]
+  memberOptions: string[]
+  envOptions: string[]
   hasFilter: boolean
   onReset: () => void
 }) {
   return (
     <Group gap="xs" wrap="wrap">
-      <TextInput
+      <Autocomplete
         size="xs"
         placeholder="Cari anggota..."
         leftSection={<TbSearch size={12} />}
+        data={memberOptions}
         value={memberQuery}
-        onChange={(e) => setMemberQuery(e.currentTarget.value)}
+        onChange={setMemberQuery}
         rightSection={
           memberQuery ? (
             <ActionIcon size="xs" variant="subtle" color="gray" aria-label="Hapus" onClick={() => setMemberQuery('')}>
@@ -40,12 +46,13 @@ export function MatrixFilterBar({
         }
         w={170}
       />
-      <TextInput
+      <Autocomplete
         size="xs"
         placeholder="Cari env..."
         leftSection={<TbSearch size={12} />}
+        data={envOptions}
         value={envQuery}
-        onChange={(e) => setEnvQuery(e.currentTarget.value)}
+        onChange={setEnvQuery}
         rightSection={
           envQuery ? (
             <ActionIcon size="xs" variant="subtle" color="gray" aria-label="Hapus" onClick={() => setEnvQuery('')}>
@@ -63,6 +70,7 @@ export function MatrixFilterBar({
           data={envTagOptions}
           value={envTag}
           onChange={setEnvTag}
+          searchable
           clearable
           w={140}
         />
