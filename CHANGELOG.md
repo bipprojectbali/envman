@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.19.17] - 2026-07-06
+
+### Fixed
+- **`envman run <alias>` kembali menerima flag tambahan** — flag setelah nama alias (mis. `envman run claude:malik-opus --resume`) sempat ditolak dengan `unknown flag: --resume` sejak migrasi CLI ke Go. Sekarang flag apa pun setelah ref alias diteruskan langsung ke command hasil ekspansi, tanpa perlu `--`. Catatan: `-e`/`--server-wins` milik envman harus diletakkan **sebelum** ref alias; `--` tetap valid sebagai pemisah eksplisit.
+
 ## [0.19.16] - 2026-07-06
 
 ### Changed
