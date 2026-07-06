@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.19.16] - 2026-07-06
+
+### Changed
+- **Filter matrix akses lebih interaktif** — input "Cari anggota" dan "Cari env" kini Autocomplete: bisa ketik bebas **atau** pilih dari dropdown saran (nama anggota / nama env yang ada). Dropdown "Tag env" jadi searchable (bisa diketik untuk mencari tag).
+
 ## [0.19.15] - 2026-07-06
 
 ### Changed
