@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getEnvironmentAccess, getProjectAccess } from '../../lib/access'
+import { getEnvironmentAccess, getSectionAccess } from '../../lib/access'
 import { extractEnvRefs } from '../../lib/alias-parser'
 import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { cacheKeys, invalidateCache, withCache } from '../../lib/cache'
@@ -27,7 +27,7 @@ export const aliasesRouter = new Elysia()
   .get('/api/envman/projects/:slug/aliases', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'ALIASES')
     if (!access) return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -60,7 +60,7 @@ export const aliasesRouter = new Elysia()
   .post('/api/envman/projects/:slug/aliases', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'ALIASES')
     if (!access || access !== 'OWNER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -117,7 +117,7 @@ export const aliasesRouter = new Elysia()
   .patch('/api/envman/projects/:slug/aliases/:name', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'ALIASES')
     if (!access || access !== 'OWNER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -157,7 +157,7 @@ export const aliasesRouter = new Elysia()
   .delete('/api/envman/projects/:slug/aliases/:name', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'ALIASES')
     if (!access || access !== 'OWNER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -192,7 +192,7 @@ export const aliasesRouter = new Elysia()
       set.status = 400
       return { error: 'project dan alias tidak boleh kosong' }
     }
-    const access = await getProjectAccess(authResult.userId, authResult.role, projectSlug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, projectSlug, 'ALIASES')
     if (!access) return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: projectSlug, ...notDeleted } })
     if (!project) {

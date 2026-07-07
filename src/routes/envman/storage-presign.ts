@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getProjectAccess } from '../../lib/access'
+import { getSectionAccess } from '../../lib/access'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { isMinioEnabled } from '../../lib/minio'
 import { prisma } from '../../lib/db'
@@ -15,7 +15,7 @@ export const storagePresignRouter = new Elysia()
   .post('/api/envman/projects/:slug/storage/presign-upload', async ({ request, params, body, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Akses ditolak (butuh EDITOR atau OWNER)' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 
@@ -60,7 +60,7 @@ export const storagePresignRouter = new Elysia()
   .post('/api/envman/projects/:slug/storage/confirm-upload', async ({ request, params, body, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Akses ditolak' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 

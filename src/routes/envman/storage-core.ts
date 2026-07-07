@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getProjectAccess } from '../../lib/access'
+import { getSectionAccess } from '../../lib/access'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { isMinioEnabled } from '../../lib/minio'
 import { prisma } from '../../lib/db'
@@ -12,7 +12,7 @@ export const storageCoreRouter = new Elysia()
   .get('/api/envman/projects/:slug/storage', async ({ request, params, query, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access) { set.status = 403; return { error: 'Akses ditolak' } }
 
     const project = await prisma.project.findFirst({
@@ -70,7 +70,7 @@ export const storageCoreRouter = new Elysia()
   .get('/api/envman/projects/:slug/storage/download', async ({ request, params, query, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access) { set.status = 403; return { error: 'Akses ditolak' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 
@@ -100,7 +100,7 @@ export const storageCoreRouter = new Elysia()
   .patch('/api/envman/projects/:slug/storage/meta', async ({ request, params, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || (access !== 'EDITOR' && access !== 'OWNER')) {
       set.status = 403; return { error: 'EDITOR atau OWNER required' }
     }
@@ -141,7 +141,7 @@ export const storageCoreRouter = new Elysia()
   .delete('/api/envman/projects/:slug/storage', async ({ request, params, query, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || access !== 'OWNER') { set.status = 403; return { error: 'OWNER required untuk hapus file' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 

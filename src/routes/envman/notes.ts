@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getProjectAccess } from '../../lib/access'
+import { getSectionAccess } from '../../lib/access'
 import { requireEnvAuth } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 import { hasCapability } from '../../lib/permissions'
@@ -15,7 +15,7 @@ export const notesRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'NOTES')
     if (!access) {
       set.status = 403
       return { error: 'Forbidden' }
@@ -53,7 +53,7 @@ export const notesRouter = new Elysia()
       set.status = 403
       return { error: 'Tidak punya izin create note. Hubungi SUPER_ADMIN.' }
     }
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'NOTES')
     if (!access || access === 'VIEWER') {
       set.status = 403
       return { error: 'Forbidden' }
@@ -97,7 +97,7 @@ export const notesRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'NOTES')
     if (!access || access === 'VIEWER') {
       set.status = 403
       return { error: 'Forbidden' }
@@ -147,7 +147,7 @@ export const notesRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'NOTES')
     if (!access || access === 'VIEWER') {
       set.status = 403
       return { error: 'Forbidden' }

@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getProjectAccess } from '../../lib/access'
+import { getSectionAccess } from '../../lib/access'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { notDeleted } from '../../lib/db-helpers'
 import { prisma } from '../../lib/db'
@@ -13,7 +13,7 @@ export const storageFolderRouter = new Elysia()
   .delete('/api/envman/projects/:slug/storage/folder', async ({ request, params, query, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getProjectAccess(auth.userId, auth.role, params.slug)
+    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || access !== 'OWNER') { set.status = 403; return { error: 'OWNER required untuk hapus folder' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 
