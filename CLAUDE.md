@@ -38,6 +38,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (`{ prisma }`). Sche
 - `EnvVar` (id, key, value, isSecret, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (id, userId, projectId, role, createdAt) — unique(userId, projectId)
 - `EnvironmentMember` (id, userId, environmentId, role?, createdAt) — unique(userId, environmentId). `role=null` = explicit DENY; role set = override; no record = inherit project role
+- `ProjectSectionMember` (id, userId, projectId, section, role?, createdAt) — unique(userId, projectId, section). `section` ∈ `ProjectSection`. Semantik identik `EnvironmentMember`: `role=null` = DENY · role set = override · no record = inherit project role. Override akses per-member untuk section non-env (Notes/Aliases/Files/Storage). Lihat [Permission per-Section](#permission-per-section-notes--aliases--files--storage).
 - `ApiToken` (id, userId, name, token, scopes[], tags[], canWrite, isDisabled, lastUsedAt?, expiresAt?, createdAt, useCount, lastIp?, disabledBy?, disabledAt?, disabledReason?)
 - `ProjectAlias` (id, projectId, name, args, description?, tags[], createdBy, timestamps) — unique(projectId, name)
 - `ProjectFile` (id, projectId, authorId, title, description, prefix?, files Json, tags[], timestamps) — unique(projectId, prefix)
@@ -52,6 +53,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (`{ prisma }`). Sche
 
 - `Role` = `USER | QC | ADMIN | SUPER_ADMIN`
 - `ProjectMemberRole` = `OWNER | EDITOR | VIEWER`
+- `ProjectSection` = `NOTES | ALIASES | FILES | STORAGE`
 - `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`
 - `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`
 
@@ -166,11 +168,47 @@ Files & aliases accessible di project level, tapi yang reference env via `-e pro
 
 `PUT /api/envman/admin/users/:userId/projects/:slug/envs/:envName` (SUPER_ADMIN) sama dengan OWNER endpoint: validasi target harus project member, last-owner-of-env protection, audit `ENV_MEMBER_SET`/`ENV_MEMBER_CLEARED` (suffix `(admin)`), invalidate `projectAccess`/`projectDetail`/`invalidateProjectCaches(slug, [userId])`.
 
+`PUT /api/envman/admin/users/:userId/projects/:slug/sections/:section` (SUPER_ADMIN) sama dengan OWNER section-member endpoint: validasi section valid + target project member, audit `SECTION_MEMBER_SET`/`SECTION_MEMBER_CLEARED` (suffix `(admin)`), invalidate `projectDetail`/`invalidateProjectCaches(slug, [userId])`.
+
 ### Audit & Cache
 
 - `ENV_MEMBER_SET` — `<slug>/<envName> user=<userId> role=<role>` (+`(admin)`)
 - `ENV_MEMBER_CLEARED` — `<slug>/<envName> user=<userId>` (+`(admin)`)
 - PUT/DELETE env-member → invalidate `cacheKeys.projectAccess(userId, slug)` + `projectDetail(slug)` + `invalidateProjectCaches(slug, [userId])`.
+
+---
+
+## Permission per-Section (Notes / Aliases / Files / Storage)
+
+Lapis override akses per-member untuk section non-env, **paralel** dengan [Env Members](#permission-hierarchy-per-project--per-env). Model: `ProjectSectionMember`. Resolver: `getSectionAccess(userId, role, slug, section)` di `src/lib/access.ts`. CRUD: `src/routes/envman/section-members.ts`. Matrix: `src/routes/envman/section-matrix.ts`.
+
+### Semantik
+
+- Section = enum `ProjectSection` (`NOTES/ALIASES/FILES/STORAGE`), bukan row. Menempel ke `projectId` + `section`.
+- Resolusi (identik env): SUPER_ADMIN → OWNER · record `role=null` → DENIED · record role set → override · no record → inherit `ProjectMember.role` · no project membership → null.
+- Enforcement: keempat section men-gate handler via `getSectionAccess()` (bukan lagi `getProjectAccess()`). 24 call-site: Notes(4), Aliases(5, hanya section-access — env-ref via `getEnvironmentAccess` tak berubah), Files(4)+files-resolve(1), Storage(10). Public storage download (`isPublic`) tak terpengaruh.
+- Role-gate per operasi **tidak berubah** (mis. Storage: VIEWER list/download, EDITOR upload/meta/rename/move, OWNER delete/folder/setPublic).
+
+### Secure-by-Default
+
+- **Backfill migration** (`20260707102900_add_project_section_member`): semua `ProjectMember` non-OWNER existing di-seed `role=null` (DENY) untuk keempat section. **Perubahan perilaku**: member existing kehilangan akses section sampai OWNER grant.
+- Member baru non-OWNER (POST `/members`) → auto-seed DENY keempat section (`projects-members.ts`), sejalan dengan env default-deny. Response `defaultDenied` mencakup ini.
+- OWNER project → tidak di-seed (inherit = OWNER). **Tanpa last-owner-protection** (deny section pada OWNER tak mengunci project; role project tetap OWNER).
+
+### Permission & Scope
+
+- Kelola override: **OWNER project** (atau SUPER_ADMIN via admin parity).
+- `GET /projects/:slug` menambah field additive `sectionAccess: { NOTES, ALIASES, FILES, STORAGE }` (`ProjectRole | null`) untuk caller — FE pakai untuk sembunyikan tab yang denied.
+
+### UI
+
+Tab Members punya `SegmentedControl` **Environments | Sections**. View Sections = matrix member × 4 section (ikon `~ V E O ✕` sama, `SectionMatrixView.tsx`). Tab section yang `sectionAccess === null` disembunyikan; deep-link ke tab denied → fallback ke Environments.
+
+### Audit & Cache
+
+- `SECTION_MEMBER_SET` — `<slug>/<section> user=<userId> role=<role>` (+`(admin)`)
+- `SECTION_MEMBER_CLEARED` — `<slug>/<section> user=<userId>` (+`(admin)`)
+- PUT/DELETE section-member → invalidate `cacheKeys.projectDetail(slug)` + `invalidateProjectCaches(slug, [userId])`. Matrix di-cache `cacheKeys.projectSectionMatrix(slug)` 60s.
 
 ---
 
@@ -284,6 +322,8 @@ Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()` di
 **Members:** `PUT|DELETE .../projects/:slug/members/:userId/role|member`
 
 **Env Members (OWNER):** `GET .../environments/:envName/members` (list + envRole `inherit`/`denied`/role + `effectiveRole`) · `PUT .../members/:userId` `{role}` · `DELETE .../members/:userId` (reset inherit). Last-owner-of-env protection.
+
+**Section Members (OWNER):** `GET .../projects/:slug/sections/:section/members` (list + sectionRole `inherit`/`denied`/role + `effectiveRole`; section invalid → 400) · `PUT .../sections/:section/members/:userId` `{role}` (`inherit|denied|OWNER|EDITOR|VIEWER`; target wajib project member → 400; tanpa last-owner-protection) · `DELETE .../sections/:section/members/:userId` (reset inherit). `GET .../projects/:slug/section-matrix` — `{project, sections[], members[{userId, user, projectRole, sectionAccess}]}`, cached 60s (`cacheKeys.projectSectionMatrix`). Audit `SECTION_MEMBER_SET`/`SECTION_MEMBER_CLEARED`. Lihat [Permission per-Section](#permission-per-section-notes--aliases--files--storage).
 
 **Env Imports (OWNER target):** `GET .../environments/:envName/imports` (bawa `keys[]` per link) · `POST .../imports` `{sourceProject, sourceEnv, keys?}` (403/400/404/409/cycle; `keys` opsional array string, kosong/absen = semua) · `PATCH .../imports/:id` `{keys}` (ubah whitelist, 400 jika bukan array string) · `DELETE .../imports/:id`. Audit `ENV_IMPORT_ADDED`/`_UPDATED`/`_REMOVED`.
 

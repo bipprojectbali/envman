@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-07-07
+
+### Added
+- **Izin per-section (Notes / Aliases / Files / Storage)** — sekarang OWNER bisa mengatur akses tiap anggota **per-section**, bukan lagi semua-atau-tidak. Contoh: anggota boleh melihat Storage tapi tidak Notes. Model sama persis dengan izin per-environment: **inherit** (ikut role project), **override** (Viewer/Editor/Owner khusus section itu), atau **denied** (blokir). Kelola di tab **Members → toggle "Sections"**: matrix anggota × section dengan ikon `~ V E O ✕` yang sama seperti matrix environment. Tab section yang diblokir otomatis disembunyikan dari anggota tersebut.
+- **Admin parity** — SUPER_ADMIN bisa mengatur override section lewat `PUT /api/envman/admin/users/:userId/projects/:slug/sections/:section` (setara endpoint OWNER).
+
+### Changed
+- **⚠️ Perubahan perilaku — secure-by-default untuk section.** Anggota non-OWNER yang **sudah ada** kini **default-deny** di Notes/Aliases/Files/Storage sampai OWNER memberi akses. Sebelumnya semua anggota otomatis bisa mengakses keempat section. Setelah update, OWNER perlu membuka tab **Members → Sections** dan grant akses (bisa massal per kolom). Anggota baru juga default-deny, konsisten dengan kebijakan per-environment yang sudah berjalan. OWNER project tidak terpengaruh (tetap akses penuh).
+
 ## [0.19.18] - 2026-07-06
 
 ### Added
