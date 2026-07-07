@@ -1,4 +1,4 @@
-import { Stack, Text } from '@mantine/core'
+import { SegmentedControl, Stack, Text } from '@mantine/core'
 import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -9,6 +9,7 @@ import { BulkRoleModal } from './members/BulkRoleModal'
 import { MembersAddSection } from './members/MembersAddSection'
 import { MembersBulkBar } from './members/MembersBulkBar'
 import { MembersMatrixView } from './members/MembersMatrixView'
+import { SectionMatrixView } from './members/SectionMatrixView'
 import { type Member, toggle } from './members/types'
 
 export function MembersPanel({
@@ -28,6 +29,7 @@ export function MembersPanel({
 }) {
   const qc = useQueryClient()
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [matrixView, setMatrixView] = useState<'environments' | 'sections'>('environments')
 
   const ownerCount = members.filter((m) => m.role === 'OWNER').length
   const selectableMembers = members.filter((m) => !(m.role === 'OWNER' && ownerCount === 1))
@@ -116,25 +118,41 @@ export function MembersPanel({
     <Stack gap="md">
       {isOwner && <MembersAddSection slug={slug} onAdded={onRefresh} />}
 
-      <MembersMatrixView
-        slug={slug}
-        selected={selected}
-        onToggleSelect={(uid) => setSelected((prev) => toggle(prev, uid))}
-        onToggleAll={(ids) => {
-          const all = ids.every((id) => selected.has(id))
-          setSelected(all ? new Set() : new Set(ids))
-        }}
-        selectableIds={new Set(selectableMembers.map((m) => m.user.id))}
+      <SegmentedControl
+        size="xs"
+        value={matrixView}
+        onChange={(v) => setMatrixView(v as 'environments' | 'sections')}
+        data={[
+          { value: 'environments', label: 'Environments' },
+          { value: 'sections', label: 'Sections' },
+        ]}
       />
 
-      {isOwner && (
-        <MembersBulkBar
-          count={selected.size}
-          onChangeRole={openBulkRoleModal}
-          onSetEnvAccess={openBulkEnvModal}
-          onDelete={confirmBulkDelete}
-          busy={bulkDeleteMutation.isPending}
-        />
+      {matrixView === 'environments' ? (
+        <>
+          <MembersMatrixView
+            slug={slug}
+            selected={selected}
+            onToggleSelect={(uid) => setSelected((prev) => toggle(prev, uid))}
+            onToggleAll={(ids) => {
+              const all = ids.every((id) => selected.has(id))
+              setSelected(all ? new Set() : new Set(ids))
+            }}
+            selectableIds={new Set(selectableMembers.map((m) => m.user.id))}
+          />
+
+          {isOwner && (
+            <MembersBulkBar
+              count={selected.size}
+              onChangeRole={openBulkRoleModal}
+              onSetEnvAccess={openBulkEnvModal}
+              onDelete={confirmBulkDelete}
+              busy={bulkDeleteMutation.isPending}
+            />
+          )}
+        </>
+      ) : (
+        <SectionMatrixView slug={slug} />
       )}
     </Stack>
   )

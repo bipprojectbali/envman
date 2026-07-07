@@ -27,6 +27,29 @@ export interface AccessMatrixMember {
   envAccess: Record<string, { envRole: EnvRole; effectiveRole: ProjectRole | null }>
 }
 
+export type SectionName = 'NOTES' | 'ALIASES' | 'FILES' | 'STORAGE'
+export type SectionRole = EnvRole
+
+export interface SectionMatrix {
+  project: { slug: string; name: string }
+  sections: SectionName[]
+  members: SectionMatrixMember[]
+}
+
+export interface SectionMatrixMember {
+  userId: string
+  user: { id: string; name: string; email: string; image?: string | null }
+  projectRole: ProjectRole
+  sectionAccess: Record<string, { sectionRole: SectionRole; effectiveRole: ProjectRole | null }>
+}
+
+export const sectionLabel: Record<SectionName, string> = {
+  NOTES: 'Notes',
+  ALIASES: 'Aliases',
+  FILES: 'Files',
+  STORAGE: 'Storage',
+}
+
 export const roleColor: Record<ProjectRole, string> = {
   OWNER: 'blue',
   EDITOR: 'teal',
