@@ -22,6 +22,13 @@ function isValidEnvRole(value: unknown): value is EnvRoleInput {
   return value === 'inherit' || value === 'denied' || value === 'OWNER' || value === 'EDITOR' || value === 'VIEWER'
 }
 
+const SECTIONS = ['NOTES', 'ALIASES', 'FILES', 'STORAGE'] as const
+type SectionName = (typeof SECTIONS)[number]
+
+function isValidSection(value: string): value is SectionName {
+  return (SECTIONS as readonly string[]).includes(value)
+}
+
 export const adminUsersRouter = new Elysia()
 
   // ─── Set project-level role (or remove membership) ───────────────────────────
@@ -157,6 +164,68 @@ export const adminUsersRouter = new Elysia()
     audit(caller.userId, auditAction, detail, getIp(request))
 
     await invalidateCache(cacheKeys.projectAccess(params.userId, params.slug), cacheKeys.projectDetail(params.slug))
+    await invalidateProjectCaches(params.slug, [params.userId])
+    return { ok: true, role: body.role }
+  })
+
+  // ─── Set section-level override (inherit / denied / role) ────────────────────
+  .put('/api/envman/admin/users/:userId/projects/:slug/sections/:section', async ({ request, params, set }) => {
+    const caller = await requireSuperAdmin(request)
+    if (!caller) {
+      set.status = 403
+      return { error: 'SUPER_ADMIN required' }
+    }
+    if (!isValidSection(params.section)) {
+      set.status = 400
+      return { error: 'Section tidak valid' }
+    }
+    const body = (await request.json().catch(() => null)) as { role?: unknown } | null
+    if (!body || !isValidEnvRole(body.role)) {
+      set.status = 400
+      return { error: "role must be 'inherit', 'denied', 'OWNER', 'EDITOR', or 'VIEWER'" }
+    }
+
+    const project = await prisma.project.findUnique({ where: { slug: params.slug } })
+    if (!project) {
+      set.status = 404
+      return { error: 'Project not found' }
+    }
+    const targetMember = await prisma.projectMember.findUnique({
+      where: { userId_projectId: { userId: params.userId, projectId: project.id } },
+    })
+    if (!targetMember) {
+      set.status = 400
+      return { error: 'User belum jadi member project. Tambah ke project dulu sebelum atur akses section.' }
+    }
+
+    const where = {
+      userId_projectId_section: { userId: params.userId, projectId: project.id, section: params.section },
+    }
+    if (body.role === 'inherit') {
+      const existing = await prisma.projectSectionMember.findUnique({ where })
+      if (existing) await prisma.projectSectionMember.delete({ where: { id: existing.id } })
+    } else if (body.role === 'denied') {
+      await prisma.projectSectionMember.upsert({
+        where,
+        update: { role: null },
+        create: { userId: params.userId, projectId: project.id, section: params.section, role: null },
+      })
+    } else {
+      await prisma.projectSectionMember.upsert({
+        where,
+        update: { role: body.role },
+        create: { userId: params.userId, projectId: project.id, section: params.section, role: body.role },
+      })
+    }
+
+    const auditAction = body.role === 'inherit' ? 'SECTION_MEMBER_CLEARED' : 'SECTION_MEMBER_SET'
+    const detail =
+      body.role === 'inherit'
+        ? `${params.slug}/${params.section} user=${params.userId} (admin)`
+        : `${params.slug}/${params.section} user=${params.userId} role=${body.role} (admin)`
+    audit(caller.userId, auditAction, detail, getIp(request))
+
+    await invalidateCache(cacheKeys.projectDetail(params.slug))
     await invalidateProjectCaches(params.slug, [params.userId])
     return { ok: true, role: body.role }
   })

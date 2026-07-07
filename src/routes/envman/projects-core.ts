@@ -86,6 +86,7 @@ export const projectsCoreRouter = new Elysia()
       where: { slug: params.slug, ...notDeleted },
       include: {
         members: { include: { user: { select: { id: true, name: true, email: true, image: true } } } },
+        sectionMembers: { where: { userId: caller.userId }, select: { section: true, role: true } },
         environments: {
           include: {
             _count: { select: { vars: true } },
@@ -120,11 +121,28 @@ export const projectsCoreRouter = new Elysia()
         return { ...rest, accessRole: envEffectiveRole }
       })
       .filter((e: any) => showAllEnvs || e.accessRole !== null)
+
+    // Resolusi akses per-section (Notes/Aliases/Files/Storage) untuk caller:
+    // override section jika ada (null = denied), else inherit role project.
+    const SECTIONS = ['NOTES', 'ALIASES', 'FILES', 'STORAGE'] as const
+    const sectionOverride = new Map((project as any).sectionMembers.map((sm: any) => [sm.section, sm.role]))
+    const sectionAccess: Record<string, 'OWNER' | 'EDITOR' | 'VIEWER' | null> = {}
+    for (const section of SECTIONS) {
+      if (isSuperAdmin) {
+        sectionAccess[section] = 'OWNER'
+      } else if (sectionOverride.has(section)) {
+        sectionAccess[section] = sectionOverride.get(section) as 'OWNER' | 'EDITOR' | 'VIEWER' | null
+      } else {
+        sectionAccess[section] = access
+      }
+    }
+    const { sectionMembers: _sm, ...projectRest } = project as any
     return {
       project: {
-        ...project,
+        ...projectRest,
         environments: environmentsWithAccess,
         myRole: access,
+        sectionAccess,
       },
     }
   })

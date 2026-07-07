@@ -20,6 +20,14 @@ enum ProjectMemberRole {
   VIEWER
 }
 
+// Section non-env yang bisa diberi override akses per-member (analog EnvironmentMember).
+enum ProjectSection {
+  NOTES
+  ALIASES
+  FILES
+  STORAGE
+}
+
 enum TicketStatus {
   OPEN
   IN_PROGRESS
@@ -60,6 +68,7 @@ model User {
   comments              TicketComment[]
   projectMembers        ProjectMember[]
   envMemberships        EnvironmentMember[]
+  sectionMemberships    ProjectSectionMember[]
   apiTokens             ApiToken[]
   notes                 ProjectNote[]
   projectAliases        ProjectAlias[]  @relation("ProjectAliasCreator")
@@ -291,6 +300,7 @@ model Project {
   createdBy   User?     @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   members           ProjectMember[]
+  sectionMembers    ProjectSectionMember[]
   environments      Environment[]
   portainerConfigs  PortainerConfig[]
   notes             ProjectNote[]
@@ -411,6 +421,25 @@ model EnvironmentMember {
   @@unique([userId, environmentId])
   @@index([environmentId])
   @@map("environment_member")
+}
+
+// Override akses per-member untuk section non-env (Notes/Aliases/Files/Storage).
+// Semantik identik EnvironmentMember:
+//   null = explicit DENY · OWNER/EDITOR/VIEWER = override · tidak ada record = inherit project role
+model ProjectSectionMember {
+  id        String            @id @default(uuid())
+  userId    String
+  projectId String
+  section   ProjectSection
+  role      ProjectMemberRole?
+  createdAt DateTime          @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId, section])
+  @@index([projectId])
+  @@map("project_section_member")
 }
 
 model ApiToken {

@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getProjectAccess } from '../../lib/access'
+import { getSectionAccess } from '../../lib/access'
 import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { cacheKeys, invalidateCache, withCache } from '../../lib/cache'
 import { prisma } from '../../lib/db'
@@ -50,7 +50,7 @@ export const filesRouter = new Elysia()
   .get('/api/envman/projects/:slug/files', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access) return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -71,7 +71,7 @@ export const filesRouter = new Elysia()
   .post('/api/envman/projects/:slug/files', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access || access === 'VIEWER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -121,7 +121,7 @@ export const filesRouter = new Elysia()
   .put('/api/envman/projects/:slug/files/:id', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access || access === 'VIEWER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -178,7 +178,7 @@ export const filesRouter = new Elysia()
   .delete('/api/envman/projects/:slug/files/:id', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access || access === 'VIEWER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {

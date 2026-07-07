@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getProjectAccess } from '../../lib/access'
+import { getSectionAccess } from '../../lib/access'
 import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
@@ -17,7 +17,7 @@ export const filesResolveRouter = new Elysia()
   .get('/api/envman/projects/:slug/files/resolve', async ({ request, params, set, query }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getProjectAccess(authResult.userId, authResult.role, params.slug)
+    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access) return forbidden(set)
     const prefix = (query.prefix as string | undefined)?.trim()
     const filename = (query.filename as string | undefined)?.trim()

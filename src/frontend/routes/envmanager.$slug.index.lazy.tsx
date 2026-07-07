@@ -60,6 +60,26 @@ function ProjectDetailPage() {
   const isOwner = myRole === 'OWNER'
   const isSuperAdmin = sessionData?.user?.role === 'SUPER_ADMIN'
 
+  // Akses per-section (Notes/Aliases/Files/Storage). null = denied → tab disembunyikan.
+  // Fallback ke myRole bila server belum mengirim sectionAccess (backward-compat).
+  type SecRole = 'OWNER' | 'EDITOR' | 'VIEWER' | null
+  const sectionAccess: Record<string, SecRole> = project?.sectionAccess ?? {}
+  const secRole = (s: string): SecRole => (s in sectionAccess ? sectionAccess[s] : (myRole as SecRole))
+  const notesRole = secRole('NOTES')
+  const aliasesRole = secRole('ALIASES')
+  const filesRole = secRole('FILES')
+  const storageRole = secRole('STORAGE')
+  const canView = (r: SecRole) => r !== null
+  const canEditSec = (r: SecRole) => r === 'OWNER' || r === 'EDITOR'
+
+  // Deep-link ke tab section yang denied → fallback ke Environments (tab tak dirender).
+  const deniedTab =
+    (tab === 'notes' && !canView(notesRole)) ||
+    (tab === 'aliases' && !canView(aliasesRole)) ||
+    (tab === 'files' && !canView(filesRole)) ||
+    (tab === 'storage' && !canView(storageRole))
+  const activeTab = deniedTab ? 'environments' : tab
+
   return (
     <Box>
       <ProjectDetailHeader
@@ -69,31 +89,39 @@ function ProjectDetailPage() {
       />
 
       {!isError && (
-        <Tabs value={tab} onChange={(v) => setTab(v ?? 'environments')} variant="pills" color="gray">
+        <Tabs value={activeTab} onChange={(v) => setTab(v ?? 'environments')} variant="pills" color="gray">
           <Tabs.List mb="lg">
             <Tabs.Tab value="environments" leftSection={<TbVariable size={13} />}
               rightSection={!isLoading && envs.length > 0 ? <Badge size="xs" variant="light" color="primary" circle>{envs.length}</Badge> : undefined}>
               Environments
             </Tabs.Tab>
-            <Tabs.Tab value="notes" leftSection={<TbNote size={13} />}
-              rightSection={notesCount > 0 ? <Badge size="xs" variant="light" color="primary" circle>{notesCount}</Badge> : undefined}>
-              Notes
-            </Tabs.Tab>
-            <Tabs.Tab value="aliases" leftSection={<TbTerminal2 size={13} />}
-              rightSection={aliasesCount > 0 ? <Badge size="xs" variant="light" color="primary" circle>{aliasesCount}</Badge> : undefined}>
-              Aliases
-            </Tabs.Tab>
-            <Tabs.Tab value="files" leftSection={<TbFiles size={13} />}
-              rightSection={filesCount > 0 ? <Badge size="xs" variant="light" color="primary" circle>{filesCount}</Badge> : undefined}>
-              Files
-            </Tabs.Tab>
+            {canView(notesRole) && (
+              <Tabs.Tab value="notes" leftSection={<TbNote size={13} />}
+                rightSection={notesCount > 0 ? <Badge size="xs" variant="light" color="primary" circle>{notesCount}</Badge> : undefined}>
+                Notes
+              </Tabs.Tab>
+            )}
+            {canView(aliasesRole) && (
+              <Tabs.Tab value="aliases" leftSection={<TbTerminal2 size={13} />}
+                rightSection={aliasesCount > 0 ? <Badge size="xs" variant="light" color="primary" circle>{aliasesCount}</Badge> : undefined}>
+                Aliases
+              </Tabs.Tab>
+            )}
+            {canView(filesRole) && (
+              <Tabs.Tab value="files" leftSection={<TbFiles size={13} />}
+                rightSection={filesCount > 0 ? <Badge size="xs" variant="light" color="primary" circle>{filesCount}</Badge> : undefined}>
+                Files
+              </Tabs.Tab>
+            )}
             <Tabs.Tab value="members" leftSection={<TbUsers size={13} />}
               rightSection={memberCount > 0 ? <Badge size="xs" variant="light" color="primary" circle>{memberCount}</Badge> : undefined}>
               Members
             </Tabs.Tab>
-            <Tabs.Tab value="storage" leftSection={<TbFolderOpen size={13} />}>
-              Storage
-            </Tabs.Tab>
+            {canView(storageRole) && (
+              <Tabs.Tab value="storage" leftSection={<TbFolderOpen size={13} />}>
+                Storage
+              </Tabs.Tab>
+            )}
           </Tabs.List>
 
           <Tabs.Panel value="environments">
@@ -101,21 +129,27 @@ function ProjectDetailPage() {
               <EnvironmentList slug={slug} envs={envs} isLoading={isLoading} isOwner={isOwner} canEdit={canEdit} myRole={myRole} />
             </Paper>
           </Tabs.Panel>
-          <Tabs.Panel value="notes">
-            <Paper withBorder p="md" radius="md">
-              <NotesPanel slug={slug} canEdit={canEdit} canCreate={canCreateNote} isOwner={isOwner} myUserId={myUserId ?? ''} />
-            </Paper>
-          </Tabs.Panel>
-          <Tabs.Panel value="aliases">
-            <Paper withBorder p="md" radius="md">
-              <AliasesPanel slug={slug} isOwner={isOwner} />
-            </Paper>
-          </Tabs.Panel>
-          <Tabs.Panel value="files">
-            <Paper withBorder p="md" radius="md">
-              <FilesPanel slug={slug} isOwner={isOwner} myUserId={myUserId ?? ''} canEdit={canEdit} />
-            </Paper>
-          </Tabs.Panel>
+          {canView(notesRole) && (
+            <Tabs.Panel value="notes">
+              <Paper withBorder p="md" radius="md">
+                <NotesPanel slug={slug} canEdit={canEditSec(notesRole)} canCreate={canCreateNote} isOwner={notesRole === 'OWNER'} myUserId={myUserId ?? ''} />
+              </Paper>
+            </Tabs.Panel>
+          )}
+          {canView(aliasesRole) && (
+            <Tabs.Panel value="aliases">
+              <Paper withBorder p="md" radius="md">
+                <AliasesPanel slug={slug} isOwner={aliasesRole === 'OWNER'} />
+              </Paper>
+            </Tabs.Panel>
+          )}
+          {canView(filesRole) && (
+            <Tabs.Panel value="files">
+              <Paper withBorder p="md" radius="md">
+                <FilesPanel slug={slug} isOwner={filesRole === 'OWNER'} myUserId={myUserId ?? ''} canEdit={canEditSec(filesRole)} />
+              </Paper>
+            </Tabs.Panel>
+          )}
           <Tabs.Panel value="members">
             <Paper withBorder p="md" radius="md">
               <MembersPanel
@@ -125,11 +159,13 @@ function ProjectDetailPage() {
               />
             </Paper>
           </Tabs.Panel>
-          <Tabs.Panel value="storage">
-            <Paper withBorder p="md" radius="md">
-              <StoragePanel slug={slug} isOwner={isOwner} canEdit={canEdit} isSuperAdmin={isSuperAdmin} />
-            </Paper>
-          </Tabs.Panel>
+          {canView(storageRole) && (
+            <Tabs.Panel value="storage">
+              <Paper withBorder p="md" radius="md">
+                <StoragePanel slug={slug} isOwner={storageRole === 'OWNER'} canEdit={canEditSec(storageRole)} isSuperAdmin={isSuperAdmin} />
+              </Paper>
+            </Tabs.Panel>
+          )}
         </Tabs>
       )}
     </Box>

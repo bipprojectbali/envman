@@ -38,6 +38,13 @@ beforeAll(async () => {
     headers: { cookie: `session=${ownerToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'storage-editor@test.com', role: 'EDITOR' }),
   }))
+  // Member baru non-OWNER kini default-deny di semua section (secure-by-default).
+  // Test ini menguji role-gate storage, jadi grant STORAGE editor kembali ke inherit (ikut EDITOR project).
+  await app.handle(new Request(`http://localhost/api/envman/projects/${projectSlug}/sections/STORAGE/members/${editor.id}`, {
+    method: 'PUT',
+    headers: { cookie: `session=${ownerToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'inherit' }),
+  }))
 })
 
 afterAll(async () => { await cleanupTestData() })

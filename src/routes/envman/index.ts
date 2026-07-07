@@ -15,6 +15,8 @@ import { filesRouter } from './files'
 import { gistsRouter } from './gists'
 import { notesRouter } from './notes'
 import { portainerRouter } from './portainer'
+import { sectionMatrixRouter } from './section-matrix'
+import { sectionMembersRouter } from './section-members'
 import { portainerBackupRouter } from './portainer-backup'
 import { portainerProbeRouter } from './portainer-probe'
 import { projectsRouter } from './projects'
@@ -61,6 +63,8 @@ export const envmanRouter = new Elysia()
   .use(projectsRouter)
   .use(accessMatrixRouter)
   .use(envMembersRouter)
+  .use(sectionMatrixRouter)
+  .use(sectionMembersRouter)
   .use(envImportsRouter)
   .use(portainerRouter)
   .use(portainerBackupRouter)

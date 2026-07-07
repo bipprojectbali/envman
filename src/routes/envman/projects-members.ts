@@ -67,6 +67,17 @@ export const projectsMembersRouter = new Elysia()
           skipDuplicates: true,
         })
       }
+      // Secure-by-default juga untuk section non-env: member baru non-OWNER default-deny
+      // di Notes/Aliases/Files/Storage sampai OWNER grant manual.
+      await prisma.projectSectionMember.createMany({
+        data: (['NOTES', 'ALIASES', 'FILES', 'STORAGE'] as const).map((section) => ({
+          userId: user.id,
+          projectId: project.id,
+          section,
+          role: null,
+        })),
+        skipDuplicates: true,
+      })
     }
     await invalidateProjectCaches(params.slug, [user.id])
     return { member, defaultDenied: shouldDefaultDeny }
