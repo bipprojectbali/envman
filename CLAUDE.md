@@ -331,6 +331,8 @@ Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()` di
 
 **Portainer:** `GET|POST .../portainer/connections` · `PUT|DELETE .../connections/:id` · `POST .../connections/:id/probe` · per-env `GET|PUT|DELETE|POST .../portainer[/sync]`
 
+**Portainer env-scoped ops (CLI + FE):** `GET .../portainer/status|containers` (akses env) · `GET .../portainer/logs/:containerId` (snapshot, akses env) · `GET .../portainer/logs/:containerId/stream` (**SSE live logs**, `event: stdout|stderr` + `data:`, heartbeat `:keepalive`, `AbortController` ikat ke `request.signal`; gate akses env; de-mux frame Docker incremental di `portainer-logs-stream-demux.ts`) · `POST .../portainer/restart` (**stop→start tanpa pull**, gate `stack:power` via `editorOrCap`; 409 saat sudah stop di-skip) · `POST .../portainer/recreate|repull|sync-repull` (`stack:deploy`) · `POST .../portainer/prune/images` (`stack:prune`). File: `portainer-restart.ts`, `portainer-logs-stream.ts` (+demux), register di `portainer-sync.ts`.
+
 **Portainer Capabilities:** operasi di-gate per-capability (`src/lib/permissions.ts`), bukan role SUPER_ADMIN. Assign via `PUT .../admin/users/:userId/permissions`. SUPER_ADMIN bypass. Guard: `src/routes/envman/portainer-auth.ts` (`requireCap`, `editorOrCap`, `envAccessOrCap`).
 
 | Capability | Mengizinkan |
@@ -424,7 +426,16 @@ envman storage upload <project> <file|dir> [--path p] [-n|--no-clobber]   # defa
 envman storage download <project>:<path> [-o file]                         # default stdout
 envman storage exec [--offline|--no-cache] <project>:<path> [-- args...]   # jalankan binary (cached)
 envman storage rm <project>:<folder>/                                      # OWNER only
+
+envman portainer status <project>:<env>                                    # (alias: pt) status stack + jumlah container
+envman portainer ps <project>:<env>                                        # daftar container
+envman portainer logs <project>:<env> <container> [-f] [--tail N]          # snapshot; -f = live (SSE) sampai Ctrl+C
+envman portainer restart-soft <project>:<env>                              # stop→start tanpa pull (stack:power)
+envman portainer restart-recreate|restart-repull <project>:<env>           # recreate / pull+recreate (stack:deploy)
+envman portainer sync-repull|prune <project>:<env>                         # push vars+repull / prune image
 ```
+
+`portainer` (alias `pt`) = thin client atas endpoint env-scoped Portainer; server simpan connection/stack/endpoint per-env, CLI cukup `project:env`. `logs -f` konsumsi SSE (`data:` → stdout, Ctrl+C via `signal.NotifyContext` → context cancel → server auto-abort upstream). Impl: `cli-go/internal/portainer/` (`portainer.go`, `logs.go`) + `cmd/envman/portainer_cmd.go`.
 
 `storage exec` untuk binary (stdin/stdout/stderr inherit, args setelah `--`, exit code propagasi). **Cached** `~/.cache/envman/exec` (0700): reuse selama `size`+`updatedAt` cocok. Cache key = `sha256(server \x00 slug \x00 path)`. Prune LRU >500 MB. `--offline` (cache tanpa server), `--no-cache` (paksa download). Impl: `cli-go/internal/storage/exec.go` + `exec_cache.go`. Server `GET .../storage/download` kirim `{url, size, updatedAt}` validator.
 

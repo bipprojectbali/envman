@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- **`envman portainer` (alias `pt`) — kontrol stack Portainer dari CLI.** Operasikan stack yang terikat ke sebuah environment cukup dengan `project:env` (server menyimpan detail connection/stack/endpoint). Subperintah: `status`, `ps`, `logs <container>` (snapshot, atau `-f` untuk live stream sampai Ctrl+C), `restart-soft` (stop→start tanpa pull image), `restart-recreate`, `restart-repull`, `sync-repull`, `prune`.
+- **Live logs (SSE).** Endpoint baru `GET .../portainer/logs/:containerId/stream` mem-broadcast log container real-time sebagai Server-Sent Events — dipakai `envman portainer logs -f` dan siap dikonsumsi panel frontend (`EventSource`).
+- **Restart ringan.** Endpoint baru `POST .../portainer/restart` (stop→start tanpa redeploy) di-gate capability `stack:power`, memberi operator dengan izin restart-saja kemampuan memulai ulang stack tanpa perlu izin deploy penuh.
+
 ## [0.20.0] - 2026-07-07
 
 ### Added
