@@ -7,6 +7,7 @@
 - **Detail container.** `envman portainer status` kini menampilkan tabel container (state, status/uptime, image, ports). `envman portainer inspect <container>` memberi detail satu container: state + health check, uptime, jumlah restart, exit code, port, mount, dan penggunaan CPU/memori real-time — via endpoint baru `GET .../portainer/inspect/:containerId`.
 - **Live logs (SSE).** Endpoint baru `GET .../portainer/logs/:containerId/stream` mem-broadcast log container real-time sebagai Server-Sent Events — dipakai `envman portainer logs -f` dan siap dikonsumsi panel frontend (`EventSource`).
 - **Restart ringan.** Endpoint baru `POST .../portainer/restart` (stop→start tanpa redeploy) di-gate capability `stack:power`, memberi operator dengan izin restart-saja kemampuan memulai ulang stack tanpa perlu izin deploy penuh.
+- **Badge Storage di tab project.** Tab **Storage** kini menampilkan badge jumlah file + ukuran terpakai (mis. `8 · 12 MB`), sejajar dengan badge count di tab lain. Data dari field additive `storageStats` di `GET /projects/:slug`; badge segar otomatis setelah upload/hapus file.
 
 ## [0.20.0] - 2026-07-07
 

@@ -137,12 +137,26 @@ export const projectsCoreRouter = new Elysia()
       }
     }
     const { sectionMembers: _sm, ...projectRest } = project as any
+
+    // Ringkasan storage untuk badge tab (count file + total byte). Hanya dihitung
+    // bila caller punya akses section STORAGE — jangan bocorkan ke yang denied.
+    let storageStats: { fileCount: number; usedBytes: number } | undefined
+    if (sectionAccess.STORAGE !== null) {
+      const agg = await prisma.projectStorageObject.aggregate({
+        where: { projectId: project.id },
+        _count: true,
+        _sum: { size: true },
+      })
+      storageStats = { fileCount: agg._count, usedBytes: agg._sum.size ?? 0 }
+    }
+
     return {
       project: {
         ...projectRest,
         environments: environmentsWithAccess,
         myRole: access,
         sectionAccess,
+        storageStats,
       },
     }
   })
