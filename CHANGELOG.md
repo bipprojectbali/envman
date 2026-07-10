@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-07-10
+
 ### Added
 - **`envman portainer` (alias `pt`) — kontrol stack Portainer dari CLI.** Operasikan stack yang terikat ke sebuah environment cukup dengan `project:env` (server menyimpan detail connection/stack/endpoint). Subperintah: `status`, `ps`, `inspect`, `logs <container>` (snapshot, atau `-f` untuk live stream sampai Ctrl+C), `restart-soft` (stop→start tanpa pull image), `restart-recreate`, `restart-repull`, `sync-repull`, `prune`.
 - **Detail container.** `envman portainer status` kini menampilkan tabel container (state, status/uptime, image, ports). `envman portainer inspect <container>` memberi detail satu container: state + health check, uptime, jumlah restart, exit code, port, mount, dan penggunaan CPU/memori real-time — via endpoint baru `GET .../portainer/inspect/:containerId`.
