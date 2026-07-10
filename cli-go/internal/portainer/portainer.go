@@ -27,11 +27,19 @@ func ParseTarget(ref string) (Target, error) {
 	return Target{Slug: ref[:idx], Env: ref[idx+1:]}, nil
 }
 
+// ShortID trims a container ID to Docker's conventional 12-char short form.
+func ShortID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
+}
+
 func (t Target) base() string {
 	return fmt.Sprintf("/api/envman/projects/%s/environments/%s/portainer", url.PathEscape(t.Slug), url.PathEscape(t.Env))
 }
 
-// Container is one container in the stack (subset of server response).
+// Container is one container in the stack (subset of the /containers response).
 type Container struct {
 	ShortID string   `json:"shortId"`
 	Names   []string `json:"names"`
@@ -40,13 +48,40 @@ type Container struct {
 	Status  string   `json:"status"`
 }
 
+// StackStatus is the stack header from the /status response.
+type StackStatus struct {
+	ID      int    `json:"id"`
+	Name    string `json:"name"`
+	Status  int    `json:"status"`
+	Type    int    `json:"type"`
+	Created int64  `json:"createdAt"`
+	Updated int64  `json:"updatedAt"`
+}
+
+// StatusContainer is one container in the /status response (richer than Container:
+// carries the Docker status string, ports, and short id already trimmed).
+type StatusContainer struct {
+	ID     string   `json:"id"`
+	Names  []string `json:"names"`
+	Image  string   `json:"image"`
+	Status string   `json:"status"`
+	State  string   `json:"state"`
+	Ports  []string `json:"ports"`
+}
+
+// StatusResult is the full /status response.
+type StatusResult struct {
+	Stack      StackStatus       `json:"stack"`
+	Containers []StatusContainer `json:"containers"`
+}
+
 // Status fetches stack + container summary for an env.
-func Status(cfg *auth.Config, t Target) (map[string]any, error) {
-	var out map[string]any
+func Status(cfg *auth.Config, t Target) (*StatusResult, error) {
+	var out StatusResult
 	if err := api.FetchJSON(cfg, t.base()+"/status", &out); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return &out, nil
 }
 
 // Ps lists containers of the env's stack.
@@ -58,6 +93,46 @@ func Ps(cfg *auth.Config, t Target) ([]Container, error) {
 		return nil, err
 	}
 	return out.Containers, nil
+}
+
+// Mount is one bind/volume mount in the inspect response.
+type Mount struct {
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Mode        string `json:"mode"`
+}
+
+// ContainerStats is the resource summary (nil when container not running).
+type ContainerStats struct {
+	CPUPercent float64 `json:"cpuPercent"`
+	MemUsageMB int     `json:"memUsageMB"`
+	MemLimitMB int     `json:"memLimitMB"`
+	MemPercent float64 `json:"memPercent"`
+}
+
+// Inspection is the detailed single-container view.
+type Inspection struct {
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Image        string          `json:"image"`
+	State        string          `json:"state"`
+	Running      bool            `json:"running"`
+	StartedAt    string          `json:"startedAt"`
+	RestartCount int             `json:"restartCount"`
+	Health       string          `json:"health"`
+	ExitCode     *int            `json:"exitCode"`
+	Ports        []string        `json:"ports"`
+	Mounts       []Mount         `json:"mounts"`
+	Stats        *ContainerStats `json:"stats"`
+}
+
+// Inspect fetches detailed info for a single container.
+func Inspect(cfg *auth.Config, t Target, containerID string) (*Inspection, error) {
+	var out Inspection
+	if err := api.FetchJSON(cfg, t.base()+"/inspect/"+url.PathEscape(containerID), &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // action names map to server POST endpoints under the env base.

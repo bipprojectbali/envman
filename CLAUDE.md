@@ -331,7 +331,7 @@ Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()` di
 
 **Portainer:** `GET|POST .../portainer/connections` · `PUT|DELETE .../connections/:id` · `POST .../connections/:id/probe` · per-env `GET|PUT|DELETE|POST .../portainer[/sync]`
 
-**Portainer env-scoped ops (CLI + FE):** `GET .../portainer/status|containers` (akses env) · `GET .../portainer/logs/:containerId` (snapshot, akses env) · `GET .../portainer/logs/:containerId/stream` (**SSE live logs**, `event: stdout|stderr` + `data:`, heartbeat `:keepalive`, `AbortController` ikat ke `request.signal`; gate akses env; de-mux frame Docker incremental di `portainer-logs-stream-demux.ts`) · `POST .../portainer/restart` (**stop→start tanpa pull**, gate `stack:power` via `editorOrCap`; 409 saat sudah stop di-skip) · `POST .../portainer/recreate|repull|sync-repull` (`stack:deploy`) · `POST .../portainer/prune/images` (`stack:prune`). File: `portainer-restart.ts`, `portainer-logs-stream.ts` (+demux), register di `portainer-sync.ts`.
+**Portainer env-scoped ops (CLI + FE):** `GET .../portainer/status|containers` (akses env) · `GET .../portainer/inspect/:containerId` (detail 1 container: state/health/uptime/restartCount/exitCode/ports/mounts + stats CPU/mem best-effort saat running; akses env; `portainer-inspect.ts`, math stats via `computeContainerStats()` di helpers) · `GET .../portainer/logs/:containerId` (snapshot, akses env) · `GET .../portainer/logs/:containerId/stream` (**SSE live logs**, `event: stdout|stderr` + `data:`, heartbeat `:keepalive`, `AbortController` ikat ke `request.signal`; gate akses env; de-mux frame Docker incremental di `portainer-logs-stream-demux.ts`) · `POST .../portainer/restart` (**stop→start tanpa pull**, gate `stack:power` via `editorOrCap`; 409 saat sudah stop di-skip) · `POST .../portainer/recreate|repull|sync-repull` (`stack:deploy`) · `POST .../portainer/prune/images` (`stack:prune`). File: `portainer-restart.ts`, `portainer-logs-stream.ts` (+demux), register di `portainer-sync.ts`.
 
 **Portainer Capabilities:** operasi di-gate per-capability (`src/lib/permissions.ts`), bukan role SUPER_ADMIN. Assign via `PUT .../admin/users/:userId/permissions`. SUPER_ADMIN bypass. Guard: `src/routes/envman/portainer-auth.ts` (`requireCap`, `editorOrCap`, `envAccessOrCap`).
 
@@ -427,8 +427,9 @@ envman storage download <project>:<path> [-o file]                         # def
 envman storage exec [--offline|--no-cache] <project>:<path> [-- args...]   # jalankan binary (cached)
 envman storage rm <project>:<folder>/                                      # OWNER only
 
-envman portainer status <project>:<env>                                    # (alias: pt) status stack + jumlah container
-envman portainer ps <project>:<env>                                        # daftar container
+envman portainer status <project>:<env>                                    # (alias: pt) ringkasan stack + tabel container
+envman portainer ps <project>:<env>                                        # daftar container ringkas
+envman portainer inspect <project>:<env> <container>                       # detail 1 container (health/uptime/restart/ports/mounts/CPU/mem)
 envman portainer logs <project>:<env> <container> [-f] [--tail N]          # snapshot; -f = live (SSE) sampai Ctrl+C
 envman portainer restart-soft <project>:<env>                              # stop→start tanpa pull (stack:power)
 envman portainer restart-recreate|restart-repull <project>:<env>           # recreate / pull+recreate (stack:deploy)

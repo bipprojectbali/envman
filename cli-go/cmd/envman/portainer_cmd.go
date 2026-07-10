@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/bipprojectbali/envman/cli/internal/auth"
 	"github.com/bipprojectbali/envman/cli/internal/portainer"
@@ -24,6 +25,7 @@ so you only reference the environment as project:env.`,
 	cmd.AddCommand(
 		ptStatusCmd(),
 		ptPsCmd(),
+		ptInspectCmd(),
 		ptLogsCmd(),
 		ptActionCmd("restart-soft", "Restart the stack without pulling images (stop→start)"),
 		ptActionCmd("restart-recreate", "Recreate the stack (stop→start, redeploy compose)"),
@@ -49,11 +51,26 @@ func ptStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if stack, ok := out["stack"].(map[string]any); ok {
-				fmt.Printf("Stack:  %v (%v)\n", stack["name"], stack["status"])
+			stackState := "inactive"
+			if out.Stack.Status == 1 {
+				stackState = "active"
 			}
-			if cs, ok := out["containers"].([]any); ok {
-				fmt.Printf("Containers: %d\n", len(cs))
+			fmt.Printf("Stack:      %s (%s)\n", out.Stack.Name, stackState)
+			fmt.Printf("Containers: %d\n", len(out.Containers))
+			if len(out.Containers) == 0 {
+				return nil
+			}
+			fmt.Println()
+			for _, c := range out.Containers {
+				name := ""
+				if len(c.Names) > 0 {
+					name = c.Names[0]
+				}
+				ports := "-"
+				if len(c.Ports) > 0 {
+					ports = strings.Join(c.Ports, ",")
+				}
+				fmt.Printf("  %-12s  %-8s  %-24s  %-28s  %s\n", portainer.ShortID(c.ID), c.State, name, c.Status, ports)
 			}
 			return nil
 		},
@@ -85,6 +102,53 @@ func ptPsCmd() *cobra.Command {
 					name = c.Names[0]
 				}
 				fmt.Printf("  %-12s  %-8s  %-30s  %s\n", c.ShortID, c.State, name, c.Image)
+			}
+			return nil
+		},
+	}
+}
+
+func ptInspectCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "inspect <project>:<env> <container>",
+		Short:   "Show detailed status of one container",
+		Long:    "Detailed view of one container: state, health, uptime, restart count, ports, mounts, and live CPU/memory (when running).",
+		Example: "  envman portainer inspect myapp:prod web",
+		Args:    cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, t, err := ptResolve(args[0])
+			if err != nil {
+				return err
+			}
+			i, err := portainer.Inspect(cfg, t, args[1])
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Container: %s (%s)\n", i.Name, i.ID)
+			fmt.Printf("Image:     %s\n", i.Image)
+			state := i.State
+			if i.Health != "" {
+				state += " / " + i.Health
+			}
+			fmt.Printf("State:     %s\n", state)
+			if i.Running {
+				fmt.Printf("Started:   %s\n", i.StartedAt)
+			} else if i.ExitCode != nil {
+				fmt.Printf("Exit code: %d\n", *i.ExitCode)
+			}
+			fmt.Printf("Restarts:  %d\n", i.RestartCount)
+			if len(i.Ports) > 0 {
+				fmt.Printf("Ports:     %s\n", strings.Join(i.Ports, ", "))
+			}
+			if i.Stats != nil {
+				fmt.Printf("CPU:       %.1f%%\n", i.Stats.CPUPercent)
+				fmt.Printf("Memory:    %d/%d MB (%.1f%%)\n", i.Stats.MemUsageMB, i.Stats.MemLimitMB, i.Stats.MemPercent)
+			}
+			if len(i.Mounts) > 0 {
+				fmt.Println("Mounts:")
+				for _, m := range i.Mounts {
+					fmt.Printf("  %s → %s (%s)\n", m.Source, m.Destination, m.Mode)
+				}
 			}
 			return nil
 		},

@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia'
+import { portainerInspectRouter } from './portainer-inspect'
 import { portainerLogsStreamRouter } from './portainer-logs-stream'
 import { portainerRestartRouter } from './portainer-restart'
 import { syncContainersRouter } from './portainer-sync-containers'
@@ -15,3 +16,4 @@ export const syncRouter = new Elysia()
   .use(syncContainersRouter)
   .use(portainerRestartRouter)
   .use(portainerLogsStreamRouter)
+  .use(portainerInspectRouter)

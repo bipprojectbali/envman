@@ -11,9 +11,17 @@ Alias perintah: \`envman pt ...\` = \`envman portainer ...\`.
 ### Status & container
 
 \`\`\`bash
-envman portainer status myapp:prod      # status stack + jumlah container
-envman portainer ps myapp:prod          # daftar container (id · state · nama · image)
+envman portainer status myapp:prod          # ringkasan stack + tabel container (state · status · image · ports)
+envman portainer ps myapp:prod              # daftar container ringkas (id · state · nama · image)
+envman portainer inspect myapp:prod web     # detail 1 container
 \`\`\`
+
+\`status\` menampilkan header stack (nama, aktif/inaktif) lalu satu baris per
+container: short-id, state, status/uptime Docker, nama, dan port mapping.
+
+\`inspect <container>\` memberi detail mendalam satu container: state + health
+check, uptime (\`Started\`), jumlah restart, exit code (bila mati), port, mount,
+dan penggunaan CPU/memori real-time (saat container berjalan).
 
 ### Logs — snapshot & live
 

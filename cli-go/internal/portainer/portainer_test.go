@@ -45,6 +45,19 @@ func TestTargetBase(t *testing.T) {
 	}
 }
 
+func TestShortID(t *testing.T) {
+	cases := map[string]string{
+		"abcdef0123456789ffff": "abcdef012345", // trimmed to 12
+		"abc":                  "abc",          // shorter than 12 unchanged
+		"":                     "",
+	}
+	for in, want := range cases {
+		if got := ShortID(in); got != want {
+			t.Errorf("ShortID(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestActionPaths(t *testing.T) {
 	// Every action exposed by the CLI must map to a server path.
 	for _, action := range []string{"restart-soft", "restart-recreate", "restart-repull", "sync-repull", "prune"} {

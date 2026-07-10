@@ -85,3 +85,23 @@ describe('GET portainer/logs/:id/stream — gate akses env', () => {
     expect(res.status).toBe(404)
   })
 })
+
+const inspectUrl = `http://localhost/api/envman/projects/${slug}/environments/prod/portainer/inspect/abc123`
+
+describe('GET portainer/inspect/:id — gate akses env', () => {
+  test('tanpa auth → 401', async () => {
+    const res = await app.handle(new Request(inspectUrl))
+    expect(res.status).toBe(401)
+  })
+
+  test('user tanpa akses env → 403', async () => {
+    const res = await app.handle(new Request(inspectUrl, { headers: authHeader(noCapToken) }))
+    expect(res.status).toBe(403)
+  })
+
+  test('env tanpa config → 404 (SUPER_ADMIN lolos gate akses)', async () => {
+    const url = `http://localhost/api/envman/projects/${slug}/environments/nonexistent/portainer/inspect/abc`
+    const res = await app.handle(new Request(url, { headers: authHeader(superToken) }))
+    expect(res.status).toBe(404)
+  })
+})
