@@ -51,7 +51,11 @@ export function StoragePanel({ slug, isOwner, canEdit, isSuperAdmin }: Props) {
   // Reset ke halaman 1 dan hapus seleksi setiap kali prefix berubah
   useEffect(() => { setPage(1); setSelectedPaths(new Set()) }, [prefix])
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['storage', slug, prefix] })
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['storage', slug, prefix] })
+    // Segarkan badge count/size di tab Storage (storageStats ada di project detail).
+    qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
+  }
 
   function toggleSelect(path: string) {
     setSelectedPaths((prev) => {

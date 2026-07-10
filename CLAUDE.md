@@ -199,6 +199,7 @@ Lapis override akses per-member untuk section non-env, **paralel** dengan [Env M
 
 - Kelola override: **OWNER project** (atau SUPER_ADMIN via admin parity).
 - `GET /projects/:slug` menambah field additive `sectionAccess: { NOTES, ALIASES, FILES, STORAGE }` (`ProjectRole | null`) untuk caller — FE pakai untuk sembunyikan tab yang denied.
+- `GET /projects/:slug` juga menambah field additive `storageStats: { fileCount, usedBytes }` (aggregate seluruh project) untuk badge count+size di tab Storage — **hanya dikirim bila `sectionAccess.STORAGE !== null`** (denied → `undefined`, tidak bocor). FE: badge `<count> · <size>` di `envmanager.$slug.index.lazy.tsx`; mutasi storage invalidate query `['envman','project',slug]` agar badge langsung segar.
 
 ### UI
 

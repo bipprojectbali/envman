@@ -18,6 +18,7 @@ import { ProjectDetailHeader } from '@/frontend/components/slug/ProjectDetailHea
 import { StoragePanel } from '@/frontend/components/slug/StoragePanel'
 import { hasCapability, useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/api'
+import { fmtBytes } from '@/frontend/lib/storage-format'
 
 export const Route = createLazyFileRoute('/envmanager/$slug/')({ component: ProjectDetailPage })
 
@@ -47,6 +48,7 @@ function ProjectDetailPage() {
   const totalVars = envs.reduce((s: number, e: { _count?: { vars: number } }) => s + (e._count?.vars ?? 0), 0)
   const memberCount: number = project?.members?.length ?? 0
   const projectTags: string[] = project?.tags ?? []
+  const storageStats: { fileCount: number; usedBytes: number } | undefined = project?.storageStats
 
   const { data: notesData } = useQuery({ queryKey: ['envman', 'notes', slug], queryFn: () => apiFetch<{ notes: unknown[] }>(`/api/envman/projects/${slug}/notes`), staleTime: 30_000 })
   const { data: aliasesData } = useQuery({ queryKey: ['envman', 'aliases', slug], queryFn: () => apiFetch<{ aliases: unknown[] }>(`/api/envman/projects/${slug}/aliases`), staleTime: 60_000 })
@@ -118,7 +120,13 @@ function ProjectDetailPage() {
               Members
             </Tabs.Tab>
             {canView(storageRole) && (
-              <Tabs.Tab value="storage" leftSection={<TbFolderOpen size={13} />}>
+              <Tabs.Tab value="storage" leftSection={<TbFolderOpen size={13} />}
+                rightSection={storageStats && storageStats.fileCount > 0 ? (
+                  <Badge size="xs" variant="light" color="primary"
+                    title={`${storageStats.fileCount} file · ${fmtBytes(storageStats.usedBytes)}`}>
+                    {storageStats.fileCount} · {fmtBytes(storageStats.usedBytes)}
+                  </Badge>
+                ) : undefined}>
                 Storage
               </Tabs.Tab>
             )}
