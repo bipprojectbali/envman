@@ -67,7 +67,7 @@ bun run start
 
 ## CLI
 
-The `envman` CLI injects environment variables at runtime from the server or local files.
+The `envman` CLI is written in Go (source in `cli-go/`, entry `cli-go/cmd/envman/main.go`). It injects environment variables at runtime from the server or local files.
 
 ```bash
 # Install (copy binary to PATH)
