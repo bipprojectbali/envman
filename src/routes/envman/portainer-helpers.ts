@@ -27,6 +27,25 @@ export function escapeEnvValue(val: string): string {
   return val.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
 }
 
+// Hitung ringkasan resource dari payload Docker stats (stream=false). Dipisah agar
+// endpoint inspect (env-scoped) & stats (connection-scoped) tak menduplikasi rumus.
+export function computeContainerStats(s: any) {
+  const cpuDelta = (s.cpu_stats?.cpu_usage?.total_usage ?? 0) - (s.precpu_stats?.cpu_usage?.total_usage ?? 0)
+  const systemDelta = (s.cpu_stats?.system_cpu_usage ?? 0) - (s.precpu_stats?.system_cpu_usage ?? 0)
+  const numCPUs = s.cpu_stats?.online_cpus ?? s.cpu_stats?.cpu_usage?.percpu_usage?.length ?? 1
+  const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * numCPUs * 100 : 0
+  const memUsage = s.memory_stats?.usage ?? 0
+  const memCache = s.memory_stats?.stats?.cache ?? 0
+  const memLimit = s.memory_stats?.limit ?? 0
+  const memPercent = memLimit > 0 ? ((memUsage - memCache) / memLimit) * 100 : 0
+  return {
+    cpuPercent: Math.round(cpuPercent * 10) / 10,
+    memUsageMB: Math.round((memUsage - memCache) / 1024 / 1024),
+    memLimitMB: Math.round(memLimit / 1024 / 1024),
+    memPercent: Math.round(memPercent * 10) / 10,
+  }
+}
+
 export function parseDockerLogStream(
   buf: Buffer,
   withTimestamps = true,
