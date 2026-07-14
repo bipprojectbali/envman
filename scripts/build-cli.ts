@@ -38,7 +38,11 @@ for (const { goos, goarch, out } of targets) {
       stdout: 'inherit',
       stderr: 'inherit',
       cwd: CLI_GO_DIR,
-      env: { ...process.env, GOOS: goos, GOARCH: goarch } as Record<string, string>,
+      // CGO_ENABLED=0 → statically-linked binary, no libc.so.6 dependency.
+      // Without this, CI (native linux + gcc) defaults to CGO_ENABLED=1 and
+      // dynamic-links to the build host's glibc, so the binary fails on older
+      // targets (e.g. Debian 11 glibc 2.31: "GLIBC_2.34 not found").
+      env: { ...process.env, GOOS: goos, GOARCH: goarch, CGO_ENABLED: '0' } as Record<string, string>,
     },
   )
   if (proc.exitCode !== 0) {
