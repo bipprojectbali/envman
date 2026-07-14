@@ -115,4 +115,29 @@ describe('clipboard endpoints', () => {
     expect((await clip('GET')).status).toBe(401)
     expect((await clip('PUT', undefined, { content: 'x' })).status).toBe(401)
   })
+
+  // Regression: a read-only API token still owns its account's clipboard.
+  // The clipboard is per-user scratch space, not shared project data, so
+  // canWrite (which protects vars/projects) must NOT gate it.
+  test('read-only API token can set/get/clear its own clipboard', async () => {
+    const roToken = crypto.randomUUID()
+    await prisma.apiToken.create({
+      data: { userId, name: 'ro-clip', token: roToken, canWrite: false, scopes: [] },
+    })
+    const bearer = (method: string, body?: unknown) =>
+      app.handle(
+        new Request('http://localhost/api/envman/clip', {
+          method,
+          headers: { 'Content-Type': 'application/json', authorization: `Bearer ${roToken}` },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+      )
+
+    const setRes = await bearer('PUT', { content: 'from-ro-token' })
+    expect(setRes.status).toBe(200)
+    const getRes = await bearer('GET')
+    expect(getRes.status).toBe(200)
+    expect(((await getRes.json()) as any).content).toBe('from-ro-token')
+    expect((await bearer('DELETE')).status).toBe(200)
+  })
 })

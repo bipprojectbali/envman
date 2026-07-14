@@ -40,10 +40,9 @@ export const clipboardRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    if (!caller.canWrite) {
-      set.status = 403
-      return { error: 'Token is read-only' }
-    }
+    // No canWrite gate: the clipboard is the caller's own per-user scratch space
+    // (keyed by userId, touches no shared project data), like Gists. A read-only
+    // token still owns its account's clipboard.
     const body = (await request.json().catch(() => null)) as { content?: string; ttlSeconds?: number } | null
     if (typeof body?.content !== 'string') {
       set.status = 400
@@ -79,10 +78,7 @@ export const clipboardRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    if (!caller.canWrite) {
-      set.status = 403
-      return { error: 'Token is read-only' }
-    }
+    // No canWrite gate — clearing your own clipboard, see PUT above.
     await prisma.clipboard.deleteMany({ where: { userId: caller.userId } })
     return { ok: true }
   })
