@@ -1,5 +1,6 @@
 import { buildAuthSection } from './cli-docs/auth'
 import { buildCicdSection } from './cli-docs/cicd'
+import { buildClipSection } from './cli-docs/clip'
 import { buildEnvSection } from './cli-docs/env'
 import { buildFilesAliasesSection } from './cli-docs/files-aliases'
 import { buildInjectSection } from './cli-docs/inject'
@@ -15,6 +16,7 @@ export function buildCliDocsMd(origin: string): string {
 ${buildAuthSection(origin)}
 ${buildInjectSection()}
 ${buildEnvSection()}
+${buildClipSection()}
 ${buildFilesAliasesSection(origin)}
 ${buildStorageSection()}
 ${buildPortainerSection()}

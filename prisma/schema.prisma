@@ -76,6 +76,7 @@ model User {
   gists                 Gist[]
   storageUploads        ProjectStorageObject[]
   createdProjects       Project[]             @relation("ProjectCreator")
+  clipboard             Clipboard?
 
   @@map("user")
 }
@@ -216,6 +217,21 @@ model Gist {
   @@index([userId])
   @@index([isPublic])
   @@map("gist")
+}
+
+// Account-scoped single-slot clipboard (like pbcopy/pbpaste, synced across
+// devices). One row per user (userId is PK). Content is encrypted at rest and
+// auto-expires at expiresAt (default 24h). See src/routes/envman/clipboard.ts.
+model Clipboard {
+  userId    String   @id
+  content   String   // encrypted: enc:iv:cipher:tag (src/lib/crypto.ts)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("clipboard")
 }
 
 // ─── Env Manager ──────────────────────────────────────────────────────────────

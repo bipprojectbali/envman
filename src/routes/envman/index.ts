@@ -7,6 +7,7 @@ import { accessMatrixRouter } from './access-matrix'
 import { adminUsersQueryRouter } from './admin-users-query'
 import { adminUsersRouter } from './admin-users'
 import { aliasesRouter } from './aliases'
+import { clipboardRouter } from './clipboard'
 import { databaseRouter } from './database'
 import { envImportsRouter } from './env-imports'
 import { envMembersRouter } from './env-members'
@@ -74,6 +75,7 @@ export const envmanRouter = new Elysia()
   .use(filesResolveRouter)
   .use(filesRouter)
   .use(gistsRouter)
+  .use(clipboardRouter)
   .use(databaseRouter)
   .use(adminUsersQueryRouter)
   .use(adminUsersRouter)

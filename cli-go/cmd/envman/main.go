@@ -108,6 +108,7 @@ Reference project files and aliases stored on the server.`, VERSION),
 		storageCmd(),
 		portainerCmd(),
 		envCmd(),
+		clipCmd(),
 	)
 
 	return root
