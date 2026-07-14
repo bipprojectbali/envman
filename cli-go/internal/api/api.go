@@ -149,6 +149,11 @@ func Put(cfg *auth.Config, path string, payload any, v any) error {
 	return sendJSON(cfg, "PUT", path, payload, v)
 }
 
+// Delete sends a DELETE request, ignoring the response body.
+func Delete(cfg *auth.Config, path string) error {
+	return sendJSON(cfg, "DELETE", path, nil, nil)
+}
+
 // sendJSON marshals payload, sends it with the given method, and unmarshals the
 // response into v (nil to ignore). Non-2xx responses become an [envman]-prefixed error.
 func sendJSON(cfg *auth.Config, method, path string, payload any, v any) error {

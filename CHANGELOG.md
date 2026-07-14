@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- **`envman clip` — clipboard akun lintas device (seperti pbcopy/pbpaste).** Clipboard slot-tunggal yang menempel di akun (bukan device), tersinkron via server — copy di satu mesin (`cat .env | envman clip set`), paste di mesin lain dengan akun sama (`envman clip get > .env`). Berguna terutama di server yang tak punya `pbcopy`. Konten **dienkripsi at-rest** (AES-256-GCM) dan **kedaluwarsa otomatis** (default 24 jam, `--ttl 30m|2h|7d`). Subperintah: `set [file]` (dari file/stdin, menimpa), `get [-o file]` (stdout atau file atomic, `--force` untuk timpa), `clear`. Batas ukuran (default 1 MB) dan TTL maksimum (default 7 hari) dapat diatur SUPER_ADMIN di `/dev > Settings` (`clipboard_max_kb`, `clipboard_max_ttl_hours`). Endpoint baru `GET/PUT/DELETE /api/envman/clip`; kedaluwarsa dibersihkan lazy (saat baca) + sweep periodik.
+
+### Database
+- Migration `20260714163134_add_clipboard` — tabel `clipboard` (PK `userId`, `content` terenkripsi, `expiresAt` + index untuk sweep, FK `ON DELETE CASCADE`). Idempotent, jalan otomatis saat startup.
+
 ## [0.21.2] - 2026-07-14
 
 ### Added

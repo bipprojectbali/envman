@@ -12,6 +12,8 @@ const ALLOWED_KEYS = [
   'token_activity_cap_per_token',
   'storage_max_file_mb',
   'storage_default_quota_mb',
+  'clipboard_max_kb',
+  'clipboard_max_ttl_hours',
 ] as const
 
 export const settingsRouter = new Elysia()

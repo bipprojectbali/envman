@@ -46,6 +46,7 @@ PostgreSQL via Prisma v6. Client singleton: `src/lib/db.ts` (`{ prisma }`). Sche
 - `PortainerConfig` (id, projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?, timestamps)
 - `AppSetting` (key PK, value, updatedAt, updatedById?) — konfigurasi global runtime (Dev > Settings)
 - `Gist` (id, userId, title, description, files Json `[{filename, content, language}]`, isPublic, tags[], timestamps). `isPublic=false` (default) = private; `true` = terlihat user lain. Edit/delete: owner atau SUPER_ADMIN.
+- `Clipboard` (userId PK, content, createdAt, expiresAt) — clipboard slot-tunggal per-user (`envman clip`). `content` **dienkripsi** (`enc:iv:cipher:tag`). Single-slot (PK userId → 1 per user, set = upsert overwrite). TTL default 24h, lazy-expire saat GET + sweep interval 1h. FK `ON DELETE CASCADE`. Lihat [Clipboard](#clipboard).
 - `EnvImport` (id, targetEnvId, sourceEnvId, order, createdById, createdAt) — unique(targetEnvId, sourceEnvId). Live-link referensi (bukan salinan), boleh lintas project. FK `ON DELETE CASCADE`. Lihat [Env Import](#env-import).
 - `ProjectStorageObject` (id, projectId, path, minioKey, size, mimeType, isPublic, tags[], description?, uploadedById, timestamps) — unique(projectId, path). `path` = path user, `minioKey` = `{projectId}/{path}`. `isPublic=true` → `/api/public/storage/:slug/:path` tanpa auth. Lihat [Project Storage](#project-storage).
 
@@ -362,11 +363,13 @@ Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()` di
 
 **Public Gists (no auth):** `GET /api/public/gists` (`?limit&cursor&search&tags&sort`) · `GET /api/public/gists/:id` (403 jika private) · `GET .../:id/raw/:filename`.
 
+**Clipboard:** `GET /api/envman/clip` (decrypt; expired → 404 + auto-delete lazy) · `PUT .../clip` `{content, ttlSeconds?}` (encrypt, upsert overwrite; size > `clipboard_max_kb` → 413; TTL clamp ke `clipboard_max_ttl_hours`; `canWrite` wajib) · `DELETE .../clip` (`canWrite`). User-level (nempel `userId`, bukan project). Lihat [Clipboard](#clipboard).
+
 **Conditional caching:** endpoint baca-resource kirim `ETag` + `Cache-Control` (+ `Last-Modified` bila ada) & support `If-None-Match`/`If-Modified-Since` → `304`. Helper: `src/lib/http-cache.ts` (`strongEtag`, `weakEtag`, `conditional`, `notModifiedResponse`). Di-cover: `gists/:id/raw` (strong), `public/gists/:id` (weak), `files/resolve` (weak, log tetap jalan sebelum 304), `aliases/resolve/:ref` (weak, **userId masuk hash** — per-caller), `/api/docs.md` (strong, `public, max-age=300`). **Tidak di-cover (sengaja):** vars, session, list endpoint, binary CLI download.
 
 **Storage:** `GET .../storage` (VIEWER+, `?prefix=`) · `POST .../storage/upload` (EDITOR+, ≤50 MB) · `POST .../storage/presign-upload` (EDITOR+, `{path, size, mimeType, noClobber?}`; `noClobber` + exist → 409) · `GET .../storage/download?path=` (VIEWER+, `{url, size, updatedAt}`) · `PATCH .../storage/meta` (EDITOR+; `isPublic` OWNER-only) · `PATCH .../storage/rename` (EDITOR+) · `PATCH .../storage/move` (EDITOR+, batch) · `DELETE .../storage?path=` (OWNER). **Public:** `GET /api/public/storage/:slug/:path` (302). **Chunked (>50 MB):** `POST .../storage/multipart/init|part|complete` · `DELETE .../storage/multipart/abort`. Validasi minioKey prefix per-project. Lihat [Project Storage](#project-storage).
 
-**Settings:** `GET /api/envman/settings` (public, key-value map) · `PUT /api/envman/settings` (SUPER_ADMIN, `[{key, value}]`) — key valid: `user_token_creation`, `user_token_max_days`, `storage_max_file_mb` (default 50), `storage_default_quota_mb` (default 500).
+**Settings:** `GET /api/envman/settings` (public, key-value map) · `PUT /api/envman/settings` (SUPER_ADMIN, `[{key, value}]`) — key valid: `user_token_creation`, `user_token_max_days`, `storage_max_file_mb` (default 50), `storage_default_quota_mb` (default 500), `clipboard_max_kb` (default 1024), `clipboard_max_ttl_hours` (default 168).
 
 ### Auth Endpoints
 
@@ -425,6 +428,10 @@ envman [options] -- <command>
 envman env push <project>:<env> [file]    # .env → server (upsert per-key; file/stdin). --dry-run · --plain K · --secret K · --no-detect
 envman env pull <project>:<env> [-o file] # server → .env (stdout/-o file). --force timpa file
 
+envman clip set [file]                    # .env/teks → clipboard akun (stdin/file). --ttl 30m|2h|7d (default 24h)
+envman clip get [-o file]                 # clipboard → stdout/-o file. --force timpa
+envman clip clear                         # kosongkan clipboard
+
 envman storage ls <project>[:prefix]
 envman storage upload <project> <file|dir> [--path p] [-n|--no-clobber]   # default overwrite
 envman storage download <project>:<path> [-o file]                         # default stdout
@@ -448,6 +455,8 @@ envman portainer sync-repull|prune <project>:<env>                         # pus
 - **push**: upsert per-key (key ada → update value; belum ada → create; key server yg tak ada di file **tak dihapus**). Env belum ada → auto-create via PUT. Baca `vars/export` dulu untuk hitung created/updated + preserve secret server.
 - **Auto-deteksi secret** dari nama key (`DetectSecret`): match `SECRET|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|CREDENTIAL|DATABASE_URL|_DSN|TOKEN` atau suffix `_KEY`; **kecuali** `PUBLIC_KEY`. Prioritas (`ClassifySecrets`): `--plain` menang > `--secret` > **secret server (server-wins, tak pernah turun)** > auto-deteksi. `--no-detect` matikan deteksi.
 - **pull**: `GET vars/export` → format `KEY=value` (quote bila ada spasi/`=`/`#`/newline). Secret ter-mask `***` (akses VIEWER) **dilewati** + warning stderr. `-o file` atomic (temp+rename, 0600), **tolak overwrite** kecuali `--force`.
+
+`clip` = clipboard slot-tunggal nempel di akun (lintas device, mirip pbcopy/pbpaste). Impl: `cli-go/internal/clipboard/` + `cmd/envman/clip_cmd.go`; server `src/routes/envman/clipboard.ts`. `set` menimpa (upsert), baca file/stdin; `get` → stdout atau `-o file` (atomic + `--force`, reuse `atomicWrite`); `clear` hapus. `--ttl` parse `30m|2h|7d`/detik. Konten **dienkripsi** (`encryptSecret`/`decryptSecret`, butuh `MASTER_KEY`). Guard `canWrite` untuk set/clear. Expiry dua lapis: lazy saat GET (expired → 404 + delete) + sweep `setInterval` 1h di `server.prod.ts`. Test: unit `internal/clipboard` (ParseTTL/HumanUntil), integration `tests/integration/envman-clipboard.test.ts` (encrypt/round-trip/TTL/expire/size/auth).
 
 **Catatan:** `envman mcp` sudah dihapus (MCP deprecated).
 

@@ -81,6 +81,17 @@ async function cleanupAuditLogs() {
 cleanupAuditLogs().catch(console.error)
 setInterval(() => cleanupAuditLogs().catch(console.error), 24 * 60 * 60 * 1000)
 
+// ─── Clipboard TTL Sweep ──────────────────────────────
+// Second layer of expiry (GET also lazily deletes). Hourly is fine — the row
+// is small and GET already refuses expired content.
+async function cleanupClipboards() {
+  const { count } = await prisma.clipboard.deleteMany({ where: { expiresAt: { lt: new Date() } } })
+  if (count > 0) console.log(`[Clipboard] Swept ${count} expired clipboard(s)`)
+}
+
+cleanupClipboards().catch(console.error)
+setInterval(() => cleanupClipboards().catch(console.error), 60 * 60 * 1000)
+
 // ─── Elysia App ────────────────────────────────────────
 import { createApp } from './app'
 
