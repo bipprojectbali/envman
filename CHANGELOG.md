@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **`envman clip set`/`clear` ditolak untuk token read-only ("Token is read-only").** Clipboard di-gate `canWrite` yang salah — `canWrite` melindungi data project/vars (resource bersama), sedangkan clipboard adalah scratch pribadi per-akun (nempel `userId`, tak menyentuh project). Akibatnya siapa pun dengan token read-only tak bisa memakai clipboard sama sekali. Gate dihapus (konsisten dengan Gist yang juga tak di-gate `canWrite`) — token read-only kini bisa set/clear clipboard-nya sendiri.
+
 ## [0.22.0] - 2026-07-14
 
 ### Added
