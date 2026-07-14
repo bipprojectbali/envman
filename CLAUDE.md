@@ -422,6 +422,9 @@ envman login <server-url> --token <token>   # logout · whoami · docs · update
 envman run [-e <source>]... <project>:<alias>
 envman [options] -- <command>
 
+envman env push <project>:<env> [file]    # .env → server (upsert per-key; file/stdin). --dry-run · --plain K · --secret K · --no-detect
+envman env pull <project>:<env> [-o file] # server → .env (stdout/-o file). --force timpa file
+
 envman storage ls <project>[:prefix]
 envman storage upload <project> <file|dir> [--path p] [-n|--no-clobber]   # default overwrite
 envman storage download <project>:<path> [-o file]                         # default stdout
@@ -440,6 +443,11 @@ envman portainer sync-repull|prune <project>:<env>                         # pus
 `portainer` (alias `pt`) = thin client atas endpoint env-scoped Portainer; server simpan connection/stack/endpoint per-env, CLI cukup `project:env`. `logs -f` konsumsi SSE (`data:` → stdout, Ctrl+C via `signal.NotifyContext` → context cancel → server auto-abort upstream). Impl: `cli-go/internal/portainer/` (`portainer.go`, `logs.go`) + `cmd/envman/portainer_cmd.go`.
 
 `storage exec` untuk binary (stdin/stdout/stderr inherit, args setelah `--`, exit code propagasi). **Cached** `~/.cache/envman/exec` (0700): reuse selama `size`+`updatedAt` cocok. Cache key = `sha256(server \x00 slug \x00 path)`. Prune LRU >500 MB. `--offline` (cache tanpa server), `--no-cache` (paksa download). Impl: `cli-go/internal/storage/exec.go` + `exec_cache.go`. Server `GET .../storage/download` kirim `{url, size, updatedAt}` validator.
+
+`env push/pull` = sinkron `.env` dgn environment, **CLI-only** (tak ada endpoint baru; reuse `PUT .../vars` bulk-upsert + `GET .../vars/export`). Impl: `cli-go/internal/envvars/` (`envvars.go`, `secret.go`, `format.go`) + `cmd/envman/env_cmd.go`; parse via `internal/envparser`.
+- **push**: upsert per-key (key ada → update value; belum ada → create; key server yg tak ada di file **tak dihapus**). Env belum ada → auto-create via PUT. Baca `vars/export` dulu untuk hitung created/updated + preserve secret server.
+- **Auto-deteksi secret** dari nama key (`DetectSecret`): match `SECRET|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|CREDENTIAL|DATABASE_URL|_DSN|TOKEN` atau suffix `_KEY`; **kecuali** `PUBLIC_KEY`. Prioritas (`ClassifySecrets`): `--plain` menang > `--secret` > **secret server (server-wins, tak pernah turun)** > auto-deteksi. `--no-detect` matikan deteksi.
+- **pull**: `GET vars/export` → format `KEY=value` (quote bila ada spasi/`=`/`#`/newline). Secret ter-mask `***` (akses VIEWER) **dilewati** + warning stderr. `-o file` atomic (temp+rename, 0600), **tolak overwrite** kecuali `--force`.
 
 **Catatan:** `envman mcp` sudah dihapus (MCP deprecated).
 

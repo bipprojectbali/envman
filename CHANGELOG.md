@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **`envman env push` / `envman env pull` — sinkron `.env` dengan environment.** `push <project>:<env> [file]` membaca `.env` (dari file atau stdin) dan meng-**upsert** tiap key ke environment: key yang ada diperbarui, key baru dibuat, key server yang tak ada di file dibiarkan (tidak dihapus). Environment yang belum ada dibuat otomatis. **Secret di-auto-deteksi dari nama key** (mengandung `SECRET`/`TOKEN`/`PASSWORD`/`API_KEY`/`CREDENTIAL`/`DATABASE_URL`/`_DSN` atau suffix `_KEY`; `PUBLIC_KEY` dikecualikan) lalu dienkripsi di server. Key yang sudah secret di server tetap secret walau heuristik meleset (server menang). Override: `--plain K`, `--secret K`, `--no-detect`; `--dry-run` untuk pratinjau. `pull <project>:<env>` mencetak vars sebagai `.env` ke stdout (atau `-o file`, atomic, tolak overwrite kecuali `--force`); secret yang tak bisa di-reveal (akses VIEWER) dilewati + warning ke stderr. Implementasi CLI-only — memakai endpoint `PUT/GET .../vars` yang sudah ada, tanpa perubahan server.
+
 ## [0.21.1] - 2026-07-14
 
 ### Fixed
