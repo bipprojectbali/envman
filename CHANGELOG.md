@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-07-14
+
 ### Fixed
 - **CLI gagal jalan di server dengan glibc lama (`GLIBC_2.34 not found`).** Build CLI (`scripts/build-cli.ts`) tidak menyetel `CGO_ENABLED=0`, sehingga saat di-compile di CI (Linux native + gcc, default `CGO_ENABLED=1`) binary jadi **dynamic-linked ke glibc** host build (Ubuntu terbaru). Akibatnya biner menolak jalan di distro lama seperti Debian 11 (glibc 2.31) — `version 'GLIBC_2.34' not found (required by envman)`. Kini semua target di-build dengan `CGO_ENABLED=0` → **statically-linked**, tanpa dependensi `libc.so.6`, portabel ke glibc versi berapa pun (dan musl/alpine). Terbukti: biner hasil build kini jalan di Debian 11.
 
