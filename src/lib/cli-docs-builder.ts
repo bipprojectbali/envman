@@ -1,9 +1,10 @@
 import { buildAuthSection } from './cli-docs/auth'
-import { buildInjectSection } from './cli-docs/inject'
-import { buildFilesAliasesSection } from './cli-docs/files-aliases'
-import { buildStorageSection } from './cli-docs/storage'
-import { buildPortainerSection } from './cli-docs/portainer'
 import { buildCicdSection } from './cli-docs/cicd'
+import { buildEnvSection } from './cli-docs/env'
+import { buildFilesAliasesSection } from './cli-docs/files-aliases'
+import { buildInjectSection } from './cli-docs/inject'
+import { buildPortainerSection } from './cli-docs/portainer'
+import { buildStorageSection } from './cli-docs/storage'
 import { buildTroubleshootSection } from './cli-docs/troubleshoot'
 
 export function buildCliDocsMd(origin: string): string {
@@ -13,6 +14,7 @@ export function buildCliDocsMd(origin: string): string {
 
 ${buildAuthSection(origin)}
 ${buildInjectSection()}
+${buildEnvSection()}
 ${buildFilesAliasesSection(origin)}
 ${buildStorageSection()}
 ${buildPortainerSection()}

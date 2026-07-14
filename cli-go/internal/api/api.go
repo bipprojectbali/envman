@@ -141,11 +141,22 @@ func FetchJSON(cfg *auth.Config, path string, v any) error {
 
 // Post sends a JSON POST request and unmarshals the response into v.
 func Post(cfg *auth.Config, path string, payload any, v any) error {
+	return sendJSON(cfg, "POST", path, payload, v)
+}
+
+// Put sends a JSON PUT request and unmarshals the response into v.
+func Put(cfg *auth.Config, path string, payload any, v any) error {
+	return sendJSON(cfg, "PUT", path, payload, v)
+}
+
+// sendJSON marshals payload, sends it with the given method, and unmarshals the
+// response into v (nil to ignore). Non-2xx responses become an [envman]-prefixed error.
+func sendJSON(cfg *auth.Config, method, path string, payload any, v any) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("POST", cfg.Server+path, strings.NewReader(string(data)))
+	req, err := http.NewRequest(method, cfg.Server+path, strings.NewReader(string(data)))
 	if err != nil {
 		return err
 	}

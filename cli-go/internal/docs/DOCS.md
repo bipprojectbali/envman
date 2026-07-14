@@ -183,6 +183,60 @@ System env (tertinggi, menang)
 ---
 
 
+## Env — Sinkron .env dengan Environment
+
+Push sebuah file `.env` lokal ke environment project (upsert per key), atau pull
+vars sebuah environment menjadi `.env`. Referensikan environment sebagai
+`project:env`.
+
+### Push (.env → server)
+
+```bash
+envman env push myapp:prod .env          # dari file
+envman env push myapp:prod < .env        # dari stdin
+cat .env | envman env push myapp:prod    # pipe
+envman env push myapp:prod .env --dry-run    # pratinjau tanpa mengubah apa pun
+```
+
+Perilaku **upsert**: key yang sudah ada diperbarui nilainya, key baru dibuat.
+Key yang ada di server tapi **tidak** ada di file **dibiarkan** (tidak dihapus).
+Environment yang belum ada akan dibuat otomatis.
+
+**Auto-deteksi secret** dari nama key (case-insensitive): key yang mengandung
+`SECRET`, `TOKEN`, `PASSWORD`, `PRIVATE_KEY`, `API_KEY`, `CREDENTIAL`,
+`DATABASE_URL`, `_DSN`, atau berakhiran `_KEY` akan ditandai secret (dienkripsi
+di server). Pengecualian: `PUBLIC_KEY` tetap plaintext.
+
+Key yang **sudah** secret di server tetap secret walau heuristik meleset
+(server menang). Override per key:
+
+```bash
+envman env push myapp:prod .env --plain PUBLIC_URL,BUILD_KEY   # paksa plaintext
+envman env push myapp:prod .env --secret LICENSE               # paksa secret
+envman env push myapp:prod .env --no-detect                    # matikan auto-deteksi
+```
+
+Gunakan `--dry-run` untuk melihat mana yang akan `create`/`update` dan mana yang
+jadi `[secret]` sebelum benar-benar push — disarankan sebelum push ke produksi.
+
+### Pull (server → .env)
+
+```bash
+envman env pull myapp:prod                # cetak ke stdout
+envman env pull myapp:prod > .env         # redirect ke file
+envman env pull myapp:prod -o .env        # tulis ke file (atomic)
+envman env pull myapp:prod -o .env --force    # timpa file yang sudah ada
+```
+
+Nilai yang mengandung spasi, `=`, `#`, atau newline otomatis dikutip
+(`KEY="..."`). Dengan `-o`, penulisan bersifat atomik dan **menolak menimpa**
+file yang sudah ada kecuali `--force`.
+
+Secret yang **tidak bisa kamu reveal** (akses VIEWER menerima `***`) akan
+**dilewati** dan dilaporkan ke stderr — sehingga `.env` yang dihasilkan tetap
+valid. Untuk mengambil nilai secret asli, kamu butuh akses EDITOR/OWNER.
+
+
 ## Eksekusi File Project (tanpa simpan ke disk)
 
 File yang tersimpan di project (tab Files) bisa langsung dieksekusi — content di-stream ke interpreter via stdin, tidak pernah ditulis ke disk.
