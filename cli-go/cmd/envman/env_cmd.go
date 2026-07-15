@@ -25,8 +25,28 @@ Secrets are auto-detected from key names (e.g. *_TOKEN, *_KEY, *PASSWORD*,
 *SECRET*, DATABASE_URL). Keys already stored as secret on the server stay
 secret. Override per key with --plain / --secret, or disable with --no-detect.`,
 	}
-	cmd.AddCommand(envPushCmd(), envPullCmd())
+	cmd.AddCommand(envPushCmd(), envPullCmd(), envKeysCmd())
 	return cmd
+}
+
+// looksLikeTarget reports whether arg is a project:env ref rather than a file
+// path. Same idea as `envman run` file-vs-target disambiguation: a ":" with a
+// non-empty slug and env, no path separator around the colon (rules out both
+// "./dir:name" paths and Windows "C:\path" drives).
+func looksLikeTarget(arg string) bool {
+	idx := strings.IndexByte(arg, ':')
+	if idx <= 0 || idx == len(arg)-1 {
+		return false
+	}
+	// A separator before the colon means it's a path (e.g. ./dir:name).
+	if strings.ContainsAny(arg[:idx], "/\\") {
+		return false
+	}
+	// A separator right after the colon means a drive/path (e.g. C:\path, a:/b).
+	if arg[idx+1] == '/' || arg[idx+1] == '\\' {
+		return false
+	}
+	return true
 }
 
 // splitCSVSet parses "A,B,C" flag values into a set.
@@ -167,6 +187,50 @@ and reported to stderr.`,
 	}
 	cmd.Flags().StringVarP(&outFile, "output", "o", "", "Write to file instead of stdout")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite output file if it exists")
+	return cmd
+}
+
+func envKeysCmd() *cobra.Command {
+	var names bool
+	cmd := &cobra.Command{
+		Use:   "keys <file|project:env>",
+		Short: "Print only the keys (no values) of a .env or environment",
+		Long: `Print the key names of a local .env file or a server environment, without any
+values. The source is a file path, or a project:env reference (auto-detected by
+the ":"). Handy for giving an AI agent the shape of an env without leaking
+secrets — pipe it to your clipboard or paste it into a prompt.
+
+Default output is a paste-ready template (KEY=); use --names for bare names.`,
+		Example: "  envman env keys .env\n" +
+			"  envman env keys myapp:prod\n" +
+			"  envman env keys myapp:prod --names\n" +
+			"  envman env keys myapp:prod | envman clip set",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var vars map[string]string
+			if looksLikeTarget(args[0]) {
+				t, err := envvars.ParseTarget(args[0])
+				if err != nil {
+					return err
+				}
+				cfg, err := auth.Resolve()
+				if err != nil {
+					return err
+				}
+				if vars, err = envvars.FetchExisting(cfg, t); err != nil {
+					return err
+				}
+			} else {
+				var err error
+				if vars, err = envparser.ParseFile(args[0]); err != nil {
+					return err
+				}
+			}
+			fmt.Print(envvars.FormatKeys(vars, names))
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&names, "names", false, "Print bare key names instead of KEY= template")
 	return cmd
 }
 
