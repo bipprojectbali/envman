@@ -1,140 +1,133 @@
-import { Box, Container, Group, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core'
-import {
-  TbBrandDocker,
-  TbBrandGithub,
-  TbCode,
-  TbFiles,
-  TbFolder,
-  TbKey,
-  TbNote,
-  TbRefresh,
-  TbServer,
-  TbShield,
-  TbTerminal2,
-  TbUsers,
-  TbVariable,
-} from 'react-icons/tb'
+import { Badge, Box, Container, Group, Stack, Text, ThemeIcon, Title } from '@mantine/core'
+import { TbArrowsExchange, TbBrandDocker, TbFolder, TbKey, TbLock, TbTerminal2, TbUsersGroup } from 'react-icons/tb'
+import classes from './HomeFeaturesSection.module.css'
 
-const features = [
-  {
-    icon: TbShield,
-    color: 'violet',
-    title: 'Encrypted at Rest',
-    description:
-      'Secret vars dienkripsi dengan AES-256-GCM sebelum disimpan ke database. Plaintext tidak pernah menyentuh disk.',
-  },
-  {
-    icon: TbCode,
-    color: 'blue',
-    title: 'Runtime Injection',
-    description:
-      'envman -e myapp:production -- bun start. Tidak ada perubahan di kode aplikasi, tidak ada library tambahan.',
-  },
-  {
-    icon: TbTerminal2,
-    color: 'indigo',
-    title: 'Aliases & Scripts',
-    description:
-      'Simpan perintah panjang sebagai alias. envman run myapp:deploy — expand dan eksekusi. Script bisa langsung dari project Files tanpa menyentuh disk.',
-  },
-  {
-    icon: TbFiles,
-    color: 'blue',
-    title: 'Project Files',
-    description:
-      'Simpan scripts, config, dan template per project. Eksekusi langsung: envman -- bash myapp:scripts/deploy.sh. Konten di-pipe via stdin, zero disk write.',
-  },
-  {
-    icon: TbNote,
-    color: 'grape',
-    title: 'Notes & Docs',
-    description: 'Dokumentasi runbook, deployment guide, atau apapun per project. Markdown support, tag, dan search.',
-  },
-  {
-    icon: TbBrandGithub,
-    color: 'dark',
-    title: 'Gists',
-    description:
-      'Simpan dan bagikan snippet multi-file dengan syntax highlight. Private secara default, atau set public agar terlihat anggota lain. Tag dan search.',
-  },
-  {
-    icon: TbUsers,
-    color: 'teal',
-    title: 'Role-Based Access',
-    description:
-      'Owner, Editor, Viewer per project. Viewer hanya melihat ***, Editor bisa reveal dan edit secara langsung.',
-  },
-  {
-    icon: TbBrandDocker,
-    color: 'cyan',
-    title: 'Portainer Integration',
-    description: 'Push semua vars ke Docker stack dalam satu klik. Sync otomatis menginject via env_file ke container.',
-  },
-  {
-    icon: TbKey,
-    color: 'orange',
-    title: 'API Tokens',
-    description: 'Token ter-scope per project:env atau global. Pilih read-only atau read-write, tambahkan expiry date.',
-  },
-  {
-    icon: TbRefresh,
-    color: 'teal',
-    title: 'Auto-Update CLI',
-    description:
-      'Binary CLI auto-update di background setiap ada versi baru. Tidak perlu reinstall manual — envman update jika butuh update paksa.',
-  },
-  {
-    icon: TbFolder,
-    color: 'indigo',
-    title: 'Project Storage',
-    description:
-      'envman storage — simpan file per project di MinIO. Upload/download/exec dari CLI, binary di-cache lokal. Kuota per project, file public tanpa login.',
-  },
-  {
-    icon: TbBrandDocker,
-    color: 'violet',
-    title: 'Kontrol Portainer',
-    description:
-      'envman portainer — operasikan stack Portainer per env dari CLI. Status container, live logs, restart, repull, prune — cukup project:env.',
-  },
-  {
-    icon: TbServer,
-    color: 'pink',
-    title: 'Self-Hosted',
-    description: 'Data sepenuhnya ada di server kamu sendiri. Tidak ada pihak ketiga yang menyentuh secrets-mu.',
-  },
-]
+function CellHead({ icon: Icon, color, title }: { icon: typeof TbLock; color: string; title: string }) {
+  return (
+    <Group gap="sm" mb="xs">
+      <ThemeIcon size={38} radius="md" variant="light" color={color}>
+        <Icon size={19} />
+      </ThemeIcon>
+      <Text fw={700} size="sm">
+        {title}
+      </Text>
+    </Group>
+  )
+}
 
 export function HomeFeaturesSection() {
   return (
-    <Container size="lg" py={{ base: 60, md: 80 }}>
+    <Container size="lg" py={{ base: 60, md: 80 }} id="features">
       <Stack gap="xl">
         <Stack align="center" gap="xs">
+          <Text size="sm" fw={700} tt="uppercase" style={{ letterSpacing: '0.08em' }} c="primary">
+            Features
+          </Text>
           <Title order={2} ta="center" fw={700}>
-            Semua yang kamu butuhkan
+            Secrets management yang lengkap
           </Title>
-          <Text c="dimmed" ta="center" maw={480}>
-            Dirancang untuk tim yang serius soal secrets management dan tidak mau kompromi soal keamanan.
+          <Text c="dimmed" ta="center" maw={520}>
+            Dari enkripsi sampai kontrol akses granular, CLI, hingga operasi infrastruktur — semua dalam satu tempat.
           </Text>
         </Stack>
 
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-          {features.map((f) => (
+        {/* Bento: anchor cell (encryption) spans 2 cols on lg, then varied cells. */}
+        <Box className={classes.bento}>
+          {/* Anchor — Encryption (big) */}
+          <Box className={classes.cell}>
+            <CellHead icon={TbLock} color="teal" title="End-to-end encryption" />
+            <Text size="sm" c="dimmed" lh={1.6} mb="md">
+              Var yang ditandai <strong>secret</strong> dienkripsi AES-256-GCM sebelum menyentuh database. MASTER_KEY
+              tinggal di server-mu — kami secara harfiah tak bisa mendekripsinya.
+            </Text>
             <Box
-              key={f.title}
-              p="md"
-              style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+              style={{
+                background: '#0c0c0f',
+                border: '1px solid #26262b',
+                borderRadius: 8,
+                padding: '10px 14px',
+                fontFamily: 'monospace',
+                fontSize: 11.5,
+                color: '#c9d1d9',
+                overflowX: 'auto',
+              }}
             >
-              <Group gap="sm" mb="xs">
-                <ThemeIcon size={36} variant="light" color={f.color} radius="md">
-                  <f.icon size={18} />
-                </ThemeIcon>
-                <Text fw={600} size="sm">{f.title}</Text>
-              </Group>
-              <Text size="sm" c="dimmed" lh={1.65}>{f.description}</Text>
+              <Text component="span" c="teal.4" ff="monospace" fz={11.5}>
+                DB_PASSWORD
+              </Text>
+              {'  '}
+              <Text component="span" ff="monospace" fz={11.5} c="dimmed">
+                enc:9f2a1c…:c71b0e…:af3e77…
+              </Text>
             </Box>
-          ))}
-        </SimpleGrid>
+          </Box>
+
+          {/* CLI inject */}
+          <Box className={classes.cell}>
+            <CellHead icon={TbTerminal2} color="violet" title="CLI inject" />
+            <Text size="sm" c="dimmed" lh={1.6}>
+              Jalankan perintah apa pun dengan env yang tepat, tanpa <code>.env</code> di disk.
+            </Text>
+            <Text mt="sm" ff="monospace" fz={11.5} c="dimmed" style={{ whiteSpace: 'nowrap', overflowX: 'auto' }}>
+              $ envman -e web:prod -- bun start
+            </Text>
+          </Box>
+
+          {/* Granular access */}
+          <Box className={classes.cell}>
+            <CellHead icon={TbUsersGroup} color="blue" title="Granular access" />
+            <Text size="sm" c="dimmed" lh={1.6}>
+              Izin per-project, per-environment, dan per-section. Secure-by-default: anggota baru default deny.
+            </Text>
+            <Group gap={6} mt="sm">
+              <Badge size="xs" variant="light" color="gray">
+                ~ inherit
+              </Badge>
+              <Badge size="xs" variant="light" color="blue">
+                V·E·O
+              </Badge>
+              <Badge size="xs" variant="light" color="red">
+                ✕ denied
+              </Badge>
+            </Group>
+          </Box>
+
+          {/* Env sync + import */}
+          <Box className={classes.cell}>
+            <CellHead icon={TbArrowsExchange} color="grape" title="Sync & live-link" />
+            <Text size="sm" c="dimmed" lh={1.6}>
+              <code>env push/pull</code> menyinkronkan <code>.env</code>. Env Import meminjam vars dari env lain secara
+              live — lintas project, tanpa duplikasi.
+            </Text>
+          </Box>
+
+          {/* Storage */}
+          <Box className={classes.cell}>
+            <CellHead icon={TbFolder} color="teal" title="Project storage" />
+            <Text size="sm" c="dimmed" lh={1.6}>
+              Simpan config, skrip, & file di samping secret (MinIO). Upload chunked &gt;50MB, quota per-project, dan{' '}
+              <code>storage exec</code> binary ter-cache.
+            </Text>
+          </Box>
+
+          {/* Portainer */}
+          <Box className={classes.cell}>
+            <CellHead icon={TbBrandDocker} color="indigo" title="Portainer control" />
+            <Text size="sm" c="dimmed" lh={1.6}>
+              Status, live logs, restart, repull, prune stack Docker — langsung dari CLI dengan
+              <code> project:env</code>. Bukan sekadar sync vars.
+            </Text>
+          </Box>
+
+          {/* Account clipboard */}
+          <Box className={classes.cell}>
+            <CellHead icon={TbKey} color="orange" title="Account clipboard" />
+            <Text size="sm" c="dimmed" lh={1.6}>
+              <code>envman clip</code> — pbcopy/pbpaste lintas device. Terenkripsi, auto-expire. Copy di server, paste
+              di laptop.
+            </Text>
+          </Box>
+        </Box>
       </Stack>
     </Container>
   )

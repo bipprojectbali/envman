@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **Landing page ditulis ulang total — lebih kaya, informatif, dan menarik.** Dari 3 section tipis (hero + features + install) menjadi alur lengkap: Hero (dengan mock terminal + install one-liner) → Trust strip → Problem → How it works (Define→Encrypt→Inject) → Bento features → CLI showcase (tabbed terminal per grup command) → Security (selling point: "trust math, not us") → Use-cases (persona) → Integrations strip → Guide + cheatsheet → FAQ → CTA. Menampilkan fitur yang sebelumnya tak ada di landing: `env push/pull/keys`, `clip`, `projects`, `docs`, Env Import live-link, granular/section permissions, values-hidden-by-default, audit trail. Copy bilingual (headline/istilah Inggris + penjelasan Indonesia), visual SVG/mock (zero copyright), dark/light adaptif, responsif. Cheatsheet CLI dilengkapi command yang sebelumnya hilang.
+
 ## [0.22.4] - 2026-07-15
 
 ### Added
