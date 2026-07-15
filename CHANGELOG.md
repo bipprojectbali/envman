@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.22.4] - 2026-07-15
+
+### Added
+- **`envman projects` — daftar project & environment dari CLI.** `projects ls` menampilkan semua project yang bisa kamu akses (slug, nama, jumlah env, role-mu, pembuat); `--me` memfilter hanya yang kamu buat; `-q` mencetak slug polos (pipe-friendly). `projects envs <slug>` (atau shortcut `projects <slug>`) menampilkan environment sebuah project beserta role akses dan jumlah var; `-q` untuk nama env polos. Alias `envman project`. CLI-only — memakai endpoint `GET /projects` yang sudah ada, hanya menampilkan yang boleh diakses.
+
 ## [0.22.3] - 2026-07-15
 
 ### Changed
