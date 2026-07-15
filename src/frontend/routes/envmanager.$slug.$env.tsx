@@ -75,6 +75,7 @@ function VarsPage() {
     cliCommand, allFilteredSelected, projectName,
     copyToClipboard, toggleSelect, toggleSelectAll, clearSelection,
     toggleReveal, startEdit, cancelEdit,
+    revealAllPlain, toggleRevealAllPlain, showValue,
   } = useVarsPageState(slug, env, integrationsOpen)
 
   const {
@@ -164,7 +165,8 @@ function VarsPage() {
       clearSelection={clearSelection} toggleSelect={toggleSelect} toggleSelectAll={toggleSelectAll}
       editingId={editingId} editForm={editForm} setEditForm={setEditForm}
       updateVar={updateVar} cancelEdit={cancelEdit} startEdit={startEdit}
-      revealed={revealed} toggleReveal={toggleReveal}
+      revealed={revealed} toggleReveal={toggleReveal} showValue={showValue}
+      revealAllPlain={revealAllPlain} toggleRevealAllPlain={toggleRevealAllPlain}
       toggleDisabled={toggleDisabled} deleteVar={deleteVar}
     />
   )

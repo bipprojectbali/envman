@@ -2,6 +2,8 @@ import { ActionIcon, Badge, Group, Menu, Select, Stack, Text, TextInput, Tooltip
 import {
   TbCheck,
   TbCopy,
+  TbEye,
+  TbEyeOff,
   TbFilter,
   TbGitCompare,
   TbKey,
@@ -38,6 +40,8 @@ interface Props {
   isOwner: boolean
   plainCount: number
   secretCount: number
+  revealAllPlain: boolean
+  toggleRevealAllPlain: () => void
   openCompare: () => void
   openImportMgr: () => void
   openBulk: () => void
@@ -70,6 +74,8 @@ export function VarsToolbar({
   isOwner,
   plainCount,
   secretCount,
+  revealAllPlain,
+  toggleRevealAllPlain,
   openCompare,
   openImportMgr,
   openBulk,
@@ -159,7 +165,11 @@ export function VarsToolbar({
                   <Menu.Label>Export sebagai .env</Menu.Label>
                   <Menu.Item
                     leftSection={<TbCopy size={14} />}
-                    rightSection={<Badge size="xs" variant="light" color="gray">{vars.length}</Badge>}
+                    rightSection={
+                      <Badge size="xs" variant="light" color="gray">
+                        {vars.length}
+                      </Badge>
+                    }
                     onClick={() => copyToClipboard(toEnvText(vars), setCopiedAll)}
                   >
                     Semua variabel
@@ -167,7 +177,11 @@ export function VarsToolbar({
                   {filteredVars.length < vars.length && (
                     <Menu.Item
                       leftSection={<TbFilter size={14} />}
-                      rightSection={<Badge size="xs" variant="light" color="blue">{filteredVars.length}</Badge>}
+                      rightSection={
+                        <Badge size="xs" variant="light" color="blue">
+                          {filteredVars.length}
+                        </Badge>
+                      }
                       onClick={() => copyToClipboard(toEnvText(filteredVars), setCopiedAll)}
                     >
                       Hasil filter
@@ -191,7 +205,11 @@ export function VarsToolbar({
                   <Menu.Label>Export hanya key (KEY=)</Menu.Label>
                   <Menu.Item
                     leftSection={<TbKey size={14} />}
-                    rightSection={<Badge size="xs" variant="light" color="grape">{vars.length}</Badge>}
+                    rightSection={
+                      <Badge size="xs" variant="light" color="grape">
+                        {vars.length}
+                      </Badge>
+                    }
                     onClick={() => copyToClipboard(toKeyTemplate(vars), setCopiedKeys)}
                   >
                     Semua key
@@ -199,7 +217,11 @@ export function VarsToolbar({
                   {filteredVars.length < vars.length && (
                     <Menu.Item
                       leftSection={<TbKey size={14} />}
-                      rightSection={<Badge size="xs" variant="light" color="grape">{filteredVars.length}</Badge>}
+                      rightSection={
+                        <Badge size="xs" variant="light" color="grape">
+                          {filteredVars.length}
+                        </Badge>
+                      }
                       onClick={() => copyToClipboard(toKeyTemplate(filteredVars), setCopiedKeys)}
                     >
                       Key hasil filter
@@ -225,6 +247,18 @@ export function VarsToolbar({
               <Tooltip label="Bandingkan dengan .env local">
                 <ActionIcon size="sm" variant="subtle" color="grape" radius="md" onClick={openCompare}>
                   <TbGitCompare size={14} />
+                </ActionIcon>
+              </Tooltip>
+
+              <Tooltip label={revealAllPlain ? 'Sembunyikan semua nilai' : 'Tampilkan semua nilai (kecuali secret)'}>
+                <ActionIcon
+                  size="sm"
+                  variant="subtle"
+                  color={revealAllPlain ? 'blue' : 'gray'}
+                  radius="md"
+                  onClick={toggleRevealAllPlain}
+                >
+                  {revealAllPlain ? <TbEye size={14} /> : <TbEyeOff size={14} />}
                 </ActionIcon>
               </Tooltip>
             </>
