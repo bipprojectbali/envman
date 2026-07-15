@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **Nilai variabel disembunyikan secara default di halaman vars.** Sebelumnya value `plain` (client ID, fingerprint SHA, dsb) selalu tampil terang — rawan terlihat saat screenshot/screen-share. Kini **semua** value tersembunyi default (`••••`), dengan tombol mata per-baris untuk mengungkap satu, dan tombol **"Tampilkan semua nilai"** di toolbar untuk mengungkap seluruh value `plain` sekaligus. **Secret tetap terpisah** — tidak ikut terbuka oleh tombol global, harus diungkap per-baris (cegah rahasia terpampang massal tak sengaja). Preferensi "tampilkan semua" disimpan per-browser (localStorage) sehingga bertahan antar env/reload. Tombol copy tetap menyalin nilai asli walau tampilan tersembunyi.
+
 ## [0.22.2] - 2026-07-15
 
 ### Added

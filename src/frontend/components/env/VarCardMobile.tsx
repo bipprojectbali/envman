@@ -2,7 +2,7 @@ import { ActionIcon, Badge, Box, Code, CopyButton, Group, Stack, Text } from '@m
 import { TbCheck, TbCopy, TbEye, TbEyeOff, TbLink, TbLock, TbSquare, TbSquareCheckFilled } from 'react-icons/tb'
 import { toEnvLine } from '@/frontend/lib/env-clipboard'
 import { type EnvVar, relTime } from '@/frontend/types/env'
-import { VarCardActionRow, VarCardEditForm, type EditForm, type UpdateVarInput } from './VarCardActions'
+import { type EditForm, type UpdateVarInput, VarCardActionRow, VarCardEditForm } from './VarCardActions'
 
 interface Props {
   filteredVars: EnvVar[]
@@ -21,6 +21,7 @@ interface Props {
   startEdit: (v: EnvVar) => void
   revealed: Set<string>
   toggleReveal: (id: string) => void
+  showValue: (v: { id: string; isSecret: boolean }) => boolean
   toggleDisabled: { mutate: (key: string) => void; isPending: boolean; variables?: string }
   deleteVar: (key: string) => void
 }
@@ -42,6 +43,7 @@ export function VarCardMobile({
   startEdit,
   revealed,
   toggleReveal,
+  showValue,
   toggleDisabled,
   deleteVar,
 }: Props) {
@@ -128,36 +130,53 @@ export function VarCardMobile({
                 cursor: canEdit ? 'pointer' : undefined,
               }}
             >
-              {v.isSecret ? (
-                <Group gap={6} justify="space-between" wrap="nowrap">
-                  <Text
-                    fz="xs"
-                    ff="monospace"
-                    c={revealed.has(v.id) ? undefined : 'dimmed'}
-                    style={{ letterSpacing: revealed.has(v.id) ? undefined : 3, userSelect: 'none', flex: 1 }}
-                  >
-                    {revealed.has(v.id) ? v.value : '••••••••••'}
-                  </Text>
-                  <ActionIcon
-                    size={28}
-                    variant="subtle"
-                    color={revealed.has(v.id) ? 'blue' : 'gray'}
-                    onClick={() => toggleReveal(v.id)}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                    style={{ flexShrink: 0 }}
-                  >
-                    {revealed.has(v.id) ? <TbEyeOff size={14} /> : <TbEye size={14} />}
-                  </ActionIcon>
-                </Group>
-              ) : (
-                <Text fz="xs" ff="monospace" style={{ wordBreak: 'break-all' }}>
-                  {v.value || (
-                    <Text span c="dimmed" fs="italic">
-                      (kosong)
+              {(() => {
+                // Hidden by default; showValue() honors per-value reveal + the
+                // global "show all plain" flag (secrets stay per-value).
+                const shown = showValue(v)
+                const maskable = v.value !== '' && v.value !== '***'
+                return (
+                  <Group gap={6} justify="space-between" wrap="nowrap">
+                    <Text
+                      fz="xs"
+                      ff="monospace"
+                      c={shown ? undefined : 'dimmed'}
+                      style={{
+                        letterSpacing: shown ? undefined : 3,
+                        userSelect: shown ? undefined : 'none',
+                        wordBreak: 'break-all',
+                        flex: 1,
+                      }}
+                    >
+                      {shown ? (
+                        v.value || (
+                          <Text span c="dimmed" fs="italic">
+                            (kosong)
+                          </Text>
+                        )
+                      ) : maskable ? (
+                        '••••••••••'
+                      ) : (
+                        <Text span c="dimmed" fs="italic">
+                          (kosong)
+                        </Text>
+                      )}
                     </Text>
-                  )}
-                </Text>
-              )}
+                    {maskable && v.value !== '***' && (
+                      <ActionIcon
+                        size={28}
+                        variant="subtle"
+                        color={shown ? 'blue' : 'gray'}
+                        onClick={() => toggleReveal(v.id)}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        style={{ flexShrink: 0 }}
+                      >
+                        {shown ? <TbEyeOff size={14} /> : <TbEye size={14} />}
+                      </ActionIcon>
+                    )}
+                  </Group>
+                )
+              })()}
             </Box>
 
             <VarCardActionRow
@@ -191,7 +210,13 @@ export function VarCardMobile({
                 {v.key}
               </Code>
               {v.isSecret && (
-                <Badge size="xs" color="red" variant="light" leftSection={<TbLock size={9} />} style={{ flexShrink: 0 }}>
+                <Badge
+                  size="xs"
+                  color="red"
+                  variant="light"
+                  leftSection={<TbLock size={9} />}
+                  style={{ flexShrink: 0 }}
+                >
                   secret
                 </Badge>
               )}

@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@/frontend/lib/api'
+import { computeShowValue } from '@/frontend/lib/value-visibility'
 import type { EnvVar, FilterType } from '@/frontend/types/env'
 
 export function useVarsPageState(slug: string, env: string, integrationsOpen: boolean) {
@@ -9,6 +10,12 @@ export function useVarsPageState(slug: string, env: string, integrationsOpen: bo
   const [bulkAllSecret, setBulkAllSecret] = useState(false)
   const [editEnvText, setEditEnvText] = useState('')
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
+  // Global "show all plain values" preference, persisted per-browser. Values are
+  // hidden by default (safer for screenshots/screen-share); secrets always stay
+  // per-value reveal regardless of this flag.
+  const [revealAllPlain, setRevealAllPlain] = useState<boolean>(
+    () => localStorage.getItem('envman:revealAllPlain') === 'true',
+  )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ value: '', isSecret: false })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -31,11 +38,16 @@ export function useVarsPageState(slug: string, env: string, integrationsOpen: bo
     queryFn: () => apiFetch('/api/envman/status'),
     staleTime: 60000,
   })
-  useEffect(() => { setVarsPage(1) }, [])
+  useEffect(() => {
+    setVarsPage(1)
+  }, [])
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['envman', 'vars', slug, env, varsPage, search],
-    queryFn: () => apiFetch(`/api/envman/projects/${slug}/environments/${env}/vars?limit=${VARS_LIMIT}&offset=${(varsPage - 1) * VARS_LIMIT}${search ? `&search=${encodeURIComponent(search)}` : ''}`),
+    queryFn: () =>
+      apiFetch(
+        `/api/envman/projects/${slug}/environments/${env}/vars?limit=${VARS_LIMIT}&offset=${(varsPage - 1) * VARS_LIMIT}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
+      ),
     refetchInterval: 15000,
     placeholderData: keepPreviousData,
   })
@@ -59,8 +71,12 @@ export function useVarsPageState(slug: string, env: string, integrationsOpen: bo
   const importedRows: EnvVar[] = (data?.imported ?? []).map(
     (v: { key: string; value: string; isSecret: boolean; sourceProject: string; sourceEnv: string }, i: number) => ({
       id: `imported:${v.sourceProject}:${v.sourceEnv}:${v.key}:${i}`,
-      key: v.key, value: v.value, isSecret: v.isSecret, isDisabled: false,
-      updatedAt: new Date(0).toISOString(), imported: true,
+      key: v.key,
+      value: v.value,
+      isSecret: v.isSecret,
+      isDisabled: false,
+      updatedAt: new Date(0).toISOString(),
+      imported: true,
       source: { project: v.sourceProject, env: v.sourceEnv },
     }),
   )
@@ -84,7 +100,10 @@ export function useVarsPageState(slug: string, env: string, integrationsOpen: bo
 
   const importedDisplay: EnvVar[] = (() => {
     let list = importedRows
-    if (search) { const q = search.toLowerCase(); list = list.filter((v) => v.key.toLowerCase().includes(q) || v.value.toLowerCase().includes(q)) }
+    if (search) {
+      const q = search.toLowerCase()
+      list = list.filter((v) => v.key.toLowerCase().includes(q) || v.value.toLowerCase().includes(q))
+    }
     if (filterType === 'plain') list = list.filter((v) => !v.isSecret)
     if (filterType === 'secret') list = list.filter((v) => v.isSecret)
     if (filterDisabled === 'disabled') list = []
@@ -102,14 +121,32 @@ export function useVarsPageState(slug: string, env: string, integrationsOpen: bo
   const projectName: string = projectData?.project?.name ?? slug
 
   const copyToClipboard = (text: string, setCopied: (v: boolean) => void) =>
-    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) })
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
   const toggleSelect = (id: string) =>
-    setSelectedIds((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+    setSelectedIds((prev) => {
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
   const toggleSelectAll = () =>
     setSelectedIds((prev) => (prev.size === filteredVars.length ? new Set() : new Set(filteredVars.map((v) => v.id))))
   const clearSelection = () => setSelectedIds(new Set())
   const toggleReveal = (id: string) =>
-    setRevealed((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+    setRevealed((prev) => {
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
+  const toggleRevealAllPlain = () =>
+    setRevealAllPlain((prev) => {
+      const next = !prev
+      localStorage.setItem('envman:revealAllPlain', String(next))
+      return next
+    })
+  const showValue = (v: { id: string; isSecret: boolean }) => computeShowValue(v, revealed, revealAllPlain)
   const startEdit = (v: EnvVar) => {
     setEditingId(v.id)
     setEditForm({ value: v.isSecret && !revealed.has(v.id) ? '' : v.value, isSecret: v.isSecret })
@@ -117,19 +154,68 @@ export function useVarsPageState(slug: string, env: string, integrationsOpen: bo
   const cancelEdit = () => setEditingId(null)
 
   return {
-    form, setForm, bulkText, setBulkText, bulkAllSecret, setBulkAllSecret,
-    editEnvText, setEditEnvText, revealed, editingId, setEditingId,
-    editForm, setEditForm, selectedIds, search, setSearch,
-    filterType, setFilterType, filterDisabled, setFilterDisabled,
-    sort, setSort, varsPage, setVarsPage, VARS_LIMIT,
-    copiedAll, setCopiedAll, copiedSelected, setCopiedSelected, copiedKeys, setCopiedKeys,
-    portainerData, historyData, isFetching, refetch,
-    canEdit, isOwner, encryptionEnabled,
-    vars, importedRows, importedKeySet, deniedImports, varsTotal, varsTotalPages,
-    filteredVars, importedDisplay,
-    plainCount, secretCount, disabledCount, activeCount,
-    cliCommand, allFilteredSelected, projectName,
-    copyToClipboard, toggleSelect, toggleSelectAll, clearSelection,
-    toggleReveal, startEdit, cancelEdit,
+    form,
+    setForm,
+    bulkText,
+    setBulkText,
+    bulkAllSecret,
+    setBulkAllSecret,
+    editEnvText,
+    setEditEnvText,
+    revealed,
+    editingId,
+    setEditingId,
+    editForm,
+    setEditForm,
+    selectedIds,
+    search,
+    setSearch,
+    filterType,
+    setFilterType,
+    filterDisabled,
+    setFilterDisabled,
+    sort,
+    setSort,
+    varsPage,
+    setVarsPage,
+    VARS_LIMIT,
+    copiedAll,
+    setCopiedAll,
+    copiedSelected,
+    setCopiedSelected,
+    copiedKeys,
+    setCopiedKeys,
+    portainerData,
+    historyData,
+    isFetching,
+    refetch,
+    canEdit,
+    isOwner,
+    encryptionEnabled,
+    vars,
+    importedRows,
+    importedKeySet,
+    deniedImports,
+    varsTotal,
+    varsTotalPages,
+    filteredVars,
+    importedDisplay,
+    plainCount,
+    secretCount,
+    disabledCount,
+    activeCount,
+    cliCommand,
+    allFilteredSelected,
+    projectName,
+    copyToClipboard,
+    toggleSelect,
+    toggleSelectAll,
+    clearSelection,
+    toggleReveal,
+    startEdit,
+    cancelEdit,
+    revealAllPlain,
+    toggleRevealAllPlain,
+    showValue,
   }
 }
