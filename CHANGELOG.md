@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-07-15
+
 ### Added
 - **`envman env keys <file|project:env>` — cetak nama key saja, tanpa value.** Menampilkan daftar key dari sebuah `.env` lokal atau environment server tanpa membocorkan value apa pun — berguna untuk memberi AI agent *bentuk* sebuah env (agent tahu key yang dibutuhkan) tanpa menyerahkan rahasianya. Sumber dideteksi otomatis: argumen berpola `project:env` diambil dari server, selain itu dianggap path file. Output default template `KEY=` (sama dengan tombol "Copy keys" di UI), `--names` untuk nama polos. Komposabel: `envman env keys myapp:prod | pbcopy` atau `| envman clip set` (ke clipboard akun lintas device). CLI-only, reuse endpoint `vars/export` yang sudah ada.
 
