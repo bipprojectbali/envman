@@ -5,6 +5,7 @@ import { buildEnvSection } from './cli-docs/env'
 import { buildFilesAliasesSection } from './cli-docs/files-aliases'
 import { buildInjectSection } from './cli-docs/inject'
 import { buildPortainerSection } from './cli-docs/portainer'
+import { buildProjectsSection } from './cli-docs/projects'
 import { buildStorageSection } from './cli-docs/storage'
 import { buildTroubleshootSection } from './cli-docs/troubleshoot'
 
@@ -14,6 +15,7 @@ export function buildCliDocsMd(origin: string): string {
 > Dokumentasi khusus CLI. Untuk referensi API server dan konfigurasi self-hosting, lihat \`${origin}/api/docs.md\`.
 
 ${buildAuthSection(origin)}
+${buildProjectsSection()}
 ${buildInjectSection()}
 ${buildEnvSection()}
 ${buildClipSection()}
