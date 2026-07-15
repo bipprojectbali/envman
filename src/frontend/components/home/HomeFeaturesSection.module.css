@@ -1,0 +1,37 @@
+/* Bento grid: 1 col on mobile, 2 on tablet, 3 on desktop.
+   The anchor cell (first child) spans 2 columns on desktop. */
+.bento {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 48em) {
+  .bento {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 62em) {
+  .bento {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .bento > :first-child {
+    grid-column: span 2;
+  }
+}
+
+.cell {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--mantine-color-body);
+  padding: var(--mantine-spacing-lg);
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+
+.cell:hover {
+  border-color: var(--mantine-color-primary-filled);
+  transform: translateY(-2px);
+}

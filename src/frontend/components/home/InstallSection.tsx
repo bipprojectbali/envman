@@ -19,18 +19,29 @@ export function InstallSection({ versionData, origin }: Props) {
   return (
     <Box
       id="install"
-      style={{ borderTop: '1px solid var(--mantine-color-default-border)', borderBottom: '1px solid var(--mantine-color-default-border)' }}
+      style={{
+        borderTop: '1px solid var(--mantine-color-default-border)',
+        borderBottom: '1px solid var(--mantine-color-default-border)',
+      }}
       py={{ base: 48, md: 64 }}
     >
       <Container size="md">
         <Stack gap="xl">
           <Stack align="center" gap="xs">
-            <ThemeIcon size={44} variant="gradient" radius="md"><TbDownload size={22} /></ThemeIcon>
-            <Text fw={700} size="xl" ta="center">Install CLI</Text>
+            <ThemeIcon size={44} variant="gradient" radius="md">
+              <TbDownload size={22} />
+            </ThemeIcon>
+            <Text fw={700} size="xl" ta="center">
+              Install CLI
+            </Text>
             {versionData?.version && (
               <Group justify="center" gap="xs">
-                <Badge variant="light" color="primary" size="sm">CLI v{versionData.version}</Badge>
-                <Badge variant="outline" color="gray" size="sm">auto-update built-in</Badge>
+                <Badge variant="light" color="primary" size="sm">
+                  CLI v{versionData.version}
+                </Badge>
+                <Badge variant="outline" color="gray" size="sm">
+                  auto-update built-in
+                </Badge>
               </Group>
             )}
             <Text c="dimmed" ta="center" maw={480}>
@@ -39,7 +50,9 @@ export function InstallSection({ versionData, origin }: Props) {
           </Stack>
 
           <Stack gap="xs">
-            <Text size="sm" fw={600}>Linux &amp; macOS — satu command, auto-detect platform:</Text>
+            <Text size="sm" fw={600}>
+              Linux &amp; macOS — satu command, auto-detect platform:
+            </Text>
             <CodeBlock code={`curl -fsSL ${origin}/install | bash`} />
           </Stack>
 
@@ -47,18 +60,36 @@ export function InstallSection({ versionData, origin }: Props) {
 
           <Tabs defaultValue="linux-x64" variant="pills" radius="md">
             <Tabs.List mb="md">
-              <Tabs.Tab value="linux-x64" leftSection={<TbTerminal size={13} />}>Linux x64</Tabs.Tab>
-              <Tabs.Tab value="linux-arm64" leftSection={<TbTerminal size={13} />}>Linux ARM64</Tabs.Tab>
-              <Tabs.Tab value="darwin-arm64" leftSection={<TbTerminal size={13} />}>macOS Apple Silicon</Tabs.Tab>
-              <Tabs.Tab value="darwin-x64" leftSection={<TbTerminal size={13} />}>macOS Intel</Tabs.Tab>
-              <Tabs.Tab value="windows-x64" leftSection={<TbBrandWindows size={13} />}>Windows</Tabs.Tab>
+              <Tabs.Tab value="linux-x64" leftSection={<TbTerminal size={13} />}>
+                Linux x64
+              </Tabs.Tab>
+              <Tabs.Tab value="linux-arm64" leftSection={<TbTerminal size={13} />}>
+                Linux ARM64
+              </Tabs.Tab>
+              <Tabs.Tab value="darwin-arm64" leftSection={<TbTerminal size={13} />}>
+                macOS Apple Silicon
+              </Tabs.Tab>
+              <Tabs.Tab value="darwin-x64" leftSection={<TbTerminal size={13} />}>
+                macOS Intel
+              </Tabs.Tab>
+              <Tabs.Tab value="windows-x64" leftSection={<TbBrandWindows size={13} />}>
+                Windows
+              </Tabs.Tab>
             </Tabs.List>
             {(Object.entries(installCmds) as [string, string][]).map(([platform, cmd]) => (
               <Tabs.Panel key={platform} value={platform}>
                 <Stack gap="sm">
                   <CodeBlock code={cmd} />
                   <Group gap="xs">
-                    <Button component="a" href={`${origin}/download/cli/${platform}`} size="xs" variant="light" color="primary" leftSection={<TbDownload size={13} />} download>
+                    <Button
+                      component="a"
+                      href={`${origin}/download/cli/${platform}`}
+                      size="xs"
+                      variant="light"
+                      color="primary"
+                      leftSection={<TbDownload size={13} />}
+                      download
+                    >
                       Download binary langsung
                     </Button>
                   </Group>

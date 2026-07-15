@@ -1,13 +1,30 @@
-import { Box, Button, Group, Text, Tooltip } from '@mantine/core'
+import { Box, Button, CopyButton, Group, Text, Tooltip } from '@mantine/core'
 import { TbCheck, TbCopy } from 'react-icons/tb'
-import { CopyButton } from '@mantine/core'
 
 export function CodeBlock({ code, label }: { code: string; label?: string }) {
   return (
     <Box>
-      {label && <Text size="xs" c="dimmed" mb={4}>{label}</Text>}
+      {label && (
+        <Text size="xs" c="dimmed" mb={4}>
+          {label}
+        </Text>
+      )}
       <Group gap={6} align="flex-start">
-        <Box style={{ flex: 1, background: '#0d0d0d', border: '1px solid #2a2a2a', borderRadius: 6, padding: '10px 14px', fontFamily: "'Courier New', Courier, monospace", fontSize: 12, lineHeight: 1.7, color: '#c9d1d9', overflowX: 'auto', whiteSpace: 'pre' }}>
+        <Box
+          style={{
+            flex: 1,
+            background: '#0d0d0d',
+            border: '1px solid #2a2a2a',
+            borderRadius: 6,
+            padding: '10px 14px',
+            fontFamily: "'Courier New', Courier, monospace",
+            fontSize: 12,
+            lineHeight: 1.7,
+            color: '#c9d1d9',
+            overflowX: 'auto',
+            whiteSpace: 'pre',
+          }}
+        >
           {code}
         </Box>
         <CopyButton value={code}>
