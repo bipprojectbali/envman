@@ -236,6 +236,26 @@ Secret yang **tidak bisa kamu reveal** (akses VIEWER menerima `***`) akan
 **dilewati** dan dilaporkan ke stderr — sehingga `.env` yang dihasilkan tetap
 valid. Untuk mengambil nilai secret asli, kamu butuh akses EDITOR/OWNER.
 
+### Keys (nama key saja, tanpa value)
+
+Cetak **hanya nama key** dari sebuah `.env` lokal atau environment server —
+tanpa value sama sekali. Berguna untuk memberi tahu AI agent *bentuk* sebuah env
+tanpa membocorkan rahasia: tinggal paste daftar key-nya.
+
+```bash
+envman env keys .env                      # dari file lokal → KEY=
+envman env keys myapp:prod                # dari server → KEY=
+envman env keys myapp:prod --names        # nama saja: DATABASE_URL (tanpa =)
+envman env keys .env | pbcopy             # ke clipboard OS
+envman env keys myapp:prod | envman clip set   # ke clipboard akun (lintas device)
+```
+
+Sumber dideteksi otomatis: argumen dengan pola `project:env` diambil dari server,
+selain itu dianggap path file. Output default adalah template `KEY=` (siap diisi,
+sama dengan tombol "Copy keys" di UI); `--names` mencetak nama key polos. Value
+**tidak pernah** dikeluarkan — aman dibagikan ke agent atau sebagai dokumentasi.
+Karena hanya nama key, akses VIEWER pun cukup.
+
 
 ## Clip — Clipboard Akun Lintas Device
 

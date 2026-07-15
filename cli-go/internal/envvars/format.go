@@ -34,6 +34,28 @@ func FormatEnv(vars map[string]string) (out string, masked []string) {
 	return b.String(), masked
 }
 
+// FormatKeys renders just the keys (no values) of vars, sorted, one per line.
+// With names=false the output is a paste-ready .env template (KEY=); with
+// names=true it is the bare key names (KEY). Values are never emitted, so this
+// is safe to share with AI agents or as documentation without leaking secrets.
+func FormatKeys(vars map[string]string, names bool) string {
+	keys := make([]string, 0, len(vars))
+	for k := range vars {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	for _, k := range keys {
+		b.WriteString(k)
+		if !names {
+			b.WriteByte('=')
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
 // quoteIfNeeded wraps a value in double quotes when it contains characters that
 // would break a bare KEY=value line, escaping " and newlines.
 func quoteIfNeeded(v string) string {

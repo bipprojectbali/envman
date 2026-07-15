@@ -5,6 +5,40 @@ import (
 	"testing"
 )
 
+func TestFormatKeys(t *testing.T) {
+	vars := map[string]string{"PORT": "3000", "API_KEY": "secret", "DATABASE_URL": "x"}
+
+	t.Run("template default (KEY=)", func(t *testing.T) {
+		got := FormatKeys(vars, false)
+		want := "API_KEY=\nDATABASE_URL=\nPORT=\n"
+		if got != want {
+			t.Errorf("FormatKeys(template) = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("names only", func(t *testing.T) {
+		got := FormatKeys(vars, true)
+		want := "API_KEY\nDATABASE_URL\nPORT\n"
+		if got != want {
+			t.Errorf("FormatKeys(names) = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("never leaks values", func(t *testing.T) {
+		for _, out := range []string{FormatKeys(vars, false), FormatKeys(vars, true)} {
+			if strings.Contains(out, "3000") || strings.Contains(out, "secret") {
+				t.Errorf("output leaked a value: %q", out)
+			}
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		if got := FormatKeys(map[string]string{}, false); got != "" {
+			t.Errorf("empty = %q, want empty", got)
+		}
+	})
+}
+
 func TestFormatEnv(t *testing.T) {
 	vars := map[string]string{
 		"PORT":         "3000",

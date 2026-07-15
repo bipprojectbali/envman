@@ -427,6 +427,7 @@ envman [options] -- <command>
 
 envman env push <project>:<env> [file]    # .env → server (upsert per-key; file/stdin). --dry-run · --plain K · --secret K · --no-detect
 envman env pull <project>:<env> [-o file] # server → .env (stdout/-o file). --force timpa file
+envman env keys <file|project:env>        # cetak KEY saja (no value) dari file/server. --names = nama polos
 
 envman clip set [file]                    # .env/teks → clipboard akun (stdin/file). --ttl 30m|2h|7d (default 24h)
 envman clip get [-o file]                 # clipboard → stdout/-o file. --force timpa
@@ -455,6 +456,7 @@ envman portainer sync-repull|prune <project>:<env>                         # pus
 - **push**: upsert per-key (key ada → update value; belum ada → create; key server yg tak ada di file **tak dihapus**). Env belum ada → auto-create via PUT. Baca `vars/export` dulu untuk hitung created/updated + preserve secret server.
 - **Auto-deteksi secret** dari nama key (`DetectSecret`): match `SECRET|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|CREDENTIAL|DATABASE_URL|_DSN|TOKEN` atau suffix `_KEY`; **kecuali** `PUBLIC_KEY`. Prioritas (`ClassifySecrets`): `--plain` menang > `--secret` > **secret server (server-wins, tak pernah turun)** > auto-deteksi. `--no-detect` matikan deteksi.
 - **pull**: `GET vars/export` → format `KEY=value` (quote bila ada spasi/`=`/`#`/newline). Secret ter-mask `***` (akses VIEWER) **dilewati** + warning stderr. `-o file` atomic (temp+rename, 0600), **tolak overwrite** kecuali `--force`.
+- **keys**: cetak **nama key saja tanpa value** dari file lokal ATAU `project:env` (deteksi via `looksLikeTarget`: ada `:`, slug+env non-kosong, tak ada separator sekitar `:` → server; else file). Default `KEY=` (template), `--names` = nama polos. Value tak pernah keluar → aman untuk AI agent. Reuse `envparser.ParseFile`/`FetchExisting` + `FormatKeys`. VIEWER cukup (nama key bukan secret).
 
 `clip` = clipboard slot-tunggal nempel di akun (lintas device, mirip pbcopy/pbpaste). Impl: `cli-go/internal/clipboard/` + `cmd/envman/clip_cmd.go`; server `src/routes/envman/clipboard.ts`. `set` menimpa (upsert), baca file/stdin; `get` → stdout atau `-o file` (atomic + `--force`, reuse `atomicWrite`); `clear` hapus. `--ttl` parse `30m|2h|7d`/detik. Konten **dienkripsi** (`encryptSecret`/`decryptSecret`, butuh `MASTER_KEY`). **Tidak** di-gate `canWrite` (clipboard = scratch pribadi per-user, bukan data project bersama — token read-only tetap bisa set/clear). Expiry dua lapis: lazy saat GET (expired → 404 + delete) + sweep `setInterval` 1h di `server.prod.ts`. Test: unit `internal/clipboard` (ParseTTL/HumanUntil), integration `tests/integration/envman-clipboard.test.ts` (encrypt/round-trip/TTL/expire/size/auth/RO-token).
 
