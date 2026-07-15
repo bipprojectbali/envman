@@ -8,9 +8,10 @@ interface HomeHeroSectionProps {
   loginRoute: string
 }
 
-const INSTALL = 'curl -fsSL https://your-server/install | sh'
-
 export function HomeHeroSection({ versionData, loginRoute }: HomeHeroSectionProps) {
+  // Real origin so the copied command works as-is (Linux/macOS auto-detect).
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://your-server'
+  const install = `curl -fsSL ${origin}/install | sh`
   return (
     <Box style={{ position: 'relative', overflow: 'hidden' }}>
       {/* Soft gradient glow behind the hero (decorative, theme-safe via light vars). */}
@@ -96,9 +97,9 @@ export function HomeHeroSection({ versionData, loginRoute }: HomeHeroSectionProp
                   <Text component="span" c="dimmed">
                     ${' '}
                   </Text>
-                  {INSTALL}
+                  {install}
                 </Text>
-                <CopyButton value={INSTALL}>
+                <CopyButton value={install}>
                   {({ copied, copy }) => (
                     <Tooltip label={copied ? 'Tersalin!' : 'Copy'}>
                       <Button
@@ -115,6 +116,12 @@ export function HomeHeroSection({ versionData, loginRoute }: HomeHeroSectionProp
                   )}
                 </CopyButton>
               </Group>
+              <Text size="xs" c="dimmed" mt={6}>
+                Linux &amp; macOS — auto-detect.{' '}
+                <Text component="a" href="#install" inherit c="primary" style={{ textDecoration: 'none' }}>
+                  Windows &amp; platform lain →
+                </Text>
+              </Text>
             </Box>
 
             <Group gap="lg" mt={4}>
