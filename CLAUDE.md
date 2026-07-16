@@ -432,6 +432,8 @@ envman env keys <file|project:env>        # cetak KEY saja (no value) dari file/
 envman projects ls [--me] [-q]            # daftar project (--me = buatan sendiri; -q = slug polos)
 envman projects [envs] <slug> [-q]        # daftar env di project (role + jumlah var). `projects <slug>` = shortcut envs
 
+envman health [dir]                       # scan file terlalu besar utk konteks AI (lokal). --copy critical|warning|all → path
+
 envman clip set [file]                    # .env/teks → clipboard akun (stdin/file). --ttl 30m|2h|7d (default 24h)
 envman clip get [-o file]                 # clipboard → stdout/-o file. --force timpa
 envman clip clear                         # kosongkan clipboard
@@ -464,6 +466,8 @@ envman portainer sync-repull|prune <project>:<env>                         # pus
 `clip` = clipboard slot-tunggal nempel di akun (lintas device, mirip pbcopy/pbpaste). Impl: `cli-go/internal/clipboard/` + `cmd/envman/clip_cmd.go`; server `src/routes/envman/clipboard.ts`. `set` menimpa (upsert), baca file/stdin; `get` → stdout atau `-o file` (atomic + `--force`, reuse `atomicWrite`); `clear` hapus. `--ttl` parse `30m|2h|7d`/detik. Konten **dienkripsi** (`encryptSecret`/`decryptSecret`, butuh `MASTER_KEY`). **Tidak** di-gate `canWrite` (clipboard = scratch pribadi per-user, bukan data project bersama — token read-only tetap bisa set/clear). Expiry dua lapis: lazy saat GET (expired → 404 + delete) + sweep `setInterval` 1h di `server.prod.ts`. Test: unit `internal/clipboard` (ParseTTL/HumanUntil), integration `tests/integration/envman-clipboard.test.ts` (encrypt/round-trip/TTL/expire/size/auth/RO-token).
 
 `projects` (alias `project`) = daftar project & env, **CLI-only** (reuse `GET /projects` + `GET /projects/:slug` + `whoami`). Impl: `cli-go/internal/projects/` + `cmd/envman/projects_cmd.go`. `ls` (table slug/name/#env/role/pembuat; `--me` filter `createdById==whoami.userId` via `FilterMine`; `-q` slug polos pipeable) · `envs <slug>` (table env/role/#var) · `projects <slug>` = shortcut ke `envs` (bare arg di parent `RunE`). Menampilkan hanya yang boleh diakses caller (server sudah filter). Test: unit `FilterMine` (`internal/projects`).
+
+`health` = scan project **lokal** (bukan server, tanpa login) untuk file terlalu besar bagi konteks agent AI. Impl: `cli-go/internal/health/health.go` (pure) + `cmd/envman/health_cmd.go`. Status `ok`(<80%)/`warning`(80-99%)/`critical`(≥100%) atas max(baris%, char%); default 500 baris/20k char, override `--max-lines`/`--max-chars`. **Skip**: hard-skip dir dependency/build (`node_modules`/`.git`/`dist`/`vendor`/dll, via `WalkDir`+`SkipDir` → cepat), hidden dir (kecuali `--all`), file biner (null-byte + ekstensi), file >5MB, kedalaman >`--depth` (default 20, `0`=unlimited; skip dicetak ke stderr — no silent cap). `WalkDir` tak follow symlink → loop aman. **`--copy critical|warning|all`** cetak path bersih (pipeable ke agent/`clip set`); `all`=warning+critical. `--ext ts,tsx,go` whitelist (default: semua teks). Berbeda dari File Health web (`/api/admin/file-health`, scan codebase server envman via UI). Test: unit `internal/health` (statusFor/ParseExts/countFile/skip/depth).
 
 **Catatan:** `envman mcp` sudah dihapus (MCP deprecated).
 
