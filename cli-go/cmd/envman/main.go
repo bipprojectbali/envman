@@ -110,6 +110,7 @@ Reference project files and aliases stored on the server.`, VERSION),
 		envCmd(),
 		clipCmd(),
 		projectsCmd(),
+		healthCmd(),
 	)
 
 	return root

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **`envman health` — cari file yang terlalu besar untuk konteks AI agent.** Memindai project lokal (tak perlu login) dan melaporkan file yang jumlah baris/karakternya mendekati atau melewati batas — file yang membludakkan context window agent. Status `ok`/`warning` (≥80%)/`critical` (≥100%), default 500 baris / 20.000 karakter (override `--max-lines`/`--max-chars`). Dependency & build dir (`node_modules`, `.git`, `dist`, `vendor`, dst) dan file biner otomatis dilewati; traversal berhenti di kedalaman 20 (`--depth 0` = tanpa batas) — direktori yang dilewati dilaporkan ke stderr. **`--copy critical|warning|all`** mencetak hanya path (satu per baris) supaya bisa langsung di-pipe ke agent AI (`| pbcopy` atau `| envman clip set`) untuk diminta split. `--ext ts,tsx,go` membatasi ekstensi; `--status` memfilter tampilan. CLI-only; berbeda dari File Health web di Dev Console (yang memindai codebase server envman).
+
 ## [0.22.5] - 2026-07-15
 
 ### Changed
