@@ -24,7 +24,8 @@ export async function appLog(level: LogLevel, message: string, detail?: string) 
     timestamp: new Date().toISOString(),
   }
   await redis.lpush(REDIS_KEY, JSON.stringify(entry))
-  await redis.ltrim(REDIS_KEY, 0, MAX_ENTRIES - 1)
+  // Bun.RedisClient lacks a native ltrim binding; use the generic send().
+  await redis.send('LTRIM', [REDIS_KEY, '0', String(MAX_ENTRIES - 1)])
 }
 
 export async function getAppLogs(options?: {
@@ -35,7 +36,8 @@ export async function getAppLogs(options?: {
   const limit = options?.limit ?? 100
   // Fetch more than needed if filtering
   const fetchCount = options?.level || options?.afterId ? MAX_ENTRIES : limit
-  const raw = await redis.lrange(REDIS_KEY, 0, fetchCount - 1)
+  // Bun.RedisClient lacks a native lrange binding; use the generic send().
+  const raw: string[] = await redis.send('LRANGE', [REDIS_KEY, '0', String(fetchCount - 1)])
 
   let logs: AppLogEntry[] = raw.map((s: string) => JSON.parse(s))
 
