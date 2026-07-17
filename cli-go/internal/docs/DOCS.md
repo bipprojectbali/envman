@@ -393,7 +393,18 @@ Tak perlu login — semua dibaca dari mesin lokal.
 ```bash
 envman sys            # ringkasan berwarna
 envman sys --json     # snapshot mesin-readable (pipe ke agent / monitor)
+envman sys --du .     # + ukuran footprint project (cwd)
+envman sys --du ./app # + ukuran footprint direktori tertentu
 ```
+
+### Ukuran project (--du)
+
+`--du <dir>` menambah blok **footprint disk** sebuah direktori: total ukuran +
+rincian per entri top-level (mis. `node_modules`, `.git`, `dist`) diurutkan dari
+terbesar — langsung kelihatan subdir mana yang bikin project membengkak. Berbeda
+dari `envman health` yang justru **melewati** dir dependency; di sini mereka
+sengaja **ditampilkan**. Symlink tak diikuti (aman dari loop); entri tak terbaca
+dilewati. Maks 12 baris teratas, sisanya dilipat jadi "(N entri lainnya)".
 
 ### Status
 
@@ -416,7 +427,8 @@ envman sys --json | jq '.disks[]'       # olah lebih lanjut
 ### Flag
 
 ```
---json    cetak snapshot sebagai JSON
+--json      cetak snapshot sebagai JSON
+--du <dir>  tambah footprint disk direktori (total + rincian subdir)
 ```
 
 > Membaca **mesin lokal saja**. Untuk memeriksa stack remote, pakai `envman pt`
