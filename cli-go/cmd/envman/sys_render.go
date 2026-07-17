@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"text/tabwriter"
+	"strings"
 
 	"github.com/bipprojectbali/envman/cli/internal/sysstat"
 )
@@ -17,6 +17,10 @@ const (
 	cDim    = "\033[2m"
 	cBold   = "\033[1m"
 )
+
+// labelWidth is the fixed width of the left label column; every content column
+// starts at the same offset so the output reads as one aligned table.
+const labelWidth = 6
 
 // statusColor maps a status to its ANSI color.
 func statusColor(s sysstat.Status) string {
@@ -42,61 +46,153 @@ func statusIcon(s sysstat.Status) string {
 	}
 }
 
-func printSysReport(r sysstat.Report) {
-	// Header line with overall verdict.
-	overall := r.Overall()
-	fmt.Printf("%s%s %s%s  %s%s%s\n",
-		statusColor(overall), statusIcon(overall), r.Host.Hostname, cReset,
-		cDim, sysLabel(overall), cReset)
+// labeledRow prints one "<label>  <content>" line with the label bolded and
+// padded to labelWidth so content aligns across sections.
+func labeledRow(label, content string) {
+	fmt.Printf("  %s%-*s%s%s\n", cBold, labelWidth, label, cReset, content)
+}
 
-	// Host block.
-	fmt.Printf("%shost%s   %s %s (%s) · kernel %s · up %s\n",
-		cBold, cReset, r.Host.Platform, r.Host.Version, r.Host.Arch,
-		r.Host.Kernel, r.Host.UptimeHuman)
-	if r.Host.Virtualization != "" {
-		fmt.Printf("       %svirt: %s%s\n", cDim, r.Host.Virtualization, cReset)
+// labeledBlock prints a multi-row section: the label appears on the first row,
+// continuation rows get a blank (but equally wide) label column.
+func labeledBlock(label string, rows []string) {
+	for i, row := range rows {
+		l := label
+		if i > 0 {
+			l = ""
+		}
+		labeledRow(l, row)
 	}
+}
 
-	// Identity block (current user, active sessions, network addresses).
+// usageBar renders a fixed-width [████······] gauge colored by status.
+func usageBar(pct float64, s sysstat.Status) string {
+	const w = 10
+	filled := int(pct/100*float64(w) + 0.5)
+	if filled > w {
+		filled = w
+	}
+	if filled < 0 {
+		filled = 0
+	}
+	return "[" + statusColor(s) + strings.Repeat("█", filled) + cReset +
+		cDim + strings.Repeat("·", w-filled) + cReset + "]"
+}
+
+// shareBar renders a fixed-width, neutral gauge showing a fraction of a whole
+// (used for directory footprint shares — not a health signal, so uncolored).
+func shareBar(pct float64) string {
+	const w = 8
+	filled := int(pct/100*float64(w) + 0.5)
+	if filled > w {
+		filled = w
+	}
+	if filled < 0 {
+		filled = 0
+	}
+	return cBold + strings.Repeat("█", filled) + cReset + cDim + strings.Repeat("·", w-filled) + cReset
+}
+
+func printSysReport(r sysstat.Report) {
+	overall := r.Overall()
+
+	// Header: status dot + hostname + verdict, then a dim detail line.
+	fmt.Printf("%s%s %s%s%s  %s·%s  %s%s%s\n",
+		statusColor(overall), statusIcon(overall), cBold, r.Host.Hostname, cReset,
+		cDim, cReset, statusColor(overall), sysLabel(overall), cReset)
+	detail := fmt.Sprintf("%s %s · %s · kernel %s · up %s",
+		r.Host.Platform, r.Host.Version, r.Host.Arch, r.Host.Kernel, r.Host.UptimeHuman)
+	if r.Host.Virtualization != "" {
+		detail += " · virt " + r.Host.Virtualization
+	}
+	fmt.Printf("  %s%s%s\n", cDim, detail, cReset)
+
+	// Identity group.
+	fmt.Println()
 	printIdentity(r.Identity, r.Host.Hostname)
 
-	// CPU block.
-	fmt.Printf("%scpu%s    %s · %d cores (%d logical) · %.0f%% busy · load %s%.2f%s / %.2f / %.2f\n",
-		cBold, cReset, cpuModel(r.CPU.Model), r.CPU.CoresPhysical, r.CPU.CoresLogical,
-		r.CPU.UsedPercent, statusColor(r.CPU.LoadStatus), r.CPU.Load1, cReset,
-		r.CPU.Load5, r.CPU.Load15)
-
-	// Memory + swap block.
-	printMemLine("mem", r.Memory)
+	// Resources group.
+	fmt.Println()
+	labeledRow("cpu", cpuLine(r.CPU))
+	labeledRow("mem", usageRow(r.Memory))
 	if r.Swap.Total > 0 {
-		printMemLine("swap", r.Swap)
+		labeledRow("swap", usageRow(r.Swap))
 	}
 
-	// Disk block.
+	// Disk group.
 	if len(r.Disks) > 0 {
-		fmt.Printf("%sdisk%s\n", cBold, cReset)
-		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-		for _, d := range r.Disks {
-			col := statusColor(d.Status)
-			fmt.Fprintf(w, "  %s%s%s\t%s\t%s%.0f%%%s\t%s / %s\t%s\n",
-				col, statusIcon(d.Status), cReset, d.Mount,
-				col, d.UsedPercent, cReset,
-				human(d.Used), human(d.Total), d.Fstype)
-		}
-		w.Flush()
+		fmt.Println()
+		printDisks(r.Disks)
 	}
 
-	// Non-fatal collection warnings.
+	// Non-fatal collection warnings go to stderr so stdout stays clean.
 	for _, msg := range r.Warnings {
 		fmt.Fprintf(os.Stderr, "%s[envman] tidak bisa membaca %s%s\n", cDim, msg, cReset)
 	}
 }
 
-func printMemLine(label string, m sysstat.MemInfo) {
-	col := statusColor(m.Status)
-	fmt.Printf("%s%-4s%s   %s%s %.0f%%%s  %s / %s used\n",
-		cBold, label, cReset, col, statusIcon(m.Status), m.UsedPercent, cReset,
+// cpuLine formats the one-line CPU summary.
+func cpuLine(c sysstat.CPUInfo) string {
+	cores := fmt.Sprintf("%d cores", c.CoresPhysical)
+	if c.CoresPhysical == 0 {
+		cores = fmt.Sprintf("%d cores", c.CoresLogical)
+	} else if c.CoresLogical > c.CoresPhysical {
+		cores = fmt.Sprintf("%d cores · %d threads", c.CoresPhysical, c.CoresLogical)
+	}
+	return fmt.Sprintf("%s · %s · %.0f%% busy · load %s%.2f%s / %.2f / %.2f",
+		cpuModel(c.Model), cores, c.UsedPercent,
+		statusColor(c.LoadStatus), c.Load1, cReset, c.Load5, c.Load15)
+}
+
+// usageRow formats a memory/swap gauge line: bar + percent + used/total.
+func usageRow(m sysstat.MemInfo) string {
+	return fmt.Sprintf("%s  %s%3.0f%%%s   %s / %s",
+		usageBar(m.UsedPercent, m.Status),
+		statusColor(m.Status), m.UsedPercent, cReset,
 		human(m.Used), human(m.Total))
+}
+
+// maxMountWidth caps how wide the mount column grows before long paths are
+// truncated with a leading ellipsis (keeping the meaningful tail).
+const maxMountWidth = 26
+
+// printDisks renders the disk block: one gauge row per filesystem, mounts
+// left-aligned in a column sized to the widest (capped) mount.
+func printDisks(disks []sysstat.DiskInfo) {
+	width := 0
+	for _, d := range disks {
+		if n := len(d.Mount); n > width {
+			width = n
+		}
+	}
+	if width > maxMountWidth {
+		width = maxMountWidth
+	}
+	rows := make([]string, 0, len(disks))
+	for _, d := range disks {
+		mount := truncMount(d.Mount, width)
+		rows = append(rows, fmt.Sprintf("%s%s%s %-*s  %s  %s%3.0f%%%s   %9s / %-9s %s%s%s",
+			statusColor(d.Status), statusIcon(d.Status), cReset,
+			width, mount,
+			usageBar(d.UsedPercent, d.Status),
+			statusColor(d.Status), d.UsedPercent, cReset,
+			human(d.Used), human(d.Total),
+			cDim, d.Fstype, cReset))
+	}
+	labeledBlock("disk", rows)
+}
+
+// truncMount shortens a mount path to at most width chars, preferring to cut at
+// a path separator so the remaining tail stays a recognizable path segment
+// (e.g. ".../Update/SFR/mnt1" rather than "…m/Volumes/...").
+func truncMount(mount string, width int) string {
+	if len(mount) <= width {
+		return mount
+	}
+	tail := mount[len(mount)-width+1:] // room for the leading "…"
+	if i := strings.IndexByte(tail, '/'); i >= 0 && i < len(tail)-1 {
+		tail = tail[i:]
+	}
+	return "…" + tail
 }
 
 // sysLabel renders a short verdict word for the header.
@@ -123,53 +219,66 @@ func cpuModel(m string) string {
 // without reaching into the package's unexported helper.
 func human(b uint64) string { return sysstat.HumanBytes(b) }
 
-// printIdentity renders the current user, active login sessions, and network
-// addresses. hostname is passed so single self-sessions (just the current user
-// on the local console) can be suppressed as redundant noise.
+// printIdentity renders the current user, active login sessions (one line), and
+// network addresses. hostname is passed so a lone local self-session can be
+// suppressed as redundant with the user line.
 func printIdentity(id sysstat.Identity, hostname string) {
-	// User line: username@hostname (uid).
 	who := id.User.Username
 	if who == "" {
 		who = "unknown"
 	}
-	line := fmt.Sprintf("%suser%s   %s@%s", cBold, cReset, who, hostname)
+	userStr := who + "@" + hostname
 	if id.User.UID != "" {
-		line += fmt.Sprintf(" %s(uid %s)%s", cDim, id.User.UID, cReset)
+		userStr += fmt.Sprintf("  %s· uid %s%s", cDim, id.User.UID, cReset)
 	}
-	fmt.Println(line)
+	labeledRow("user", userStr)
 
-	// Active sessions: show only when there is more than a lone local login,
-	// or when any session comes from a remote host — otherwise it just repeats
-	// the user line.
 	if sessions := notableSessions(id.Sessions, id.User.Username); len(sessions) > 0 {
-		fmt.Printf("%ssessions%s\n", cBold, cReset)
-		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-		for _, s := range sessions {
-			from := ""
-			if s.Host != "" {
-				from = fmt.Sprintf("%sfrom %s%s", cDim, s.Host, cReset)
-			}
-			fmt.Fprintf(w, "  %s\t%s\t%s\n", s.User, s.Terminal, from)
-		}
-		w.Flush()
+		labeledRow("login", formatSessions(sessions))
 	}
 
-	// Network addresses.
 	if len(id.LocalIPs) > 0 || id.PublicIP != "" {
-		fmt.Printf("%snet%s\n", cBold, cReset)
-		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
+		width := len("public")
 		for _, a := range id.LocalIPs {
-			kind := "v4"
-			if a.IsV6 {
-				kind = "v6"
+			if n := len(a.Iface); n > width {
+				width = n
 			}
-			fmt.Fprintf(w, "  %s\t%s\t%s%s%s\n", a.Iface, a.Addr, cDim, kind, cReset)
+		}
+		rows := make([]string, 0, len(id.LocalIPs)+1)
+		for _, a := range id.LocalIPs {
+			rows = append(rows, fmt.Sprintf("%s%-*s%s  %s", cDim, width, a.Iface, cReset, a.Addr))
 		}
 		if id.PublicIP != "" {
-			fmt.Fprintf(w, "  %spublic%s\t%s\t%svia --public-ip%s\n", cBold, cReset, id.PublicIP, cDim, cReset)
+			rows = append(rows, fmt.Sprintf("%s%-*s%s  %s  %s(publik)%s",
+				cBold, width, "public", cReset, id.PublicIP, cDim, cReset))
 		}
-		w.Flush()
+		labeledBlock("net", rows)
 	}
+}
+
+// formatSessions renders active logins as a single "·"-separated line. When all
+// sessions belong to one user the terminals are listed bare; otherwise each is
+// prefixed with its user. Remote sessions carry a dim "(host)" suffix.
+func formatSessions(sessions []sysstat.SessionInfo) string {
+	sameUser := true
+	for _, s := range sessions {
+		if s.User != sessions[0].User {
+			sameUser = false
+			break
+		}
+	}
+	parts := make([]string, 0, len(sessions))
+	for _, s := range sessions {
+		p := s.Terminal
+		if !sameUser {
+			p = s.User + "@" + s.Terminal
+		}
+		if s.Host != "" {
+			p += fmt.Sprintf(" %s(%s)%s", cDim, s.Host, cReset)
+		}
+		parts = append(parts, p)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // notableSessions filters out the trivial case of a single local session
@@ -205,32 +314,39 @@ func lastIndexByte(s string, b byte) int {
 const maxDirRows = 12
 
 func printDirReport(d sysstat.DirReport) {
-	fmt.Printf("%sproject%s  %s   %s%s%s · %s files\n",
-		cBold, cReset, d.Root, cBold, human(d.TotalBytes), cReset,
-		groupThousands(d.FileCount))
+	fmt.Println()
+	fmt.Printf("  %s%-*s%s%s   %s%s%s  %s· %s files%s\n",
+		cBold, labelWidth, "proj", cReset, d.Root,
+		cBold, human(d.TotalBytes), cReset,
+		cDim, groupThousands(d.FileCount), cReset)
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
 	shown := d.Children
 	var rest []sysstat.DirEntry
 	if len(shown) > maxDirRows {
 		rest = shown[maxDirRows:]
 		shown = shown[:maxDirRows]
 	}
+	total := d.TotalBytes
+	if total == 0 {
+		total = 1
+	}
 	for _, c := range shown {
 		name := c.Name
 		if c.IsDir {
 			name += "/"
 		}
-		fmt.Fprintf(w, "  %s\t%s\n", human(c.Bytes), name)
+		pct := float64(c.Bytes) / float64(total) * 100
+		fmt.Printf("    %s  %s%9s%s  %s\n", shareBar(pct), cDim, human(c.Bytes), cReset, name)
 	}
 	if len(rest) > 0 {
 		var sum uint64
 		for _, c := range rest {
 			sum += c.Bytes
 		}
-		fmt.Fprintf(w, "  %s\t%s(%d entri lainnya)%s\n", human(sum), cDim, len(rest), cReset)
+		pct := float64(sum) / float64(total) * 100
+		fmt.Printf("    %s  %s%9s%s  %s(%d entri lainnya)%s\n",
+			shareBar(pct), cDim, human(sum), cReset, cDim, len(rest), cReset)
 	}
-	w.Flush()
 }
 
 // groupThousands formats an int with dot separators (Indonesian locale style),
