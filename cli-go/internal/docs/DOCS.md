@@ -387,15 +387,29 @@ semua path polos (opsional dengan `--status`).
 ## Sys — Snapshot Kesehatan Mesin Lokal
 
 `envman sys` menampilkan gambaran cepat kesehatan mesin **tempat CLI dijalankan**:
-host & uptime, CPU + load, memory & swap, dan penggunaan disk per filesystem.
-Tak perlu login — semua dibaca dari mesin lokal.
+host & uptime, user & sesi login aktif, alamat jaringan, CPU + load, memory &
+swap, dan penggunaan disk per filesystem. Tak perlu login — semua dibaca lokal
+**tanpa jaringan keluar**, kecuali `--public-ip` (opt-in).
 
 ```bash
-envman sys            # ringkasan berwarna
-envman sys --json     # snapshot mesin-readable (pipe ke agent / monitor)
-envman sys --du .     # + ukuran footprint project (cwd)
-envman sys --du ./app # + ukuran footprint direktori tertentu
+envman sys              # ringkasan berwarna
+envman sys --json       # snapshot mesin-readable (pipe ke agent / monitor)
+envman sys --du .       # + ukuran footprint project (cwd)
+envman sys --public-ip  # + IP publik (menghubungi layanan eksternal)
 ```
+
+### User & jaringan
+
+Blok `user` menampilkan akun yang menjalankan CLI (`username@hostname (uid)`).
+Blok `sessions` mendaftar login aktif (mirip `who`) — **disembunyikan** bila hanya
+diri sendiri di konsol lokal, ditampilkan bila ada beberapa sesi, sesi remote
+(kolom `from <host>`), atau user lain. Blok `net` mendaftar alamat interface
+non-loopback (IPv4/IPv6).
+
+`--public-ip` menambah baris IP publik dengan menghubungi layanan eksternal
+(default `api.ipify.org`, override via env `ENVMAN_PUBLIC_IP_URL`) — **satu-satunya**
+bagian `sys` yang menyentuh jaringan, karena itu opt-in. Gagal fetch → warning di
+stderr, snapshot tetap tampil.
 
 ### Ukuran project (--du)
 
@@ -427,8 +441,9 @@ envman sys --json | jq '.disks[]'       # olah lebih lanjut
 ### Flag
 
 ```
---json      cetak snapshot sebagai JSON
---du <dir>  tambah footprint disk direktori (total + rincian subdir)
+--json       cetak snapshot sebagai JSON
+--du <dir>   tambah footprint disk direktori (total + rincian subdir)
+--public-ip  tambah IP publik (menghubungi layanan eksternal, opt-in)
 ```
 
 > Membaca **mesin lokal saja**. Untuk memeriksa stack remote, pakai `envman pt`

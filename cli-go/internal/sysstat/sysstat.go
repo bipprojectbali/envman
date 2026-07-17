@@ -16,6 +16,7 @@ import (
 // error recorded in Warnings, so a partial snapshot still renders.
 type Report struct {
 	Host     HostInfo   `json:"host"`
+	Identity Identity   `json:"identity"`
 	CPU      CPUInfo    `json:"cpu"`
 	Memory   MemInfo    `json:"memory"`
 	Swap     MemInfo    `json:"swap"`
@@ -100,6 +101,7 @@ func Collect(ctx context.Context) Report {
 		warn("host: " + err.Error())
 	}
 
+	r.Identity = collectIdentity(ctx, warn)
 	r.CPU = collectCPU(ctx, warn)
 
 	if vm, err := mem.VirtualMemoryWithContext(ctx); err == nil {
