@@ -111,6 +111,7 @@ Reference project files and aliases stored on the server.`, VERSION),
 		clipCmd(),
 		projectsCmd(),
 		healthCmd(),
+		sysCmd(),
 	)
 
 	return root
