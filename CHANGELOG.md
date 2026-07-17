@@ -2,12 +2,17 @@
 
 ## [Unreleased]
 
+## [0.22.8] - 2026-07-18
+
 ### Added
 - **`envman gists` — kelola gist (snippet) dari CLI.** List, cari, ambil, push, pull, dan hapus gist tanpa buka web. Satu gist menampung **banyak file** (folder): `envman gists push mycfg ./a.ts ./b.json` menggabungkan keduanya jadi satu gist, `envman gists pull mycfg -o ./out/` menuliskannya kembali. Gist dirujuk lewat **judul** (kini unik per akun) atau UUID — `push <judul>` membuat gist baru, lalu `push <judul> --force` memperbaruinya. Bahasa tiap file dideteksi otomatis dari ekstensi. `envman gists find <query>` mencari lintas gist milik sendiri dan public; `envman gists ls -q` mencetak judul polos untuk di-pipe. Membuat gist tetap butuh capability `gist:create`.
 
 ### Changed
 - **Judul gist kini unik per akun** (`@@unique([userId, title])`) sehingga bisa jadi identitas stabil untuk CLI. Migrasi otomatis mengganti nama judul yang bentrok pada data lama dengan suffix ` (2)`, ` (3)`, dst sebelum menerapkan constraint. Membuat/rename gist ke judul yang sudah dipakai akun yang sama kini mengembalikan `409`.
 - **Endpoint gist menerima `Authorization: Bearer <token>`** (sebelumnya hanya cookie sesi) agar bisa dipakai CLI; sesi web tetap jalan. `GET /api/envman/gists` menerima `search`/`tags`/`sort` (mencakup gist private sendiri, bukan hanya public). Membuat/mengubah/menghapus gist kini menolak token **read-only** (`canWrite=false`) — gist adalah konten bersama, jadi butuh token tulis.
+
+### Fixed
+- **App Logs (Dev Console) berfungsi lagi.** `Bun.RedisClient` tidak punya binding `ltrim`/`lrange`, sehingga penulisan app-log gagal di setiap request `/api` dan halaman App Logs error. Sekarang lewat `send()` generik — ring buffer 500 entri ter-cap kembali dan log bisa dibaca.
 
 ## [0.22.7] - 2026-07-17
 
