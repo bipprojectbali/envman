@@ -112,6 +112,7 @@ Reference project files and aliases stored on the server.`, VERSION),
 		projectsCmd(),
 		healthCmd(),
 		sysCmd(),
+		gistsCmd(),
 	)
 
 	return root
