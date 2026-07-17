@@ -8,6 +8,7 @@ import { buildInjectSection } from './cli-docs/inject'
 import { buildPortainerSection } from './cli-docs/portainer'
 import { buildProjectsSection } from './cli-docs/projects'
 import { buildStorageSection } from './cli-docs/storage'
+import { buildSysSection } from './cli-docs/sys'
 import { buildTroubleshootSection } from './cli-docs/troubleshoot'
 
 export function buildCliDocsMd(origin: string): string {
@@ -21,6 +22,7 @@ ${buildInjectSection()}
 ${buildEnvSection()}
 ${buildClipSection()}
 ${buildHealthSection()}
+${buildSysSection()}
 ${buildFilesAliasesSection(origin)}
 ${buildStorageSection()}
 ${buildPortainerSection()}
