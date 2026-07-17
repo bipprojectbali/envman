@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.22.7] - 2026-07-17
+
+### Added
+- **`envman sys` — snapshot kesehatan mesin lokal.** Gambaran cepat mesin tempat CLI dijalankan (tanpa login): host & uptime, user & sesi login aktif, alamat jaringan, CPU + load average, memory & swap, dan penggunaan disk per filesystem. Memory/swap/disk ditandai **warning** pada penggunaan ≥80% dan **critical** ≥90%; load average dinilai relatif jumlah core logis; baris header membawa verdict keseluruhan (status terparah). Filesystem virtual dilewati dan mount yang berbagi pool fisik sama (mis. volume sintetis APFS di macOS) diringkas jadi satu baris. Output berkelompok dengan usage bar `[████······]` agar mudah dibaca sekilas. `--json` untuk output mesin-readable (pipe ke agent/monitor). `--du <dir>` menambah footprint disk sebuah direktori: total + rincian per entri top-level (node_modules, .git, dist) urut terbesar — langsung kelihatan subdir mana yang membengkak. `--public-ip` (opt-in) menambah IP publik dengan menghubungi layanan eksternal (`api.ipify.org`, override via `ENVMAN_PUBLIC_IP_URL`) — satu-satunya bagian yang menyentuh jaringan. Lokal saja; untuk stack remote pakai `envman pt`.
+
 ## [0.22.6] - 2026-07-16
 
 ### Added
