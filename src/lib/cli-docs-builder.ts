@@ -3,6 +3,7 @@ import { buildCicdSection } from './cli-docs/cicd'
 import { buildClipSection } from './cli-docs/clip'
 import { buildEnvSection } from './cli-docs/env'
 import { buildFilesAliasesSection } from './cli-docs/files-aliases'
+import { buildGistsSection } from './cli-docs/gists'
 import { buildHealthSection } from './cli-docs/health'
 import { buildInjectSection } from './cli-docs/inject'
 import { buildPortainerSection } from './cli-docs/portainer'
@@ -21,6 +22,7 @@ ${buildProjectsSection()}
 ${buildInjectSection()}
 ${buildEnvSection()}
 ${buildClipSection()}
+${buildGistsSection()}
 ${buildHealthSection()}
 ${buildSysSection()}
 ${buildFilesAliasesSection(origin)}

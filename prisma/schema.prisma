@@ -214,6 +214,9 @@ model Gist {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // title is a natural key per user so the CLI (`envman gists push <name>`) can
+  // resolve a gist by name instead of UUID.
+  @@unique([userId, title])
   @@index([userId])
   @@index([isPublic])
   @@map("gist")
