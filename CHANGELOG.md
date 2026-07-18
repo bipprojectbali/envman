@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **`envman gists pull` bisa ambil satu file** dari gist multi-file, pipe-friendly. Pakai `--file <name>` atau ref `judul:namafile` — isinya ke stdout (bisa langsung di-pipe), atau ke path dengan `-o`. Contoh: `envman gists pull mycfg --file a.ts | grep KEY` atau `envman gists pull mycfg:a.ts`. `--file` menang atas ref (berguna bila judul mengandung `:`); file yang tak ada memunculkan error berisi daftar file tersedia.
+
 ## [0.22.8] - 2026-07-18
 
 ### Added

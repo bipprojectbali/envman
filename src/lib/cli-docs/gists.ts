@@ -63,6 +63,19 @@ envman gists pull mycfg -o ./out/ --force   # timpa file yang sudah ada
 Tanpa \`-o\` dan gist berisi **satu** file, isinya dicetak ke stdout. Untuk gist
 multi-file, wajib \`-o <dir>\` — tiap file ditulis atomik ke folder itu.
 
+**Ambil satu file** dari gist multi-file (pipe-friendly) — pakai \`--file <name>\`
+atau ref \`judul:namafile\`:
+
+\`\`\`bash
+envman gists pull mycfg --file a.ts        # isi a.ts → stdout
+envman gists pull mycfg:a.ts               # sama, via ref judul:namafile
+envman gists pull mycfg:a.ts | grep KEY    # langsung di-pipe
+envman gists pull mycfg --file a.ts -o a.ts   # tulis 1 file ke path
+\`\`\`
+
+\`--file\` menang atas ref (berguna bila judul mengandung \`:\`). File tak ditemukan →
+error yang menampilkan daftar file tersedia.
+
 ### Remove
 
 \`\`\`bash

@@ -55,6 +55,29 @@ func TestLooksLikeUUID(t *testing.T) {
 	}
 }
 
+func TestSplitFileRef(t *testing.T) {
+	cases := []struct {
+		ref          string
+		wantTarget   string
+		wantFilename string
+	}{
+		{"mycfg", "mycfg", ""},
+		{"mycfg:a.ts", "mycfg", "a.ts"},
+		{"mycfg:dir/a.ts", "mycfg", "dir/a.ts"},
+		{"mycfg:weird:name.txt", "mycfg", "weird:name.txt"}, // split on first colon only
+		{"mycfg:", "mycfg", ""},
+		// A UUID must never be split even though it contains no colon anyway.
+		{"123e4567-e89b-12d3-a456-426614174000", "123e4567-e89b-12d3-a456-426614174000", ""},
+	}
+	for _, c := range cases {
+		gotT, gotF := SplitFileRef(c.ref)
+		if gotT != c.wantTarget || gotF != c.wantFilename {
+			t.Errorf("SplitFileRef(%q) = (%q, %q), want (%q, %q)",
+				c.ref, gotT, gotF, c.wantTarget, c.wantFilename)
+		}
+	}
+}
+
 func TestFmtBytes(t *testing.T) {
 	cases := map[int]string{
 		0:       "0B",

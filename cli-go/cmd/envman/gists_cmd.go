@@ -187,15 +187,22 @@ given; otherwise a new gist is created. --public marks it public.`,
 
 func gistsPullCmd() *cobra.Command {
 	var outDir string
+	var file string
 	var force bool
 	cmd := &cobra.Command{
-		Use:   "pull <title|id>",
+		Use:   "pull <title|id>[:filename]",
 		Short: "Write a gist's files to disk",
 		Long: `Fetch a gist and write its files. With a single file and no -o, the content is
 printed to stdout. For multiple files use -o <dir> to write each file into that
-directory. --force overwrites existing files.`,
+directory.
+
+To pull just one file from a multi-file gist, name it with --file <name> or the
+"title:filename" ref — the content goes to stdout (pipe-friendly), or to a file
+with -o. --force overwrites existing files.`,
 		Example: "  envman gists pull mycfg              # single file → stdout\n" +
 			"  envman gists pull mycfg -o ./out/    # all files → ./out/\n" +
+			"  envman gists pull mycfg --file a.ts  # one file → stdout (pipe-friendly)\n" +
+			"  envman gists pull mycfg:a.ts | grep KEY   # same, via title:filename ref\n" +
 			"  envman gists pull mycfg -o ./out/ --force",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -203,14 +210,21 @@ directory. --force overwrites existing files.`,
 			if err != nil {
 				return err
 			}
-			g, err := resolveGist(cfg, args[0])
+			// A "title:filename" ref selects one file; an explicit --file wins
+			// (lets you target a file when the title itself contains a colon).
+			target, refFile := gists.SplitFileRef(args[0])
+			if file == "" {
+				file = refFile
+			}
+			g, err := resolveGist(cfg, target)
 			if err != nil {
 				return err
 			}
-			return pullGistFiles(g, outDir, force)
+			return pullGistFiles(g, file, outDir, force)
 		},
 	}
 	cmd.Flags().StringVarP(&outDir, "output", "o", "", "Directory to write files into")
+	cmd.Flags().StringVar(&file, "file", "", "Pull only this filename (stdout, or -o <file>)")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing files")
 	return cmd
 }
@@ -274,12 +288,26 @@ func readGistFiles(paths []string) ([]gists.File, error) {
 	return files, nil
 }
 
-// pullGistFiles writes a gist's files to stdout (single file, no dir) or into
-// outDir (each file), honoring force for overwrite.
-func pullGistFiles(g *gists.Gist, outDir string, force bool) error {
+// pullGistFiles writes a gist's files. When file is set, only that file is
+// pulled (to stdout, or to outDir as a path/file). Otherwise: a single-file gist
+// prints to stdout when outDir is empty, and any gist writes each file into
+// outDir. force allows overwriting existing files.
+func pullGistFiles(g *gists.Gist, file, outDir string, force bool) error {
+	if file != "" {
+		f := findGistFile(g, file)
+		if f == nil {
+			return fmt.Errorf("[envman] file %q tidak ada di gist %q — file tersedia: %s",
+				file, g.Title, strings.Join(gistFilenames(g), ", "))
+		}
+		if outDir == "" {
+			fmt.Print(f.Content)
+			return nil
+		}
+		return writeGistFile(outDir, f.Filename, f.Content, force)
+	}
 	if outDir == "" {
 		if len(g.Files) != 1 {
-			return fmt.Errorf("[envman] gist %q punya %d file — gunakan -o <dir> untuk menulis ke folder",
+			return fmt.Errorf("[envman] gist %q punya %d file — gunakan --file <name> atau -o <dir>",
 				g.Title, len(g.Files))
 		}
 		fmt.Print(g.Files[0].Content)
@@ -289,18 +317,49 @@ func pullGistFiles(g *gists.Gist, outDir string, force bool) error {
 		return err
 	}
 	for _, f := range g.Files {
-		dest := filepath.Join(outDir, f.Filename)
-		if !force {
-			if _, err := os.Stat(dest); err == nil {
-				return fmt.Errorf("[envman] %s sudah ada — gunakan --force untuk menimpa", dest)
-			}
-		}
-		if err := atomicWrite(dest, f.Content); err != nil {
+		if err := writeGistFile(outDir, f.Filename, f.Content, force); err != nil {
 			return err
 		}
 	}
 	fmt.Fprintf(os.Stderr, "[envman] %d file ditulis ke %s\n", len(g.Files), outDir)
 	return nil
+}
+
+// writeGistFile writes content to dest. If dest is an existing directory (or ends
+// in a separator), filename is joined into it; otherwise dest is the file path.
+func writeGistFile(dest, filename, content string, force bool) error {
+	path := dest
+	if info, err := os.Stat(dest); (err == nil && info.IsDir()) || os.IsPathSeparator(dest[len(dest)-1]) {
+		if err := os.MkdirAll(dest, 0o755); err != nil {
+			return err
+		}
+		path = filepath.Join(dest, filename)
+	}
+	if !force {
+		if _, err := os.Stat(path); err == nil {
+			return fmt.Errorf("[envman] %s sudah ada — gunakan --force untuk menimpa", path)
+		}
+	}
+	return atomicWrite(path, content)
+}
+
+// findGistFile returns the file named name, or nil if absent.
+func findGistFile(g *gists.Gist, name string) *gists.File {
+	for i := range g.Files {
+		if g.Files[i].Filename == name {
+			return &g.Files[i]
+		}
+	}
+	return nil
+}
+
+// gistFilenames returns the gist's filenames, for error messages.
+func gistFilenames(g *gists.Gist) []string {
+	names := make([]string, len(g.Files))
+	for i := range g.Files {
+		names[i] = g.Files[i].Filename
+	}
+	return names
 }
 
 // splitCSV flattens comma-separated flag values into a trimmed slice.
