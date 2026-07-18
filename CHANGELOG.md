@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+- **`envman gists pull` bisa ambil satu file** dari gist multi-file, pipe-friendly. Pakai `--file <name>` atau ref `judul:namafile` — isinya ke stdout (bisa langsung di-pipe), atau ke path dengan `-o`. Contoh: `envman gists pull mycfg --file a.ts | grep KEY` atau `envman gists pull mycfg:a.ts`. `--file` menang atas ref (berguna bila judul mengandung `:`); file yang tak ada memunculkan error berisi daftar file tersedia.
+- **`envman gists rm` bisa hapus satu file** dari gist tanpa menghapus seluruhnya: `envman gists rm mycfg:b.json` atau `--file b.json`. File terakhir tak bisa dihapus dengan cara ini (menyisakan gist kosong) — hapus seluruh gist.
+- **`envman gists push --clean`** untuk mengganti seluruh isi gist dengan tepat file yang disebut (operasi destruktif yang eksplisit).
+
+### Changed
+- **`envman gists push` kini upsert per-file, bukan ganti-total.** Sebelumnya `push mycfg a.ts --force` pada gist berisi banyak file akan **menghapus** file lain yang tak disebut — mudah bikin kehilangan data. Sekarang push hanya menyentuh file yang kamu sebut: file baru ditambahkan, file yang sudah ada butuh `--force` untuk ditimpa (file itu saja), sisanya dipertahankan. Untuk ganti-total gunakan `--clean`.
+
+### Fixed
+- **`envman gists push` tak lagi mereset metadata diam-diam.** Update sebelumnya selalu mengirim `isPublic` (default `false`), sehingga `push` tanpa `--public` mengubah gist public jadi private. Kini `--public`/`--desc`/`--tags` hanya diterapkan bila kamu menyebutkannya.
+
 ## [0.22.8] - 2026-07-18
 
 ### Added

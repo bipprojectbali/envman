@@ -70,6 +70,21 @@ func DetectLanguage(filename string) string {
 	return "plaintext"
 }
 
+// SplitFileRef splits a "title:filename" ref into its title and filename parts,
+// mirroring the storage "project:path" convention. It splits on the FIRST colon
+// so a filename may itself contain colons. A ref with no colon (a bare title or
+// UUID) returns (ref, ""). A UUID is never split — it has no colon — so callers
+// resolving by id are unaffected.
+func SplitFileRef(ref string) (target, filename string) {
+	if looksLikeUUID(ref) {
+		return ref, ""
+	}
+	if i := strings.IndexByte(ref, ':'); i >= 0 {
+		return ref[:i], ref[i+1:]
+	}
+	return ref, ""
+}
+
 // looksLikeUUID reports whether s is a canonical 36-char UUID (8-4-4-4-12).
 // Used to decide whether a gists arg is an id (use directly) or a title (resolve).
 func looksLikeUUID(s string) bool {
