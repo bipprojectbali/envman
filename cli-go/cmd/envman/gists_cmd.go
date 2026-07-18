@@ -119,19 +119,28 @@ func gistsGetCmd() *cobra.Command {
 }
 
 func gistsPushCmd() *cobra.Command {
-	var force, public bool
+	var force, public, clean bool
 	var desc string
 	var tags []string
 	cmd := &cobra.Command{
 		Use:   "push <title> <file>...",
 		Short: "Create or update a gist from local files",
-		Long: `Bundle one or more local files into a single gist titled <title>. Each file's
-language is auto-detected from its extension.
+		Long: `Bundle one or more local files into a gist titled <title>. Each file's language
+is auto-detected from its extension.
 
-If a gist with that title already exists it is only updated when --force is
-given; otherwise a new gist is created. --public marks it public.`,
+Push is a per-file upsert, so it only touches the files you name:
+  - A new gist is created if the title doesn't exist yet.
+  - A new filename is added to an existing gist.
+  - An existing filename is left untouched unless you pass --force, which
+    overwrites just that file. Other files in the gist are never removed.
+
+To replace the whole gist (drop files you didn't name), pass --clean. To delete
+a single file use "envman gists rm <title>:<filename>".
+
+--public/--desc/--tags only change those fields when you actually pass them.`,
 		Example: "  envman gists push mycfg ./a.ts ./b.json\n" +
-			"  envman gists push mycfg ./a.ts --force\n" +
+			"  envman gists push mycfg ./a.ts --force        # overwrite a.ts, keep the rest\n" +
+			"  envman gists push mycfg ./a.ts ./b.json --clean   # gist becomes exactly these\n" +
 			"  envman gists push notes ./README.md --public --tags docs",
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -152,23 +161,9 @@ given; otherwise a new gist is created. --public marks it public.`,
 			if err != nil && !errors.Is(err, gists.ErrNotFound) {
 				return err
 			}
+
 			if existing != nil {
-				if !force {
-					return fmt.Errorf("[envman] gist %q sudah ada — gunakan --force untuk memperbarui", title)
-				}
-				up := gists.UpdateInput{Files: files, IsPublic: &public}
-				if desc != "" {
-					up.Description = &desc
-				}
-				if len(tags) > 0 {
-					t := splitCSV(tags)
-					up.Tags = &t
-				}
-				if _, err := gists.Update(cfg, existing.ID, up); err != nil {
-					return err
-				}
-				fmt.Fprintf(os.Stderr, "[envman] gist %q diperbarui (%d file)\n", title, len(files))
-				return nil
+				return pushUpdate(cmd, cfg, existing, files, clean, force, public, desc, tags)
 			}
 			in := gists.CreateInput{Title: title, Description: desc, Files: files, IsPublic: public, Tags: splitCSV(tags)}
 			if _, err := gists.Create(cfg, in); err != nil {
@@ -178,7 +173,8 @@ given; otherwise a new gist is created. --public marks it public.`,
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "Update the gist if the title already exists")
+	cmd.Flags().BoolVar(&force, "force", false, "Overwrite files that already exist in the gist")
+	cmd.Flags().BoolVar(&clean, "clean", false, "Replace the whole gist with exactly the named files")
 	cmd.Flags().BoolVar(&public, "public", false, "Make the gist public")
 	cmd.Flags().StringVar(&desc, "desc", "", "Gist description")
 	cmd.Flags().StringSliceVar(&tags, "tags", nil, "Tags (comma-separated)")
@@ -230,21 +226,34 @@ with -o. --force overwrites existing files.`,
 }
 
 func gistsRmCmd() *cobra.Command {
+	var file string
 	cmd := &cobra.Command{
-		Use:     "rm <title|id>",
+		Use:     "rm <title|id>[:filename]",
 		Aliases: []string{"delete"},
-		Short:   "Delete a gist",
-		Long:    `Delete a gist by title (your own) or UUID. Only the owner or a SUPER_ADMIN can delete.`,
-		Example: "  envman gists rm mycfg",
-		Args:    cobra.ExactArgs(1),
+		Short:   "Delete a gist, or a single file within it",
+		Long: `Delete a gist by title (your own) or UUID. To delete just one file from a
+multi-file gist, name it with the "title:filename" ref or --file <name>; the
+rest of the gist is kept. You cannot delete the last remaining file this way —
+delete the whole gist instead. Only the owner or a SUPER_ADMIN can delete.`,
+		Example: "  envman gists rm mycfg\n" +
+			"  envman gists rm mycfg:b.json      # delete one file, keep the rest\n" +
+			"  envman gists rm mycfg --file b.json",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := auth.Resolve()
 			if err != nil {
 				return err
 			}
-			g, err := resolveGist(cfg, args[0])
+			target, refFile := gists.SplitFileRef(args[0])
+			if file == "" {
+				file = refFile
+			}
+			g, err := resolveGist(cfg, target)
 			if err != nil {
 				return err
+			}
+			if file != "" {
+				return rmGistFile(cfg, g, file)
 			}
 			if err := gists.Delete(cfg, g.ID); err != nil {
 				return err
@@ -253,7 +262,73 @@ func gistsRmCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&file, "file", "", "Delete only this filename (keep the rest)")
 	return cmd
+}
+
+// rmGistFile removes a single file from a gist via an update. Refuses to remove
+// the last file (that would leave an empty gist — delete the whole gist instead).
+func rmGistFile(cfg *auth.Config, g *gists.Gist, filename string) error {
+	if findGistFile(g, filename) == nil {
+		return fmt.Errorf("[envman] file %q tidak ada di gist %q — file tersedia: %s",
+			filename, g.Title, strings.Join(gistFilenames(g), ", "))
+	}
+	if len(g.Files) == 1 {
+		return fmt.Errorf("[envman] %q file terakhir di gist %q — hapus seluruh gist: envman gists rm %q",
+			filename, g.Title, g.Title)
+	}
+	remaining := make([]gists.File, 0, len(g.Files)-1)
+	for _, f := range g.Files {
+		if f.Filename != filename {
+			remaining = append(remaining, f)
+		}
+	}
+	if _, err := gists.Update(cfg, g.ID, gists.UpdateInput{Files: remaining}); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "[envman] file %q dihapus dari gist %q (%d file tersisa)\n",
+		filename, g.Title, len(remaining))
+	return nil
+}
+
+// pushUpdate applies a per-file upsert to an existing gist. Conflicting files
+// (already present, no --force) abort the whole push so nothing is half-applied.
+// public/desc/tags are only sent when their flags were actually set, so an
+// update never silently resets metadata.
+func pushUpdate(
+	cmd *cobra.Command, cfg *auth.Config, existing *gists.Gist,
+	files []gists.File, clean, force, public bool, desc string, tags []string,
+) error {
+	merged := gists.MergeFiles(existing.Files, files, clean, force)
+	if len(merged.Conflicts) > 0 {
+		return fmt.Errorf(
+			"[envman] file sudah ada di gist %q: %s — gunakan --force untuk menimpa (file lain tetap aman)",
+			existing.Title, strings.Join(merged.Conflicts, ", "))
+	}
+
+	up := gists.UpdateInput{Files: merged.Files}
+	if cmd.Flags().Changed("public") {
+		up.IsPublic = &public
+	}
+	if cmd.Flags().Changed("desc") {
+		up.Description = &desc
+	}
+	if cmd.Flags().Changed("tags") {
+		t := splitCSV(tags)
+		up.Tags = &t
+	}
+	if _, err := gists.Update(cfg, existing.ID, up); err != nil {
+		return err
+	}
+
+	switch {
+	case clean:
+		fmt.Fprintf(os.Stderr, "[envman] gist %q diganti — kini %d file\n", existing.Title, len(merged.Files))
+	default:
+		fmt.Fprintf(os.Stderr, "[envman] gist %q diperbarui — %d ditambah, %d ditimpa (total %d file)\n",
+			existing.Title, len(merged.Added), len(merged.Overwritten), len(merged.Files))
+	}
+	return nil
 }
 
 // resolveGist resolves ref (title or UUID) to a gist, needing the caller's user
