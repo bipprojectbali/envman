@@ -1,16 +1,14 @@
-import { Group, SegmentedControl, Stack, Text } from '@mantine/core'
+import { Stack, Text } from '@mantine/core'
 import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { TbFolders, TbServer2 } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyBulkResult, runBulk } from '@/frontend/lib/bulk'
+import { AccessMatrix } from './members/AccessMatrix'
 import { BulkEnvAccessModal } from './members/BulkEnvAccessModal'
 import { BulkRoleModal } from './members/BulkRoleModal'
 import { MembersAddSection } from './members/MembersAddSection'
 import { MembersBulkBar } from './members/MembersBulkBar'
-import { MembersMatrixView } from './members/MembersMatrixView'
-import { SectionMatrixView } from './members/SectionMatrixView'
 import { type Member, toggle } from './members/types'
 
 export function MembersPanel({
@@ -30,7 +28,6 @@ export function MembersPanel({
 }) {
   const qc = useQueryClient()
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [matrixView, setMatrixView] = useState<'environments' | 'sections'>('environments')
 
   const ownerCount = members.filter((m) => m.role === 'OWNER').length
   const selectableMembers = members.filter((m) => !(m.role === 'OWNER' && ownerCount === 1))
@@ -119,66 +116,34 @@ export function MembersPanel({
     <Stack gap="md">
       {isOwner && <MembersAddSection slug={slug} onAdded={onRefresh} />}
 
-      {/* Dua matrix ini bentuknya identik (grid akses per-kolom) tapi mengatur
-          hal berbeda — beri ikon + sub-deskripsi agar tak tertukar. */}
-      <Stack gap={6}>
-        <SegmentedControl
-          size="xs"
-          value={matrixView}
-          onChange={(v) => setMatrixView(v as 'environments' | 'sections')}
-          data={[
-            {
-              value: 'environments',
-              label: (
-                <Group gap={6} wrap="nowrap" justify="center">
-                  <TbServer2 size={14} />
-                  <span>Environments</span>
-                </Group>
-              ),
-            },
-            {
-              value: 'sections',
-              label: (
-                <Group gap={6} wrap="nowrap" justify="center">
-                  <TbFolders size={14} />
-                  <span>Sections</span>
-                </Group>
-              ),
-            },
-          ]}
+      {/* Satu matrix menyatukan akses Environments + Sections (Notes/Aliases/
+          Files/Storage). Kolom Environments memuat semua env dalam satu kolom
+          (popover) supaya tak ada scroll horizontal saat env banyak. */}
+      <Text size="xs" c="dimmed">
+        Atur akses tiap anggota ke <strong>environment</strong> (production, staging…) dan tiap{' '}
+        <strong>fitur project</strong> (Notes, Aliases, Files, Storage). Kolom Environments memuat semua env dalam satu
+        popover.
+      </Text>
+
+      <AccessMatrix
+        slug={slug}
+        selected={selected}
+        onToggleSelect={(uid) => setSelected((prev) => toggle(prev, uid))}
+        onToggleAll={(ids) => {
+          const all = ids.every((id) => selected.has(id))
+          setSelected(all ? new Set() : new Set(ids))
+        }}
+        selectableIds={new Set(selectableMembers.map((m) => m.user.id))}
+      />
+
+      {isOwner && (
+        <MembersBulkBar
+          count={selected.size}
+          onChangeRole={openBulkRoleModal}
+          onSetEnvAccess={openBulkEnvModal}
+          onDelete={confirmBulkDelete}
+          busy={bulkDeleteMutation.isPending}
         />
-        <Text size="xs" c="dimmed">
-          {matrixView === 'environments'
-            ? 'Akses ke tiap environment (mis. production, staging) — siapa boleh baca/ubah var-nya.'
-            : 'Akses ke tiap fitur project (Notes, Aliases, Files, Storage) — di luar environment.'}
-        </Text>
-      </Stack>
-
-      {matrixView === 'environments' ? (
-        <>
-          <MembersMatrixView
-            slug={slug}
-            selected={selected}
-            onToggleSelect={(uid) => setSelected((prev) => toggle(prev, uid))}
-            onToggleAll={(ids) => {
-              const all = ids.every((id) => selected.has(id))
-              setSelected(all ? new Set() : new Set(ids))
-            }}
-            selectableIds={new Set(selectableMembers.map((m) => m.user.id))}
-          />
-
-          {isOwner && (
-            <MembersBulkBar
-              count={selected.size}
-              onChangeRole={openBulkRoleModal}
-              onSetEnvAccess={openBulkEnvModal}
-              onDelete={confirmBulkDelete}
-              busy={bulkDeleteMutation.isPending}
-            />
-          )}
-        </>
-      ) : (
-        <SectionMatrixView slug={slug} />
       )}
     </Stack>
   )
