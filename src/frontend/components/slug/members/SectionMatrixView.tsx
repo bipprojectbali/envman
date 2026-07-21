@@ -1,6 +1,7 @@
-import { ActionIcon, Badge, Box, Group, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Badge, Box, Button, Group, Popover, ScrollArea, Stack, TagsInput, Text, Tooltip } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { TbLock } from 'react-icons/tb'
+import { useState } from 'react'
+import { TbLock, TbTag } from 'react-icons/tb'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
@@ -19,10 +20,10 @@ export function SectionMatrixView({ slug }: { slug: string }) {
   })
 
   const setRoleMutation = useMutation({
-    mutationFn: ({ userId, section, role }: { userId: string; section: string; role: SectionRole }) =>
+    mutationFn: ({ userId, section, role, scopeTags }: { userId: string; section: string; role: SectionRole; scopeTags?: string[] }) =>
       apiFetch(`/api/envman/projects/${slug}/sections/${section}/members/${userId}`, {
         method: 'PUT',
-        body: JSON.stringify({ role }),
+        body: JSON.stringify(scopeTags !== undefined ? { role, scopeTags } : { role }),
       }),
     onSuccess: (_d, vars) => {
       notifyOk(`Akses ${sectionLabel[vars.section as keyof typeof sectionLabel]} diperbarui`)
@@ -188,6 +189,23 @@ export function SectionMatrixView({ slug }: { slug: string }) {
                         )
                       })}
                     </Group>
+                    {/* Tag-scope editor: hanya saat role granted (bukan denied/inherit). */}
+                    {cell && cell.effectiveRole !== null && (
+                      <Box mt={4} style={{ display: 'flex', justifyContent: 'center' }}>
+                        <TagScopeEditor
+                          scopeTags={cell.scopeTags ?? []}
+                          disabled={setRoleMutation.isPending}
+                          onSave={(tags) =>
+                            setRoleMutation.mutate({
+                              userId: m.userId,
+                              section,
+                              role: cell.sectionRole,
+                              scopeTags: tags,
+                            })
+                          }
+                        />
+                      </Box>
+                    )}
                   </Box>
                 )
               })}
@@ -196,5 +214,77 @@ export function SectionMatrixView({ slug }: { slug: string }) {
         </Box>
       </ScrollArea>
     </Stack>
+  )
+}
+
+// TagScopeEditor: badge "Full"/"N tag" yang membuka Popover berisi TagsInput.
+// Kosong = full access (lihat semua item). Isi = limit-by-tag (OR).
+function TagScopeEditor({
+  scopeTags,
+  disabled,
+  onSave,
+}: {
+  scopeTags: string[]
+  disabled: boolean
+  onSave: (tags: string[]) => void
+}) {
+  const [opened, setOpened] = useState(false)
+  const [draft, setDraft] = useState<string[]>(scopeTags)
+  const limited = scopeTags.length > 0
+
+  return (
+    <Popover
+      opened={opened}
+      onChange={setOpened}
+      width={220}
+      position="bottom"
+      withArrow
+      trapFocus
+      onOpen={() => setDraft(scopeTags)}
+    >
+      <Popover.Target>
+        <Tooltip label={limited ? `Limit tag: ${scopeTags.join(', ')}` : 'Full access (semua item)'} withArrow fz="xs">
+          <Badge
+            size="xs"
+            variant={limited ? 'light' : 'outline'}
+            color={limited ? 'grape' : 'gray'}
+            leftSection={<TbTag size={9} />}
+            style={{ cursor: 'pointer' }}
+            onClick={() => setOpened((o) => !o)}
+          >
+            {limited ? `${scopeTags.length} tag` : 'Full'}
+          </Badge>
+        </Tooltip>
+      </Popover.Target>
+      <Popover.Dropdown>
+        <Stack gap="xs">
+          <Text size="xs" c="dimmed">
+            Batasi akses ke item bertag tertentu. Kosongkan = full access.
+          </Text>
+          <TagsInput
+            size="xs"
+            placeholder="tag..."
+            value={draft}
+            onChange={setDraft}
+            clearable
+          />
+          <Group justify="flex-end" gap="xs">
+            <Button size="compact-xs" variant="subtle" color="gray" onClick={() => setOpened(false)}>
+              Batal
+            </Button>
+            <Button
+              size="compact-xs"
+              disabled={disabled}
+              onClick={() => {
+                onSave(draft.map((t) => t.trim()).filter(Boolean))
+                setOpened(false)
+              }}
+            >
+              Simpan
+            </Button>
+          </Group>
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   )
 }

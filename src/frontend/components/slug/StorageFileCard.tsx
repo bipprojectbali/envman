@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { TbCheck, TbCopy, TbDownload, TbEye, TbEyeOff, TbFileSearch, TbFolder, TbPencil, TbShare2, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { useStorageFileActions } from '@/frontend/hooks/useStorageFileActions'
+import { tagColor } from '@/frontend/lib/project-utils'
 import { fmtBytes, getFileIcon } from '@/frontend/lib/storage-format'
 import { StorageFileDrawer } from './StorageFileDrawer'
 import { StorageRenameModal } from './StorageRenameModal'
@@ -94,6 +95,18 @@ function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSel
             {ext && <Badge size="xs" variant="dot" color="gray">{ext}</Badge>}
             {file.isPublic && <Badge size="xs" variant="light" color="green">publik</Badge>}
           </Group>
+          {file.tags.length > 0 && (
+            <Group gap={4}>
+              {file.tags.slice(0, 3).map((t) => (
+                <Badge key={t} size="xs" variant="light" color={tagColor(t)}>{t}</Badge>
+              ))}
+              {file.tags.length > 3 && (
+                <Tooltip label={file.tags.slice(3).join(', ')} withArrow>
+                  <Text size="xs" c="dimmed">+{file.tags.length - 3}</Text>
+                </Tooltip>
+              )}
+            </Group>
+          )}
         </Stack>
 
         <Group gap={2} mt={8} wrap="nowrap">
@@ -143,7 +156,7 @@ function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSel
 
       <StorageFileDrawer file={file} slug={slug} opened={previewOpen} onClose={() => setPreviewOpen(false)} />
 
-      <Modal opened={renameOpen} onClose={() => setRenameOpen(false)} title="Rename File" size="sm">
+      <Modal opened={renameOpen} onClose={() => setRenameOpen(false)} title="Edit File (nama & tag)" size="sm">
         <StorageRenameModal slug={slug} file={file} onSuccess={onRename} onClose={() => setRenameOpen(false)} />
       </Modal>
     </>

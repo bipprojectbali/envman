@@ -40,7 +40,7 @@ export interface SectionMatrixMember {
   userId: string
   user: { id: string; name: string; email: string; image?: string | null }
   projectRole: ProjectRole
-  sectionAccess: Record<string, { sectionRole: SectionRole; effectiveRole: ProjectRole | null }>
+  sectionAccess: Record<string, { sectionRole: SectionRole; effectiveRole: ProjectRole | null; scopeTags: string[] }>
 }
 
 export const sectionLabel: Record<SectionName, string> = {
