@@ -1,11 +1,11 @@
-import { ActionIcon, Badge, Box, Group, Popover, ScrollArea, Stack, TagsInput, Text, Tooltip } from '@mantine/core'
+import { Badge, Box, Group, Popover, ScrollArea, Stack, TagsInput, Text, Tooltip } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { TbLock, TbTag } from 'react-icons/tb'
+import { TbTag } from 'react-icons/tb'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
-import { MatrixLegend } from './MatrixLegend'
+import { AccessRoleCell } from './AccessRoleCell'
 import { roleColor, type SectionMatrix, type SectionRole, sectionLabel } from './types'
 
 // Matrix member × section (Notes/Aliases/Files/Storage) — analog MembersMatrixView.
@@ -58,16 +58,8 @@ export function SectionMatrixView({ slug }: { slug: string }) {
     )
   }
 
-  const cellWidth = 150
+  const cellWidth = 160
   const memberColWidth = 220
-
-  const ROLE_BTNS: { value: SectionRole; label: string; short: string; color: string }[] = [
-    { value: 'inherit', label: 'Inherit (ikut project)', short: '~', color: 'gray' },
-    { value: 'VIEWER', label: 'Viewer', short: 'V', color: 'gray' },
-    { value: 'EDITOR', label: 'Editor', short: 'E', color: 'teal' },
-    { value: 'OWNER', label: 'Owner', short: 'O', color: 'blue' },
-    { value: 'denied', label: 'Denied (blokir akses)', short: '✕', color: 'red' },
-  ]
 
   return (
     <Stack gap="xs">
@@ -79,8 +71,6 @@ export function SectionMatrixView({ slug }: { slug: string }) {
           {data.members.length} user × {data.sections.length} section
         </Text>
       </Group>
-
-      <MatrixLegend />
 
       <ScrollArea type="auto" offsetScrollbars>
         <Box style={{ minWidth: memberColWidth + cellWidth * data.sections.length }}>
@@ -173,44 +163,13 @@ export function SectionMatrixView({ slug }: { slug: string }) {
                       background: isDenied ? 'var(--mantine-color-red-light)' : undefined,
                     }}
                   >
-                    <Group gap={2} wrap="nowrap" justify="center">
-                      {isDenied && (
-                        <Tooltip label="Akses diblokir di section ini" withArrow fz="xs">
-                          <Text span c="red" style={{ display: 'flex', alignItems: 'center' }}>
-                            <TbLock size={11} />
-                          </Text>
-                        </Tooltip>
-                      )}
-                      {ROLE_BTNS.map((btn) => {
-                        // Project OWNER selalu akses penuh via inherit — override role
-                        // atau tag-scope tak bermakna. Kunci ke inherit: hanya tombol
-                        // inherit yang aktif & enabled, sisanya disabled.
-                        const current = isProjectOwner ? 'inherit' : (cell?.sectionRole ?? 'denied')
-                        const isActive = current === btn.value
-                        const ownerLocked = isProjectOwner && btn.value !== 'inherit'
-                        return (
-                          <Tooltip
-                            key={btn.value}
-                            label={isProjectOwner ? 'OWNER project selalu akses penuh' : btn.label}
-                            withArrow
-                            fz="xs"
-                          >
-                            <ActionIcon
-                              size={18}
-                              variant={isActive ? 'filled' : 'subtle'}
-                              color={isActive ? btn.color : 'gray'}
-                              disabled={setRoleMutation.isPending || ownerLocked}
-                              onClick={() => {
-                                if (!isActive) setRoleMutation.mutate({ userId: m.userId, section, role: btn.value })
-                              }}
-                              style={{ fontSize: 10, fontWeight: 700 }}
-                            >
-                              {btn.short}
-                            </ActionIcon>
-                          </Tooltip>
-                        )
-                      })}
-                    </Group>
+                    <AccessRoleCell
+                      value={isProjectOwner ? 'inherit' : (cell?.sectionRole ?? 'inherit')}
+                      effectiveRole={cell?.effectiveRole ?? null}
+                      disabled={setRoleMutation.isPending}
+                      locked={isProjectOwner}
+                      onChange={(role) => setRoleMutation.mutate({ userId: m.userId, section, role })}
+                    />
                     {/* Tag-scope editor: hanya saat role di-grant EKSPLISIT di section
                         (bukan denied, bukan inherit). Server mengabaikan scopeTags saat
                         inherit (role dihapus), jadi menampilkan editor di sana menyesatkan. */}

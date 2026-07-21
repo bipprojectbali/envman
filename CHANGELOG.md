@@ -2,8 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+- **Matrix akses anggota (Environments & Sections) lebih mudah dipahami.** Kedua tab dulu memakai idiom tombol huruf `~ V E O ✕` yang identik dan butuh legenda terpisah untuk dibaca — sering membingungkan, apalagi untuk pengguna baru, dan tak jelas mana tab yang mengatur apa. Sekarang:
+  - Tiap sel akses jadi **pill berlabel kata** (Inherit / Viewer / Editor / Owner / Denied) yang diklik untuk membuka menu berisi pilihan **beserta penjelasan singkat** tiap peran — tak perlu lagi menghafal simbol atau melihat legenda.
+  - Sel `Inherit` kini menampilkan peran efektif yang diwarisi (mis. `Inherit · Owner`), jadi jelas nilai default itu mewarisi apa — bukan sekadar tanda `~` yang ambigu.
+  - Tab **Environments** dan **Sections** diberi ikon + kalimat penjelas berbeda ("akses tiap environment" vs "akses tiap fitur project"), supaya dua matrix yang berbentuk serupa tak tertukar.
+  - Perilaku tak berubah: pilihan, keamanan (sel denied tetap ber-tint merah + ikon gembok), tag-scope Storage, dan penguncian OWNER ke inherit semuanya tetap sama — hanya cara memilihnya yang lebih jelas.
+
 ### Fixed
-- **Sel section untuk anggota ber-role project OWNER kini dikunci ke `inherit`.** Di tab Members → Sections, anggota dengan role project **OWNER** sebelumnya masih bisa diberi override role/tag-scope per-section — padahal OWNER selalu punya akses penuh via inherit (dan bisa membalikkan override itu kapan saja), jadi override maupun badge tag hanya menyesatkan (mis. OWNER tampil punya tag-scope di kolom Aliases saja). Kini tombol V/E/O/denied dinonaktifkan untuk OWNER (hanya `~` inherit yang aktif) dan badge tag-scope disembunyikan. Anggota non-OWNER tak terpengaruh.
+- **Sel section untuk anggota ber-role project OWNER kini dikunci ke `inherit`.** Di tab Members → Sections, anggota dengan role project **OWNER** sebelumnya masih bisa diberi override role/tag-scope per-section — padahal OWNER selalu punya akses penuh via inherit (dan bisa membalikkan override itu kapan saja), jadi override maupun badge tag hanya menyesatkan (mis. OWNER tampil punya tag-scope di kolom Aliases saja). Kini sel OWNER dikunci ke inherit (pilihan role dinonaktifkan) dan badge tag-scope disembunyikan. Anggota non-OWNER tak terpengaruh.
 - **Badge tag-scope tak lagi muncul di sel section yang `inherit`.** Di tab Members → Sections, badge `Full`/`N tag` sebelumnya juga tampil untuk sel dengan role **inherit** (mis. OWNER project yang mewarisi akses) — padahal server mengabaikan `scopeTags` saat inherit (row section dihapus), jadi klik "Simpan" tak berefek dan badge tetap "Full", terlihat seperti tombol rusak. Kini badge hanya muncul saat role di-**grant eksplisit** di section itu (Viewer/Editor/Owner), konsisten dengan sel denied yang juga tak menampilkannya. Untuk memakai tag-scope, set role section member secara eksplisit dulu.
 
 ## [0.24.0] - 2026-07-21

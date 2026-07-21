@@ -1,7 +1,8 @@
-import { SegmentedControl, Stack, Text } from '@mantine/core'
+import { Group, SegmentedControl, Stack, Text } from '@mantine/core'
 import { modals } from '@mantine/modals'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { TbFolders, TbServer2 } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyBulkResult, runBulk } from '@/frontend/lib/bulk'
 import { BulkEnvAccessModal } from './members/BulkEnvAccessModal'
@@ -118,15 +119,40 @@ export function MembersPanel({
     <Stack gap="md">
       {isOwner && <MembersAddSection slug={slug} onAdded={onRefresh} />}
 
-      <SegmentedControl
-        size="xs"
-        value={matrixView}
-        onChange={(v) => setMatrixView(v as 'environments' | 'sections')}
-        data={[
-          { value: 'environments', label: 'Environments' },
-          { value: 'sections', label: 'Sections' },
-        ]}
-      />
+      {/* Dua matrix ini bentuknya identik (grid akses per-kolom) tapi mengatur
+          hal berbeda — beri ikon + sub-deskripsi agar tak tertukar. */}
+      <Stack gap={6}>
+        <SegmentedControl
+          size="xs"
+          value={matrixView}
+          onChange={(v) => setMatrixView(v as 'environments' | 'sections')}
+          data={[
+            {
+              value: 'environments',
+              label: (
+                <Group gap={6} wrap="nowrap" justify="center">
+                  <TbServer2 size={14} />
+                  <span>Environments</span>
+                </Group>
+              ),
+            },
+            {
+              value: 'sections',
+              label: (
+                <Group gap={6} wrap="nowrap" justify="center">
+                  <TbFolders size={14} />
+                  <span>Sections</span>
+                </Group>
+              ),
+            },
+          ]}
+        />
+        <Text size="xs" c="dimmed">
+          {matrixView === 'environments'
+            ? 'Akses ke tiap environment (mis. production, staging) — siapa boleh baca/ubah var-nya.'
+            : 'Akses ke tiap fitur project (Notes, Aliases, Files, Storage) — di luar environment.'}
+        </Text>
+      </Stack>
 
       {matrixView === 'environments' ? (
         <>

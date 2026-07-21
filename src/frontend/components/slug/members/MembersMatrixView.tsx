@@ -1,12 +1,11 @@
-import { ActionIcon, Badge, Box, Checkbox, Group, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { Badge, Box, Checkbox, Group, ScrollArea, Stack, Text } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { TbLock } from 'react-icons/tb'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { AccessRoleCell } from './AccessRoleCell'
 import { MatrixFilterBar } from './MatrixFilterBar'
-import { MatrixLegend } from './MatrixLegend'
 import { type AccessMatrix, type EnvRole, roleColor } from './types'
 
 export function MembersMatrixView({
@@ -41,14 +40,8 @@ export function MembersMatrixView({
   }, [data])
 
   // Saran autocomplete: nama anggota & nama env (ketik bebas tetap didukung).
-  const memberOptions = useMemo(
-    () => [...new Set((data?.members ?? []).map((m) => m.user.name))].sort(),
-    [data],
-  )
-  const envOptions = useMemo(
-    () => (data?.environments ?? []).map((e) => e.name).sort(),
-    [data],
-  )
+  const memberOptions = useMemo(() => [...new Set((data?.members ?? []).map((m) => m.user.name))].sort(), [data])
+  const envOptions = useMemo(() => (data?.environments ?? []).map((e) => e.name).sort(), [data])
 
   // Filter baris (anggota) by nama/email, dan kolom (env) by nama + tag.
   const filteredMembers = useMemo(() => {
@@ -110,16 +103,8 @@ export function MembersMatrixView({
   const someSelected = selectableList.some((id) => selected.has(id)) && !allSelected
   const hasFilter = memberQuery.trim() !== '' || envQuery.trim() !== '' || envTag !== null
 
-  const cellWidth = 140
+  const cellWidth = 150
   const memberColWidth = 220
-
-  const ROLE_BTNS: { value: EnvRole; label: string; short: string; color: string }[] = [
-    { value: 'inherit', label: 'Inherit (ikut project)', short: '~', color: 'gray' },
-    { value: 'VIEWER', label: 'Viewer', short: 'V', color: 'gray' },
-    { value: 'EDITOR', label: 'Editor', short: 'E', color: 'teal' },
-    { value: 'OWNER', label: 'Owner', short: 'O', color: 'blue' },
-    { value: 'denied', label: 'Denied (blokir akses)', short: '✕', color: 'red' },
-  ]
 
   return (
     <Stack gap="xs">
@@ -159,9 +144,6 @@ export function MembersMatrixView({
             : `${data.members.length} user × ${data.environments.length} env`}
         </Text>
       </Group>
-
-      {/* Legenda arti simbol — menggantikan badge role di tiap cell */}
-      <MatrixLegend />
 
       <ScrollArea type="auto" offsetScrollbars>
         <Box style={{ minWidth: memberColWidth + cellWidth * filteredEnvs.length }}>
@@ -252,42 +234,22 @@ export function MembersMatrixView({
                     style={{
                       width: cellWidth,
                       padding: 6,
+                      display: 'flex',
+                      alignItems: 'center',
                       borderLeft: '1px solid var(--mantine-color-default-border)',
                       // Tint merah tipis menandai env yang diblokir (denied) — sinyal
-                      // keamanan tetap terlihat sekilas tanpa badge per-cell.
+                      // keamanan tetap terlihat sekilas.
                       background: isDenied ? 'var(--mantine-color-red-light)' : undefined,
                     }}
                   >
-                    <Group gap={2} wrap="nowrap" justify="center">
-                      {isDenied && (
-                        <Tooltip label="Akses diblokir di env ini" withArrow fz="xs">
-                          <Text span c="red" style={{ display: 'flex', alignItems: 'center' }}>
-                            <TbLock size={11} />
-                          </Text>
-                        </Tooltip>
-                      )}
-                      {ROLE_BTNS.map((btn) => {
-                        const current = cell?.envRole ?? 'denied'
-                        const isActive = current === btn.value
-                        return (
-                          <Tooltip key={btn.value} label={btn.label} withArrow fz="xs">
-                            <ActionIcon
-                              size={18}
-                              variant={isActive ? 'filled' : 'subtle'}
-                              color={isActive ? btn.color : 'gray'}
-                              disabled={setEnvRoleMutation.isPending}
-                              onClick={() => {
-                                if (!isActive)
-                                  setEnvRoleMutation.mutate({ userId: m.userId, envName: env.name, role: btn.value })
-                              }}
-                              style={{ fontSize: 10, fontWeight: 700 }}
-                            >
-                              {btn.short}
-                            </ActionIcon>
-                          </Tooltip>
-                        )
-                      })}
-                    </Group>
+                    <Box style={{ flex: 1 }}>
+                      <AccessRoleCell
+                        value={cell?.envRole ?? 'inherit'}
+                        effectiveRole={cell?.effectiveRole ?? null}
+                        disabled={setEnvRoleMutation.isPending}
+                        onChange={(role) => setEnvRoleMutation.mutate({ userId: m.userId, envName: env.name, role })}
+                      />
+                    </Box>
                   </Box>
                 )
               })}
