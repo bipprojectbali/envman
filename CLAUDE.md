@@ -193,6 +193,7 @@ Lapisan ke-4 (ABAC) di atas section access: **mempersempit** akses member di dal
 - Berlaku keempat section (NOTES→`ProjectNote`, ALIASES→`ProjectAlias`, FILES→`ProjectFile`, STORAGE→`ProjectStorageObject`; semua punya `tags[]`).
 - **Enforcement baca + tulis**: item di luar scope **tak terlihat** (list ter-filter) **dan tak bisa disentuh**.
   - Read-by-id/download/edit/delete item luar scope → **404** (invisibility, jangan bocorkan keberadaan). Bedakan dari section-denied yang tetap **403**.
+  - **Section-role OWNER pun di-guard**: OWNER via matrix bisa punya scopeTags → storage delete/folder-delete tetap cek scope (project-OWNER inherit selalu scope kosong = full). Jangan asumsikan OWNER=full-access saat ada `scopeTags`.
   - **Create rule**: user limited WAJIB memberi item baru ≥1 tag scope-nya → else **400** (cegah bikin item invisible-to-self). Edit yang retag keluar scope → **400**.
 - SUPER_ADMIN & OWNER (via inherit) selalu `scopeTags=[]` (tak pernah di-limit).
 
@@ -206,8 +207,9 @@ Lapisan ke-4 (ABAC) di atas section access: **mempersempit** akses member di dal
 
 - `PUT .../sections/:section/members/:userId` body additive `{ role, scopeTags? }` (validasi array string, trim/dedupe; `denied`/`inherit`→scope di-clear). Admin parity `PUT admin/.../sections/:section` sama. Response bawa `scopeTags`.
 - `GET section-matrix` + `GET .../sections/:section/members` field additive `scopeTags` per cell.
-- UI: `SectionMatrixView.tsx` per-cell `TagScopeEditor` (Popover+TagsInput; badge `Full`/`N tag`) saat role granted. Storage: badge tag di row/card (`tagColor`), edit tag via `StorageRenameModal` (PATCH `/storage/meta`).
-- CLI: `envman storage ls --tag a,b` (filter client-side; server sudah scope). Tags dicetak di baris file.
+- `GET section-matrix` juga bawa `availableTags: Record<section, string[]>` (union tag item per section) untuk autocomplete editor.
+- UI: `SectionMatrixView.tsx` per-cell `TagScopeEditor` (Popover+TagsInput dengan saran `availableTags`; badge `Full`/`N tag`) saat role granted. Storage: badge tag di row/card (`tagColor`), edit tag via `StorageRenameModal` (PATCH `/storage/meta`).
+- CLI: `envman storage ls --tag a,b` (filter client-side; server sudah scope; tags dicetak di baris file). `envman storage upload --tag a,b` memberi tag saat upload (folder → semua file; via `confirm-upload`/`multipart/complete`).
 
 ### Test
 
