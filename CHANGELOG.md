@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-07-21
+
 ### Added
 - **`envman env pull --only KEY1,KEY2`** — tarik hanya sebagian key sebuah environment jadi `.env`. Key yang diminta tapi tak ada dilaporkan ke stderr dan menyebabkan exit non-zero (key yang ketemu tetap dicetak/ditulis), jadi script bisa mendeteksi key hilang. Contoh: `envman env pull myapp:prod --only DATABASE_URL,REDIS_URL > .env`.
 - **`envman env get <project>:<env> <KEY>`** — cetak satu value mentah (tanpa `KEY=`), ideal untuk `$(...)` atau pipe ke clipboard. `-n`/`--no-newline` menekan newline. Key yang tak ada atau secret yang tak bisa di-reveal (akses VIEWER) jadi error dengan exit non-zero.
