@@ -179,11 +179,21 @@ export const adminUsersRouter = new Elysia()
       set.status = 400
       return { error: 'Section tidak valid' }
     }
-    const body = (await request.json().catch(() => null)) as { role?: unknown } | null
+    const body = (await request.json().catch(() => null)) as { role?: unknown; scopeTags?: unknown } | null
     if (!body || !isValidEnvRole(body.role)) {
       set.status = 400
       return { error: "role must be 'inherit', 'denied', 'OWNER', 'EDITOR', or 'VIEWER'" }
     }
+    let scopeTags: string[] = []
+    if (body.scopeTags !== undefined) {
+      if (!Array.isArray(body.scopeTags) || body.scopeTags.some((t) => typeof t !== 'string')) {
+        set.status = 400
+        return { error: 'scopeTags harus berupa array string' }
+      }
+      scopeTags = [...new Set((body.scopeTags as string[]).map((t) => t.trim()).filter(Boolean))]
+    }
+    const isRole = body.role !== 'inherit' && body.role !== 'denied'
+    const effectiveScope = isRole ? scopeTags : []
 
     const project = await prisma.project.findUnique({ where: { slug: params.slug } })
     if (!project) {
@@ -207,14 +217,14 @@ export const adminUsersRouter = new Elysia()
     } else if (body.role === 'denied') {
       await prisma.projectSectionMember.upsert({
         where,
-        update: { role: null },
-        create: { userId: params.userId, projectId: project.id, section: params.section, role: null },
+        update: { role: null, scopeTags: [] },
+        create: { userId: params.userId, projectId: project.id, section: params.section, role: null, scopeTags: [] },
       })
     } else {
       await prisma.projectSectionMember.upsert({
         where,
-        update: { role: body.role },
-        create: { userId: params.userId, projectId: project.id, section: params.section, role: body.role },
+        update: { role: body.role, scopeTags: effectiveScope },
+        create: { userId: params.userId, projectId: project.id, section: params.section, role: body.role, scopeTags: effectiveScope },
       })
     }
 
@@ -222,12 +232,12 @@ export const adminUsersRouter = new Elysia()
     const detail =
       body.role === 'inherit'
         ? `${params.slug}/${params.section} user=${params.userId} (admin)`
-        : `${params.slug}/${params.section} user=${params.userId} role=${body.role} (admin)`
+        : `${params.slug}/${params.section} user=${params.userId} role=${body.role}${effectiveScope.length ? ` scope=[${effectiveScope.join(',')}]` : ''} (admin)`
     audit(caller.userId, auditAction, detail, getIp(request))
 
     await invalidateCache(cacheKeys.projectDetail(params.slug))
     await invalidateProjectCaches(params.slug, [params.userId])
-    return { ok: true, role: body.role }
+    return { ok: true, role: body.role, scopeTags: effectiveScope }
   })
 
   // ─── Set user capability list (SUPER_ADMIN grants) ───────────────────────────

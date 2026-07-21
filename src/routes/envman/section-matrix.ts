@@ -22,7 +22,7 @@ export const sectionMatrixRouter = new Elysia()
       const project = await prisma.project.findFirst({
         where: { slug: params.slug, ...notDeleted },
         include: {
-          sectionMembers: { select: { userId: true, section: true, role: true } },
+          sectionMembers: { select: { userId: true, section: true, role: true, scopeTags: true } },
           members: {
             include: { user: { select: { id: true, name: true, email: true, image: true } } },
             orderBy: { createdAt: 'asc' },
@@ -31,17 +31,18 @@ export const sectionMatrixRouter = new Elysia()
       })
       if (!project) return null
       const members = project.members.map((pm) => {
-        const sectionAccess: Record<string, { sectionRole: SectionRoleInput; effectiveRole: ProjectRole | null }> = {}
+        const sectionAccess: Record<string, { sectionRole: SectionRoleInput; effectiveRole: ProjectRole | null; scopeTags: string[] }> = {}
         for (const section of SECTIONS) {
           const override = project.sectionMembers.find((sm) => sm.userId === pm.userId && sm.section === section)
           if (!override) {
-            sectionAccess[section] = { sectionRole: 'inherit', effectiveRole: pm.role as ProjectRole }
+            sectionAccess[section] = { sectionRole: 'inherit', effectiveRole: pm.role as ProjectRole, scopeTags: [] }
           } else if (override.role === null) {
-            sectionAccess[section] = { sectionRole: 'denied', effectiveRole: null }
+            sectionAccess[section] = { sectionRole: 'denied', effectiveRole: null, scopeTags: [] }
           } else {
             sectionAccess[section] = {
               sectionRole: override.role as ProjectRole,
               effectiveRole: override.role as ProjectRole,
+              scopeTags: override.scopeTags,
             }
           }
         }

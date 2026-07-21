@@ -56,6 +56,7 @@ export const sectionMembersRouter = new Elysia()
       const override = overrideByUser.get(pm.userId)
       let sectionRole: SectionRoleInput = 'inherit'
       let effectiveRole: ProjectRole | null = pm.role as ProjectRole
+      let scopeTags: string[] = []
       if (override) {
         if (override.role === null) {
           sectionRole = 'denied'
@@ -63,6 +64,7 @@ export const sectionMembersRouter = new Elysia()
         } else {
           sectionRole = override.role as ProjectRole
           effectiveRole = override.role as ProjectRole
+          scopeTags = override.scopeTags
         }
       }
       return {
@@ -71,6 +73,7 @@ export const sectionMembersRouter = new Elysia()
         projectRole: pm.role as ProjectRole,
         sectionRole,
         effectiveRole,
+        scopeTags,
       }
     })
 
@@ -88,11 +91,24 @@ export const sectionMembersRouter = new Elysia()
     const access = await getProjectAccess(caller.userId, caller.role, params.slug)
     if (!access || access !== 'OWNER') return forbidden(set)
 
-    const body = (await request.json().catch(() => null)) as { role?: unknown } | null
+    const body = (await request.json().catch(() => null)) as { role?: unknown; scopeTags?: unknown } | null
     if (!body || !isValidSectionRole(body.role)) {
       set.status = 400
       return { error: "role harus 'inherit', 'denied', 'OWNER', 'EDITOR', atau 'VIEWER'" }
     }
+    // scopeTags opsional; hanya bermakna saat role granted (bukan inherit/denied).
+    // Trim + dedupe + drop kosong. Validasi harus array string.
+    let scopeTags: string[] = []
+    if (body.scopeTags !== undefined) {
+      if (!Array.isArray(body.scopeTags) || body.scopeTags.some((t) => typeof t !== 'string')) {
+        set.status = 400
+        return { error: 'scopeTags harus berupa array string' }
+      }
+      scopeTags = [...new Set((body.scopeTags as string[]).map((t) => t.trim()).filter(Boolean))]
+    }
+    // Tag scope tak relevan untuk inherit (row dihapus) atau denied (tak ada akses).
+    const isRole = body.role !== 'inherit' && body.role !== 'denied'
+    const effectiveScope = isRole ? scopeTags : []
 
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -118,28 +134,29 @@ export const sectionMembersRouter = new Elysia()
     if (body.role === 'inherit') {
       if (existing) await prisma.projectSectionMember.delete({ where: { id: existing.id } })
     } else if (body.role === 'denied') {
+      // denied → clear scopeTags (tak boleh ada phantom scope).
       await prisma.projectSectionMember.upsert({
         where: { userId_projectId_section: { userId: params.userId, projectId: project.id, section: params.section } },
-        update: { role: null },
-        create: { userId: params.userId, projectId: project.id, section: params.section, role: null },
+        update: { role: null, scopeTags: [] },
+        create: { userId: params.userId, projectId: project.id, section: params.section, role: null, scopeTags: [] },
       })
     } else {
       await prisma.projectSectionMember.upsert({
         where: { userId_projectId_section: { userId: params.userId, projectId: project.id, section: params.section } },
-        update: { role: body.role },
-        create: { userId: params.userId, projectId: project.id, section: params.section, role: body.role },
+        update: { role: body.role, scopeTags: effectiveScope },
+        create: { userId: params.userId, projectId: project.id, section: params.section, role: body.role, scopeTags: effectiveScope },
       })
     }
 
     audit(
       caller.userId,
       'SECTION_MEMBER_SET',
-      `${params.slug}/${params.section} user=${params.userId} role=${body.role}`,
+      `${params.slug}/${params.section} user=${params.userId} role=${body.role}${effectiveScope.length ? ` scope=[${effectiveScope.join(',')}]` : ''}`,
       getIp(request),
     )
     await invalidateCache(cacheKeys.projectDetail(params.slug))
     await invalidateProjectCaches(params.slug, [params.userId])
-    return { ok: true, role: body.role }
+    return { ok: true, role: body.role, scopeTags: effectiveScope }
   })
 
   // DELETE /api/envman/projects/:slug/sections/:section/members/:userId — reset to inherit (OWNER)
