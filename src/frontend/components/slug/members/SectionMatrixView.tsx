@@ -189,8 +189,10 @@ export function SectionMatrixView({ slug }: { slug: string }) {
                         )
                       })}
                     </Group>
-                    {/* Tag-scope editor: hanya saat role granted (bukan denied/inherit). */}
-                    {cell && cell.effectiveRole !== null && (
+                    {/* Tag-scope editor: hanya saat role di-grant EKSPLISIT di section
+                        (bukan denied, bukan inherit). Server mengabaikan scopeTags saat
+                        inherit (role dihapus), jadi menampilkan editor di sana menyesatkan. */}
+                    {cell && cell.effectiveRole !== null && cell.sectionRole !== 'inherit' && (
                       <Box mt={4} style={{ display: 'flex', justifyContent: 'center' }}>
                         <TagScopeEditor
                           scopeTags={cell.scopeTags ?? []}

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Badge tag-scope tak lagi muncul di sel section yang `inherit`.** Di tab Members → Sections, badge `Full`/`N tag` sebelumnya juga tampil untuk sel dengan role **inherit** (mis. OWNER project yang mewarisi akses) — padahal server mengabaikan `scopeTags` saat inherit (row section dihapus), jadi klik "Simpan" tak berefek dan badge tetap "Full", terlihat seperti tombol rusak. Kini badge hanya muncul saat role di-**grant eksplisit** di section itu (Viewer/Editor/Owner), konsisten dengan sel denied yang juga tak menampilkannya. Untuk memakai tag-scope, set role section member secara eksplisit dulu.
+
 ## [0.24.0] - 2026-07-21
 
 ### Added
