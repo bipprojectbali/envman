@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-07-21
+
 ### Added
 - **Tag scope per-section (limit by tag).** Selain memberi member akses ke sebuah section (Notes/Aliases/Files/Storage), OWNER kini bisa **mempersempit** akses itu ke item bertag tertentu. Di tab Members → Sections, tiap sel role punya badge `Full`/`N tag` — klik untuk set daftar tag. Member dengan scope tag hanya melihat & mengelola item yang punya **minimal satu** tag itu (match OR); item tanpa tag **hanya** untuk member full-access (aman-by-default). Berlaku baca **dan** tulis: item di luar scope tak terlihat (404) dan tak bisa diedit/hapus; membuat item wajib menyertakan ≥1 tag scope-nya. Kosongkan tag = full access (perilaku lama, tak ada perubahan bagi member existing).
 - **Tag di UI Storage.** File storage kini menampilkan badge tag (list & grid), dan tag file bisa diedit dari web (modal Edit File). Sebelumnya tag hanya bisa diset saat upload.
