@@ -79,10 +79,11 @@ code is propagated as envman's exit code.
 func storageLsCmd() *cobra.Command {
 	var prefix string
 	var page int
+	var tags []string
 	cmd := &cobra.Command{
 		Use:     "ls <project>",
 		Short:   "List files and folders in project storage",
-		Example: "  envman storage ls myapp\n  envman storage ls myapp --prefix assets/",
+		Example: "  envman storage ls myapp\n  envman storage ls myapp --prefix assets/\n  envman storage ls myapp --tag design,logo",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := auth.Resolve()
@@ -93,6 +94,13 @@ func storageLsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// --tag: client-side filter (OR match). Server already scopes what a
+			// tag-limited member can see; this just narrows the displayed rows.
+			wantTags := splitCSV(tags)
+			files := result.Files
+			if len(wantTags) > 0 {
+				files = filterFilesByTag(files, wantTags)
+			}
 			fmt.Printf("Storage: %s / %s  (%d files)\n\n",
 				storage.FmtBytes(result.Usage.UsedBytes),
 				storage.FmtBytes(result.Usage.QuotaBytes),
@@ -100,12 +108,16 @@ func storageLsCmd() *cobra.Command {
 			for _, f := range result.Folders {
 				fmt.Printf("  %s/\n", f)
 			}
-			for _, f := range result.Files {
+			for _, f := range files {
 				pub := ""
 				if f.IsPublic {
 					pub = " [public]"
 				}
-				fmt.Printf("  %-40s  %8s  %s%s\n", f.Path, storage.FmtBytes(f.Size), f.MimeType, pub)
+				tagStr := ""
+				if len(f.Tags) > 0 {
+					tagStr = "  #" + strings.Join(f.Tags, " #")
+				}
+				fmt.Printf("  %-40s  %8s  %s%s%s\n", f.Path, storage.FmtBytes(f.Size), f.MimeType, pub, tagStr)
 			}
 			if result.TotalFiles > result.PageSize {
 				fmt.Printf("\nPage %d / %d  (use --page N for more)\n", result.Page, (result.TotalFiles+result.PageSize-1)/result.PageSize)
@@ -115,7 +127,26 @@ func storageLsCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&prefix, "prefix", "", "Folder prefix to list (e.g. assets/)")
 	cmd.Flags().IntVar(&page, "page", 1, "Page number")
+	cmd.Flags().StringSliceVar(&tags, "tag", nil, "Only show files with any of these tags (comma-separated)")
 	return cmd
+}
+
+// filterFilesByTag keeps files that carry at least one of the wanted tags (OR).
+func filterFilesByTag(files []storage.StorageFile, want []string) []storage.StorageFile {
+	wset := make(map[string]bool, len(want))
+	for _, t := range want {
+		wset[t] = true
+	}
+	out := make([]storage.StorageFile, 0, len(files))
+	for _, f := range files {
+		for _, t := range f.Tags {
+			if wset[t] {
+				out = append(out, f)
+				break
+			}
+		}
+	}
+	return out
 }
 
 func storageUploadCmd() *cobra.Command {

@@ -11,6 +11,7 @@ envman storage ls myapp                      # list semua di root
 envman storage ls myapp --prefix assets/     # list folder assets/
 envman storage ls myapp --prefix scripts/    # list folder scripts/
 envman storage ls myapp --page 2             # halaman berikutnya (50/halaman)
+envman storage ls myapp --tag design,logo    # hanya file bertag design ATAU logo
 \`\`\`
 
 Output: kuota terpakai, daftar folder, daftar file (path · ukuran · MIME · public).
