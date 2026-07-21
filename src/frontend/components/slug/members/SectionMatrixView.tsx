@@ -2,7 +2,6 @@ import {
   ActionIcon,
   Badge,
   Box,
-  Button,
   Group,
   Popover,
   ScrollArea,
@@ -256,17 +255,15 @@ function TagScopeEditor({
 }) {
   const [opened, setOpened] = useState(false)
   const [draft, setDraft] = useState<string[]>(scopeTags)
-  // Track the uncommitted search text so "Simpan" also picks up a tag the user
-  // typed but didn't press Enter on (Mantine TagsInput keeps it out of `value`).
-  const [search, setSearch] = useState('')
   const limited = scopeTags.length > 0
 
-  const commitAndSave = () => {
-    const pending = search.trim()
-    const all = pending ? [...draft, pending] : draft
-    onSave([...new Set(all.map((t) => t.trim()).filter(Boolean))])
-    setSearch('')
-    setOpened(false)
+  // Auto-save on every change — no Save button (the suggestion dropdown could
+  // cover it in the narrow popover). Each add/remove persists immediately, like
+  // the role buttons. Dedupe + trim + drop empties.
+  const apply = (tags: string[]) => {
+    const clean = [...new Set(tags.map((t) => t.trim()).filter(Boolean))]
+    setDraft(clean)
+    onSave(clean)
   }
 
   return (
@@ -277,10 +274,7 @@ function TagScopeEditor({
       position="bottom"
       withArrow
       trapFocus
-      onOpen={() => {
-        setDraft(scopeTags)
-        setSearch('')
-      }}
+      onOpen={() => setDraft(scopeTags)}
     >
       <Popover.Target>
         <Tooltip label={limited ? `Limit tag: ${scopeTags.join(', ')}` : 'Full access (semua item)'} withArrow fz="xs">
@@ -297,28 +291,23 @@ function TagScopeEditor({
         </Tooltip>
       </Popover.Target>
       <Popover.Dropdown>
-        <Stack gap="xs">
+        <Stack gap={6}>
           <Text size="xs" c="dimmed">
             Batasi akses ke item bertag tertentu. Kosongkan = full access.
           </Text>
           <TagsInput
             size="xs"
-            placeholder="tag..."
+            placeholder="ketik tag lalu Enter"
             data={suggestions}
             value={draft}
-            onChange={setDraft}
-            searchValue={search}
-            onSearchChange={setSearch}
+            onChange={apply}
+            disabled={disabled}
             clearable
+            comboboxProps={{ withinPortal: true }}
           />
-          <Group justify="flex-end" gap="xs">
-            <Button size="compact-xs" variant="subtle" color="gray" onClick={() => setOpened(false)}>
-              Batal
-            </Button>
-            <Button size="compact-xs" disabled={disabled} onClick={commitAndSave}>
-              Simpan
-            </Button>
-          </Group>
+          <Text size="xs" c="dimmed" fz={10}>
+            Perubahan tersimpan otomatis.
+          </Text>
         </Stack>
       </Popover.Dropdown>
     </Popover>
