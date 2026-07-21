@@ -1,4 +1,16 @@
-import { ActionIcon, Badge, Box, Button, Group, Popover, ScrollArea, Stack, TagsInput, Text, Tooltip } from '@mantine/core'
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Popover,
+  ScrollArea,
+  Stack,
+  TagsInput,
+  Text,
+  Tooltip,
+} from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { TbLock, TbTag } from 'react-icons/tb'
@@ -6,7 +18,7 @@ import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { MatrixLegend } from './MatrixLegend'
-import { type SectionMatrix, type SectionRole, roleColor, sectionLabel } from './types'
+import { roleColor, type SectionMatrix, type SectionRole, sectionLabel } from './types'
 
 // Matrix member × section (Notes/Aliases/Files/Storage) — analog MembersMatrixView.
 // Section kolomnya fixed 4, tanpa filter/tag; ikon role sama persis (~ V E O ✕).
@@ -20,7 +32,17 @@ export function SectionMatrixView({ slug }: { slug: string }) {
   })
 
   const setRoleMutation = useMutation({
-    mutationFn: ({ userId, section, role, scopeTags }: { userId: string; section: string; role: SectionRole; scopeTags?: string[] }) =>
+    mutationFn: ({
+      userId,
+      section,
+      role,
+      scopeTags,
+    }: {
+      userId: string
+      section: string
+      role: SectionRole
+      scopeTags?: string[]
+    }) =>
       apiFetch(`/api/envman/projects/${slug}/sections/${section}/members/${userId}`, {
         method: 'PUT',
         body: JSON.stringify(scopeTags !== undefined ? { role, scopeTags } : { role }),
@@ -178,8 +200,7 @@ export function SectionMatrixView({ slug }: { slug: string }) {
                               color={isActive ? btn.color : 'gray'}
                               disabled={setRoleMutation.isPending}
                               onClick={() => {
-                                if (!isActive)
-                                  setRoleMutation.mutate({ userId: m.userId, section, role: btn.value })
+                                if (!isActive) setRoleMutation.mutate({ userId: m.userId, section, role: btn.value })
                               }}
                               style={{ fontSize: 10, fontWeight: 700 }}
                             >
@@ -235,7 +256,18 @@ function TagScopeEditor({
 }) {
   const [opened, setOpened] = useState(false)
   const [draft, setDraft] = useState<string[]>(scopeTags)
+  // Track the uncommitted search text so "Simpan" also picks up a tag the user
+  // typed but didn't press Enter on (Mantine TagsInput keeps it out of `value`).
+  const [search, setSearch] = useState('')
   const limited = scopeTags.length > 0
+
+  const commitAndSave = () => {
+    const pending = search.trim()
+    const all = pending ? [...draft, pending] : draft
+    onSave([...new Set(all.map((t) => t.trim()).filter(Boolean))])
+    setSearch('')
+    setOpened(false)
+  }
 
   return (
     <Popover
@@ -245,7 +277,10 @@ function TagScopeEditor({
       position="bottom"
       withArrow
       trapFocus
-      onOpen={() => setDraft(scopeTags)}
+      onOpen={() => {
+        setDraft(scopeTags)
+        setSearch('')
+      }}
     >
       <Popover.Target>
         <Tooltip label={limited ? `Limit tag: ${scopeTags.join(', ')}` : 'Full access (semua item)'} withArrow fz="xs">
@@ -272,20 +307,15 @@ function TagScopeEditor({
             data={suggestions}
             value={draft}
             onChange={setDraft}
+            searchValue={search}
+            onSearchChange={setSearch}
             clearable
           />
           <Group justify="flex-end" gap="xs">
             <Button size="compact-xs" variant="subtle" color="gray" onClick={() => setOpened(false)}>
               Batal
             </Button>
-            <Button
-              size="compact-xs"
-              disabled={disabled}
-              onClick={() => {
-                onSave(draft.map((t) => t.trim()).filter(Boolean))
-                setOpened(false)
-              }}
-            >
+            <Button size="compact-xs" disabled={disabled} onClick={commitAndSave}>
               Simpan
             </Button>
           </Group>
