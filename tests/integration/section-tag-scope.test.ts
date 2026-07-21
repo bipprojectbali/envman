@@ -63,10 +63,11 @@ beforeAll(async () => {
     ],
   })
 
-  // limited di NOTES: EDITOR tapi scope terbatas ke tag 'a'.
-  await setSectionScope(limitedId, 'NOTES', 'EDITOR', ['a'])
-  // limited di FILES: EDITOR scope 'a'.
-  await setSectionScope(limitedId, 'FILES', 'EDITOR', ['a'])
+  // limited jadi section OWNER + scope ['a'] agar author-check (EDITOR hanya
+  // boleh edit note sendiri) tak mengaburkan logika tag-scope yang diuji —
+  // OWNER bypass author-check, jadi hanya guard tag yang menentukan.
+  await setSectionScope(limitedId, 'NOTES', 'OWNER', ['a'])
+  await setSectionScope(limitedId, 'FILES', 'OWNER', ['a'])
 }, 30000)
 
 afterAll(async () => {
