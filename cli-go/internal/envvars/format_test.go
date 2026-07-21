@@ -78,6 +78,41 @@ func TestFormatEnv(t *testing.T) {
 	}
 }
 
+func TestSelectKeys(t *testing.T) {
+	vars := map[string]string{"A": "1", "B": "2", "C": "3"}
+
+	t.Run("empty only returns all, no missing", func(t *testing.T) {
+		sel, missing := SelectKeys(vars, nil)
+		if len(sel) != 3 || len(missing) != 0 {
+			t.Errorf("got sel=%v missing=%v", sel, missing)
+		}
+	})
+
+	t.Run("subset selected", func(t *testing.T) {
+		sel, missing := SelectKeys(vars, []string{"A", "C"})
+		if len(sel) != 2 || sel["A"] != "1" || sel["C"] != "3" {
+			t.Errorf("unexpected selection: %v", sel)
+		}
+		if _, ok := sel["B"]; ok {
+			t.Errorf("B should not be selected")
+		}
+		if len(missing) != 0 {
+			t.Errorf("expected no missing, got %v", missing)
+		}
+	})
+
+	t.Run("missing keys reported sorted", func(t *testing.T) {
+		sel, missing := SelectKeys(vars, []string{"C", "Z", "A", "Y"})
+		if len(sel) != 2 {
+			t.Errorf("expected A and C, got %v", sel)
+		}
+		want := []string{"Y", "Z"}
+		if len(missing) != 2 || missing[0] != want[0] || missing[1] != want[1] {
+			t.Errorf("missing = %v, want %v", missing, want)
+		}
+	})
+}
+
 func TestQuoteIfNeeded(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"simple", "simple"},

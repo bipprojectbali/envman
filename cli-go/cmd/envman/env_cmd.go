@@ -25,7 +25,7 @@ Secrets are auto-detected from key names (e.g. *_TOKEN, *_KEY, *PASSWORD*,
 *SECRET*, DATABASE_URL). Keys already stored as secret on the server stay
 secret. Override per key with --plain / --secret, or disable with --no-detect.`,
 	}
-	cmd.AddCommand(envPushCmd(), envPullCmd(), envKeysCmd())
+	cmd.AddCommand(envPushCmd(), envPullCmd(), envGetCmd(), envKeysCmd())
 	return cmd
 }
 
@@ -47,6 +47,23 @@ func looksLikeTarget(arg string) bool {
 		return false
 	}
 	return true
+}
+
+// splitCSVList flattens repeated/comma-joined flag values into an ordered,
+// de-duplicated list (order of first appearance). Used where order matters,
+// e.g. --only reporting.
+func splitCSVList(vals []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, v := range vals {
+		for _, part := range strings.Split(v, ",") {
+			if p := strings.TrimSpace(part); p != "" && !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+		}
+	}
+	return out
 }
 
 // splitCSVSet parses "A,B,C" flag values into a set.
@@ -138,15 +155,21 @@ the server but absent from the file are left untouched (never deleted).`,
 func envPullCmd() *cobra.Command {
 	var outFile string
 	var force bool
+	var only []string
 	cmd := &cobra.Command{
 		Use:   "pull <project>:<env>",
 		Short: "Pull an environment's vars as .env",
 		Long: `Fetch an environment's vars and print them as .env lines to stdout, or write
 them to a file with -o. Secrets you cannot reveal (VIEWER access) are skipped
-and reported to stderr.`,
+and reported to stderr.
+
+Use --only KEY1,KEY2 to pull just a subset of keys. Requested keys missing from
+the environment are reported to stderr and cause a non-zero exit (the keys that
+were found are still printed/written).`,
 		Example: "  envman env pull myapp:prod\n" +
 			"  envman env pull myapp:prod -o .env\n" +
-			"  envman env pull myapp:prod -o .env --force",
+			"  envman env pull myapp:prod -o .env --force\n" +
+			"  envman env pull myapp:prod --only DATABASE_URL,REDIS_URL",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := envvars.ParseTarget(args[0])
@@ -161,6 +184,11 @@ and reported to stderr.`,
 			if err != nil {
 				return err
 			}
+
+			// --only: keep just the requested keys (preserving flag order for the
+			// missing report), and remember any that were absent.
+			vars, missing := envvars.SelectKeys(vars, splitCSVList(only))
+
 			content, masked := envvars.FormatEnv(vars)
 
 			if len(masked) > 0 {
@@ -171,22 +199,75 @@ and reported to stderr.`,
 
 			if outFile == "" {
 				fmt.Print(content)
-				return nil
-			}
-			if !force {
-				if _, err := os.Stat(outFile); err == nil {
-					return fmt.Errorf("[envman] %s sudah ada — gunakan --force untuk menimpa", outFile)
+			} else {
+				if !force {
+					if _, err := os.Stat(outFile); err == nil {
+						return fmt.Errorf("[envman] %s sudah ada — gunakan --force untuk menimpa", outFile)
+					}
 				}
+				if err := atomicWrite(outFile, content); err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stderr, "[envman] %d variabel ditulis ke %s\n", countLines(content), outFile)
 			}
-			if err := atomicWrite(outFile, content); err != nil {
-				return err
+
+			// Report missing --only keys and exit non-zero so scripts can detect it.
+			if len(missing) > 0 {
+				fmt.Fprintf(os.Stderr, "[envman] key tidak ditemukan: %s\n", strings.Join(missing, ", "))
+				return fmt.Errorf("[envman] %d key dari --only tidak ada di %s:%s", len(missing), t.Slug, t.Env)
 			}
-			fmt.Fprintf(os.Stderr, "[envman] %d variabel ditulis ke %s\n", countLines(content), outFile)
 			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&outFile, "output", "o", "", "Write to file instead of stdout")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite output file if it exists")
+	cmd.Flags().StringSliceVar(&only, "only", nil, "Only pull these keys (comma-separated)")
+	return cmd
+}
+
+func envGetCmd() *cobra.Command {
+	var noNewline bool
+	cmd := &cobra.Command{
+		Use:   "get <project>:<env> <KEY>",
+		Short: "Print a single var's raw value (no KEY=)",
+		Long: `Fetch one variable and print just its value — no KEY= prefix, nothing else on
+stdout. Ideal for capturing into a shell var or piping to a clipboard. All
+diagnostics go to stderr. Missing key (or a secret you cannot reveal) is an
+error with a non-zero exit.`,
+		Example: "  envman env get myapp:prod DATABASE_URL\n" +
+			"  envman env get myapp:prod DATABASE_URL -n | envman clip set\n" +
+			"  DB=$(envman env get myapp:prod DATABASE_URL)",
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			t, err := envvars.ParseTarget(args[0])
+			if err != nil {
+				return err
+			}
+			key := args[1]
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return err
+			}
+			vars, err := envvars.FetchExisting(cfg, t)
+			if err != nil {
+				return err
+			}
+			val, ok := vars[key]
+			if !ok {
+				return fmt.Errorf("[envman] key tidak ditemukan: %s", key)
+			}
+			if val == envvars.MaskedValue {
+				return fmt.Errorf("[envman] %s adalah secret yang tak bisa kamu reveal (akses VIEWER)", key)
+			}
+			if noNewline {
+				fmt.Print(val)
+			} else {
+				fmt.Println(val)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVarP(&noNewline, "no-newline", "n", false, "Do not print a trailing newline (ideal for piping to a clipboard)")
 	return cmd
 }
 

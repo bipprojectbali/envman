@@ -252,15 +252,35 @@ envman env pull myapp:prod                # cetak ke stdout
 envman env pull myapp:prod > .env         # redirect ke file
 envman env pull myapp:prod -o .env        # tulis ke file (atomic)
 envman env pull myapp:prod -o .env --force    # timpa file yang sudah ada
+envman env pull myapp:prod --only DATABASE_URL,REDIS_URL   # hanya key tertentu
 ```
 
 Nilai yang mengandung spasi, `=`, `#`, atau newline otomatis dikutip
 (`KEY="..."`). Dengan `-o`, penulisan bersifat atomik dan **menolak menimpa**
 file yang sudah ada kecuali `--force`.
 
+`--only KEY1,KEY2` mengambil **subset key** saja. Key yang diminta tapi tidak ada
+di environment dilaporkan ke stderr dan menyebabkan **exit non-zero** (key yang
+ketemu tetap dicetak/ditulis) — sehingga script bisa mendeteksi key yang hilang.
+
 Secret yang **tidak bisa kamu reveal** (akses VIEWER menerima `***`) akan
 **dilewati** dan dilaporkan ke stderr — sehingga `.env` yang dihasilkan tetap
 valid. Untuk mengambil nilai secret asli, kamu butuh akses EDITOR/OWNER.
+
+### Get (satu value mentah)
+
+Cetak **satu value** saja — tanpa `KEY=`, tanpa apa pun lain di stdout. Cocok
+untuk menangkap ke shell var atau mengirim ke clipboard.
+
+```bash
+envman env get myapp:prod DATABASE_URL              # cetak value (dengan newline)
+envman env get myapp:prod DATABASE_URL -n | pbcopy  # tanpa newline, ke clipboard
+DB=$(envman env get myapp:prod DATABASE_URL)        # tangkap ke shell var
+```
+
+Key yang tidak ada — atau secret yang tak bisa kamu reveal (akses VIEWER) —
+adalah error dengan exit non-zero, jadi aman dipakai di `$(...)`. Gunakan `-n`
+untuk menekan newline (ideal saat di-pipe ke clipboard).
 
 ### Keys (nama key saja, tanpa value)
 
@@ -333,6 +353,36 @@ code non-nol) — aman dipakai di skrip.
 ```bash
 envman clip clear              # kosongkan clipboard
 ```
+
+
+## Install — pbcopy/pbpaste OSC 52 (untuk headless / SSH)
+
+`clip` menyinkron via server; **`install pbcopy`** menyelesaikan masalah berbeda:
+di mesin **headless / SSH** (devbox, VPS) tak ada `pbcopy`, dan `xclip`/`wl-copy`
+percuma karena tak ada display server. Perintah ini memasang shim `pbcopy` +
+`pbpaste` berbasis **OSC 52** ke `~/.local/bin` yang mengirim teks ke clipboard
+mesin **lokal** (tempat terminal SSH-mu jalan) — tanpa sudo, tanpa package
+manager, tanpa X11/Wayland.
+
+```bash
+envman install pbcopy                 # pasang ke ~/.local/bin
+envman install pbcopy --dry-run       # lihat isi skrip tanpa menulis
+envman install pbcopy --force         # timpa walau pbcopy sudah ada
+envman install pbcopy --prefix ~/bin  # lokasi lain
+```
+
+**Menolak** memasang bila `pbcopy` sudah ada — di macOS (bawaan) atau ditemukan
+di PATH — kecuali `--force`. Setelah terpasang:
+
+```bash
+envman env get myapp:dev DATABASE_URL -n | pbcopy   # value → clipboard lokal
+echo "halo" | pbcopy
+```
+
+**Syarat:** terminal harus mendukung OSC 52 (kitty, WezTerm, iTerm2, Alacritty,
+foot, xterm `allowWindowOps`). Di dalam tmux, aktifkan `set -g set-clipboard on`.
+`pbpaste` (baca clipboard) sering ditolak terminal demi keamanan — `pbcopy`
+(tulis) jauh lebih luas didukung. Detail lengkap di `FITUR_PBCOPY.md`.
 
 
 ## Gists — Kelola Snippet dari CLI

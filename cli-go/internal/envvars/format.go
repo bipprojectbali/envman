@@ -34,6 +34,26 @@ func FormatEnv(vars map[string]string) (out string, masked []string) {
 	return b.String(), masked
 }
 
+// SelectKeys returns a copy of vars containing only the given keys, plus the
+// list of requested keys that were absent (sorted). Order of `only` is the
+// caller's; missing keys let the caller warn and exit non-zero. An empty `only`
+// returns vars unchanged and no missing.
+func SelectKeys(vars map[string]string, only []string) (selected map[string]string, missing []string) {
+	if len(only) == 0 {
+		return vars, nil
+	}
+	selected = make(map[string]string, len(only))
+	for _, k := range only {
+		if v, ok := vars[k]; ok {
+			selected[k] = v
+		} else {
+			missing = append(missing, k)
+		}
+	}
+	sort.Strings(missing)
+	return selected, missing
+}
+
 // FormatKeys renders just the keys (no values) of vars, sorted, one per line.
 // With names=false the output is a paste-ready .env template (KEY=); with
 // names=true it is the bare key names (KEY). Values are never emitted, so this
