@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getSectionAccess } from '../../lib/access'
+import { canAccessItem, filterByTagScope, getSectionAccessWithScope } from '../../lib/access'
 import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { cacheKeys, invalidateCache, withCache } from '../../lib/cache'
 import { prisma } from '../../lib/db'
@@ -50,20 +50,22 @@ export const filesRouter = new Elysia()
   .get('/api/envman/projects/:slug/files', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access) return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
       set.status = 404
       return { error: 'Project tidak ditemukan' }
     }
-    const files = await withCache(cacheKeys.projectFiles(params.slug), 60, () =>
+    const cachedFiles = await withCache(cacheKeys.projectFiles(params.slug), 60, () =>
       prisma.projectFile.findMany({
         where: { projectId: project.id },
         orderBy: { updatedAt: 'desc' },
         select: fileSelect,
       }),
     )
+    // Cache global per-project; tag-scope per-user → filter setelah cache boundary.
+    const files = filterByTagScope(cachedFiles, scopeTags)
     return { files }
   })
 
@@ -71,7 +73,7 @@ export const filesRouter = new Elysia()
   .post('/api/envman/projects/:slug/files', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access || access === 'VIEWER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -92,6 +94,11 @@ export const filesRouter = new Elysia()
     if (!isValidFiles(body?.files)) {
       set.status = 400
       return { error: 'files harus berisi minimal satu file' }
+    }
+    // Limited-by-tag user wajib memberi ≥1 tag scope-nya.
+    if (!canAccessItem(body.tags ?? [], scopeTags)) {
+      set.status = 400
+      return { error: `File harus punya minimal satu tag yang Anda kelola: ${scopeTags.join(', ')}` }
     }
     const prefix = body.prefix?.trim() || null
     if (prefix) {
@@ -121,7 +128,7 @@ export const filesRouter = new Elysia()
   .put('/api/envman/projects/:slug/files/:id', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access || access === 'VIEWER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -129,7 +136,8 @@ export const filesRouter = new Elysia()
       return { error: 'Project tidak ditemukan' }
     }
     const existing = await prisma.projectFile.findUnique({ where: { id: params.id } })
-    if (!existing || existing.projectId !== project.id) {
+    // Item di luar tag-scope = tak terlihat → 404.
+    if (!existing || existing.projectId !== project.id || !canAccessItem(existing.tags, scopeTags)) {
       set.status = 404
       return { error: 'File tidak ditemukan' }
     }
@@ -144,6 +152,11 @@ export const filesRouter = new Elysia()
     if (body?.files !== undefined && !isValidFiles(body.files)) {
       set.status = 400
       return { error: 'files harus berisi minimal satu file' }
+    }
+    // Retag yang mengeluarkan file dari scope sendiri ditolak.
+    if (body?.tags !== undefined && !canAccessItem(body.tags, scopeTags)) {
+      set.status = 400
+      return { error: `File harus tetap punya minimal satu tag yang Anda kelola: ${scopeTags.join(', ')}` }
     }
     if (body?.prefix !== undefined) {
       const newPrefix = typeof body.prefix === 'string' ? body.prefix.trim() || null : null
@@ -178,7 +191,7 @@ export const filesRouter = new Elysia()
   .delete('/api/envman/projects/:slug/files/:id', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access || access === 'VIEWER') return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
@@ -186,7 +199,8 @@ export const filesRouter = new Elysia()
       return { error: 'Project tidak ditemukan' }
     }
     const existing = await prisma.projectFile.findUnique({ where: { id: params.id } })
-    if (!existing || existing.projectId !== project.id) {
+    // Item di luar tag-scope = tak terlihat → 404.
+    if (!existing || existing.projectId !== project.id || !canAccessItem(existing.tags, scopeTags)) {
       set.status = 404
       return { error: 'File tidak ditemukan' }
     }

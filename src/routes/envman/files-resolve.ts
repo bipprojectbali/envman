@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getSectionAccess } from '../../lib/access'
+import { canAccessItem, getSectionAccessWithScope } from '../../lib/access'
 import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
@@ -17,7 +17,7 @@ export const filesResolveRouter = new Elysia()
   .get('/api/envman/projects/:slug/files/resolve', async ({ request, params, set, query }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'FILES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'FILES')
     if (!access) return forbidden(set)
     const prefix = (query.prefix as string | undefined)?.trim()
     const filename = (query.filename as string | undefined)?.trim()
@@ -31,7 +31,8 @@ export const filesResolveRouter = new Elysia()
       return { error: 'Project tidak ditemukan' }
     }
     const entry = await prisma.projectFile.findFirst({ where: { projectId: project.id, prefix } })
-    if (!entry) {
+    // Entry di luar tag-scope = tak terlihat → 404.
+    if (!entry || !canAccessItem(entry.tags, scopeTags)) {
       set.status = 404
       return { error: `File dengan prefix "${prefix}" tidak ditemukan di project ${params.slug}` }
     }

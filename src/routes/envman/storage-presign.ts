@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getSectionAccess } from '../../lib/access'
+import { canAccessItem, getSectionAccessWithScope } from '../../lib/access'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { isMinioEnabled } from '../../lib/minio'
 import { prisma } from '../../lib/db'
@@ -15,7 +15,7 @@ export const storagePresignRouter = new Elysia()
   .post('/api/envman/projects/:slug/storage/presign-upload', async ({ request, params, body, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Akses ditolak (butuh EDITOR atau OWNER)' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 
@@ -29,6 +29,17 @@ export const storagePresignRouter = new Elysia()
       select: { id: true, storageQuotaMb: true, storageMaxFileMb: true },
     })
     if (!project) { set.status = 404; return { error: 'Project tidak ditemukan' } }
+
+    // Tag-scope: bila menimpa file existing, file itu harus di dalam scope caller.
+    if (scopeTags.length > 0) {
+      const prior = await prisma.projectStorageObject.findUnique({
+        where: { projectId_path: { projectId: project.id, path } },
+        select: { tags: true },
+      })
+      if (prior && !canAccessItem(prior.tags, scopeTags)) {
+        set.status = 404; return { error: 'File tidak ditemukan' }
+      }
+    }
 
     // --no-clobber: tolak jika path sudah terisi (cek sebelum PUT — hemat bandwidth).
     if (noClobber && await storageObjectExists(project.id, path)) {
@@ -60,7 +71,7 @@ export const storagePresignRouter = new Elysia()
   .post('/api/envman/projects/:slug/storage/confirm-upload', async ({ request, params, body, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Akses ditolak' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 
@@ -71,6 +82,12 @@ export const storagePresignRouter = new Elysia()
     const path = sanitizePath(rawPath ?? '')
     if (!path || !minioKey) { set.status = 400; return { error: 'path atau minioKey tidak valid' } }
     if (typeof size !== 'number' || size <= 0) { set.status = 400; return { error: 'Size tidak valid' } }
+
+    // Tag-scope (limited user): tag file wajib memuat ≥1 tag scope-nya.
+    if (!canAccessItem(tags ?? [], scopeTags)) {
+      set.status = 400
+      return { error: `File harus punya minimal satu tag yang Anda kelola: ${scopeTags.join(', ')}` }
+    }
 
     const project = await prisma.project.findFirst({
       where: { slug: params.slug, ...notDeleted },

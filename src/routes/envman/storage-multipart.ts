@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getSectionAccess } from '../../lib/access'
+import { canAccessItem, getSectionAccess, getSectionAccessWithScope } from '../../lib/access'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { notDeleted } from '../../lib/db-helpers'
 import { isMinioEnabled } from '../../lib/minio'
@@ -124,7 +124,7 @@ export const storageMultipartRouter = new Elysia()
   .post('/api/envman/projects/:slug/storage/multipart/complete', async ({ request, params, body, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || access === 'VIEWER') { set.status = 403; return { error: 'Akses ditolak' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 
@@ -138,6 +138,12 @@ export const storageMultipartRouter = new Elysia()
       set.status = 400; return { error: 'path, uploadId, minioKey, dan parts wajib ada' }
     }
     if (typeof size !== 'number' || size <= 0) { set.status = 400; return { error: 'Size tidak valid' } }
+
+    // Tag-scope (limited user): tag file wajib memuat ≥1 tag scope-nya.
+    if (!canAccessItem(tags ?? [], scopeTags)) {
+      set.status = 400
+      return { error: `File harus punya minimal satu tag yang Anda kelola: ${scopeTags.join(', ')}` }
+    }
 
     const project = await prisma.project.findFirst({
       where: { slug: params.slug, ...notDeleted },

@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getSectionAccess } from '../../lib/access'
+import { canAccessItem, getSectionAccessWithScope } from '../../lib/access'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
@@ -11,7 +11,7 @@ export const storageRenameRouter = new Elysia()
   .patch('/api/envman/projects/:slug/storage/rename', async ({ request, params, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || (access !== 'EDITOR' && access !== 'OWNER')) {
       set.status = 403; return { error: 'EDITOR atau OWNER required' }
     }
@@ -38,7 +38,8 @@ export const storageRenameRouter = new Elysia()
     const obj = await prisma.projectStorageObject.findUnique({
       where: { projectId_path: { projectId: project.id, path: body.oldPath } },
     })
-    if (!obj) { set.status = 404; return { error: 'File tidak ditemukan' } }
+    // File di luar tag-scope = tak terlihat → 404.
+    if (!obj || !canAccessItem(obj.tags, scopeTags)) { set.status = 404; return { error: 'File tidak ditemukan' } }
 
     const conflict = await prisma.projectStorageObject.findUnique({
       where: { projectId_path: { projectId: project.id, path: newPath } },

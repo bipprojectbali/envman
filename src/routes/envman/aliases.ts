@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getEnvironmentAccess, getSectionAccess } from '../../lib/access'
+import { canAccessItem, filterByTagScope, getEnvironmentAccess, getSectionAccess, getSectionAccessWithScope } from '../../lib/access'
 import { extractEnvRefs } from '../../lib/alias-parser'
 import { forbidden, requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { cacheKeys, invalidateCache, withCache } from '../../lib/cache'
@@ -27,20 +27,23 @@ export const aliasesRouter = new Elysia()
   .get('/api/envman/projects/:slug/aliases', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) return unauthorized(set)
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'ALIASES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'ALIASES')
     if (!access) return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: params.slug, ...notDeleted } })
     if (!project) {
       set.status = 404
       return { error: 'Project tidak ditemukan' }
     }
-    const rawAliases = await withCache(cacheKeys.projectAliases(params.slug), 60, () =>
+    const cachedAliases = await withCache(cacheKeys.projectAliases(params.slug), 60, () =>
       prisma.projectAlias.findMany({
         where: { projectId: project.id },
         orderBy: { name: 'asc' },
         select: aliasSelect,
       }),
     )
+    // Cache di atas global per-project; tag-scope bersifat per-user → filter SETELAH
+    // cache boundary agar hasil ter-scope tak pernah masuk cache bersama.
+    const rawAliases = filterByTagScope(cachedAliases, scopeTags)
     // Compute requiresEnvs + deniedEnvs per-user (tidak boleh masuk cache karena akses per-user).
     const aliases = await Promise.all(
       rawAliases.map(async (a) => {
@@ -192,7 +195,7 @@ export const aliasesRouter = new Elysia()
       set.status = 400
       return { error: 'project dan alias tidak boleh kosong' }
     }
-    const access = await getSectionAccess(authResult.userId, authResult.role, projectSlug, 'ALIASES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, projectSlug, 'ALIASES')
     if (!access) return forbidden(set)
     const project = await prisma.project.findFirst({ where: { slug: projectSlug, ...notDeleted } })
     if (!project) {
@@ -202,7 +205,8 @@ export const aliasesRouter = new Elysia()
     const alias = await prisma.projectAlias.findUnique({
       where: { projectId_name: { projectId: project.id, name: aliasName } },
     })
-    if (!alias) {
+    // Alias di luar tag-scope = tak terlihat → 404.
+    if (!alias || !canAccessItem(alias.tags, scopeTags)) {
       set.status = 404
       return { error: 'Alias tidak ditemukan' }
     }

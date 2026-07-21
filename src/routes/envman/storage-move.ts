@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getSectionAccess } from '../../lib/access'
+import { canAccessItem, getSectionAccessWithScope } from '../../lib/access'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
@@ -12,7 +12,7 @@ export const storageMoveRouter = new Elysia()
   .patch('/api/envman/projects/:slug/storage/move', async ({ request, params, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || (access !== 'EDITOR' && access !== 'OWNER')) {
       set.status = 403; return { error: 'EDITOR atau OWNER required' }
     }
@@ -53,7 +53,8 @@ export const storageMoveRouter = new Elysia()
       const obj = await prisma.projectStorageObject.findUnique({
         where: { projectId_path: { projectId: project.id, path: oldPath } },
       })
-      if (!obj) { errors.push(`${oldPath}: tidak ditemukan`); continue }
+      // File di luar tag-scope diperlakukan tak ada (limited user tak bisa pindahkan file tak terlihat).
+      if (!obj || !canAccessItem(obj.tags, scopeTags)) { errors.push(`${oldPath}: tidak ditemukan`); continue }
 
       const newMinioKey = buildMinioKey(project.id, newPath)
       try {

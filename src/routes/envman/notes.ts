@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getSectionAccess } from '../../lib/access'
+import { canAccessItem, getSectionAccessWithScope, tagScopeWhere } from '../../lib/access'
 import { requireEnvAuth } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 import { hasCapability } from '../../lib/permissions'
@@ -15,7 +15,7 @@ export const notesRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'NOTES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'NOTES')
     if (!access) {
       set.status = 403
       return { error: 'Forbidden' }
@@ -26,7 +26,7 @@ export const notesRouter = new Elysia()
       return { error: 'Project tidak ditemukan' }
     }
     const notes = await prisma.projectNote.findMany({
-      where: { projectId: project.id },
+      where: { projectId: project.id, ...tagScopeWhere(scopeTags) },
       orderBy: [{ pinned: 'desc' }, { updatedAt: 'desc' }],
       select: {
         id: true,
@@ -53,7 +53,7 @@ export const notesRouter = new Elysia()
       set.status = 403
       return { error: 'Tidak punya izin create note. Hubungi SUPER_ADMIN.' }
     }
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'NOTES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'NOTES')
     if (!access || access === 'VIEWER') {
       set.status = 403
       return { error: 'Forbidden' }
@@ -67,6 +67,12 @@ export const notesRouter = new Elysia()
     if (!title?.trim()) {
       set.status = 400
       return { error: 'Title wajib diisi' }
+    }
+    // Limited-by-tag user wajib memberi ≥1 tag scope-nya, kalau tidak note yang
+    // ia buat jadi tak terlihat oleh dirinya sendiri.
+    if (!canAccessItem(tags ?? [], scopeTags)) {
+      set.status = 400
+      return { error: `Note harus punya minimal satu tag yang Anda kelola: ${scopeTags.join(', ')}` }
     }
     const note = await prisma.projectNote.create({
       data: {
@@ -97,13 +103,14 @@ export const notesRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'NOTES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'NOTES')
     if (!access || access === 'VIEWER') {
       set.status = 403
       return { error: 'Forbidden' }
     }
     const note = await prisma.projectNote.findUnique({ where: { id: params.id } })
-    if (!note) {
+    // Item di luar tag-scope = tak terlihat → 404 (bukan 403; jangan bocorkan keberadaan).
+    if (!note || !canAccessItem(note.tags, scopeTags)) {
       set.status = 404
       return { error: 'Note tidak ditemukan' }
     }
@@ -117,6 +124,11 @@ export const notesRouter = new Elysia()
       body?: string
       pinned?: boolean
       tags?: string[]
+    }
+    // Retag yang mengeluarkan note dari scope sendiri ditolak.
+    if (tags !== undefined && !canAccessItem(tags, scopeTags)) {
+      set.status = 400
+      return { error: `Note harus tetap punya minimal satu tag yang Anda kelola: ${scopeTags.join(', ')}` }
     }
     const updated = await prisma.projectNote.update({
       where: { id: params.id },
@@ -147,13 +159,14 @@ export const notesRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    const access = await getSectionAccess(authResult.userId, authResult.role, params.slug, 'NOTES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'NOTES')
     if (!access || access === 'VIEWER') {
       set.status = 403
       return { error: 'Forbidden' }
     }
     const note = await prisma.projectNote.findUnique({ where: { id: params.id } })
-    if (!note) {
+    // Item di luar tag-scope = tak terlihat → 404.
+    if (!note || !canAccessItem(note.tags, scopeTags)) {
       set.status = 404
       return { error: 'Note tidak ditemukan' }
     }

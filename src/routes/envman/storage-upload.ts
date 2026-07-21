@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { getSectionAccess } from '../../lib/access'
+import { canAccessItem, getSectionAccessWithScope } from '../../lib/access'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 import { notDeleted } from '../../lib/db-helpers'
@@ -20,7 +20,7 @@ export const storageUploadRouter = new Elysia()
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
 
-    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || (access !== 'EDITOR' && access !== 'OWNER')) {
       set.status = 403
       return { error: 'EDITOR atau OWNER required untuk upload' }
@@ -55,6 +55,23 @@ export const storageUploadRouter = new Elysia()
     if (!path) {
       set.status = 400
       return { error: 'Path tidak valid (jangan gunakan .., karakter khusus, atau lebih dari 10 level)' }
+    }
+
+    // Tag-scope (limited user): tag file baru wajib memuat ≥1 tag scope-nya, dan
+    // bila menimpa file existing, file itu harus ada di dalam scope-nya.
+    if (scopeTags.length > 0) {
+      if (!canAccessItem(tags, scopeTags)) {
+        set.status = 400
+        return { error: `File harus punya minimal satu tag yang Anda kelola: ${scopeTags.join(', ')}` }
+      }
+      const prior = await prisma.projectStorageObject.findUnique({
+        where: { projectId_path: { projectId: project.id, path } },
+        select: { tags: true },
+      })
+      if (prior && !canAccessItem(prior.tags, scopeTags)) {
+        set.status = 404
+        return { error: 'File tidak ditemukan' }
+      }
     }
 
     // Validasi ukuran file sebelum baca ke memory
