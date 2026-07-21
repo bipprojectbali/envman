@@ -1,15 +1,4 @@
-import {
-  ActionIcon,
-  Badge,
-  Box,
-  Group,
-  Popover,
-  ScrollArea,
-  Stack,
-  TagsInput,
-  Text,
-  Tooltip,
-} from '@mantine/core'
+import { ActionIcon, Badge, Box, Group, Popover, ScrollArea, Stack, TagsInput, Text, Tooltip } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { TbLock, TbTag } from 'react-icons/tb'
@@ -170,6 +159,10 @@ export function SectionMatrixView({ slug }: { slug: string }) {
               {data.sections.map((section) => {
                 const cell = m.sectionAccess[section]
                 const isDenied = cell?.effectiveRole === null
+                // Project OWNER always has full access via inherit — overriding a
+                // section role or scoping by tag is meaningless (they can revert it
+                // anytime). Lock their cells to inherit-only to avoid confusion.
+                const isProjectOwner = m.projectRole === 'OWNER'
                 return (
                   <Box
                     key={section}
@@ -189,15 +182,24 @@ export function SectionMatrixView({ slug }: { slug: string }) {
                         </Tooltip>
                       )}
                       {ROLE_BTNS.map((btn) => {
-                        const current = cell?.sectionRole ?? 'denied'
+                        // Project OWNER selalu akses penuh via inherit — override role
+                        // atau tag-scope tak bermakna. Kunci ke inherit: hanya tombol
+                        // inherit yang aktif & enabled, sisanya disabled.
+                        const current = isProjectOwner ? 'inherit' : (cell?.sectionRole ?? 'denied')
                         const isActive = current === btn.value
+                        const ownerLocked = isProjectOwner && btn.value !== 'inherit'
                         return (
-                          <Tooltip key={btn.value} label={btn.label} withArrow fz="xs">
+                          <Tooltip
+                            key={btn.value}
+                            label={isProjectOwner ? 'OWNER project selalu akses penuh' : btn.label}
+                            withArrow
+                            fz="xs"
+                          >
                             <ActionIcon
                               size={18}
                               variant={isActive ? 'filled' : 'subtle'}
                               color={isActive ? btn.color : 'gray'}
-                              disabled={setRoleMutation.isPending}
+                              disabled={setRoleMutation.isPending || ownerLocked}
                               onClick={() => {
                                 if (!isActive) setRoleMutation.mutate({ userId: m.userId, section, role: btn.value })
                               }}
@@ -212,7 +214,7 @@ export function SectionMatrixView({ slug }: { slug: string }) {
                     {/* Tag-scope editor: hanya saat role di-grant EKSPLISIT di section
                         (bukan denied, bukan inherit). Server mengabaikan scopeTags saat
                         inherit (role dihapus), jadi menampilkan editor di sana menyesatkan. */}
-                    {cell && cell.effectiveRole !== null && cell.sectionRole !== 'inherit' && (
+                    {!isProjectOwner && cell && cell.effectiveRole !== null && cell.sectionRole !== 'inherit' && (
                       <Box mt={4} style={{ display: 'flex', justifyContent: 'center' }}>
                         <TagScopeEditor
                           scopeTags={cell.scopeTags ?? []}
