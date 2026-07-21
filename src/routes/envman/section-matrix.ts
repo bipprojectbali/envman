@@ -30,6 +30,23 @@ export const sectionMatrixRouter = new Elysia()
         },
       })
       if (!project) return null
+
+      // Union tag yang benar-benar dipakai per section — jadi saran autocomplete
+      // di editor tag-scope (OWNER memilih tag nyata, bukan mengetik buta).
+      const [noteTags, aliasTags, fileTags, storageTags] = await Promise.all([
+        prisma.projectNote.findMany({ where: { projectId: project.id }, select: { tags: true } }),
+        prisma.projectAlias.findMany({ where: { projectId: project.id }, select: { tags: true } }),
+        prisma.projectFile.findMany({ where: { projectId: project.id }, select: { tags: true } }),
+        prisma.projectStorageObject.findMany({ where: { projectId: project.id }, select: { tags: true } }),
+      ])
+      const uniq = (rows: { tags: string[] }[]) => [...new Set(rows.flatMap((r) => r.tags))].sort()
+      const availableTags: Record<string, string[]> = {
+        NOTES: uniq(noteTags),
+        ALIASES: uniq(aliasTags),
+        FILES: uniq(fileTags),
+        STORAGE: uniq(storageTags),
+      }
+
       const members = project.members.map((pm) => {
         const sectionAccess: Record<string, { sectionRole: SectionRoleInput; effectiveRole: ProjectRole | null; scopeTags: string[] }> = {}
         for (const section of SECTIONS) {
@@ -57,6 +74,7 @@ export const sectionMatrixRouter = new Elysia()
         project: { slug: project.slug, name: project.name },
         sections: SECTIONS,
         members,
+        availableTags,
       }
     })
 

@@ -34,6 +34,7 @@ export interface SectionMatrix {
   project: { slug: string; name: string }
   sections: SectionName[]
   members: SectionMatrixMember[]
+  availableTags?: Record<string, string[]>
 }
 
 export interface SectionMatrixMember {

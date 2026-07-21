@@ -194,6 +194,7 @@ export function SectionMatrixView({ slug }: { slug: string }) {
                       <Box mt={4} style={{ display: 'flex', justifyContent: 'center' }}>
                         <TagScopeEditor
                           scopeTags={cell.scopeTags ?? []}
+                          suggestions={data.availableTags?.[section] ?? []}
                           disabled={setRoleMutation.isPending}
                           onSave={(tags) =>
                             setRoleMutation.mutate({
@@ -221,10 +222,12 @@ export function SectionMatrixView({ slug }: { slug: string }) {
 // Kosong = full access (lihat semua item). Isi = limit-by-tag (OR).
 function TagScopeEditor({
   scopeTags,
+  suggestions,
   disabled,
   onSave,
 }: {
   scopeTags: string[]
+  suggestions: string[]
   disabled: boolean
   onSave: (tags: string[]) => void
 }) {
@@ -264,6 +267,7 @@ function TagScopeEditor({
           <TagsInput
             size="xs"
             placeholder="tag..."
+            data={suggestions}
             value={draft}
             onChange={setDraft}
             clearable
