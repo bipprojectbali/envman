@@ -139,7 +139,7 @@ var ErrExists = errors.New("file sudah ada di storage")
 // The CLI PUTs directly to MinIO — no reverse-proxy timeout.
 // onProgress is optional — pass nil to disable progress reporting.
 // noClobber=true makes the server reject an existing path with ErrExists.
-func Upload(cfg *auth.Config, slug, localFile, remotePath string, noClobber bool, onProgress ProgressFunc) (*UploadResult, error) {
+func Upload(cfg *auth.Config, slug, localFile, remotePath string, noClobber bool, tags []string, onProgress ProgressFunc) (*UploadResult, error) {
 	f, err := os.Open(localFile)
 	if err != nil {
 		return nil, fmt.Errorf("[envman] open %s: %w", localFile, err)
@@ -165,7 +165,7 @@ func Upload(cfg *auth.Config, slug, localFile, remotePath string, noClobber bool
 	}
 
 	// Step 3 — tell server to register the object in DB.
-	return confirmUpload(cfg, slug, remotePath, presign.MinioKey, fileSize, mimeType)
+	return confirmUpload(cfg, slug, remotePath, presign.MinioKey, fileSize, mimeType, tags)
 }
 
 // requestPresign asks the server to issue a presigned MinIO PUT URL.
@@ -242,11 +242,15 @@ func putToMinio(uploadURL string, r io.Reader, size int64, mimeType string, onPr
 }
 
 // confirmUpload registers the uploaded object in the server DB.
-func confirmUpload(cfg *auth.Config, slug, path, minioKey string, size int64, mimeType string) (*UploadResult, error) {
+func confirmUpload(cfg *auth.Config, slug, path, minioKey string, size int64, mimeType string, tags []string) (*UploadResult, error) {
 	apiPath := fmt.Sprintf("/api/envman/projects/%s/storage/confirm-upload", url.PathEscape(slug))
-	payload, _ := json.Marshal(map[string]any{
+	reqBody := map[string]any{
 		"path": path, "minioKey": minioKey, "size": size, "mimeType": mimeType,
-	})
+	}
+	if len(tags) > 0 {
+		reqBody["tags"] = tags
+	}
+	payload, _ := json.Marshal(reqBody)
 	req, err := http.NewRequest("POST", cfg.Server+apiPath, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
@@ -324,7 +328,7 @@ func detectMIME(filename string) string {
 // verbose is an optional writer for per-file progress lines (pass nil to suppress).
 // With noClobber, files that already exist on the server are skipped (like
 // `cp -n`) rather than aborting the whole directory upload.
-func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, noClobber bool, verbose io.Writer) error {
+func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, noClobber bool, tags []string, verbose io.Writer) error {
 	var files []string
 	err := filepath.WalkDir(localDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -351,7 +355,7 @@ func UploadDir(cfg *auth.Config, slug, localDir, remotePrefix string, noClobber 
 		if verbose != nil {
 			fmt.Fprintf(verbose, "[%d/%d] %-50s", i+1, len(files), remotePath)
 		}
-		result, err := Upload(cfg, slug, f, remotePath, noClobber, nil)
+		result, err := Upload(cfg, slug, f, remotePath, noClobber, tags, nil)
 		if err != nil {
 			if noClobber && errors.Is(err, ErrExists) {
 				skipped++

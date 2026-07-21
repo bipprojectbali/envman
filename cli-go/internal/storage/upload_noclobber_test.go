@@ -73,7 +73,7 @@ func TestUploadNoClobberRejectsExisting(t *testing.T) {
 	cfg := &auth.Config{Server: srv.URL, Token: "t"}
 	local := writeTempFile(t, "logo.png", "data")
 
-	_, err := Upload(cfg, "proj", local, "logo.png", true, nil)
+	_, err := Upload(cfg, "proj", local, "logo.png", true, nil, nil)
 	if err == nil {
 		t.Fatal("expected ErrExists, got nil")
 	}
@@ -88,7 +88,7 @@ func TestUploadNoClobberAllowsNew(t *testing.T) {
 	cfg := &auth.Config{Server: srv.URL, Token: "t"}
 	local := writeTempFile(t, "fresh.png", "data")
 
-	res, err := Upload(cfg, "proj", local, "fresh.png", true, nil)
+	res, err := Upload(cfg, "proj", local, "fresh.png", true, nil, nil)
 	if err != nil {
 		t.Fatalf("new path should upload, got %v", err)
 	}
@@ -104,7 +104,7 @@ func TestUploadWithoutNoClobberOverwrites(t *testing.T) {
 	cfg := &auth.Config{Server: srv.URL, Token: "t"}
 	local := writeTempFile(t, "logo.png", "data")
 
-	if _, err := Upload(cfg, "proj", local, "logo.png", false, nil); err != nil {
+	if _, err := Upload(cfg, "proj", local, "logo.png", false, nil, nil); err != nil {
 		t.Fatalf("default overwrite should succeed, got %v", err)
 	}
 }
@@ -120,7 +120,7 @@ func TestUploadDirNoClobberSkipsExisting(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b"), 0o644)
 
 	var log strings.Builder
-	if err := UploadDir(cfg, "proj", dir, "", true, &log); err != nil {
+	if err := UploadDir(cfg, "proj", dir, "", true, nil, &log); err != nil {
 		t.Fatalf("UploadDir should skip existing, not fail: %v", err)
 	}
 	out := log.String()

@@ -152,6 +152,7 @@ func filterFilesByTag(files []storage.StorageFile, want []string) []storage.Stor
 func storageUploadCmd() *cobra.Command {
 	var remotePath string
 	var noClobber bool
+	var tags []string
 	cmd := &cobra.Command{
 		Use:   "upload <project> <file|dir>",
 		Short: "Upload a file or folder to project storage (streaming)",
@@ -179,9 +180,10 @@ upload skips existing files and continues with the rest.`,
 				return fmt.Errorf("[envman] %w", err)
 			}
 
+			tagList := splitCSV(tags)
 			if stat.IsDir() {
 				prefix := storage.RemotePath(localPath, remotePath)
-				return storage.UploadDir(cfg, slug, localPath, prefix, noClobber, os.Stderr)
+				return storage.UploadDir(cfg, slug, localPath, prefix, noClobber, tagList, os.Stderr)
 			}
 
 			target := storage.RemotePath(localPath, remotePath)
@@ -194,11 +196,11 @@ upload skips existing files and continues with the rest.`,
 				// Upload yang terputus bisa dilanjutkan dengan perintah yang sama.
 				fmt.Fprintf(os.Stderr, "[envman] File besar (%s) — memakai chunked upload (%d chunk × 50 MB)\n",
 					storage.FmtBytes(stat.Size()), (stat.Size()+storage.MultipartThreshold-1)/storage.MultipartThreshold)
-				result, err = storage.UploadMultipart(cfg, slug, localPath, target, noClobber, func(written, total int64, elapsed time.Duration) {
+				result, err = storage.UploadMultipart(cfg, slug, localPath, target, noClobber, tagList, func(written, total int64, elapsed time.Duration) {
 					renderProgress(name, written, total, elapsed)
 				})
 			} else {
-				result, err = storage.Upload(cfg, slug, localPath, target, noClobber, func(written, total int64, elapsed time.Duration) {
+				result, err = storage.Upload(cfg, slug, localPath, target, noClobber, tagList, func(written, total int64, elapsed time.Duration) {
 					renderProgress(name, written, total, elapsed)
 				})
 			}
@@ -215,6 +217,7 @@ upload skips existing files and continues with the rest.`,
 	}
 	cmd.Flags().StringVar(&remotePath, "path", "", "Remote path or prefix (default: basename of local file/dir)")
 	cmd.Flags().BoolVarP(&noClobber, "no-clobber", "n", false, "Refuse to overwrite existing files (skip existing in folder upload)")
+	cmd.Flags().StringSliceVar(&tags, "tag", nil, "Tags to attach to the uploaded file(s) (comma-separated)")
 	return cmd
 }
 

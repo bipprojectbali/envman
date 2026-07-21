@@ -708,6 +708,9 @@ envman storage upload myapp ./compose.yml --path infra/compose.yml
 envman storage upload myapp ./logo.png     --path assets/images/logo.png
 envman storage upload myapp ./seed.sql     --path backup/2026-07-04.sql
 
+# Beri tag (dipakai pencarian & akses per-tag). Folder → tag kena semua file.
+envman storage upload myapp ./logo.png --tag brand,logo
+
 # Upload dari script (CI/CD)
 envman storage upload myapp ./dist/report.html --path reports/$(date +%F).html
 

@@ -33,6 +33,7 @@ type uploadState struct {
 	FileSize   int64           `json:"fileSize"`
 	TotalParts int             `json:"totalParts"`
 	MimeType   string          `json:"mimeType"`
+	Tags       []string        `json:"tags,omitempty"`
 	Completed  []completedPart `json:"completed"`
 }
 
@@ -186,14 +187,18 @@ func completeMultipart(cfg *auth.Config, slug string, state *uploadState) (*Uplo
 	apiURL := fmt.Sprintf("%s/api/envman/projects/%s/storage/multipart/complete",
 		cfg.Server, url.PathEscape(slug))
 
-	payload, _ := json.Marshal(map[string]any{
+	completeBody := map[string]any{
 		"path":     state.RemotePath,
 		"uploadId": state.UploadID,
 		"minioKey": state.MinioKey,
 		"parts":    state.Completed,
 		"size":     state.FileSize,
 		"mimeType": state.MimeType,
-	})
+	}
+	if len(state.Tags) > 0 {
+		completeBody["tags"] = state.Tags
+	}
+	payload, _ := json.Marshal(completeBody)
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewReader(payload))
 	if err != nil {
@@ -229,7 +234,7 @@ func completeMultipart(cfg *auth.Config, slug string, state *uploadState) (*Uplo
 // Each chunk (≤ 50 MB) goes through the envman server → MinIO, bypassing Cloudflare's
 // per-request body limit. State is persisted to ~/.cache/envman/upload-*.json so
 // interrupted uploads can be resumed by re-running the same command.
-func UploadMultipart(cfg *auth.Config, slug, localFile, remotePath string, noClobber bool, onProgress ProgressFunc) (*UploadResult, error) {
+func UploadMultipart(cfg *auth.Config, slug, localFile, remotePath string, noClobber bool, tags []string, onProgress ProgressFunc) (*UploadResult, error) {
 	f, err := os.Open(localFile)
 	if err != nil {
 		return nil, fmt.Errorf("[envman] open %s: %w", localFile, err)
@@ -256,6 +261,7 @@ func UploadMultipart(cfg *auth.Config, slug, localFile, remotePath string, noClo
 			return nil, err
 		}
 		state.LocalPath = localFile
+		state.Tags = tags
 		saveState(cfg.Server, state)
 	}
 
