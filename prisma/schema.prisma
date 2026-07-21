@@ -451,6 +451,10 @@ model ProjectSectionMember {
   projectId String
   section   ProjectSection
   role      ProjectMemberRole?
+  // Tag scope untuk limit-by-tag di dalam section. Kosong [] = full access
+  // (lihat semua item, termasuk yang tak bertag). Non-kosong = hanya item yang
+  // punya ≥1 tag ini (match OR). Item tanpa tag hanya untuk full-access member.
+  scopeTags String[]          @default([])
   createdAt DateTime          @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
