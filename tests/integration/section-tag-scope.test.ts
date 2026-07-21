@@ -180,6 +180,35 @@ describe('NOTES create rule', () => {
   })
 })
 
+describe('scoped OWNER tetap dibatasi tag (bukan hanya EDITOR)', () => {
+  // Regresi untuk bug: section-role OWNER + scopeTags harus tetap di-guard,
+  // jangan diperlakukan sebagai full-access. limited di sini memang OWNER+scope[a].
+  test('OWNER-scope[a] delete note bertag b → 404', async () => {
+    const noteB = await prisma.projectNote.findFirstOrThrow({ where: { projectId, title: 'note-b' } })
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${slug}/notes/${noteB.id}`, {
+        method: 'DELETE',
+        headers: authHeader(limitedToken),
+      }),
+    )
+    expect(res.status).toBe(404)
+  })
+
+  test('OWNER-scope[a] delete note bertag a → 200 (dalam scope)', async () => {
+    // note baru bertag a agar tak mengganggu test lain.
+    const created = await prisma.projectNote.create({
+      data: { projectId, authorId: ownerId, title: 'note-a-del', body: '', tags: ['a'] },
+    })
+    const res = await app.handle(
+      new Request(`http://localhost/api/envman/projects/${slug}/notes/${created.id}`, {
+        method: 'DELETE',
+        headers: authHeader(limitedToken),
+      }),
+    )
+    expect(res.status).toBe(200)
+  })
+})
+
 describe('FILES — scope shares the same helper', () => {
   test('limited create file bertag a → 200; tanpa tag → 400', async () => {
     const ok = await app.handle(

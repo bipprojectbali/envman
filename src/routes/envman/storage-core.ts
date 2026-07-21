@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { canAccessItem, getSectionAccess, getSectionAccessWithScope, tagScopeWhere } from '../../lib/access'
+import { canAccessItem, getSectionAccessWithScope, tagScopeWhere } from '../../lib/access'
 import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { isMinioEnabled } from '../../lib/minio'
 import { prisma } from '../../lib/db'
@@ -150,9 +150,10 @@ export const storageCoreRouter = new Elysia()
   .delete('/api/envman/projects/:slug/storage', async ({ request, params, query, set }) => {
     const auth = await requireEnvAuth(request)
     if (!auth) return unauthorized(set)
-    // Delete = OWNER only; OWNER selalu full-access (scope kosong), jadi tak perlu
-    // guard tag di sini — role check sudah cukup.
-    const access = await getSectionAccess(auth.userId, auth.role, params.slug, 'STORAGE')
+    // Delete = OWNER only. Catatan: section-role OWNER pun bisa dibatasi scopeTags
+    // lewat matrix, jadi tetap guard tag agar OWNER ber-scope tak bisa hapus file
+    // di luar scope-nya. Project-OWNER (inherit) selalu scope kosong → lolos.
+    const { role: access, scopeTags } = await getSectionAccessWithScope(auth.userId, auth.role, params.slug, 'STORAGE')
     if (!access || access !== 'OWNER') { set.status = 403; return { error: 'OWNER required untuk hapus file' } }
     if (!isMinioEnabled()) { set.status = 503; return { error: 'Storage tidak dikonfigurasi' } }
 
@@ -167,9 +168,10 @@ export const storageCoreRouter = new Elysia()
 
     const obj = await prisma.projectStorageObject.findUnique({
       where: { projectId_path: { projectId: project.id, path } },
-      select: { id: true, minioKey: true },
+      select: { id: true, minioKey: true, tags: true },
     })
-    if (!obj) { set.status = 404; return { error: 'File tidak ditemukan' } }
+    // File di luar tag-scope = tak terlihat → 404.
+    if (!obj || !canAccessItem(obj.tags, scopeTags)) { set.status = 404; return { error: 'File tidak ditemukan' } }
 
     // Hapus dari MinIO dulu, baru DB
     await minioDelete(obj.minioKey)
