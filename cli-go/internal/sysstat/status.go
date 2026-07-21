@@ -71,6 +71,10 @@ func humanBytes(b uint64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
+// HumanDuration formats a seconds count as a compact uptime string. Exported
+// for the command layer (e.g. container uptime rendering).
+func HumanDuration(secs uint64) string { return humanDuration(secs) }
+
 // humanDuration formats a seconds count as a compact uptime string (e.g. "3d 4h 12m").
 func humanDuration(secs uint64) string {
 	d := secs / 86400

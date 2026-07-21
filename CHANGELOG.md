@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- **`envman env pull --only KEY1,KEY2`** — tarik hanya sebagian key sebuah environment jadi `.env`. Key yang diminta tapi tak ada dilaporkan ke stderr dan menyebabkan exit non-zero (key yang ketemu tetap dicetak/ditulis), jadi script bisa mendeteksi key hilang. Contoh: `envman env pull myapp:prod --only DATABASE_URL,REDIS_URL > .env`.
+- **`envman env get <project>:<env> <KEY>`** — cetak satu value mentah (tanpa `KEY=`), ideal untuk `$(...)` atau pipe ke clipboard. `-n`/`--no-newline` menekan newline. Key yang tak ada atau secret yang tak bisa di-reveal (akses VIEWER) jadi error dengan exit non-zero.
+- **`envman install pbcopy`** — pasang shim `pbcopy`/`pbpaste` berbasis **OSC 52** ke `~/.local/bin` untuk mesin headless/SSH (devbox, VPS) yang tak punya `pbcopy`. Teks dikirim ke clipboard mesin lokal via escape sequence terminal — tanpa sudo, tanpa package manager, tanpa X11/Wayland. Menolak bila `pbcopy` sudah ada (mis. macOS) kecuali `--force`; `--dry-run` mempratinjau tanpa menulis. Butuh terminal yang mendukung OSC 52; di tmux aktifkan `set -g set-clipboard on`.
+
+### Fixed
+- **`envman sys` kini sadar-container.** Di dalam container, `sys` sebelumnya menampilkan angka **host** (memory, CPU cores, uptime) yang menyesatkan — mis. 31 GiB RAM & 8 cores padahal cgroup membatasi 8 GiB & 4 cores. Sekarang saat terdeteksi container, memory & CPU dibaca dari cgroup (v1/v2) dan ditampilkan sebagai limit + host berdampingan (`2.5/8.0 GiB · host 31.4 GiB`, `4 of 8 cores`), uptime dihitung dari PID 1 container, plus baris **PSI** (`cpu.pressure`) sebagai sinyal tekanan per-container yang lebih jujur daripada load average host. Verdict keseluruhan kini menilai batas cgroup, bukan headroom host. Di bare metal output tak berubah.
+
 - **`envman gists pull` bisa ambil satu file** dari gist multi-file, pipe-friendly. Pakai `--file <name>` atau ref `judul:namafile` — isinya ke stdout (bisa langsung di-pipe), atau ke path dengan `-o`. Contoh: `envman gists pull mycfg --file a.ts | grep KEY` atau `envman gists pull mycfg:a.ts`. `--file` menang atas ref (berguna bila judul mengandung `:`); file yang tak ada memunculkan error berisi daftar file tersedia.
 - **`envman gists rm` bisa hapus satu file** dari gist tanpa menghapus seluruhnya: `envman gists rm mycfg:b.json` atau `--file b.json`. File terakhir tak bisa dihapus dengan cara ini (menyisakan gist kosong) — hapus seluruh gist.
 - **`envman gists push --clean`** untuk mengganti seluruh isi gist dengan tepat file yang disebut (operasi destruktif yang eksplisit).

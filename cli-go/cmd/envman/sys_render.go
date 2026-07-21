@@ -99,8 +99,14 @@ func printSysReport(r sysstat.Report) {
 	fmt.Printf("%s%s %s%s%s  %s·%s  %s%s%s\n",
 		statusColor(overall), statusIcon(overall), cBold, r.Host.Hostname, cReset,
 		cDim, cReset, statusColor(overall), sysLabel(overall), cReset)
+	// Uptime: inside a container, prefer the container's own uptime (PID 1
+	// start) over the host's — the host figure is misleading here.
+	uptime := r.Host.UptimeHuman
+	if r.Container.Detected && r.Container.UptimeSecs > 0 {
+		uptime = sysstat.HumanDuration(r.Container.UptimeSecs)
+	}
 	detail := fmt.Sprintf("%s %s · %s · kernel %s · up %s",
-		r.Host.Platform, r.Host.Version, r.Host.Arch, r.Host.Kernel, r.Host.UptimeHuman)
+		r.Host.Platform, r.Host.Version, r.Host.Arch, r.Host.Kernel, uptime)
 	if r.Host.Virtualization != "" {
 		detail += " · virt " + r.Host.Virtualization
 	}
@@ -113,9 +119,20 @@ func printSysReport(r sysstat.Report) {
 	// Resources group.
 	fmt.Println()
 	labeledRow("cpu", cpuLine(r.CPU))
-	labeledRow("mem", usageRow(r.Memory))
+	// Memory: inside a container with a real limit, the cgroup slice is the
+	// primary number; the host total is shown dimmed for context.
+	if r.Container.Detected && r.ContainerMem.Total > 0 {
+		labeledRow("mem", containerMemRow(r.ContainerMem, r.Memory))
+	} else {
+		labeledRow("mem", usageRow(r.Memory))
+	}
 	if r.Swap.Total > 0 {
 		labeledRow("swap", usageRow(r.Swap))
+	}
+	// PSI: per-container CPU pressure — a truer saturation signal than the
+	// host-wide load average when containerized.
+	if r.Container.Detected && r.Container.PSISome10 >= 0 {
+		labeledRow("psi", psiRow(r.Container))
 	}
 
 	// Disk group.
@@ -130,17 +147,52 @@ func printSysReport(r sysstat.Report) {
 	}
 }
 
-// cpuLine formats the one-line CPU summary.
+// cpuLine formats the one-line CPU summary. When a cgroup CPU quota is present
+// (containerized), it leads with the allowance ("4 of 8 cores") since that is
+// the effective core count for this box.
 func cpuLine(c sysstat.CPUInfo) string {
-	cores := fmt.Sprintf("%d cores", c.CoresPhysical)
-	if c.CoresPhysical == 0 {
-		cores = fmt.Sprintf("%d cores", c.CoresLogical)
-	} else if c.CoresLogical > c.CoresPhysical {
+	hostCores := c.CoresPhysical
+	if hostCores == 0 {
+		hostCores = c.CoresLogical
+	}
+	var cores string
+	switch {
+	case c.QuotaCores > 0:
+		// Container CPU allowance vs host cores.
+		cores = fmt.Sprintf("%s of %d cores", trimFloat(c.QuotaCores), hostCores)
+	case c.CoresLogical > c.CoresPhysical && c.CoresPhysical > 0:
 		cores = fmt.Sprintf("%d cores · %d threads", c.CoresPhysical, c.CoresLogical)
+	default:
+		cores = fmt.Sprintf("%d cores", hostCores)
 	}
 	return fmt.Sprintf("%s · %s · %.0f%% busy · load %s%.2f%s / %.2f / %.2f",
 		cpuModel(c.Model), cores, c.UsedPercent,
 		statusColor(c.LoadStatus), c.Load1, cReset, c.Load5, c.Load15)
+}
+
+// containerMemRow renders the memory gauge against the cgroup limit, with the
+// host total appended dimmed for context.
+func containerMemRow(limit, host sysstat.MemInfo) string {
+	return fmt.Sprintf("%s  %s%3.0f%%%s   %s / %s   %s· host %s%s",
+		usageBar(limit.UsedPercent, limit.Status),
+		statusColor(limit.Status), limit.UsedPercent, cReset,
+		human(limit.Used), human(limit.Total),
+		cDim, human(host.Total), cReset)
+}
+
+// psiRow renders the container's CPU pressure (PSI "some") averages.
+func psiRow(c sysstat.Container) string {
+	return fmt.Sprintf("%scpu pressure%s  %.1f%% / %.1f%% / %.1f%%  %s(10s / 60s / 300s stalled)%s",
+		cDim, cReset, c.PSISome10, c.PSISome60, c.PSISome300, cDim, cReset)
+}
+
+// trimFloat formats a fractional core count without a trailing ".0" (4.0 → "4",
+// 1.5 → "1.5").
+func trimFloat(f float64) string {
+	if f == float64(int64(f)) {
+		return fmt.Sprintf("%d", int64(f))
+	}
+	return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", f), "0"), ".")
 }
 
 // usageRow formats a memory/swap gauge line: bar + percent + used/total.

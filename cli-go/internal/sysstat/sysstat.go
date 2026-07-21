@@ -21,7 +21,12 @@ type Report struct {
 	Memory   MemInfo    `json:"memory"`
 	Swap     MemInfo    `json:"swap"`
 	Disks    []DiskInfo `json:"disks"`
-	Warnings []string   `json:"warnings,omitempty"` // non-fatal collection errors
+	// Container is the cgroup-scoped view when running inside a container. Its
+	// Detected field gates all container-aware rendering; host figures above
+	// remain populated for side-by-side display.
+	Container    Container `json:"container"`
+	ContainerMem MemInfo   `json:"containerMemory,omitempty"` // memory scoped to the cgroup limit (only when limited)
+	Warnings     []string  `json:"warnings,omitempty"`        // non-fatal collection errors
 }
 
 // HostInfo describes the machine and how long it has been up.
@@ -42,6 +47,7 @@ type CPUInfo struct {
 	Model         string  `json:"model"`
 	CoresPhysical int     `json:"coresPhysical"`
 	CoresLogical  int     `json:"coresLogical"`
+	QuotaCores    float64 `json:"quotaCores,omitempty"` // cgroup CPU allowance (fractional cores); 0 = unlimited
 	UsedPercent   float64 `json:"usedPercent"`
 	Load1         float64 `json:"load1"`
 	Load5         float64 `json:"load5"`
@@ -129,6 +135,33 @@ func Collect(ctx context.Context) Report {
 	}
 
 	r.Disks = collectDisks(ctx, warn)
+
+	// Container view: when inside a container, /proc figures above describe the
+	// HOST, not our slice. Read the real limits from cgroup and expose them so
+	// the renderer can show "limit vs host" instead of a misleading host number.
+	r.Container = collectContainer(warn)
+	if r.Container.Detected {
+		if r.Container.CPUQuotaCores > 0 {
+			r.CPU.QuotaCores = r.Container.CPUQuotaCores
+			// Rate load against the CPU allowance, not host cores — that's the
+			// saturation the container actually experiences.
+			r.CPU.LoadStatus = loadStatus(r.CPU.Load1, int(r.Container.CPUQuotaCores+0.5))
+		}
+		if r.Container.MemLimit > 0 {
+			used := r.Container.MemUsed
+			pct := 0.0
+			if r.Container.MemLimit > 0 {
+				pct = float64(used) / float64(r.Container.MemLimit) * 100
+			}
+			r.ContainerMem = MemInfo{
+				Total:       r.Container.MemLimit,
+				Used:        used,
+				Available:   r.Container.MemLimit - used,
+				UsedPercent: pct,
+				Status:      statusFor(pct),
+			}
+		}
+	}
 	return r
 }
 
@@ -203,7 +236,13 @@ func collectDisks(ctx context.Context, warn func(string)) []DiskInfo {
 // Overall returns the most severe status across memory, swap and all disks —
 // a one-glance verdict for the whole machine.
 func (r Report) Overall() Status {
-	statuses := []Status{r.Memory.Status, r.Swap.Status, r.CPU.LoadStatus}
+	mem := r.Memory.Status
+	// Inside a container the cgroup limit is the memory pressure that matters —
+	// judge on it rather than the host's headroom.
+	if r.Container.Detected && r.ContainerMem.Total > 0 {
+		mem = r.ContainerMem.Status
+	}
+	statuses := []Status{mem, r.Swap.Status, r.CPU.LoadStatus}
 	for _, d := range r.Disks {
 		statuses = append(statuses, d.Status)
 	}
