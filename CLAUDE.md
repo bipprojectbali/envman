@@ -29,7 +29,7 @@ PostgreSQL via Prisma v6. Client singleton `src/lib/db.ts` (`{ prisma }`). Schem
 - `EnvVar` (id, key, value, isSecret, isDisabled, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (userId, projectId, role) — unique(userId, projectId)
 - `EnvironmentMember` (userId, environmentId, role?) — unique(userId, environmentId). `role=null` = DENY · role set = override · no record = inherit project role.
-- `ProjectSectionMember` (userId, projectId, section, role?) — unique(userId, projectId, section). Semantik identik `EnvironmentMember` untuk section non-env. Lihat [Permission per-Section](#permission-per-section-notes--aliases--files--storage).
+- `ProjectSectionMember` (userId, projectId, section, role?, scopeTags[]) — unique(userId, projectId, section). Semantik identik `EnvironmentMember` untuk section non-env. `scopeTags` kosong=full access, isi=limit-by-tag (OR). Lihat [Permission per-Section](#permission-per-section-notes--aliases--files--storage) + [Tag Scope](#tag-scope-per-section-limit-by-tag).
 - `ApiToken` (id, userId, name, token, scopes[], tags[], canWrite, isDisabled, lastUsedAt?, expiresAt?, useCount, lastIp?, disabledBy?, disabledAt?, disabledReason?)
 - `ProjectAlias` (projectId, name, args, description?, tags[], createdBy) — unique(projectId, name)
 - `ProjectFile` (projectId, authorId, title, description, prefix?, files Json, tags[]) — unique(projectId, prefix)
@@ -151,7 +151,7 @@ Files & aliases accessible di project level, tapi yang reference env via `-e pro
 
 ## Permission per-Section (Notes / Aliases / Files / Storage)
 
-Override akses per-member untuk section non-env, **paralel** dengan env members. Model `ProjectSectionMember`. Resolver `getSectionAccess(userId, role, slug, section)` (`src/lib/access.ts`). CRUD `src/routes/envman/section-members.ts`. Matrix `src/routes/envman/section-matrix.ts`.
+Override akses per-member untuk section non-env, **paralel** dengan env members. Model `ProjectSectionMember`. Resolver `getSectionAccess(userId, role, slug, section)` (`src/lib/access.ts`). CRUD `src/routes/envman/section-members.ts`. Matrix `src/routes/envman/section-matrix.ts`. Lihat juga [Tag Scope per-Section](#tag-scope-per-section-limit-by-tag) untuk penyempitan akses berbasis tag.
 
 ### Semantik
 
@@ -178,9 +178,40 @@ Tab Members `SegmentedControl` Environments | Sections. View Sections = matrix m
 
 ### Audit & Cache
 
-- `SECTION_MEMBER_SET` — `<slug>/<section> user=<userId> role=<role>` (+`(admin)`)
+- `SECTION_MEMBER_SET` — `<slug>/<section> user=<userId> role=<role>` (+` scope=[a,b]` bila di-set) (+`(admin)`)
 - `SECTION_MEMBER_CLEARED` — `<slug>/<section> user=<userId>` (+`(admin)`)
 - PUT/DELETE → invalidate `projectDetail(slug)` + `invalidateProjectCaches(slug, [userId])`. Matrix cache `projectSectionMatrix(slug)` 60s.
+
+## Tag Scope per-Section (Limit by Tag)
+
+Lapisan ke-4 (ABAC) di atas section access: **mempersempit** akses member di dalam sebuah section ke item bertag tertentu saja. Kolom `ProjectSectionMember.scopeTags String[]` (migration `20260721040000_add_section_scope_tags`, additive default `[]`, tanpa backfill).
+
+### Semantik (MUTLAK)
+
+- **Kosong `[]` = full access** (lihat/kelola semua item, termasuk yang tak bertag) = perilaku lama, backward-compatible.
+- **Non-kosong = limit-by-tag**: hanya item yang punya **≥1** tag dari `scopeTags` (**match OR**). Item **tanpa tag** hanya untuk full-access member (**secure-by-default**, otomatis via `hasSome`).
+- Berlaku keempat section (NOTES→`ProjectNote`, ALIASES→`ProjectAlias`, FILES→`ProjectFile`, STORAGE→`ProjectStorageObject`; semua punya `tags[]`).
+- **Enforcement baca + tulis**: item di luar scope **tak terlihat** (list ter-filter) **dan tak bisa disentuh**.
+  - Read-by-id/download/edit/delete item luar scope → **404** (invisibility, jangan bocorkan keberadaan). Bedakan dari section-denied yang tetap **403**.
+  - **Create rule**: user limited WAJIB memberi item baru ≥1 tag scope-nya → else **400** (cegah bikin item invisible-to-self). Edit yang retag keluar scope → **400**.
+- SUPER_ADMIN & OWNER (via inherit) selalu `scopeTags=[]` (tak pernah di-limit).
+
+### Resolver & Helper (`src/lib/access.ts`)
+
+- Primitif `getSectionAccessWithScope(userId, role, slug, section) → { role, scopeTags }` (1 DB read). `getSectionAccess()` = wrapper return `.role` (**signature tak berubah** — 34 call-site aman). `getSectionTagScope()` return `.scopeTags`.
+- Helper murni: `canAccessItem(itemTags, scopeTags)` (OR; untagged→false saat limited), `filterByTagScope(items, scope)`, `tagScopeWhere(scope)` (`{}` | `{ tags: { hasSome } }`).
+- **Cache caveat**: list Aliases/Files pakai `withCache` key **global** → filter `filterByTagScope()` **setelah** cache boundary (per-request), JANGAN cache hasil ter-scope. Notes/Storage tak di-cache → filter di query. Storage 2-query: filter di **Query 1** agar folder/`totalFiles`/pagination benar.
+
+### API & UI
+
+- `PUT .../sections/:section/members/:userId` body additive `{ role, scopeTags? }` (validasi array string, trim/dedupe; `denied`/`inherit`→scope di-clear). Admin parity `PUT admin/.../sections/:section` sama. Response bawa `scopeTags`.
+- `GET section-matrix` + `GET .../sections/:section/members` field additive `scopeTags` per cell.
+- UI: `SectionMatrixView.tsx` per-cell `TagScopeEditor` (Popover+TagsInput; badge `Full`/`N tag`) saat role granted. Storage: badge tag di row/card (`tagColor`), edit tag via `StorageRenameModal` (PATCH `/storage/meta`).
+- CLI: `envman storage ls --tag a,b` (filter client-side; server sudah scope). Tags dicetak di baris file.
+
+### Test
+
+Unit `tests/unit/tag-scope.test.ts` (truth-table + invariant untagged). Integration `tests/integration/section-tag-scope.test.ts` (list-filter, guard 404, create-rule 400, retag 400 — butuh Redis untuk `app.handle`).
 
 ## Env Import (Reference / Live-Link)
 
@@ -282,7 +313,7 @@ Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()`).
 
 **Env Members (OWNER):** `GET .../environments/:envName/members` (list + envRole `inherit`/`denied`/role + `effectiveRole`) · `PUT .../members/:userId {role}` · `DELETE .../members/:userId` (reset inherit). Last-owner-of-env protection.
 
-**Section Members (OWNER):** `GET .../sections/:section/members` (section invalid→400) · `PUT .../sections/:section/members/:userId {role}` (`inherit|denied|OWNER|EDITOR|VIEWER`; target wajib project member→400; tanpa last-owner-protection) · `DELETE .../sections/:section/members/:userId` · `GET .../section-matrix` cache 60s (`projectSectionMatrix`). Audit `SECTION_MEMBER_SET`/`_CLEARED`.
+**Section Members (OWNER):** `GET .../sections/:section/members` (section invalid→400; bawa `scopeTags`) · `PUT .../sections/:section/members/:userId {role, scopeTags?}` (`inherit|denied|OWNER|EDITOR|VIEWER`; `scopeTags` array string, hanya bermakna saat role granted; target wajib project member→400; tanpa last-owner-protection) · `DELETE .../sections/:section/members/:userId` · `GET .../section-matrix` cache 60s (`projectSectionMatrix`; cell bawa `scopeTags`). Audit `SECTION_MEMBER_SET`/`_CLEARED`. Lihat [Tag Scope per-Section](#tag-scope-per-section-limit-by-tag).
 
 **Env Imports (OWNER target):** `GET .../environments/:envName/imports` (bawa `keys[]`) · `POST .../imports {sourceProject, sourceEnv, keys?}` (403/400/404/409/cycle; `keys` opsional, kosong=semua) · `PATCH .../imports/:id {keys}` (400 jika bukan array string) · `DELETE .../imports/:id`.
 
