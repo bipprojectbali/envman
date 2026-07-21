@@ -24,9 +24,10 @@ type Report struct {
 	// Container is the cgroup-scoped view when running inside a container. Its
 	// Detected field gates all container-aware rendering; host figures above
 	// remain populated for side-by-side display.
-	Container    Container `json:"container"`
-	ContainerMem MemInfo   `json:"containerMemory,omitempty"` // memory scoped to the cgroup limit (only when limited)
-	Warnings     []string  `json:"warnings,omitempty"`        // non-fatal collection errors
+	Container     Container `json:"container"`
+	ContainerMem  MemInfo   `json:"containerMemory,omitempty"` // memory scoped to the cgroup limit (only when limited)
+	ContainerSwap MemInfo   `json:"containerSwap,omitempty"`   // swap scoped to the cgroup limit (only when limited)
+	Warnings      []string  `json:"warnings,omitempty"`        // non-fatal collection errors
 }
 
 // HostInfo describes the machine and how long it has been up.
@@ -148,21 +149,30 @@ func Collect(ctx context.Context) Report {
 			r.CPU.LoadStatus = loadStatus(r.CPU.Load1, int(r.Container.CPUQuotaCores+0.5))
 		}
 		if r.Container.MemLimit > 0 {
-			used := r.Container.MemUsed
-			pct := 0.0
-			if r.Container.MemLimit > 0 {
-				pct = float64(used) / float64(r.Container.MemLimit) * 100
-			}
-			r.ContainerMem = MemInfo{
-				Total:       r.Container.MemLimit,
-				Used:        used,
-				Available:   r.Container.MemLimit - used,
-				UsedPercent: pct,
-				Status:      statusFor(pct),
-			}
+			r.ContainerMem = poolInfo(r.Container.MemUsed, r.Container.MemLimit)
+		}
+		if r.Container.SwapLimit > 0 {
+			r.ContainerSwap = poolInfo(r.Container.SwapUsed, r.Container.SwapLimit)
 		}
 	}
 	return r
+}
+
+// poolInfo builds a MemInfo for a used/total byte pair with a derived percent
+// and status. total must be > 0.
+func poolInfo(used, total uint64) MemInfo {
+	pct := float64(used) / float64(total) * 100
+	avail := uint64(0)
+	if total > used {
+		avail = total - used
+	}
+	return MemInfo{
+		Total:       total,
+		Used:        used,
+		Available:   avail,
+		UsedPercent: pct,
+		Status:      statusFor(pct),
+	}
 }
 
 // collectCPU reads processor model, core counts and load average.

@@ -22,6 +22,11 @@ type Container struct {
 	MemLimit uint64
 	MemUsed  uint64
 
+	// Swap limit (bytes) and current usage (bytes) for the cgroup. SwapLimit==0
+	// means no swap limit was set (cgroup "max") — treat as unlimited / host.
+	SwapLimit uint64
+	SwapUsed  uint64
+
 	// CPUQuotaCores is the fractional CPU allowance from cpu.max / cfs quota
 	// (e.g. quota 400000 / period 100000 = 4.0). 0 means unlimited.
 	CPUQuotaCores float64
@@ -74,19 +79,30 @@ func collectContainer(warn func(string)) Container {
 	if v2 {
 		c.MemLimit = parseCgroupBytes(filepath.Join(cgroupRoot, "memory.max"))
 		c.MemUsed = parseCgroupBytes(filepath.Join(cgroupRoot, "memory.current"))
+		// v2 exposes a dedicated swap-only limit and usage.
+		c.SwapLimit = parseCgroupBytes(filepath.Join(cgroupRoot, "memory.swap.max"))
+		c.SwapUsed = parseCgroupBytes(filepath.Join(cgroupRoot, "memory.swap.current"))
 		c.CPUQuotaCores = parseCPUMaxV2(filepath.Join(cgroupRoot, "cpu.max"))
 		c.PSISome10, c.PSISome60, c.PSISome300 = parsePSI(filepath.Join(cgroupRoot, "cpu.pressure"))
 	} else {
 		c.MemLimit = parseCgroupBytes(filepath.Join(cgroupRoot, "memory", "memory.limit_in_bytes"))
 		c.MemUsed = parseCgroupBytes(filepath.Join(cgroupRoot, "memory", "memory.usage_in_bytes"))
+		// v1 reports a combined mem+swap figure (memsw); swap-only = memsw - mem.
+		memswLimit := parseCgroupBytes(filepath.Join(cgroupRoot, "memory", "memory.memsw.limit_in_bytes"))
+		memswUsed := parseCgroupBytes(filepath.Join(cgroupRoot, "memory", "memory.memsw.usage_in_bytes"))
+		c.SwapLimit = subFloor(memswLimit, c.MemLimit)
+		c.SwapUsed = subFloor(memswUsed, c.MemUsed)
 		quota := readInt64(filepath.Join(cgroupRoot, "cpu", "cpu.cfs_quota_us"))
 		period := readInt64(filepath.Join(cgroupRoot, "cpu", "cpu.cfs_period_us"))
 		c.CPUQuotaCores = cpuCoresFromQuota(quota, period)
 	}
 
-	// A v1 "unlimited" memory limit is a sentinel near max uint64; normalize to 0.
+	// A v1 "unlimited" limit is a sentinel near max uint64; normalize to 0.
 	if c.MemLimit >= 1<<62 {
 		c.MemLimit = 0
+	}
+	if c.SwapLimit >= 1<<62 {
+		c.SwapLimit = 0
 	}
 
 	if up, ok := pid1UptimeSecs(); ok {
@@ -183,6 +199,15 @@ func pid1UptimeSecs() (uint64, bool) {
 		return 0, false
 	}
 	return uint64(d.Seconds()), true
+}
+
+// subFloor returns a-b, clamped at 0 (memsw should be >= mem, but guard against
+// a transient read where usage figures don't line up).
+func subFloor(a, b uint64) uint64 {
+	if a <= b {
+		return 0
+	}
+	return a - b
 }
 
 func fileExists(path string) bool {

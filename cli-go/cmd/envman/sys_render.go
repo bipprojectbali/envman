@@ -126,7 +126,9 @@ func printSysReport(r sysstat.Report) {
 	} else {
 		labeledRow("mem", usageRow(r.Memory))
 	}
-	if r.Swap.Total > 0 {
+	if r.Container.Detected && r.ContainerSwap.Total > 0 {
+		labeledRow("swap", containerMemRow(r.ContainerSwap, r.Swap))
+	} else if r.Swap.Total > 0 {
 		labeledRow("swap", usageRow(r.Swap))
 	}
 	// PSI: per-container CPU pressure — a truer saturation signal than the

@@ -79,6 +79,22 @@ func TestCPUCoresFromQuota(t *testing.T) {
 	}
 }
 
+func TestSubFloor(t *testing.T) {
+	cases := []struct {
+		a, b, want uint64
+	}{
+		{8589934592, 8589934592, 0}, // memsw == mem → no swap
+		{9000000000, 8589934592, 410065408},
+		{100, 200, 0}, // underflow guard
+		{500, 0, 500},
+	}
+	for _, c := range cases {
+		if got := subFloor(c.a, c.b); got != c.want {
+			t.Errorf("subFloor(%d,%d) = %d, want %d", c.a, c.b, got, c.want)
+		}
+	}
+}
+
 func TestParsePSI(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "cpu.pressure")

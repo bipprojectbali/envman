@@ -534,6 +534,32 @@ Filesystem virtual (`tmpfs`, `proc`, `overlay`, dll) dilewati. Mount yang
 berbagi pool fisik sama (mis. volume sintetis APFS di macOS) diringkas jadi satu
 baris agar tetap enak dibaca sekilas.
 
+### Di dalam container (Docker/cgroup)
+
+Bila `sys` berjalan **di dalam container**, `/proc` melaporkan angka **host**
+(memory, CPU cores, uptime, swap) yang menyesatkan — mis. 31 GiB RAM & 8 core
+padahal cgroup membatasi 8 GiB & 4 core. Saat container terdeteksi
+(`/.dockerenv` atau cgroup PID 1), `sys` membaca batas sebenarnya dari **cgroup**
+(v1 & v2) dan menampilkan **limit + host** berdampingan:
+
+```
+cpu   ... · 4 of 8 cores · 22% busy · load 0.67 / 0.65 / 0.58
+mem   [██········]  25%   2.0 GiB / 8.0 GiB   · host 31.4 GiB
+swap  [··········]   0%   2.8 MiB / 8.0 GiB   · host 16.0 GiB
+psi   cpu pressure  0.3% / 0.1% / 0.1%  (10s / 60s / 300s stalled)
+```
+
+- **memory & swap** dibaca dari cgroup (`memory.max`/`current`, `memory.swap.max`/
+  `current`; v1: `limit_in_bytes`/`memsw`). `max` = tak dibatasi → pakai host.
+- **CPU cores** = jatah cgroup (`cpu.max` atau `cfs_quota/period`) ditampilkan
+  sebagai `N of M cores`; load dinilai relatif jatah ini, bukan core host.
+- **uptime** dihitung dari start PID 1 container, bukan uptime host.
+- **PSI** (`cpu.pressure`) — persen waktu ter-stall (10s/60s/300s), sinyal
+  saturasi per-container yang lebih jujur daripada load average host-wide.
+- **verdict** keseluruhan menilai batas cgroup, bukan headroom host.
+
+Di bare metal (bukan container) output tak berubah.
+
 ### Kirim ke agent atau monitor
 
 ```bash
