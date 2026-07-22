@@ -6,17 +6,14 @@ import { useState } from 'react'
 import { TbCode } from 'react-icons/tb'
 import { AppLogsPanel } from '@/frontend/components/dev/app-logs-panel'
 import { DatabasePanel } from '@/frontend/components/dev/dev-database'
-import { ProjectPanel } from '@/frontend/components/dev/dev-project'
 import { DevSidebar } from '@/frontend/components/dev/DevSidebar'
 import { ExtensionsPanel } from '@/frontend/components/dev/extensions-panel'
-import { FileHealthPanel } from '@/frontend/components/dev/FileHealthPanel'
 import { OverviewPanel } from '@/frontend/components/dev/overview-panel'
 import { SettingsPanel } from '@/frontend/components/dev/SettingsPanel'
 import { StorageAdminPanel } from '@/frontend/components/dev/StorageAdminPanel'
 import { TokensAdminPanel } from '@/frontend/components/dev/TokensAdminPanel'
 import { UserLogsPanel } from '@/frontend/components/dev/user-logs-panel'
 import { UsersPanel } from '@/frontend/components/dev/users-panel'
-import { TicketsPanel } from '@/frontend/components/TicketsPanel'
 import { useLogout, useSession } from '@/frontend/hooks/useAuth'
 
 export const Route = createLazyFileRoute('/dev')({ component: DevPage })
@@ -83,12 +80,9 @@ function DevPage() {
             {active === 'overview' && <OverviewPanel />}
             {active === 'users' && <UsersPanel />}
             {active === 'tokens-admin' && <TokensAdminPanel />}
-            {active === 'tickets' && <TicketsPanel />}
             {active === 'app-logs' && <AppLogsPanel />}
             {active === 'user-logs' && <UserLogsPanel />}
             {active === 'database' && <DatabasePanel />}
-            {active === 'project' && <ProjectPanel />}
-            {active === 'file-health' && <FileHealthPanel />}
             {active === 'extensions' && <ExtensionsPanel />}
             {active === 'settings' && <SettingsPanel />}
             {active === 'storage' && <StorageAdminPanel />}

@@ -13,9 +13,7 @@ import {
 } from '@mantine/core'
 import type { NavigateFn } from '@tanstack/react-router'
 import {
-  TbActivity,
   TbBook,
-  TbBug,
   TbChevronRight,
   TbCode,
   TbDatabase,
@@ -28,7 +26,6 @@ import {
   TbServer,
   TbBucket,
   TbSettings,
-  TbSitemap,
   TbUser,
   TbUserSearch,
   TbUsers,
@@ -51,15 +48,12 @@ export const navGroups = [
     items: [
       { key: 'users', label: 'Users', icon: TbUsers, desc: 'Kelola akun, ubah role, blokir user' },
       { key: 'tokens-admin', label: 'Token Control', icon: TbKey, desc: 'Pantau & kendalikan semua API token' },
-      { key: 'tickets', label: 'Tickets', icon: TbBug, desc: 'Bug report & QC workflow (OPEN → CLOSED)' },
     ],
   },
   {
     group: 'Codebase',
     items: [
       { key: 'database', label: 'Database', icon: TbDatabase, desc: 'Visualisasi schema Prisma & relasi antar tabel' },
-      { key: 'project', label: 'Project', icon: TbSitemap, desc: 'Struktur file, routes, data flow & user flow' },
-      { key: 'file-health', label: 'File Health', icon: TbActivity, desc: 'Monitor ukuran file vs limit per kategori' },
     ],
   },
   {

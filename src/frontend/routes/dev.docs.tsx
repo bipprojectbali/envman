@@ -51,24 +51,6 @@ Diagram ER interaktif berbasis React Flow:
 - Enum sebagai node terpisah
 - Drag-to-reposition, zoom, auto-save posisi ke localStorage
 
-### Project (10 sub-view)
-Visualisasi struktur project via React Flow:
-
-| Sub-view | Sumber Data |
-|----------|-------------|
-| API Routes | \`GET /api/admin/routes\` |
-| File Structure | \`GET /api/admin/project-structure\` |
-| User Flow | Static — alur navigasi per role |
-| Data Flow | Static — request lifecycle |
-| Env Variables | \`GET /api/admin/env-map\` |
-| Test Coverage | \`GET /api/admin/test-coverage\` |
-| Dependencies | \`GET /api/admin/dependencies\` |
-| Migrations | \`GET /api/admin/migrations\` |
-| Sessions | \`GET /api/admin/sessions\` |
-| Live Requests | WebSocket broadcast |
-
-Setiap sub-view memiliki auto-save posisi node dan viewport.
-
 ### Settings
 Pengaturan aplikasi global (SUPER_ADMIN only).
 
@@ -97,11 +79,6 @@ Semua endpoint admin di-prefix \`/api/admin/\` — memerlukan session SUPER_ADMI
 | \`DELETE /api/admin/logs/app\` | Clear app logs |
 | \`DELETE /api/admin/logs/audit\` | Clear audit logs |
 | \`GET /api/admin/schema\` | Parse schema ke JSON |
-| \`GET /api/admin/routes\` | Semua route + metadata |
-| \`GET /api/admin/project-structure\` | Struktur file + import |
-| \`GET /api/admin/dependencies\` | NPM packages |
-| \`GET /api/admin/migrations\` | Timeline migrasi |
-| \`GET /api/admin/sessions\` | Session aktif |
 `
 
 function DevDocsPage() {

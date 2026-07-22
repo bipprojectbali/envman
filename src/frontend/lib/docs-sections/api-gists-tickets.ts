@@ -124,15 +124,8 @@ Semua endpoint di bawah memerlukan role \`SUPER_ADMIN\`.
 
 | Method | Path | Keterangan |
 |--------|------|-----------|
-| \`GET\` | \`/api/admin/routes\` | Semua routes dengan method, auth level, kategori |
 | \`GET\` | \`/api/admin/schema\` | Prisma schema → JSON (models, fields, relations, enums) |
-| \`GET\` | \`/api/admin/sessions\` | Semua session aktif + user info + online status |
 | \`GET\` | \`/api/admin/presence\` | List user ID yang online saat ini |
-| \`GET\` | \`/api/admin/project-structure\` | File scan \`src/\`, \`prisma/\`, \`tests/\` |
-| \`GET\` | \`/api/admin/env-map\` | Env vars yang digunakan (set/unset status) |
-| \`GET\` | \`/api/admin/dependencies\` | NPM packages + versi + files yang import |
-| \`GET\` | \`/api/admin/migrations\` | Timeline migrasi Prisma + SQL preview |
-| \`GET\` | \`/api/admin/test-coverage\` | Source files + test files mapping |
 
 ---
 

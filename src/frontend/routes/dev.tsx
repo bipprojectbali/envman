@@ -3,12 +3,9 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 const validTabs = [
   'overview',
   'users',
-  'tickets',
   'app-logs',
   'user-logs',
   'database',
-  'project',
-  'file-health',
   'tokens-admin',
   'extensions',
   'settings',
