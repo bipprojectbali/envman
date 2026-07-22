@@ -174,7 +174,7 @@ Override akses per-member untuk section non-env, **paralel** dengan env members.
 
 ### UI
 
-Tab Members `SegmentedControl` Environments | Sections. View Sections = matrix member × 4 section (`SectionMatrixView.tsx`). Tab `sectionAccess === null` disembunyikan; deep-link denied → fallback Environments.
+Tab Members = **satu matrix gabungan** (`AccessMatrix.tsx`): baris per anggota, kolom `Environments` + 4 section (Notes/Aliases/Files/Storage), fetch `access-matrix` + `section-matrix` lalu merge by userId. Kolom Environments = **satu kolom untuk semua env** (`EnvAccessCell.tsx`, popover berisi daftar env + cari saat >6) — hindari scroll horizontal. Tiap sel role = `AccessRoleCell.tsx` (pill berlabel + menu, bukan idiom huruf). Tag-scope Storage via `TagScopeEditor.tsx`. Section tab yang `sectionAccess === null` tetap disembunyikan dari panel-nya sendiri.
 
 ### Audit & Cache
 
@@ -208,7 +208,7 @@ Lapisan ke-4 (ABAC) di atas section access: **mempersempit** akses member di dal
 - `PUT .../sections/:section/members/:userId` body additive `{ role, scopeTags? }` (validasi array string, trim/dedupe; `denied`/`inherit`→scope di-clear). Admin parity `PUT admin/.../sections/:section` sama. Response bawa `scopeTags`.
 - `GET section-matrix` + `GET .../sections/:section/members` field additive `scopeTags` per cell.
 - `GET section-matrix` juga bawa `availableTags: Record<section, string[]>` (union tag item per section) untuk autocomplete editor.
-- UI: `SectionMatrixView.tsx` per-cell `TagScopeEditor` (Popover+TagsInput dengan saran `availableTags`; badge `Full`/`N tag`) saat role granted. Storage: badge tag di row/card (`tagColor`), edit tag via `StorageRenameModal` (PATCH `/storage/meta`).
+- UI: `AccessMatrix.tsx` per-cell `TagScopeEditor.tsx` (Popover+TagsInput dengan saran `availableTags`; badge `Full`/`N tag`) saat role granted. Storage: badge tag di row/card (`tagColor`), edit tag via `StorageRenameModal` (PATCH `/storage/meta`).
 - CLI: `envman storage ls --tag a,b` (filter client-side; server sudah scope; tags dicetak di baris file). `envman storage upload --tag a,b` memberi tag saat upload (folder → semua file; via `confirm-upload`/`multipart/complete`).
 
 ### Test
@@ -319,7 +319,7 @@ Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()`).
 
 **Env Imports (OWNER target):** `GET .../environments/:envName/imports` (bawa `keys[]`) · `POST .../imports {sourceProject, sourceEnv, keys?}` (403/400/404/409/cycle; `keys` opsional, kosong=semua) · `PATCH .../imports/:id {keys}` (400 jika bukan array string) · `DELETE .../imports/:id`.
 
-**Access Matrix (OWNER):** `GET .../projects/:slug/access-matrix` single fetch `{project, environments[], members[]}`. Cache 60s (`projectAccessMatrix`), auto-invalidate. Bulk = fan-out `Promise.allSettled` atas PATCH/PUT (`src/frontend/lib/bulk.ts`). `MembersMatrixView` + `MatrixFilterBar`.
+**Access Matrix (OWNER):** `GET .../projects/:slug/access-matrix` single fetch `{project, environments[], members[]}`. Cache 60s (`projectAccessMatrix`), auto-invalidate. Bulk = fan-out `Promise.allSettled` atas PATCH/PUT (`src/frontend/lib/bulk.ts`). FE: `AccessMatrix.tsx` (gabungan env+section, lihat [UI](#ui)).
 
 **Portainer:** `GET|POST .../portainer/connections` · `PUT|DELETE .../connections/:id` · `POST .../connections/:id/probe` · per-env `GET|PUT|DELETE|POST .../portainer[/sync]`
 

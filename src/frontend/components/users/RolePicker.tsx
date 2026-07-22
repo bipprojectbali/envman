@@ -10,8 +10,7 @@ interface RoleBtn {
 }
 
 // Per-env: inherit → deny, semua opsi. Default role: hanya No/V/E/O
-// (tak ada konsep inherit/deny di level project). Urutan konsisten
-// dengan MembersMatrixView agar satu bahasa visual antar dua halaman.
+// (tak ada konsep inherit/deny di level project).
 const ENV_BTNS: RoleBtn[] = [
   { value: 'inherit', label: 'Inherit (ikut project)', short: '~', color: 'gray' },
   { value: 'VIEWER', label: 'Viewer', short: 'V', color: ROLE_COLOR.VIEWER },
