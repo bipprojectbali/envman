@@ -222,10 +222,8 @@ Status machine: \`OPEN → IN_PROGRESS → READY_FOR_QC → CLOSED\` + \`REOPENE
 | \`GET\` | \`/api/admin/logs/audit\` | Audit trail (\`?userId&action&limit\`) |
 | \`DELETE\` | \`/api/admin/logs/app\` | Clear app logs |
 | \`DELETE\` | \`/api/admin/logs/audit\` | Clear audit logs |
-| \`GET\` | \`/api/admin/sessions\` | Semua sessions aktif |
 | \`GET\` | \`/api/admin/presence\` | Online user IDs |
 | \`GET\` | \`/api/admin/schema\` | Prisma schema sebagai JSON |
-| \`GET\` | \`/api/admin/routes\` | Semua routes + metadata |
 
 ### WebSocket
 

@@ -1,8 +1,6 @@
 import { Elysia } from 'elysia'
 import { forbidden, requireSuperAdmin } from '../../lib/auth-middleware'
 import { getOnlineUserIds } from '../../lib/presence'
-import { analyticsDataRouter } from './analytics-data'
-import { analyticsInspectRouter } from './analytics-inspect'
 import { analyticsStructureRouter } from './analytics-structure'
 
 export const adminAnalyticsRouter = new Elysia()
@@ -14,5 +12,3 @@ export const adminAnalyticsRouter = new Elysia()
   })
 
   .use(analyticsStructureRouter)
-  .use(analyticsInspectRouter)
-  .use(analyticsDataRouter)
