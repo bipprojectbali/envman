@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-07-23
+
 ### Removed
 - **Dev Console: tab Project, File Health, dan Tickets dihapus** karena sudah tidak dipakai. Tab **Project** (visualisasi struktur file/routes/data-flow/dll via React Flow, 10 sub-view) dan **File Health** (monitor ukuran file) dicabut sepenuhnya beserta 11 komponen flow dan endpoint server yatimnya (`/api/admin/routes`, `project-structure`, `env-map`, `test-coverage`, `dependencies`, `migrations`, `sessions`, `file-health`) — menghemat ~2.900 baris kode. Tab **Tickets** dihapus dari Dev Console (fitur Tickets **tetap tersedia** di `/dashboard` untuk workflow QC — hanya shortcut duplikatnya di Dev Console yang dihilangkan). Tab lain (Overview, Users, Token Control, App/User Logs, Database, Extensions, Storage, Settings) tak berubah; `GET /api/admin/schema` (dipakai tab Database) tetap ada.
 
