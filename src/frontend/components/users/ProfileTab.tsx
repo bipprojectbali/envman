@@ -8,7 +8,6 @@ import { GLOBAL_ROLE_COLOR } from './types'
 
 const ROLE_DESCRIPTIONS: Record<GlobalRole, { label: string; description: string; icon: typeof TbUser }> = {
   USER: { label: 'USER', description: 'Default. Tidak punya hak istimewa. Lihat profile saja.', icon: TbUser },
-  QC: { label: 'QC', description: 'Akses dashboard ticket (QC workflow). Tidak ke envmanager.', icon: TbShieldCheck },
   ADMIN: { label: 'ADMIN', description: 'Akses envmanager. Hak harus di-grant via capability.', icon: TbShieldCheck },
   SUPER_ADMIN: {
     label: 'SUPER_ADMIN',
@@ -78,7 +77,7 @@ export function ProfileTab({ user }: { user: UserDetail }) {
             onChange={(v) => roleMutation.mutate(v as GlobalRole)}
             disabled={roleMutation.isPending}
             color={GLOBAL_ROLE_COLOR[user.role]}
-            data={(['USER', 'QC', 'ADMIN'] as const).map((r) => ({
+            data={(['USER', 'ADMIN'] as const).map((r) => ({
               value: r,
               label: (
                 <Group gap={5} justify="center" wrap="nowrap">

@@ -33,7 +33,9 @@ export function ProfileTokensSection({ role }: { role: string }) {
   const [search, setSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [groupByTag, setGroupByTag] = useState(() => localStorage.getItem('profile:tokens:groupByTag') !== 'false')
-  const [viewMode, setViewMode] = useState<ViewMode>(() => (localStorage.getItem('profile:tokens:viewMode') as ViewMode) ?? 'list')
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    () => (localStorage.getItem('profile:tokens:viewMode') as ViewMode) ?? 'list',
+  )
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
@@ -49,21 +51,41 @@ export function ProfileTokensSection({ role }: { role: string }) {
   const { data, isLoading } = useQuery<{ tokens: Token[] }>({
     queryKey: ['profile', 'tokens'],
     queryFn: () => apiFetch('/api/envman/tokens'),
-    enabled: role !== 'QC',
   })
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['profile', 'tokens'] })
-  const resetCreate = () => { setNewToken(null); setNewName(''); setNewWrite(false); setNewExpiry(''); setNewTags([]); closeCreate() }
+  const resetCreate = () => {
+    setNewToken(null)
+    setNewName('')
+    setNewWrite(false)
+    setNewExpiry('')
+    setNewTags([])
+    closeCreate()
+  }
 
   const create = useMutation({
-    mutationFn: () => apiFetch<{ token: string }>('/api/envman/tokens', { method: 'POST', body: JSON.stringify({ name: newName, canWrite: newWrite, expiresAt: newExpiry || null, tags: newTags }) }),
-    onSuccess: (d) => { setNewToken(d.token); invalidate() },
+    mutationFn: () =>
+      apiFetch<{ token: string }>('/api/envman/tokens', {
+        method: 'POST',
+        body: JSON.stringify({ name: newName, canWrite: newWrite, expiresAt: newExpiry || null, tags: newTags }),
+      }),
+    onSuccess: (d) => {
+      setNewToken(d.token)
+      invalidate()
+    },
   })
-  const toggle = useMutation({ mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/toggle`, { method: 'PATCH' }), onSuccess: invalidate })
-  const rotate = useMutation({ mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/rotate`, { method: 'POST' }), onSuccess: invalidate })
-  const remove = useMutation({ mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}`, { method: 'DELETE' }), onSuccess: invalidate })
-
-  if (role === 'QC') return null
+  const toggle = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/toggle`, { method: 'PATCH' }),
+    onSuccess: invalidate,
+  })
+  const rotate = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}/rotate`, { method: 'POST' }),
+    onSuccess: invalidate,
+  })
+  const remove = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/envman/tokens/${id}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
 
   const allTokens = data?.tokens ?? []
   const allTags = [...new Set(allTokens.flatMap((t) => t.tags))].sort()
@@ -79,85 +101,178 @@ export function ProfileTokensSection({ role }: { role: string }) {
   const groups: { label: string; tokens: Token[] }[] = groupByTag
     ? [
         ...(allTags.length > 0
-          ? allTags.filter((tag) => selectedTags.length === 0 || selectedTags.includes(tag)).map((tag) => ({ label: tag, tokens: filtered.filter((t) => t.tags.includes(tag)) })).filter((g) => g.tokens.length > 0)
+          ? allTags
+              .filter((tag) => selectedTags.length === 0 || selectedTags.includes(tag))
+              .map((tag) => ({ label: tag, tokens: filtered.filter((t) => t.tags.includes(tag)) }))
+              .filter((g) => g.tokens.length > 0)
           : []),
         { label: 'Lainnya', tokens: filtered.filter((t) => t.tags.length === 0) },
       ].filter((g) => g.tokens.length > 0)
     : [{ label: '', tokens: filtered }]
 
   return (
-    <Box p="md" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+    <Box
+      p="md"
+      style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+    >
       <Group justify="space-between" mb="sm">
         <Group gap="xs">
           <TbKey size={15} />
-          <Text fw={600} size="sm">API Tokens</Text>
-          {allTokens.length > 0 && <Badge size="xs" variant="light" color="gray">{allTokens.length}</Badge>}
+          <Text fw={600} size="sm">
+            API Tokens
+          </Text>
+          {allTokens.length > 0 && (
+            <Badge size="xs" variant="light" color="gray">
+              {allTokens.length}
+            </Badge>
+          )}
         </Group>
         {creationAllowed && (
-          <Button size="xs" leftSection={<TbPlus size={14} />} onClick={openCreate}>Buat Token</Button>
+          <Button size="xs" leftSection={<TbPlus size={14} />} onClick={openCreate}>
+            Buat Token
+          </Button>
         )}
       </Group>
       <Divider mb="sm" />
 
       {isLoading ? (
-        <Text c="dimmed" size="xs">Loading...</Text>
+        <Text c="dimmed" size="xs">
+          Loading...
+        </Text>
       ) : !allTokens.length ? (
         <Text c="dimmed" size="xs" ta="center" py="sm">
-          {creationAllowed ? 'Belum ada token. Buat token untuk akses API.' : 'Pembuatan token dinonaktifkan oleh administrator.'}
+          {creationAllowed
+            ? 'Belum ada token. Buat token untuk akses API.'
+            : 'Pembuatan token dinonaktifkan oleh administrator.'}
         </Text>
       ) : (
         <Stack gap="sm">
           <ProfileTokensToolbar
-            search={search} onSearch={setSearch}
-            dateFrom={dateFrom} dateTo={dateTo} onDateFrom={setDateFrom} onDateTo={setDateTo}
-            allTags={allTags} selectedTags={selectedTags}
-            onToggleTag={(tag) => setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))}
-            groupByTag={groupByTag} onGroupByTag={(v) => { setGroupByTag(v); localStorage.setItem('profile:tokens:groupByTag', String(v)) }}
-            viewMode={viewMode} onViewMode={(v) => { setViewMode(v); localStorage.setItem('profile:tokens:viewMode', v) }}
+            search={search}
+            onSearch={setSearch}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onDateFrom={setDateFrom}
+            onDateTo={setDateTo}
+            allTags={allTags}
+            selectedTags={selectedTags}
+            onToggleTag={(tag) =>
+              setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+            }
+            groupByTag={groupByTag}
+            onGroupByTag={(v) => {
+              setGroupByTag(v)
+              localStorage.setItem('profile:tokens:groupByTag', String(v))
+            }}
+            viewMode={viewMode}
+            onViewMode={(v) => {
+              setViewMode(v)
+              localStorage.setItem('profile:tokens:viewMode', v)
+            }}
           />
 
           {groups.map((g) => (
             <Box key={g.label}>
               {groupByTag && g.label && (
                 <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb={6} style={{ letterSpacing: '0.05em' }}>
-                  {g.label} <Badge size="xs" variant="light" color="gray" ml={4}>{g.tokens.length}</Badge>
+                  {g.label}{' '}
+                  <Badge size="xs" variant="light" color="gray" ml={4}>
+                    {g.tokens.length}
+                  </Badge>
                 </Text>
               )}
               {viewMode === 'grid' ? (
                 <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} mb={groupByTag ? 'sm' : 0}>
-                  {g.tokens.map((t) => <TokenCard key={t.id} t={t} toggle={toggle.mutate} rotate={rotate.mutate} remove={remove.mutate} />)}
+                  {g.tokens.map((t) => (
+                    <TokenCard key={t.id} t={t} toggle={toggle.mutate} rotate={rotate.mutate} remove={remove.mutate} />
+                  ))}
                 </SimpleGrid>
               ) : (
-                g.tokens.map((t) => <TokenRow key={t.id} t={t} toggle={toggle.mutate} rotate={rotate.mutate} remove={remove.mutate} />)
+                g.tokens.map((t) => (
+                  <TokenRow key={t.id} t={t} toggle={toggle.mutate} rotate={rotate.mutate} remove={remove.mutate} />
+                ))
               )}
             </Box>
           ))}
 
-          {filtered.length === 0 && <Text c="dimmed" size="xs" ta="center" py="sm">Tidak ada token yang cocok dengan filter.</Text>}
+          {filtered.length === 0 && (
+            <Text c="dimmed" size="xs" ta="center" py="sm">
+              Tidak ada token yang cocok dengan filter.
+            </Text>
+          )}
         </Stack>
       )}
 
       <Modal opened={createOpen && !newToken} onClose={closeCreate} title="Buat Token Baru" size="sm">
         <Stack gap="sm">
-          <TextInput label="Nama" placeholder="misal: laptop-dev" value={newName} onChange={(e) => setNewName(e.currentTarget.value)} required />
-          <Switch label="Read-Write" description="Izinkan token untuk menulis/mengubah vars" checked={newWrite} onChange={(e) => setNewWrite(e.currentTarget.checked)} />
-          <TagsInput label="Tags (opsional)" placeholder="Ketik lalu Enter" value={newTags} onChange={setNewTags} description="Tag untuk mengelompokkan token" />
-          <TextInput label={`Expired${maxDays > 0 ? ` (maks ${maxDays} hari)` : ' (opsional)'}`} placeholder="YYYY-MM-DD" type="date" value={newExpiry} onChange={(e) => setNewExpiry(e.currentTarget.value)} min={new Date().toISOString().slice(0, 10)} max={maxExpiry ? maxExpiry.toISOString().slice(0, 10) : undefined} />
-          {create.isError && <Text c="red" size="xs">{(create.error as Error).message}</Text>}
+          <TextInput
+            label="Nama"
+            placeholder="misal: laptop-dev"
+            value={newName}
+            onChange={(e) => setNewName(e.currentTarget.value)}
+            required
+          />
+          <Switch
+            label="Read-Write"
+            description="Izinkan token untuk menulis/mengubah vars"
+            checked={newWrite}
+            onChange={(e) => setNewWrite(e.currentTarget.checked)}
+          />
+          <TagsInput
+            label="Tags (opsional)"
+            placeholder="Ketik lalu Enter"
+            value={newTags}
+            onChange={setNewTags}
+            description="Tag untuk mengelompokkan token"
+          />
+          <TextInput
+            label={`Expired${maxDays > 0 ? ` (maks ${maxDays} hari)` : ' (opsional)'}`}
+            placeholder="YYYY-MM-DD"
+            type="date"
+            value={newExpiry}
+            onChange={(e) => setNewExpiry(e.currentTarget.value)}
+            min={new Date().toISOString().slice(0, 10)}
+            max={maxExpiry ? maxExpiry.toISOString().slice(0, 10) : undefined}
+          />
+          {create.isError && (
+            <Text c="red" size="xs">
+              {(create.error as Error).message}
+            </Text>
+          )}
           <Group justify="flex-end">
-            <Button variant="subtle" color="gray" onClick={closeCreate}>Batal</Button>
-            <Button loading={create.isPending} disabled={!newName.trim()} onClick={() => create.mutate()}>Buat</Button>
+            <Button variant="subtle" color="gray" onClick={closeCreate}>
+              Batal
+            </Button>
+            <Button loading={create.isPending} disabled={!newName.trim()} onClick={() => create.mutate()}>
+              Buat
+            </Button>
           </Group>
         </Stack>
       </Modal>
 
       <Modal opened={!!newToken} onClose={resetCreate} title="Token Berhasil Dibuat" size="sm">
         <Stack gap="sm">
-          <Text size="sm" c="dimmed">Salin token sekarang. Token tidak akan ditampilkan lagi.</Text>
-          <Box p="sm" style={{ background: 'var(--mantine-color-default-hover)', borderRadius: 4, fontFamily: 'monospace', wordBreak: 'break-all', fontSize: 13 }}>
+          <Text size="sm" c="dimmed">
+            Salin token sekarang. Token tidak akan ditampilkan lagi.
+          </Text>
+          <Box
+            p="sm"
+            style={{
+              background: 'var(--mantine-color-default-hover)',
+              borderRadius: 4,
+              fontFamily: 'monospace',
+              wordBreak: 'break-all',
+              fontSize: 13,
+            }}
+          >
             {newToken}
           </Box>
-          <Button fullWidth leftSection={newTokenCb.copied ? <TbCopyCheck size={16} /> : <TbCopy size={16} />} color={newTokenCb.copied ? 'green' : 'blue'} onClick={() => newTokenCb.copy(newToken!)}>
+          <Button
+            fullWidth
+            leftSection={newTokenCb.copied ? <TbCopyCheck size={16} /> : <TbCopy size={16} />}
+            color={newTokenCb.copied ? 'green' : 'blue'}
+            onClick={() => newTokenCb.copy(newToken!)}
+          >
             {newTokenCb.copied ? 'Disalin!' : 'Salin Token'}
           </Button>
         </Stack>

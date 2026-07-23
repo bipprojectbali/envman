@@ -121,7 +121,8 @@ export function EnvAccessCell({
 
             {overrides.length === 0 ? (
               <Text size="xs" c="dimmed" py={2}>
-                Belum ada override — semua env mengikuti role project ({roleShort(projectRole)}).
+                Belum ada override — semua env mengikuti role project{projectRole ? ` (${roleShort(projectRole)})` : ''}
+                .
               </Text>
             ) : (
               <Stack gap={2}>

@@ -1,10 +1,10 @@
 import { Elysia } from 'elysia'
+import { appLog } from '../lib/applog'
 import { audit } from '../lib/audit'
 import { auth } from '../lib/auth'
 import { requireAuth } from '../lib/auth-middleware'
 import { prisma } from '../lib/db'
 import { env } from '../lib/env'
-import { appLog } from '../lib/applog'
 import { redis } from '../lib/redis'
 import { getIp, getPublicOrigin } from '../lib/request'
 
@@ -175,14 +175,7 @@ export const authCompatRouter = new Elysia()
     })
     redis.del(`avatar:${userId}`).catch(() => {})
     appLog('info', `Login (Google): ${dbUser?.email} (${dbUser?.role})`, getIp(request))
-    const defaultRoute =
-      dbUser?.role === 'SUPER_ADMIN'
-        ? '/dev'
-        : dbUser?.role === 'QC'
-          ? '/dashboard'
-          : dbUser?.role === 'ADMIN'
-            ? '/envmanager'
-            : '/profile'
+    const defaultRoute = dbUser?.role === 'SUPER_ADMIN' ? '/dev' : dbUser?.role === 'ADMIN' ? '/envmanager' : '/profile'
     set.status = 302
     set.headers.location = defaultRoute
   })

@@ -23,7 +23,7 @@ PostgreSQL via Prisma v6. Client singleton `src/lib/db.ts` (`{ prisma }`). Schem
 
 ### Schema Models
 
-- `User`, `Session`, `AuditLog`, `Ticket`, `TicketComment`, `TicketEvidence` — field standar (lihat schema).
+- `User`, `Session`, `AuditLog` — field standar (lihat schema).
 - `Project` (id, slug, name, description, tags[], icon?, color?, cardColor?, storageQuotaMb?, storageMaxFileMb?, createdById?, timestamps) — `icon`/`color`/`cardColor` divalidasi vs registry `src/lib/project-avatar.ts`, null=fallback. `storageQuotaMb`/`storageMaxFileMb` = override storage per-project (SUPER_ADMIN), null=global AppSetting. `createdById` (FK User, `ON DELETE SET NULL`).
 - `Environment` (id, name, tags[], projectId, createdAt) — unique(projectId, name)
 - `EnvVar` (id, key, value, isSecret, isDisabled, environmentId, timestamps) — unique(environmentId, key)
@@ -43,11 +43,9 @@ PostgreSQL via Prisma v6. Client singleton `src/lib/db.ts` (`{ prisma }`). Schem
 
 ### Enums
 
-- `Role` = `USER | QC | ADMIN | SUPER_ADMIN`
+- `Role` = `USER | ADMIN | SUPER_ADMIN`
 - `ProjectMemberRole` = `OWNER | EDITOR | VIEWER`
 - `ProjectSection` = `NOTES | ALIASES | FILES | STORAGE`
-- `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`
-- `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`
 
 ### Commands
 
@@ -95,8 +93,7 @@ Static route wajib untuk navigasi yang merepresentasikan lokasi dalam hierarki d
 | Role | Default | Access |
 |------|---------|--------|
 | SUPER_ADMIN | `/dev` | `/dev`, `/dashboard`, `/envmanager`, `/profile` |
-| ADMIN | `/dashboard` | `/dashboard`, `/envmanager`, `/profile` |
-| QC | `/dashboard` | `/dashboard` (QC tickets only), `/profile` |
+| ADMIN | `/envmanager` | `/envmanager`, `/profile` (hak di-grant via capability/access matrix) |
 | USER | `/profile` | `/profile` |
 
 `getDefaultRoute(role)` di `src/frontend/hooks/useAuth.ts`. Blocked → `/blocked`.
@@ -135,7 +132,7 @@ Files & aliases accessible di project level, tapi yang reference env via `-e pro
 - Env card badge `DENIED` (red) / override `<role>` (grape).
 - MembersPanel: chevron expand → `MemberEnvOverrides.tsx` (select `inherit|OWNER|EDITOR|VIEWER|denied`, OWNER-only).
 - AliasesPanel: `deniedEnvs.length>0` → Badge merah "needs <env>", sembunyikan CopyButton.
-- Users Management (`AccessMatrixTab`): collapsible row per project, badge counts, stats global, default filter `with-access`.
+- Users Management (`AccessMatrixTab`): **read-only** ringkasan akses per-user (badge role+override per project, stats global, filter `with-access`). Tiap baris deep-link ke `/envmanager/:slug?tab=members` — **semua penyuntingan akses dilakukan di tab Members project** (single source of truth), bukan dari sisi user.
 
 ### Admin Endpoint Parity (SUPER_ADMIN)
 
@@ -297,10 +294,6 @@ MINIO_ENDPOINT · MINIO_ACCESS_KEY · MINIO_SECRET_KEY · MINIO_BUCKET=envman ·
 - `GET .../schema` (Prisma schema → JSON, dipakai Dev > Database)
 - `PUT /api/envman/admin/users/:userId/permissions` — set capability array (`isValidCapability`→400).
 
-### Tickets API
-
-Status `OPEN → IN_PROGRESS → READY_FOR_QC → CLOSED` (+ `REOPENED`). `GET|POST /api/tickets` · `GET|PATCH /api/tickets/:id` · `POST /api/tickets/:id/comments|evidence`. FE `TicketsPanel.tsx`.
-
 ### Envman API
 
 Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()`).
@@ -374,9 +367,9 @@ React 19 + Vite 8 (middleware mode dev). File-based routing TanStack Router.
 - `src/frontend.tsx` — render App, remove splash, DevInspector (dev)
 - `src/frontend/App.tsx` — MantineProvider, ModalsProvider, QueryClientProvider, RouterProvider
 
-**Routes** (`src/frontend/routes/`): `__root` · `index` (landing) · `login` · `dev` (SUPER_ADMIN) · `dashboard` (ADMIN+) · `envmanager` (AppShell) · `envmanager.index` (project list) · `envmanager.tokens.lazy` · `envmanager.connections` · `envmanager.$slug` (`<Outlet/>`) · `envmanager.$slug.index` (environments/notes/aliases) · `envmanager.$slug.$env` (vars; Portainer+History via Drawer `?integrations=true`) · `profile` · `blocked`.
+**Routes** (`src/frontend/routes/`): `__root` · `index` (landing) · `login` · `dev` (SUPER_ADMIN) · `dashboard` (SUPER_ADMIN) · `envmanager` (AppShell) · `envmanager.index` (project list) · `envmanager.tokens.lazy` · `envmanager.connections` · `envmanager.$slug` (`<Outlet/>`) · `envmanager.$slug.index` (environments/notes/aliases) · `envmanager.$slug.$env` (vars; Portainer+History via Drawer `?integrations=true`) · `profile` · `blocked`.
 
-**Components:** `CodeEditor.tsx`+`MonacoCodeEditor.tsx` (lazy ~1MB, mobile→Textarea) · `ThemeToggle` · `TicketsPanel` (shared `/dev`+`/dashboard`) · `PortainerSync` · `slug/AliasesPanel` · `slug/FilesPanel` · `env/CompareModal`.
+**Components:** `CodeEditor.tsx`+`MonacoCodeEditor.tsx` (lazy ~1MB, mobile→Textarea) · `ThemeToggle` · `PortainerSync` · `slug/AliasesPanel` · `slug/FilesPanel` · `env/CompareModal`.
 
 **Hooks:** `useAuth.ts` (`useSession/useLogin/useLogout/getDefaultRoute`) · `usePresence.ts` (WebSocket, `onlineUserIds`).
 

@@ -14,7 +14,6 @@ import {
 import type { NavigateFn } from '@tanstack/react-router'
 import {
   TbBook,
-  TbBug,
   TbCalendar,
   TbChevronRight,
   TbClipboardList,
@@ -42,7 +41,6 @@ type NavItem = {
 
 export const dashboardNavItemsAll: NavItem[] = [
   { label: 'Dashboard', icon: TbLayoutDashboard, key: 'dashboard', adminOnly: true },
-  { label: 'Tickets', icon: TbBug, key: 'tickets' },
   { label: 'Analytics', icon: TbReportAnalytics, key: 'analytics', adminOnly: true },
   { label: 'Orders', icon: TbClipboardList, key: 'orders', adminOnly: true },
   { label: 'Messages', icon: TbMessages, key: 'messages', badge: 3, adminOnly: true },
@@ -56,14 +54,22 @@ interface DashboardSidebarProps {
   active: string
   setActive: (key: string) => void
   user: { name?: string; role?: string } | null | undefined
-  isQcOnly: boolean
   logoutPending: boolean
   confirmLogout: () => void
   navigate: NavigateFn
 }
 
-export function DashboardSidebar({ collapsed, toggleSidebar, active, setActive, user, isQcOnly, logoutPending, confirmLogout, navigate }: DashboardSidebarProps) {
-  const navItems = dashboardNavItemsAll.filter((item) => (isQcOnly ? !item.adminOnly : true))
+export function DashboardSidebar({
+  collapsed,
+  toggleSidebar,
+  active,
+  setActive,
+  user,
+  logoutPending,
+  confirmLogout,
+  navigate,
+}: DashboardSidebarProps) {
+  const navItems = dashboardNavItemsAll
 
   return (
     <AppShell.Navbar p={collapsed ? 'xs' : 'md'}>
@@ -82,8 +88,12 @@ export function DashboardSidebar({ collapsed, toggleSidebar, active, setActive, 
                   <TbLayoutDashboard size={18} />
                 </ThemeIcon>
                 <div>
-                  <Text fw={700} size="sm">Dashboard</Text>
-                  <Text size="xs" c="dimmed">Admin Panel</Text>
+                  <Text fw={700} size="sm">
+                    Dashboard
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Admin Panel
+                  </Text>
                 </div>
               </Group>
               <Tooltip label="Minimize sidebar">
@@ -110,7 +120,12 @@ export function DashboardSidebar({ collapsed, toggleSidebar, active, setActive, 
               >
                 <item.icon size={18} />
                 {item.badge && (
-                  <Badge size="xs" color="red" variant="filled" style={{ position: 'absolute', top: -2, right: -2, padding: '0 4px', minWidth: 16, height: 16 }}>
+                  <Badge
+                    size="xs"
+                    color="red"
+                    variant="filled"
+                    style={{ position: 'absolute', top: -2, right: -2, padding: '0 4px', minWidth: 16, height: 16 }}
+                  >
                     {item.badge}
                   </Badge>
                 )}
@@ -121,7 +136,15 @@ export function DashboardSidebar({ collapsed, toggleSidebar, active, setActive, 
               key={item.key}
               label={item.label}
               leftSection={<item.icon size={18} />}
-              rightSection={item.badge ? <Badge size="xs" color="red" variant="filled">{item.badge}</Badge> : <TbChevronRight size={14} />}
+              rightSection={
+                item.badge ? (
+                  <Badge size="xs" color="red" variant="filled">
+                    {item.badge}
+                  </Badge>
+                ) : (
+                  <TbChevronRight size={14} />
+                )
+              }
               active={active === item.key}
               onClick={() => setActive(item.key)}
               variant="light"
@@ -130,41 +153,86 @@ export function DashboardSidebar({ collapsed, toggleSidebar, active, setActive, 
           ),
         )}
 
-        {!isQcOnly && (
-          collapsed ? (
-            <Tooltip label="Env Manager" position="right">
-              <ActionIcon variant="subtle" color="gray" size="lg" component="a" href="/envmanager" mt={8} style={{ width: '100%' }}>
-                <TbVariable size={18} />
-              </ActionIcon>
-            </Tooltip>
-          ) : (
-            <>
-              <Text size="xs" c="dimmed" fw={500} mt="md" mb={4} ml="sm">Tools</Text>
-              <NavLink label="Env Manager" leftSection={<TbVariable size={18} />} rightSection={<TbChevronRight size={14} />} component="a" href="/envmanager" variant="light" mb={4} />
-            </>
-          )
+        {collapsed ? (
+          <Tooltip label="Env Manager" position="right">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="lg"
+              component="a"
+              href="/envmanager"
+              mt={8}
+              style={{ width: '100%' }}
+            >
+              <TbVariable size={18} />
+            </ActionIcon>
+          </Tooltip>
+        ) : (
+          <>
+            <Text size="xs" c="dimmed" fw={500} mt="md" mb={4} ml="sm">
+              Tools
+            </Text>
+            <NavLink
+              label="Env Manager"
+              leftSection={<TbVariable size={18} />}
+              rightSection={<TbChevronRight size={14} />}
+              component="a"
+              href="/envmanager"
+              variant="light"
+              mb={4}
+            />
+          </>
         )}
 
-        {user?.role === 'SUPER_ADMIN' && (
-          collapsed ? (
+        {user?.role === 'SUPER_ADMIN' &&
+          (collapsed ? (
             <Tooltip label="Dev Console" position="right">
-              <ActionIcon variant="subtle" color="gray" size="lg" component="a" href="/dev" mt={8} style={{ width: '100%' }}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="lg"
+                component="a"
+                href="/dev"
+                mt={8}
+                style={{ width: '100%' }}
+              >
                 <TbCode size={18} />
               </ActionIcon>
             </Tooltip>
           ) : (
-            <NavLink label="Dev Console" leftSection={<TbCode size={18} />} rightSection={<TbChevronRight size={14} />} component="a" href="/dev" variant="light" mb={4} />
-          )
-        )}
+            <NavLink
+              label="Dev Console"
+              leftSection={<TbCode size={18} />}
+              rightSection={<TbChevronRight size={14} />}
+              component="a"
+              href="/dev"
+              variant="light"
+              mb={4}
+            />
+          ))}
 
         {collapsed ? (
           <Tooltip label="Docs" position="right">
-            <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })} mt={8} style={{ width: '100%' }}>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="lg"
+              onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })}
+              mt={8}
+              style={{ width: '100%' }}
+            >
               <TbBook size={18} />
             </ActionIcon>
           </Tooltip>
         ) : (
-          <NavLink label="Docs" leftSection={<TbBook size={18} />} rightSection={<TbChevronRight size={14} />} onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })} variant="light" mb={4} />
+          <NavLink
+            label="Docs"
+            leftSection={<TbBook size={18} />}
+            rightSection={<TbChevronRight size={14} />}
+            onClick={() => navigate({ to: '/dashboard/docs', search: { tab: 'dashboard' } })}
+            variant="light"
+            mb={4}
+          />
         )}
       </AppShell.Section>
 
@@ -196,9 +264,11 @@ export function DashboardSidebar({ collapsed, toggleSidebar, active, setActive, 
                   {user?.name?.charAt(0).toUpperCase()}
                 </Avatar>
                 <div>
-                  <Text size="xs" fw={500}>{user?.name}</Text>
+                  <Text size="xs" fw={500}>
+                    {user?.name}
+                  </Text>
                   <Text size="xs" c="dimmed">
-                    {user?.role === 'SUPER_ADMIN' ? 'Super Admin' : user?.role === 'ADMIN' ? 'Admin' : 'QC'}
+                    {user?.role === 'SUPER_ADMIN' ? 'Super Admin' : user?.role === 'ADMIN' ? 'Admin' : 'User'}
                   </Text>
                 </div>
               </Group>

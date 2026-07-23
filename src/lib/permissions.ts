@@ -1,10 +1,8 @@
 export const CAPABILITIES = [
   // Create capabilities
   'project:create',
-  'ticket:create',
   'gist:create',
   'token:create',
-  'note:create',
   // Sidebar menu visibility
   'menu:overview',
   'menu:tokens',

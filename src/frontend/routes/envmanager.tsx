@@ -19,7 +19,6 @@ export const Route = createFileRoute('/envmanager')({
       })
       if (!data?.user) throw redirect({ to: '/login' })
       if (data.user.blocked) throw redirect({ to: '/blocked' })
-      if (data.user.role === 'QC') throw redirect({ to: '/dashboard', search: { tab: 'dashboard' } })
     } catch (e) {
       if (e instanceof Error) throw redirect({ to: '/login' })
       throw e
@@ -58,7 +57,12 @@ function EnvManagerLayout() {
       navbar={{ width: collapsed ? 60 : 260, breakpoint: 'sm', collapsed: { mobile: !mobileOpened } }}
       padding={{ base: 'sm', sm: 'md' }}
     >
-      <MobileAppHeader user={user} mobileOpened={mobileOpened} toggleMobile={toggleMobile} confirmLogout={confirmLogout} />
+      <MobileAppHeader
+        user={user}
+        mobileOpened={mobileOpened}
+        toggleMobile={toggleMobile}
+        confirmLogout={confirmLogout}
+      />
 
       <AppShell.Navbar p={collapsed ? 'xs' : 'md'} style={{ overflow: 'hidden' }}>
         <EnvManagerSidebar

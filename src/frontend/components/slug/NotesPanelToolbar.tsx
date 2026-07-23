@@ -1,14 +1,4 @@
-import {
-  ActionIcon,
-  Button,
-  Group,
-  Kbd,
-  Select,
-  Stack,
-  Text,
-  TextInput,
-  Tooltip,
-} from '@mantine/core'
+import { ActionIcon, Button, Group, Kbd, Select, Stack, Text, TextInput, Tooltip } from '@mantine/core'
 import type { RefObject } from 'react'
 import {
   TbBookmarkFilled,
@@ -38,7 +28,6 @@ interface Props {
   view: 'list' | 'grid'
   onViewChange: (v: 'list' | 'grid') => void
   canEdit: boolean
-  canCreate: boolean
   allTags: TagOption[]
   notesTotal: number
   filteredTotal: number
@@ -50,14 +39,24 @@ interface Props {
 }
 
 export function NotesPanelToolbar({
-  search, onSearchChange, searchRef,
-  tagFilter, onTagFilterChange,
-  sort, onSortChange,
-  view, onViewChange,
-  canEdit, canCreate,
-  allTags, notesTotal, filteredTotal,
-  hasFilter, pinnedCount, myCount,
-  onNewNote, onResetFilter,
+  search,
+  onSearchChange,
+  searchRef,
+  tagFilter,
+  onTagFilterChange,
+  sort,
+  onSortChange,
+  view,
+  onViewChange,
+  canEdit,
+  allTags,
+  notesTotal,
+  filteredTotal,
+  hasFilter,
+  pinnedCount,
+  myCount,
+  onNewNote,
+  onResetFilter,
 }: Props) {
   return (
     <Stack gap="xs">
@@ -65,19 +64,28 @@ export function NotesPanelToolbar({
       {notesTotal > 0 && (
         <Group gap="xs" wrap="wrap" mb={-4}>
           <Text size="xs" c="dimmed">
-            <Text component="span" fw={600} c="default">{notesTotal}</Text> note
+            <Text component="span" fw={600} c="default">
+              {notesTotal}
+            </Text>{' '}
+            note
           </Text>
           {pinnedCount > 0 && (
             <Group gap={4}>
               <TbBookmarkFilled size={11} color="var(--mantine-color-yellow-5)" />
               <Text size="xs" c="dimmed">
-                <Text component="span" fw={600} c="default">{pinnedCount}</Text> disematkan
+                <Text component="span" fw={600} c="default">
+                  {pinnedCount}
+                </Text>{' '}
+                disematkan
               </Text>
             </Group>
           )}
           {myCount > 0 && (
             <Text size="xs" c="dimmed">
-              <Text component="span" fw={600} c="default">{myCount}</Text> saya buat
+              <Text component="span" fw={600} c="default">
+                {myCount}
+              </Text>{' '}
+              saya buat
             </Text>
           )}
         </Group>
@@ -138,19 +146,29 @@ export function NotesPanelToolbar({
         <Group gap="xs" wrap="nowrap">
           <Group gap={2} wrap="nowrap">
             <Tooltip label="Tampilan list">
-              <ActionIcon size="sm" variant={view === 'list' ? 'filled' : 'subtle'} color={view === 'list' ? 'violet' : 'gray'}
-                aria-label="Tampilan list" onClick={() => onViewChange('list')}>
+              <ActionIcon
+                size="sm"
+                variant={view === 'list' ? 'filled' : 'subtle'}
+                color={view === 'list' ? 'violet' : 'gray'}
+                aria-label="Tampilan list"
+                onClick={() => onViewChange('list')}
+              >
                 <TbLayoutList size={14} />
               </ActionIcon>
             </Tooltip>
             <Tooltip label="Tampilan grid">
-              <ActionIcon size="sm" variant={view === 'grid' ? 'filled' : 'subtle'} color={view === 'grid' ? 'violet' : 'gray'}
-                aria-label="Tampilan grid" onClick={() => onViewChange('grid')}>
+              <ActionIcon
+                size="sm"
+                variant={view === 'grid' ? 'filled' : 'subtle'}
+                color={view === 'grid' ? 'violet' : 'gray'}
+                aria-label="Tampilan grid"
+                onClick={() => onViewChange('grid')}
+              >
                 <TbLayoutGrid size={14} />
               </ActionIcon>
             </Tooltip>
           </Group>
-          {canEdit && canCreate && (
+          {canEdit && (
             <Button type="button" size="sm" color="primary" leftSection={<TbPlus size={13} />} onClick={onNewNote}>
               New Note
             </Button>
@@ -160,7 +178,9 @@ export function NotesPanelToolbar({
 
       {tagFilter.length > 0 && (
         <Group gap="xs" wrap="wrap" align="center">
-          <Text size="xs" c="dimmed">Tag aktif:</Text>
+          <Text size="xs" c="dimmed">
+            Tag aktif:
+          </Text>
           <MultiSelectChipsRow value={tagFilter} onChange={onTagFilterChange} />
         </Group>
       )}
@@ -168,9 +188,17 @@ export function NotesPanelToolbar({
       {hasFilter && (
         <Group justify="space-between" gap="xs" wrap="nowrap">
           <Text size="xs" c="dimmed">
-            {filteredTotal === notesTotal ? `Menampilkan semua ${notesTotal} note` : `${filteredTotal} dari ${notesTotal} note`}
+            {filteredTotal === notesTotal
+              ? `Menampilkan semua ${notesTotal} note`
+              : `${filteredTotal} dari ${notesTotal} note`}
           </Text>
-          <Button size="compact-xs" variant="subtle" color="gray" leftSection={<TbX size={11} />} onClick={onResetFilter}>
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            color="gray"
+            leftSection={<TbX size={11} />}
+            onClick={onResetFilter}
+          >
             Reset filter
           </Button>
         </Group>

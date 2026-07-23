@@ -24,15 +24,13 @@ export function buildIntroSection(origin: string): string {
    - [Env Manager — Tokens](#env-manager--tokens)
    - [Env Manager — Portainer](#env-manager--portainer)
    - [Env Manager — Gists](#env-manager--gists)
-   - [Tickets](#tickets)
    - [Admin (SUPER_ADMIN)](#admin-super_admin)
    - [WebSocket](#websocket)
 5. [Enkripsi Secret Vars](#enkripsi-secret-vars)
 6. [Portainer Integration](#portainer-integration)
 7. [Gists](#gists)
-8. [Tickets](#tickets-1)
-9. [Database Schema](#database-schema)
-10. [Self-Hosting](#self-hosting)
+8. [Database Schema](#database-schema)
+9. [Self-Hosting](#self-hosting)
 
 ---
 
@@ -66,8 +64,7 @@ Semua endpoint \`/api/envman/*\` menerima keduanya via \`requireEnvAuth()\`.
 | Role | Default Route | Akses |
 |------|--------------|-------|
 | \`SUPER_ADMIN\` | \`/dev\` | Semua fitur + Dev Console + User management |
-| \`ADMIN\` | \`/dashboard\` | Dashboard + Env Manager (buat project) |
-| \`QC\` | \`/dashboard\` | Dashboard (tiket QC scope saja) |
+| \`ADMIN\` | \`/envmanager\` | Env Manager (hak di-grant via capability/access matrix) |
 | \`USER\` | \`/profile\` | Profile saja |
 
 ### Role Project (akses ke data vars)
@@ -77,15 +74,6 @@ Semua endpoint \`/api/envman/*\` menerima keduanya via \`requireEnvAuth()\`.
 | \`OWNER\` | Kontrol penuh — kelola member, hapus env, semua EDITOR permission |
 | \`EDITOR\` | Tambah / edit / hapus vars, reveal secrets, export decrypted, config Portainer |
 | \`VIEWER\` | Lihat vars (secrets tampil sebagai \`***\`), tidak bisa edit atau reveal |
-
-### Transisi Status Tiket (role-gated)
-
-| Dari → Ke | Aktor |
-|-----------|-------|
-| \`OPEN → IN_PROGRESS\` | ADMIN, SUPER_ADMIN |
-| \`IN_PROGRESS → READY_FOR_QC\` | ADMIN, SUPER_ADMIN |
-| \`READY_FOR_QC → CLOSED\` | QC, SUPER_ADMIN |
-| \`CLOSED / READY_FOR_QC → REOPENED\` | QC, SUPER_ADMIN |
 
 ---
 `

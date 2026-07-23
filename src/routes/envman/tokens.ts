@@ -44,10 +44,6 @@ export const tokensRouter = new Elysia()
     }
     const isSuperAdminOrGranted = hasCapability(caller, 'token:create')
     if (!isSuperAdminOrGranted) {
-      if (caller.role === 'QC') {
-        set.status = 403
-        return { error: 'QC tidak dapat membuat token.' }
-      }
       const allowed = await getSettingBool('user_token_creation', true)
       if (!allowed) {
         set.status = 403

@@ -98,33 +98,5 @@ Gists adalah snippet/konfigurasi yang bisa di-share antar anggota tim.
 }
 \`\`\`
 
----
-
-## Tickets
-
-Sistem tiket untuk melacak bug, feature request, dan QC workflow.
-
-### Status Machine
-
-\`\`\`
-OPEN
-  ↓ (ADMIN assign ke diri sendiri)
-IN_PROGRESS
-  ↓ (ADMIN: selesai, butuh review QC)
-READY_FOR_QC
-  ↓ (QC: approved)      ↓ (QC: butuh perbaikan)
-CLOSED               REOPENED → IN_PROGRESS → READY_FOR_QC → ...
-\`\`\`
-
-### Priority
-
-| Level | Warna | Use Case |
-|-------|-------|---------|
-| \`LOW\` | Gray | Nice-to-have, tidak urgent |
-| \`MEDIUM\` | Blue | Bug normal, bisa ditunda |
-| \`HIGH\` | Orange | Mengganggu user, perlu segera |
-| \`CRITICAL\` | Red | Production down, security issue |
-
----
 `
 }

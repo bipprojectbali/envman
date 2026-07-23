@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { apiFetch } from '@/frontend/lib/api'
 
-export type Role = 'USER' | 'QC' | 'ADMIN' | 'SUPER_ADMIN'
+export type Role = 'USER' | 'ADMIN' | 'SUPER_ADMIN'
 
 export interface User {
   id: string
@@ -25,8 +25,6 @@ export function getDefaultRoute(role: Role): string {
   switch (role) {
     case 'SUPER_ADMIN':
       return '/dev'
-    case 'QC':
-      return '/dashboard'
     case 'ADMIN':
     case 'USER':
       // ADMIN dan USER landing di envmanager.

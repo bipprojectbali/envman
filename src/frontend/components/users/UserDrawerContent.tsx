@@ -244,7 +244,7 @@ export function UserDrawerContent({ userId }: { userId: string }) {
                 block.
               </Alert>
             )}
-            <AccessMatrixTab userId={userId} projects={projects} />
+            <AccessMatrixTab projects={projects} />
           </Tabs.Panel>
         )}
         {!isUserOnly && (

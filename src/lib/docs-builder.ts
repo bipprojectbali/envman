@@ -31,8 +31,7 @@ Auth dua metode: **Session** (browser, cookie HttpOnly) dan **API Token** (\`Aut
 | Role | Akses |
 |------|-------|
 | \`SUPER_ADMIN\` | Semua fitur + Dev Console + User management |
-| \`ADMIN\` | Dashboard + Env Manager (buat project) |
-| \`QC\` | Dashboard (tiket QC scope saja) |
+| \`ADMIN\` | Env Manager (hak di-grant via capability/access matrix) |
 | \`USER\` | Profile saja |
 
 ### Role Project
@@ -198,19 +197,6 @@ ENVMAN_SERVER=${origin} ENVMAN_TOKEN=<TOKEN> envman -e myapp:production -- bun s
 | \`PUT\` | \`/api/envman/gists/:id\` | Owner | Update |
 | \`DELETE\` | \`/api/envman/gists/:id\` | Owner | Hapus |
 
-### Tickets
-
-| Method | Path | Auth | Keterangan |
-|--------|------|------|-----------|
-| \`GET\` | \`/api/tickets\` | Session | List (QC: hanya scope QC) |
-| \`POST\` | \`/api/tickets\` | ADMIN+ | Buat \`{title, description, priority, route?}\` |
-| \`GET\` | \`/api/tickets/:id\` | Session | Detail + comments + evidence |
-| \`PATCH\` | \`/api/tickets/:id\` | Role-gated | Update \`{status?, priority?, assigneeId?}\` |
-| \`POST\` | \`/api/tickets/:id/comments\` | Session | Komentar \`{body}\` |
-| \`POST\` | \`/api/tickets/:id/evidence\` | Session | Evidence \`{kind, url, note?}\` |
-
-Status machine: \`OPEN → IN_PROGRESS → READY_FOR_QC → CLOSED\` + \`REOPENED\`
-
 ### Admin (SUPER_ADMIN only)
 
 | Method | Path | Keterangan |
@@ -262,10 +248,8 @@ AUDIT_LOG_RETENTION_DAYS=90
 ## Database Enums
 
 \`\`\`
-Role:              USER | QC | ADMIN | SUPER_ADMIN
+Role:              USER | ADMIN | SUPER_ADMIN
 ProjectMemberRole: OWNER | EDITOR | VIEWER
-TicketStatus:      OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED
-TicketPriority:    LOW | MEDIUM | HIGH | CRITICAL
 \`\`\`
 
 ---

@@ -5,9 +5,9 @@ import { useEffect, useState } from 'react'
 import { TbAlertCircle, TbCheck, TbSettings } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
-import { TokenActivitySection } from './TokenActivitySection'
 import type { ActivityStats, Settings } from './settings-types'
 import { parseSettings } from './settings-types'
+import { TokenActivitySection } from './TokenActivitySection'
 
 export function SettingsPanel() {
   const qc = useQueryClient()
@@ -100,8 +100,8 @@ export function SettingsPanel() {
           <Stack gap={2}>
             <Text size="sm">Izinkan user membuat token sendiri</Text>
             <Text size="xs" c="dimmed">
-              Semua user non-QC dapat membuat token dari halaman Profile. Token hanya bekerja untuk project yang user
-              sudah jadi member.
+              Semua user dapat membuat token dari halaman Profile. Token hanya bekerja untuk project yang user sudah
+              jadi member.
             </Text>
           </Stack>
           <Switch

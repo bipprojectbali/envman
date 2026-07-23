@@ -34,26 +34,68 @@ export function useEnvManagerNav() {
 
   const mainNav = [
     ...(hasCapability(user, 'menu:overview')
-      ? [{ label: 'Overview', description: 'Ringkasan semua resources', icon: TbHome, href: '/envmanager/overview', active: isOverview }]
+      ? [
+          {
+            label: 'Overview',
+            description: 'Ringkasan semua resources',
+            icon: TbHome,
+            href: '/envmanager/overview',
+            active: isOverview,
+          },
+        ]
       : []),
-    { label: 'Projects', description: 'Kelola environment vars', icon: TbVariable, href: '/envmanager', active: isProjectsActive },
+    {
+      label: 'Projects',
+      description: 'Kelola environment vars',
+      icon: TbVariable,
+      href: '/envmanager',
+      active: isProjectsActive,
+    },
     ...(hasCapability(user, 'menu:tokens')
-      ? [{ label: 'Tokens', description: 'API token untuk CLI', icon: TbKey, href: '/envmanager/tokens', active: isTokens }]
+      ? [
+          {
+            label: 'Tokens',
+            description: 'API token untuk CLI',
+            icon: TbKey,
+            href: '/envmanager/tokens',
+            active: isTokens,
+          },
+        ]
       : []),
     ...(hasCapability(user, 'menu:gists')
-      ? [{ label: 'Gists', description: 'Snippets & konfigurasi', icon: TbBrandGithub, href: '/envmanager/gists', active: isGists }]
+      ? [
+          {
+            label: 'Gists',
+            description: 'Snippets & konfigurasi',
+            icon: TbBrandGithub,
+            href: '/envmanager/gists',
+            active: isGists,
+          },
+        ]
       : []),
     ...(user?.role === 'SUPER_ADMIN'
       ? [
-          { label: 'Database', description: 'Sync data dari remote', icon: TbDatabase, href: '/envmanager/database', active: isDatabase },
-          { label: 'Users', description: 'Kelola akses user', icon: TbUsers, href: '/envmanager/users', active: isUsers },
+          {
+            label: 'Database',
+            description: 'Sync data dari remote',
+            icon: TbDatabase,
+            href: '/envmanager/database',
+            active: isDatabase,
+          },
+          {
+            label: 'Users',
+            description: 'Kelola akses user',
+            icon: TbUsers,
+            href: '/envmanager/users',
+            active: isUsers,
+          },
         ]
       : []),
   ]
 
   const otherNav = [
-    // Dashboard hanya untuk QC + SUPER_ADMIN (ticket workflow). ADMIN tidak.
-    ...(user?.role === 'QC' || user?.role === 'SUPER_ADMIN'
+    // Dashboard hanya untuk SUPER_ADMIN. ADMIN tidak.
+    ...(user?.role === 'SUPER_ADMIN'
       ? [{ label: 'Dashboard', icon: TbLayoutDashboard, href: '/dashboard', active: false }]
       : []),
     ...(user?.role === 'SUPER_ADMIN' ? [{ label: 'Dev Console', icon: TbCode, href: '/dev', active: false }] : []),
@@ -62,15 +104,29 @@ export function useEnvManagerNav() {
 
   const extensionsNav = [
     ...(portainerEnabled && (user?.role === 'SUPER_ADMIN' || hasCapability(user, 'menu:connections'))
-      ? [{ label: 'Portainer', description: 'Connections & backup', icon: TbPlugConnected, href: '/envmanager/connections', active: isConnections }]
+      ? [
+          {
+            label: 'Portainer',
+            description: 'Connections & backup',
+            icon: TbPlugConnected,
+            href: '/envmanager/connections',
+            active: isConnections,
+          },
+        ]
       : []),
   ]
 
   const bottomTabs = [
-    ...(hasCapability(user, 'menu:overview') ? [{ label: 'Overview', icon: TbHome, href: '/envmanager/overview', active: isOverview }] : []),
+    ...(hasCapability(user, 'menu:overview')
+      ? [{ label: 'Overview', icon: TbHome, href: '/envmanager/overview', active: isOverview }]
+      : []),
     { label: 'Projects', icon: TbVariable, href: '/envmanager', active: isProjectsActive },
-    ...(hasCapability(user, 'menu:tokens') ? [{ label: 'Tokens', icon: TbKey, href: '/envmanager/tokens', active: isTokens }] : []),
-    ...(hasCapability(user, 'menu:gists') ? [{ label: 'Gists', icon: TbBrandGithub, href: '/envmanager/gists', active: isGists }] : []),
+    ...(hasCapability(user, 'menu:tokens')
+      ? [{ label: 'Tokens', icon: TbKey, href: '/envmanager/tokens', active: isTokens }]
+      : []),
+    ...(hasCapability(user, 'menu:gists')
+      ? [{ label: 'Gists', icon: TbBrandGithub, href: '/envmanager/gists', active: isGists }]
+      : []),
     { label: 'Profil', icon: TbUser, href: '/profile', active: false },
   ]
 

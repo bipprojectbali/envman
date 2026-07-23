@@ -27,23 +27,19 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       {
         value: 'project:create',
         label: 'Create new project',
-        description: 'Bisa create project baru (otomatis jadi OWNER).',
+        description: 'Bisa create project baru (otomatis jadi OWNER project itu).',
       },
       {
         value: 'token:create',
         label: 'Create API token',
-        description: 'Bisa create API token untuk CLI/integrasi (scope tetap dibatasi project member).',
-      },
-      { value: 'gist:create', label: 'Create gist', description: 'Bisa simpan snippet/konfigurasi di Gists.' },
-      {
-        value: 'ticket:create',
-        label: 'Create ticket',
-        description: 'Bisa create ticket di tracker. (QC sudah otomatis bisa.)',
+        description:
+          'Buat API token tanpa batas masa berlaku & tanpa dibatasi setting global. Scope selalu dibatasi ke project member. (Tanpa capability ini, user tetap bisa buat token bila admin mengaktifkan setting-nya, dengan masa berlaku terbatas.)',
       },
       {
-        value: 'note:create',
-        label: 'Create project note',
-        description: 'Bisa create note di project (selain capability, butuh role EDITOR+ di project tersebut).',
+        value: 'gist:create',
+        label: 'Create gist',
+        description:
+          'Bisa membuat gist (snippet multi-file, private default). Edit/hapus gist sendiri tak butuh capability ini.',
       },
     ],
   },

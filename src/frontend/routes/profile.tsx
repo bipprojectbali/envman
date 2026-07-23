@@ -1,14 +1,4 @@
-import {
-  AppShell,
-  Badge,
-  Burger,
-  Container,
-  Divider,
-  Group,
-  Stack,
-  Text,
-  ThemeIcon,
-} from '@mantine/core'
+import { AppShell, Badge, Burger, Container, Divider, Group, Stack, Text, ThemeIcon } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
@@ -42,7 +32,7 @@ export const Route = createFileRoute('/profile')({
   component: ProfilePage,
 })
 
-const roleBadgeColor: Record<string, string> = { USER: 'blue', QC: 'orange', ADMIN: 'violet', SUPER_ADMIN: 'red' }
+const roleBadgeColor: Record<string, string> = { USER: 'blue', ADMIN: 'violet', SUPER_ADMIN: 'red' }
 
 function ProfilePage() {
   const { data } = useSession()
@@ -54,9 +44,16 @@ function ProfilePage() {
   const isMobile = useMediaQuery('(max-width: 48em)')
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('profile:sidebar') === 'collapsed')
 
-  const setTab = (key: string) => { navigate({ to: '/profile', search: { tab: key } }); closeMobile() }
+  const setTab = (key: string) => {
+    navigate({ to: '/profile', search: { tab: key } })
+    closeMobile()
+  }
   const toggleSidebar = () =>
-    setCollapsed((prev) => { const next = !prev; localStorage.setItem('profile:sidebar', next ? 'collapsed' : 'open'); return next })
+    setCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem('profile:sidebar', next ? 'collapsed' : 'open')
+      return next
+    })
   const confirmLogout = () =>
     modals.openConfirmModal({
       title: 'Logout',
@@ -68,8 +65,10 @@ function ProfilePage() {
 
   const backLinks = [
     ...(user?.role === 'SUPER_ADMIN' ? [{ label: 'Dev Console', icon: TbCode, href: '/dev' }] : []),
-    ...(user?.role !== 'QC' ? [{ label: 'Env Manager', icon: TbVariable, href: '/envmanager' }] : []),
-    ...(['QC', 'ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '') ? [{ label: 'Dashboard', icon: TbLayoutDashboard, href: '/dashboard' }] : []),
+    { label: 'Env Manager', icon: TbVariable, href: '/envmanager' },
+    ...(['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '')
+      ? [{ label: 'Dashboard', icon: TbLayoutDashboard, href: '/dashboard' }]
+      : []),
   ]
 
   return (
@@ -84,7 +83,9 @@ function ProfilePage() {
           <ThemeIcon size="md" variant="gradient" gradient={{ from: 'blue', to: 'violet' }}>
             <TbUser size={16} />
           </ThemeIcon>
-          <Text fw={700} size="sm">Profile</Text>
+          <Text fw={700} size="sm">
+            Profile
+          </Text>
         </Group>
       </AppShell.Header>
 
@@ -102,7 +103,7 @@ function ProfilePage() {
         <Container size="xl">
           {tab === 'account' && <AccountPanel user={user} />}
           {tab === 'projects' && <ProfileProjectsSection role={user?.role ?? 'USER'} />}
-          {tab === 'tokens' && user?.role !== 'QC' && <ProfileTokensSection role={user?.role ?? 'USER'} />}
+          {tab === 'tokens' && <ProfileTokensSection role={user?.role ?? 'USER'} />}
           {tab === 'docs' && <ProfileDocsSection />}
         </Container>
       </AppShell.Main>
@@ -115,25 +116,56 @@ type SessionUser = NonNullable<NonNullable<ReturnType<typeof useSession>['data']
 function AccountPanel({ user }: { user: SessionUser | null | undefined }) {
   return (
     <Stack gap="md">
-      <Stack p="lg" gap="sm" align="center" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
-        <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size={72} color="blue" variant="gradient" gradient={{ from: 'blue', to: 'violet' }} />
+      <Stack
+        p="lg"
+        gap="sm"
+        align="center"
+        style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+      >
+        <UserAvatar
+          user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }}
+          size={72}
+          color="blue"
+          variant="gradient"
+          gradient={{ from: 'blue', to: 'violet' }}
+        />
         <Stack gap={4} align="center">
-          <Text fw={600} size="md">{user?.name}</Text>
-          <Text c="dimmed" size="sm" style={{ wordBreak: 'break-all' }}>{user?.email}</Text>
+          <Text fw={600} size="md">
+            {user?.name}
+          </Text>
+          <Text c="dimmed" size="sm" style={{ wordBreak: 'break-all' }}>
+            {user?.email}
+          </Text>
         </Stack>
-        <Badge color={roleBadgeColor[user?.role ?? 'USER']} variant="light" size="md">{user?.role}</Badge>
+        <Badge color={roleBadgeColor[user?.role ?? 'USER']} variant="light" size="md">
+          {user?.role}
+        </Badge>
       </Stack>
-      <Stack p="md" gap="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}>
+      <Stack
+        p="md"
+        gap="sm"
+        style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 'var(--mantine-radius-md)' }}
+      >
         <Group gap="xs">
           <TbUser size={15} />
-          <Text fw={600} size="sm">Account Info</Text>
+          <Text fw={600} size="sm">
+            Account Info
+          </Text>
         </Group>
         <Divider />
         <Stack gap="xs">
-          {[{ label: 'Name', value: user?.name }, { label: 'Email', value: user?.email }, { label: 'Role', value: user?.role }].map((row) => (
+          {[
+            { label: 'Name', value: user?.name },
+            { label: 'Email', value: user?.email },
+            { label: 'Role', value: user?.role },
+          ].map((row) => (
             <Group key={row.label} justify="space-between" wrap="nowrap">
-              <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>{row.label}</Text>
-              <Text size="sm" ta="right" style={{ wordBreak: 'break-all', minWidth: 0 }}>{row.value}</Text>
+              <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>
+                {row.label}
+              </Text>
+              <Text size="sm" ta="right" style={{ wordBreak: 'break-all', minWidth: 0 }}>
+                {row.value}
+              </Text>
             </Group>
           ))}
         </Stack>

@@ -3,136 +3,196 @@ import {
   Badge,
   Box,
   Button,
-  Collapse,
   Group,
-  Pagination,
   SegmentedControl,
-  Select,
   Stack,
+  Table,
   Text,
   TextInput,
   ThemeIcon,
 } from '@mantine/core'
 import { useMemo, useState } from 'react'
-import { TbBan, TbChevronDown, TbChevronRight, TbSearch, TbX } from 'react-icons/tb'
+import { TbArrowRight, TbBan, TbSearch, TbShieldCheck, TbX } from 'react-icons/tb'
 import { AccessStatsHeader, computeStats } from './AccessStatsHeader'
-import { ProjectAccessRow } from './ProjectAccessRow'
 import type { ProjectAccess } from './types'
+import { ROLE_COLOR } from './types'
 
-const PAGE_SIZE = 20
-type FilterKey = 'with-access' | 'restricted' | 'override' | 'all'
-type SortKey = 'name' | 'role' | 'overrides'
+type FilterKey = 'with-access' | 'override'
 
 const hasAnyOverride = (p: ProjectAccess) => p.environments.some((e) => e.envRole !== 'inherit')
-const hasRestricted = (p: ProjectAccess) => p.environments.some((e) => e.envRole === 'denied')
-const overrideCount = (p: ProjectAccess) => p.environments.filter((e) => e.envRole !== 'inherit').length
-const roleWeight = (p: ProjectAccess) =>
-  p.projectRole === 'OWNER' ? 3 : p.projectRole === 'EDITOR' ? 2 : p.projectRole === 'VIEWER' ? 1 : 0
+// Benar-benar bisa menyentuh sesuatu: punya role project, ATAU override env
+// berupa role (bukan denied). Project NO ROLE tanpa akses efektif tak ditampilkan.
+const hasEffectiveAccess = (p: ProjectAccess) =>
+  p.projectRole !== null ||
+  p.environments.some((e) => e.envRole === 'OWNER' || e.envRole === 'EDITOR' || e.envRole === 'VIEWER')
 
-export function AccessMatrixTab({ userId, projects }: { userId: string; projects: ProjectAccess[] }) {
+function envCounts(envs: ProjectAccess['environments']) {
+  let denied = 0
+  let override = 0
+  for (const e of envs) {
+    if (e.envRole === 'denied') denied++
+    else if (e.envRole !== 'inherit') override++
+  }
+  return { denied, override }
+}
+
+// Ringkasan akses per-user READ-ONLY. Semua penyuntingan role/override kini
+// dilakukan di satu tempat: tab Members tiap project (single source of truth).
+// Tab ini hanya lensa audit "apa yang bisa diakses user ini" lintas project,
+// tiap baris deep-link ke tab Members project untuk mengedit.
+export function AccessMatrixTab({ projects }: { projects: ProjectAccess[] }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterKey>('with-access')
-  const [sort, setSort] = useState<SortKey>('name')
-  const [page, setPage] = useState(1)
-  const [showNoAccess, setShowNoAccess] = useState(false)
 
   const stats = useMemo(() => computeStats(projects), [projects])
 
+  // Basis view: HANYA project yang user benar-benar bisa akses. Project NO ROLE
+  // (mayoritas) tak pernah ditampilkan — noise untuk audit, bukan sinyal.
+  const accessible = useMemo(() => projects.filter(hasEffectiveAccess), [projects])
+  const overrideCount = useMemo(() => accessible.filter(hasAnyOverride).length, [accessible])
+
   const filtered = useMemo(() => {
-    let list = projects
+    let list = accessible
     const q = search.trim().toLowerCase()
     if (q) list = list.filter((p) => p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q))
-    if (filter === 'with-access') list = list.filter((p) => p.projectRole !== null || hasAnyOverride(p))
-    else if (filter === 'restricted') list = list.filter(hasRestricted)
-    else if (filter === 'override') list = list.filter(hasAnyOverride)
-
-    const sorted = [...list]
-    if (sort === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name))
-    else if (sort === 'role') sorted.sort((a, b) => roleWeight(b) - roleWeight(a) || a.name.localeCompare(b.name))
-    else if (sort === 'overrides')
-      sorted.sort((a, b) => overrideCount(b) - overrideCount(a) || a.name.localeCompare(b.name))
-    return sorted
-  }, [projects, search, filter, sort])
-
-  const noAccessList = useMemo(() => projects.filter((p) => p.projectRole === null && !hasAnyOverride(p)), [projects])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-
-  const handleSearch = (v: string) => {
-    setSearch(v)
-    setPage(1)
-  }
-  const handleFilter = (v: string) => {
-    setFilter(v as FilterKey)
-    setPage(1)
-  }
-  const resetFilters = () => {
-    setSearch('')
-    setFilter('with-access')
-    setSort('name')
-    setPage(1)
-  }
+    if (filter === 'override') list = list.filter(hasAnyOverride)
+    return [...list].sort((a, b) => a.name.localeCompare(b.name))
+  }, [accessible, search, filter])
 
   return (
     <Stack gap="sm">
       <AccessStatsHeader stats={stats} />
 
+      <Text size="xs" c="dimmed">
+        Ringkasan akses (read-only). Untuk mengubah role atau override, buka tab <strong>Members</strong> di project
+        terkait — di sanalah semua akses diatur.
+      </Text>
+
       <Group gap="xs" wrap="nowrap">
         <TextInput
-          placeholder="Cari project (nama atau slug)..."
+          placeholder="Cari project (nama atau slug)…"
           leftSection={<TbSearch size={14} />}
           value={search}
-          onChange={(e) => handleSearch(e.currentTarget.value)}
+          onChange={(e) => setSearch(e.currentTarget.value)}
           size="sm"
           style={{ flex: 1 }}
           rightSection={
             search ? (
-              <ActionIcon size="xs" variant="subtle" onClick={() => handleSearch('')}>
+              <ActionIcon size="xs" variant="subtle" onClick={() => setSearch('')}>
                 <TbX size={11} />
               </ActionIcon>
             ) : undefined
           }
-        />
-        <Select
-          size="sm"
-          value={sort}
-          onChange={(v) => v && setSort(v as SortKey)}
-          data={[
-            { value: 'name', label: 'Sort: Name' },
-            { value: 'role', label: 'Sort: Role' },
-            { value: 'overrides', label: 'Sort: Override count' },
-          ]}
-          style={{ width: 180 }}
-          allowDeselect={false}
         />
       </Group>
 
       <SegmentedControl
         size="xs"
         value={filter}
-        onChange={handleFilter}
+        onChange={(v) => setFilter(v as FilterKey)}
         data={[
-          { value: 'with-access', label: `Has access (${stats.withAccess})` },
-          { value: 'override', label: `Override (${stats.envOverrides})` },
-          { value: 'restricted', label: `Restricted (${stats.envDenied})` },
-          { value: 'all', label: `Semua (${stats.total})` },
+          { value: 'with-access', label: `Punya akses (${accessible.length})` },
+          { value: 'override', label: `Ada override (${overrideCount})` },
         ]}
       />
 
-      {paginated.length > 0 && (
-        <Stack gap={4}>
-          {paginated.map((p) => (
-            <ProjectAccessRow key={p.slug} userId={userId} project={p} />
-          ))}
-        </Stack>
-      )}
-
-      {filtered.length === 0 && (
+      {filtered.length > 0 ? (
+        <Box
+          style={{
+            border: '1px solid var(--mantine-color-default-border)',
+            borderRadius: 'var(--mantine-radius-md)',
+            overflow: 'hidden',
+          }}
+        >
+          <Table highlightOnHover verticalSpacing="xs" horizontalSpacing="sm" layout="fixed">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Project</Table.Th>
+                <Table.Th w={110}>Role</Table.Th>
+                <Table.Th w={70} ta="center">
+                  Env
+                </Table.Th>
+                <Table.Th w={90} ta="center">
+                  Override
+                </Table.Th>
+                <Table.Th w={80} ta="center">
+                  Denied
+                </Table.Th>
+                <Table.Th w={44} />
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {filtered.map((p) => {
+                const c = envCounts(p.environments)
+                return (
+                  <Table.Tr
+                    key={p.slug}
+                    onClick={() => {
+                      window.location.href = `/envmanager/${p.slug}?tab=members`
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <Table.Td>
+                      <Text size="sm" fw={600} truncate>
+                        {p.name}
+                      </Text>
+                      <Text span fz={9} c="dimmed" style={{ fontFamily: 'var(--mantine-font-family-monospace)' }}>
+                        {p.slug}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      {p.projectRole ? (
+                        <Badge size="sm" color={ROLE_COLOR[p.projectRole]} variant="light">
+                          {p.projectRole}
+                        </Badge>
+                      ) : (
+                        <Badge size="sm" color="gray" variant="outline" leftSection={<TbBan size={9} />}>
+                          no role
+                        </Badge>
+                      )}
+                    </Table.Td>
+                    <Table.Td ta="center">
+                      <Text size="xs" c="dimmed">
+                        {p.environments.length}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td ta="center">
+                      {c.override > 0 ? (
+                        <Badge size="sm" color="orange" variant="light">
+                          {c.override}
+                        </Badge>
+                      ) : (
+                        <Text size="xs" c="dimmed">
+                          —
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td ta="center">
+                      {c.denied > 0 ? (
+                        <Badge size="sm" color="red" variant="light">
+                          {c.denied}
+                        </Badge>
+                      ) : (
+                        <Text size="xs" c="dimmed">
+                          —
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td ta="center">
+                      <ThemeIcon size={18} radius="sm" variant="subtle" color="gray">
+                        <TbArrowRight size={13} />
+                      </ThemeIcon>
+                    </Table.Td>
+                  </Table.Tr>
+                )
+              })}
+            </Table.Tbody>
+          </Table>
+        </Box>
+      ) : (
         <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
           <ThemeIcon size={32} radius="xl" variant="light" color="gray" mx="auto" mb="xs">
-            <TbSearch size={16} />
+            <TbShieldCheck size={16} />
           </ThemeIcon>
           <Text size="sm" fw={500}>
             Tidak ada project yang cocok
@@ -140,68 +200,21 @@ export function AccessMatrixTab({ userId, projects }: { userId: string; projects
           <Text size="xs" c="dimmed">
             {filter === 'with-access' && !search
               ? 'User ini belum punya akses ke project mana pun.'
-              : 'Coba ubah filter atau hapus kata kunci pencarian.'}
+              : 'Coba ubah filter atau hapus kata kunci.'}
           </Text>
-          {(search || filter !== 'with-access' || sort !== 'name') && (
-            <Button size="xs" variant="subtle" mt="xs" onClick={resetFilters}>
+          {(search || filter !== 'with-access') && (
+            <Button
+              size="xs"
+              variant="subtle"
+              mt="xs"
+              onClick={() => {
+                setSearch('')
+                setFilter('with-access')
+              }}
+            >
               Reset filter
             </Button>
           )}
-        </Box>
-      )}
-
-      {totalPages > 1 && (
-        <Group justify="space-between" align="center" mt="xs">
-          <Text size="xs" c="dimmed">
-            {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} dari {filtered.length}
-          </Text>
-          <Pagination value={safePage} onChange={setPage} total={totalPages} size="sm" />
-        </Group>
-      )}
-
-      {/* No-access section (collapsed by default) */}
-      {noAccessList.length > 0 && filter !== 'all' && (
-        <Box
-          mt="sm"
-          style={{
-            borderTop: '1px dashed var(--mantine-color-default-border)',
-            paddingTop: 'var(--mantine-spacing-sm)',
-          }}
-        >
-          <Group
-            gap="xs"
-            wrap="nowrap"
-            onClick={() => setShowNoAccess((v) => !v)}
-            style={{ cursor: 'pointer', userSelect: 'none' }}
-          >
-            <ActionIcon
-              size="xs"
-              variant="subtle"
-              color="gray"
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowNoAccess((v) => !v)
-              }}
-            >
-              {showNoAccess ? <TbChevronDown size={12} /> : <TbChevronRight size={12} />}
-            </ActionIcon>
-            <ThemeIcon size={18} radius="sm" variant="light" color="gray">
-              <TbBan size={11} />
-            </ThemeIcon>
-            <Text size="xs" tt="uppercase" fw={700} c="dimmed" style={{ flex: 1 }}>
-              No access
-            </Text>
-            <Badge size="xs" variant="outline" color="gray">
-              {noAccessList.length}
-            </Badge>
-          </Group>
-          <Collapse in={showNoAccess}>
-            <Stack gap={4} mt="xs">
-              {noAccessList.map((p) => (
-                <ProjectAccessRow key={p.slug} userId={userId} project={p} />
-              ))}
-            </Stack>
-          </Collapse>
         </Box>
       )}
     </Stack>

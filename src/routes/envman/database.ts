@@ -21,12 +21,9 @@ const TABLES_INSERT_ORDER = [
   'project_note',
   'environment',
   'portainer_config',
-  'ticket',
   'env_var',
   'portainer_sync_log',
   'portainer_stack_target',
-  'ticket_comment',
-  'ticket_evidence',
 ] as const
 
 type TableName = (typeof TABLES_INSERT_ORDER)[number]
