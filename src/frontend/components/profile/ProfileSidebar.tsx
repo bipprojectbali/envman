@@ -26,7 +26,7 @@ import {
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 
-const roleBadgeColor: Record<string, string> = { USER: 'blue', QC: 'orange', ADMIN: 'violet', SUPER_ADMIN: 'red' }
+const roleBadgeColor: Record<string, string> = { USER: 'blue', ADMIN: 'violet', SUPER_ADMIN: 'red' }
 
 export const profileNavItems = [
   { key: 'account', label: 'Account', icon: TbUser, desc: 'Info akun & profil' },
@@ -51,7 +51,15 @@ interface ProfileSidebarProps {
   backLinks: BackLink[]
 }
 
-export function ProfileSidebar({ collapsed, toggleSidebar, tab, setTab, user, confirmLogout, backLinks }: ProfileSidebarProps) {
+export function ProfileSidebar({
+  collapsed,
+  toggleSidebar,
+  tab,
+  setTab,
+  user,
+  confirmLogout,
+  backLinks,
+}: ProfileSidebarProps) {
   return (
     <AppShell.Navbar p={collapsed ? 'xs' : 'md'}>
       <AppShell.Section>
@@ -69,8 +77,12 @@ export function ProfileSidebar({ collapsed, toggleSidebar, tab, setTab, user, co
                   <TbUser size={18} />
                 </ThemeIcon>
                 <div>
-                  <Text fw={700} size="sm">Profile</Text>
-                  <Text size="xs" c="dimmed">{user?.role ?? 'User'}</Text>
+                  <Text fw={700} size="sm">
+                    Profile
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {user?.role ?? 'User'}
+                  </Text>
                 </div>
               </Group>
               <Tooltip label="Minimize sidebar">
@@ -117,7 +129,16 @@ export function ProfileSidebar({ collapsed, toggleSidebar, tab, setTab, user, co
             ))}
             {backLinks.length > 0 && (
               <>
-                <Text size="xs" c="dimmed" fw={600} tt="uppercase" mt="sm" mb={4} ml={4} style={{ letterSpacing: '0.05em' }}>
+                <Text
+                  size="xs"
+                  c="dimmed"
+                  fw={600}
+                  tt="uppercase"
+                  mt="sm"
+                  mb={4}
+                  ml={4}
+                  style={{ letterSpacing: '0.05em' }}
+                >
                   Navigasi
                 </Text>
                 {backLinks.map((l) => (
@@ -145,13 +166,19 @@ export function ProfileSidebar({ collapsed, toggleSidebar, tab, setTab, user, co
               <Menu position="right-end" withArrow offset={12}>
                 <Menu.Target>
                   <Box style={{ cursor: 'pointer' }}>
-                    <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="sm" color="blue" />
+                    <UserAvatar
+                      user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }}
+                      size="sm"
+                      color="blue"
+                    />
                   </Box>
                 </Menu.Target>
                 <Menu.Dropdown>
                   <Menu.Label>{user?.email}</Menu.Label>
                   <Menu.Divider />
-                  <Menu.Item leftSection={<TbLogout size={14} />} color="red" onClick={confirmLogout}>Logout</Menu.Item>
+                  <Menu.Item leftSection={<TbLogout size={14} />} color="red" onClick={confirmLogout}>
+                    Logout
+                  </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
               <ThemeToggle size="sm" />
@@ -160,12 +187,24 @@ export function ProfileSidebar({ collapsed, toggleSidebar, tab, setTab, user, co
             <Stack gap={6}>
               <Menu position="top-start" withArrow offset={8} width={220}>
                 <Menu.Target>
-                  <Group gap="xs" justify="space-between" style={{ cursor: 'pointer', borderRadius: 'var(--mantine-radius-sm)', padding: '4px 6px' }}>
+                  <Group
+                    gap="xs"
+                    justify="space-between"
+                    style={{ cursor: 'pointer', borderRadius: 'var(--mantine-radius-sm)', padding: '4px 6px' }}
+                  >
                     <Group gap="xs" style={{ minWidth: 0, flex: 1 }}>
-                      <UserAvatar user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }} size="sm" color="blue" />
+                      <UserAvatar
+                        user={{ id: user?.id ?? '', name: user?.name ?? '', image: user?.image }}
+                        size="sm"
+                        color="blue"
+                      />
                       <div style={{ minWidth: 0 }}>
-                        <Text size="xs" fw={500} truncate>{user?.name}</Text>
-                        <Badge size="xs" color={roleBadgeColor[user?.role ?? 'USER']} variant="light">{user?.role}</Badge>
+                        <Text size="xs" fw={500} truncate>
+                          {user?.name}
+                        </Text>
+                        <Badge size="xs" color={roleBadgeColor[user?.role ?? 'USER']} variant="light">
+                          {user?.role}
+                        </Badge>
                       </div>
                     </Group>
                     <TbChevronUp size={13} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
@@ -174,12 +213,16 @@ export function ProfileSidebar({ collapsed, toggleSidebar, tab, setTab, user, co
                 <Menu.Dropdown>
                   <Menu.Label>{user?.email}</Menu.Label>
                   <Menu.Divider />
-                  <Menu.Item leftSection={<TbLogout size={14} />} color="red" onClick={confirmLogout}>Logout</Menu.Item>
+                  <Menu.Item leftSection={<TbLogout size={14} />} color="red" onClick={confirmLogout}>
+                    Logout
+                  </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
               <Group gap="xs" px={6}>
                 <ThemeToggle size="sm" />
-                <Text size="xs" c="dimmed">Theme</Text>
+                <Text size="xs" c="dimmed">
+                  Theme
+                </Text>
               </Group>
             </Stack>
           )}

@@ -1,25 +1,7 @@
-import {
-  ActionIcon,
-  Alert,
-  Badge,
-  Box,
-  Group,
-  SimpleGrid,
-  Stack,
-  Text,
-  TextInput,
-  Tooltip,
-} from '@mantine/core'
+import { ActionIcon, Alert, Badge, Box, Group, SimpleGrid, Stack, Text, TextInput, Tooltip } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import {
-  TbAlertCircle,
-  TbFolders,
-  TbLayoutGrid,
-  TbLayoutList,
-  TbSearch,
-  TbX,
-} from 'react-icons/tb'
+import { TbAlertCircle, TbFolders, TbLayoutGrid, TbLayoutList, TbSearch, TbX } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { type Project, ProjectCard, ProjectListItem } from './ProjectDisplayItems'
 
@@ -35,7 +17,7 @@ export function ProfileProjectsSection({ role }: { role: string }) {
   })
 
   const projects = data?.projects ?? []
-  const canNavigate = role !== 'QC'
+  const canNavigate = true
 
   const filtered = search.trim()
     ? projects.filter(

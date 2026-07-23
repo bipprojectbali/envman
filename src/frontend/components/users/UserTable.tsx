@@ -29,7 +29,6 @@ interface Stats {
 interface RoleCounts {
   ALL: number
   USER: number
-  QC: number
   ADMIN: number
   SUPER_ADMIN: number
 }
@@ -47,7 +46,18 @@ interface UserTableProps {
   navigate: NavigateFn
 }
 
-export function UserTable({ users, filtered, stats, roleCounts, isLoading, search, setSearch, roleFilter, setRoleFilter, navigate }: UserTableProps) {
+export function UserTable({
+  users,
+  filtered,
+  stats,
+  roleCounts,
+  isLoading,
+  search,
+  setSearch,
+  roleFilter,
+  setRoleFilter,
+  navigate,
+}: UserTableProps) {
   return (
     <Stack gap="lg" p="md">
       <Group justify="space-between" wrap="nowrap">
@@ -56,27 +66,45 @@ export function UserTable({ users, filtered, stats, roleCounts, isLoading, searc
             <TbUsers size={20} />
           </ThemeIcon>
           <Box style={{ minWidth: 0 }}>
-            <Text fw={800} size="xl" lh={1.2}>User Management</Text>
+            <Text fw={800} size="xl" lh={1.2}>
+              User Management
+            </Text>
             {!isLoading && users.length > 0 ? (
               <Group gap={4} mt={2} wrap="wrap">
-                <Text size="xs" c="dimmed">{users.length} user</Text>
-                <Text size="xs" c="dimmed">·</Text>
-                <Text size="xs" c="dimmed">{stats.active} aktif</Text>
+                <Text size="xs" c="dimmed">
+                  {users.length} user
+                </Text>
+                <Text size="xs" c="dimmed">
+                  ·
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {stats.active} aktif
+                </Text>
                 {stats.blocked > 0 && (
                   <>
-                    <Text size="xs" c="dimmed">·</Text>
-                    <Text size="xs" c="dimmed">{stats.blocked} blocked</Text>
+                    <Text size="xs" c="dimmed">
+                      ·
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {stats.blocked} blocked
+                    </Text>
                   </>
                 )}
                 {stats.adminPlus > 0 && (
                   <>
-                    <Text size="xs" c="dimmed">·</Text>
-                    <Text size="xs" c="dimmed">{stats.adminPlus} admin+</Text>
+                    <Text size="xs" c="dimmed">
+                      ·
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {stats.adminPlus} admin+
+                    </Text>
                   </>
                 )}
               </Group>
             ) : (
-              <Text size="xs" c="dimmed" mt={2}>Kelola role global dan akses per project.</Text>
+              <Text size="xs" c="dimmed" mt={2}>
+                Kelola role global dan akses per project.
+              </Text>
             )}
           </Box>
         </Group>
@@ -110,7 +138,6 @@ export function UserTable({ users, filtered, stats, roleCounts, isLoading, searc
             [
               { value: 'ALL', label: 'All' },
               { value: 'USER', label: 'User' },
-              { value: 'QC', label: 'QC' },
               { value: 'ADMIN', label: 'Admin' },
               { value: 'SUPER_ADMIN', label: 'Super' },
             ] as { value: keyof typeof roleCounts; label: string }[]
@@ -134,7 +161,11 @@ export function UserTable({ users, filtered, stats, roleCounts, isLoading, searc
         {isLoading ? (
           <Stack gap={0}>
             {[0, 1, 2, 3, 4].map((i) => (
-              <Box key={i} p="sm" style={{ borderBottom: i < 4 ? '1px solid var(--mantine-color-default-border)' : undefined }}>
+              <Box
+                key={i}
+                p="sm"
+                style={{ borderBottom: i < 4 ? '1px solid var(--mantine-color-default-border)' : undefined }}
+              >
                 <Group gap="sm">
                   <Skeleton circle height={34} width={34} />
                   <Box style={{ flex: 1 }}>
@@ -153,10 +184,22 @@ export function UserTable({ users, filtered, stats, roleCounts, isLoading, searc
             <ThemeIcon size={44} radius="xl" variant="light" color="gray">
               <TbSearch size={22} />
             </ThemeIcon>
-            <Text fw={500} size="sm">Tidak ada user yang cocok</Text>
-            <Text size="xs" c="dimmed" ta="center">Coba ubah filter atau hapus kata kunci pencarian.</Text>
+            <Text fw={500} size="sm">
+              Tidak ada user yang cocok
+            </Text>
+            <Text size="xs" c="dimmed" ta="center">
+              Coba ubah filter atau hapus kata kunci pencarian.
+            </Text>
             {(search || roleFilter !== 'ALL') && (
-              <Button size="xs" variant="subtle" mt={4} onClick={() => { setSearch(''); setRoleFilter('ALL') }}>
+              <Button
+                size="xs"
+                variant="subtle"
+                mt={4}
+                onClick={() => {
+                  setSearch('')
+                  setRoleFilter('ALL')
+                }}
+              >
                 Reset filter
               </Button>
             )}
@@ -176,45 +219,79 @@ export function UserTable({ users, filtered, stats, roleCounts, isLoading, searc
             </Table.Thead>
             <Table.Tbody>
               {filtered.map((u) => (
-                <Table.Tr key={u.id} onClick={() => navigate({ to: '/envmanager/users', search: { user: u.id } })} style={{ cursor: 'pointer' }}>
+                <Table.Tr
+                  key={u.id}
+                  onClick={() => navigate({ to: '/envmanager/users', search: { user: u.id } })}
+                  style={{ cursor: 'pointer' }}
+                >
                   <Table.Td>
                     <Group gap="xs" wrap="nowrap">
-                      <UserAvatar user={u} size={32} color={GLOBAL_ROLE_COLOR[u.role]} variant="gradient" gradient={{ from: GLOBAL_ROLE_COLOR[u.role], to: 'grape' }} />
+                      <UserAvatar
+                        user={u}
+                        size={32}
+                        color={GLOBAL_ROLE_COLOR[u.role]}
+                        variant="gradient"
+                        gradient={{ from: GLOBAL_ROLE_COLOR[u.role], to: 'grape' }}
+                      />
                       <div>
-                        <Text size="sm" fw={500}>{u.name}</Text>
-                        <Text size="xs" c="dimmed">{u.email}</Text>
+                        <Text size="sm" fw={500}>
+                          {u.name}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {u.email}
+                        </Text>
                       </div>
                     </Group>
                   </Table.Td>
                   <Table.Td>
-                    <Badge size="sm" color={GLOBAL_ROLE_COLOR[u.role]} variant="light">{u.role}</Badge>
+                    <Badge size="sm" color={GLOBAL_ROLE_COLOR[u.role]} variant="light">
+                      {u.role}
+                    </Badge>
                   </Table.Td>
                   <Table.Td>
                     {u.blocked ? (
-                      <Badge size="xs" color="red" variant="light" leftSection={<TbBan size={10} />}>Blocked</Badge>
+                      <Badge size="xs" color="red" variant="light" leftSection={<TbBan size={10} />}>
+                        Blocked
+                      </Badge>
                     ) : (
-                      <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={10} />}>Active</Badge>
+                      <Badge size="xs" color="teal" variant="light" leftSection={<TbCheck size={10} />}>
+                        Active
+                      </Badge>
                     )}
                   </Table.Td>
                   <Table.Td ta="right">
-                    <Text size="sm" fw={u.projectCount > 0 ? 500 : undefined} c={u.projectCount > 0 ? undefined : 'dimmed'}>
+                    <Text
+                      size="sm"
+                      fw={u.projectCount > 0 ? 500 : undefined}
+                      c={u.projectCount > 0 ? undefined : 'dimmed'}
+                    >
                       {u.projectCount > 0 ? u.projectCount : '—'}
                     </Text>
                   </Table.Td>
                   <Table.Td ta="right">
                     {u.envOverrideCount > 0 ? (
-                      <Badge size="xs" color="orange" variant="light">{u.envOverrideCount}</Badge>
+                      <Badge size="xs" color="orange" variant="light">
+                        {u.envOverrideCount}
+                      </Badge>
                     ) : (
-                      <Text size="xs" c="dimmed">—</Text>
+                      <Text size="xs" c="dimmed">
+                        —
+                      </Text>
                     )}
                   </Table.Td>
                   <Table.Td ta="right">
                     {u.role === 'SUPER_ADMIN' ? (
-                      <Badge size="xs" color="red" variant="light">all</Badge>
+                      <Badge size="xs" color="red" variant="light">
+                        all
+                      </Badge>
                     ) : u.permissions.length > 0 ? (
-                      <Badge size="xs" color="violet" variant="light">{u.permissions.length}</Badge>
+                      <Badge size="xs" color="violet" variant="light">
+                        {u.permissions.length}
+                      </Badge>
                     ) : (
-                      <Text size="xs" c="dimmed">—</Text>
+                      <Text size="xs" c="dimmed">
+                        —
+                      </Text>
                     )}
                   </Table.Td>
                   <Table.Td>

@@ -1,12 +1,11 @@
 import { Badge, Box, Divider, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core'
+import { TbChevronUp, TbLogout, TbUser } from 'react-icons/tb'
 import { ThemeToggle } from '@/frontend/components/ThemeToggle'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
-import { TbChevronUp, TbLogout, TbUser } from 'react-icons/tb'
 
 const roleLabel: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
   ADMIN: 'Admin',
-  QC: 'QC',
   USER: 'User',
 }
 

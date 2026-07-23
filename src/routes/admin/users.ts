@@ -26,9 +26,9 @@ export const adminUsersRouter = new Elysia()
     }
 
     const { role } = (await request.json()) as { role: string }
-    if (!['USER', 'QC', 'ADMIN'].includes(role)) {
+    if (!['USER', 'ADMIN'].includes(role)) {
       set.status = 400
-      return { error: 'Role tidak valid (USER, QC, atau ADMIN)' }
+      return { error: 'Role tidak valid (USER atau ADMIN)' }
     }
 
     const target = await prisma.user.findUnique({ where: { id: params.id }, select: { email: true, role: true } })
@@ -39,7 +39,7 @@ export const adminUsersRouter = new Elysia()
 
     const user = await prisma.user.update({
       where: { id: params.id },
-      data: { role: role as 'USER' | 'QC' | 'ADMIN' },
+      data: { role: role as 'USER' | 'ADMIN' },
       select: { id: true, name: true, email: true, role: true, blocked: true, createdAt: true, image: true },
     })
     audit(params.id, 'ROLE_CHANGED', `${target?.role} → ${role} by ${caller.userId}`, getIp(request))

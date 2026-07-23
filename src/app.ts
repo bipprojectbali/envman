@@ -14,7 +14,6 @@ import { cliDownloadRouter } from './routes/cli-download'
 import { envmanRouter } from './routes/envman/index'
 import { infraRouter } from './routes/infra'
 import { publicStorageRouter } from './routes/public-storage'
-import { ticketsRouter } from './routes/tickets'
 import { v1Router } from './routes/v1/index'
 
 export function createApp() {
@@ -71,7 +70,6 @@ export function createApp() {
       // Domain and infra routers
       .use(authCompatRouter)
       .use(adminRouter)
-      .use(ticketsRouter)
       .use(envmanRouter)
       .use(v1Router)
       .use(infraRouter)

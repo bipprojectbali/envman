@@ -1,9 +1,9 @@
 import { Elysia } from 'elysia'
-import { forbidden, requireAuth, requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
+import { requireEnvAuth, unauthorized } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
 
 // /api/v1/ — versioned API gateway
-// Saat ini identik dengan /api/envman/ dan /api/tickets/
+// Saat ini identik dengan /api/envman/.
 // Gunakan versi ini untuk integrasi baru. /api/envman/ tetap berjalan (legacy).
 // Breaking changes HANYA masuk di /api/v2/, tidak di /api/envman/ atau /api/v1/.
 
@@ -48,32 +48,4 @@ export const v1Router = new Elysia({ prefix: '/api/v1' })
       offset,
       hasMore: offset + limit < total,
     }
-  })
-
-  // Versioned ticket list dengan pagination
-  .get('/tickets', async ({ request, set, query }) => {
-    const caller = await requireAuth(request)
-    if (!caller) return unauthorized(set)
-    if (caller.role === 'USER') return forbidden(set)
-    const limit = Math.min(Number(query.limit) || 50, 500)
-    const offset = Number(query.offset) || 0
-    const where: Record<string, unknown> = {}
-    if (query.status) where.status = String(query.status)
-    if (query.priority) where.priority = String(query.priority)
-    if (query.mine === '1') where.assigneeId = caller.userId
-    const [tickets, total] = await Promise.all([
-      prisma.ticket.findMany({
-        where,
-        include: {
-          reporter: { select: { id: true, name: true, email: true, role: true } },
-          assignee: { select: { id: true, name: true, email: true, role: true } },
-          _count: { select: { comments: true, evidence: true } },
-        },
-        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-        take: limit,
-        skip: offset,
-      }),
-      prisma.ticket.count({ where }),
-    ])
-    return { tickets, total, limit, offset, hasMore: offset + limit < total }
   })

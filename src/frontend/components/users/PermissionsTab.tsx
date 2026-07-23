@@ -200,8 +200,8 @@ export function PermissionsTab({ user }: { user: UserDetail }) {
               <br />• <b>Per-env Portainer (sync/deploy/prune)</b> — butuh ProjectMember EDITOR+ <b>atau</b> capability
               terkait (<Code fz={10}>stack:sync</Code>/<Code fz={10}>stack:deploy</Code>/
               <Code fz={10}>stack:prune</Code>). Env vars CRUD tetap butuh EDITOR+.
-              <br />• <b>Default landing</b> — ADMIN ke <Code fz={10}>/envmanager</Code>; QC ke{' '}
-              <Code fz={10}>/dashboard</Code>; SUPER_ADMIN ke <Code fz={10}>/dev</Code>.
+              <br />• <b>Default landing</b> — ADMIN ke <Code fz={10}>/envmanager</Code>; SUPER_ADMIN ke{' '}
+              <Code fz={10}>/dev</Code>.
             </Text>
           </Box>
         </Collapse>

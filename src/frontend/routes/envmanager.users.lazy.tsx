@@ -43,7 +43,6 @@ function UsersPage() {
     () => ({
       ALL: users.length,
       USER: users.filter((u) => u.role === 'USER').length,
-      QC: users.filter((u) => u.role === 'QC').length,
       ADMIN: users.filter((u) => u.role === 'ADMIN').length,
       SUPER_ADMIN: users.filter((u) => u.role === 'SUPER_ADMIN').length,
     }),
@@ -62,23 +61,47 @@ function UsersPage() {
     return (
       <Stack gap="lg" p="md">
         <Group gap={6} align="center">
-          <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => navigate({ to: '/envmanager/users', search: { user: undefined } })}>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            onClick={() => navigate({ to: '/envmanager/users', search: { user: undefined } })}
+          >
             <TbChevronLeft size={15} />
           </ActionIcon>
-          <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={() => navigate({ to: '/envmanager/users', search: { user: undefined } })}>
+          <Text
+            size="sm"
+            c="dimmed"
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate({ to: '/envmanager/users', search: { user: undefined } })}
+          >
             Users
           </Text>
-          <Text size="sm" c="dimmed">/</Text>
+          <Text size="sm" c="dimmed">
+            /
+          </Text>
           {selectedUser ? (
             <Group gap="xs" wrap="nowrap">
-              <UserAvatar user={selectedUser} size={22} color={GLOBAL_ROLE_COLOR[selectedUser.role]} variant="gradient" gradient={{ from: GLOBAL_ROLE_COLOR[selectedUser.role], to: 'grape' }} />
-              <Text size="sm" fw={600}>{selectedUser.name}</Text>
+              <UserAvatar
+                user={selectedUser}
+                size={22}
+                color={GLOBAL_ROLE_COLOR[selectedUser.role]}
+                variant="gradient"
+                gradient={{ from: GLOBAL_ROLE_COLOR[selectedUser.role], to: 'grape' }}
+              />
+              <Text size="sm" fw={600}>
+                {selectedUser.name}
+              </Text>
               {selectedUser.blocked && (
-                <Badge size="xs" color="red" variant="filled" leftSection={<TbBan size={9} />}>Blocked</Badge>
+                <Badge size="xs" color="red" variant="filled" leftSection={<TbBan size={9} />}>
+                  Blocked
+                </Badge>
               )}
             </Group>
           ) : (
-            <Text size="sm" fw={600}>User Access</Text>
+            <Text size="sm" fw={600}>
+              User Access
+            </Text>
           )}
         </Group>
         <UserDrawerContent userId={selectedUserId} />

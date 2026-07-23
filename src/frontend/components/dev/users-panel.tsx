@@ -15,17 +15,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type React from 'react'
 import { useMemo, useState } from 'react'
-import {
-  TbBug,
-  TbCircleFilled,
-  TbDots,
-  TbLock,
-  TbLockOpen,
-  TbSearch,
-  TbShieldCheck,
-  TbShieldOff,
-  TbX,
-} from 'react-icons/tb'
+import { TbCircleFilled, TbDots, TbLock, TbLockOpen, TbSearch, TbShieldCheck, TbShieldOff, TbX } from 'react-icons/tb'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { useSession } from '@/frontend/hooks/useAuth'
 import { usePresence } from '@/frontend/hooks/usePresence'
@@ -35,7 +25,6 @@ import type { AdminUser } from './types'
 const roleBadge: Record<string, { color: string; label: string }> = {
   USER: { color: 'blue', label: 'User' },
   ADMIN: { color: 'violet', label: 'Admin' },
-  QC: { color: 'teal', label: 'QC' },
   SUPER_ADMIN: { color: 'red', label: 'Super Admin' },
 }
 
@@ -242,14 +231,6 @@ export function UsersPanel() {
                                 onClick={() => changeRole.mutate({ id: u.id, role: 'USER' })}
                               >
                                 Set as User
-                              </Menu.Item>
-                            )}
-                            {u.role !== 'QC' && (
-                              <Menu.Item
-                                leftSection={<TbBug size={14} />}
-                                onClick={() => changeRole.mutate({ id: u.id, role: 'QC' })}
-                              >
-                                Set as QC
                               </Menu.Item>
                             )}
                             {u.role !== 'ADMIN' && (

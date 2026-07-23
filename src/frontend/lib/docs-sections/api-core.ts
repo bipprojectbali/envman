@@ -4,7 +4,7 @@ export function buildApiCoreSection(origin: string): string {
 
 ### Autentikasi Request
 
-Semua endpoint \`/api/envman/*\` dan \`/api/tickets/*\` memerlukan autentikasi via:
+Semua endpoint \`/api/envman/*\` memerlukan autentikasi via:
 
 - **Cookie** \`session\`: dari login browser (set otomatis)
 - **Header** \`Authorization: Bearer <token>\`: API token dari halaman Tokens

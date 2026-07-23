@@ -11,7 +11,7 @@ export const Route = createFileRoute('/dashboard/docs')({
 const content = `
 # Dashboard
 
-Dashboard adalah pusat kontrol untuk tim Admin dan QC. Semua fitur manajemen tiket, analitik, dan monitoring tersedia di sini.
+Dashboard adalah halaman admin dengan panel overview, analytics, dan tools pendukung.
 
 ---
 
@@ -20,43 +20,20 @@ Dashboard adalah pusat kontrol untuk tim Admin dan QC. Semua fitur manajemen tik
 | Role | Melihat |
 |------|---------|
 | \`SUPER_ADMIN\` | Semua tab + akses penuh |
-| \`ADMIN\` | Semua tab — manajemen tiket & tim |
-| \`QC\` | Hanya tab **Tickets** (tiket dengan scope QC) |
+| \`ADMIN\` | Diarahkan ke Env Manager (tidak mengakses Dashboard) |
 
 ---
 
 ## Tab & Fitur
 
 ### Dashboard
-Overview statistik sistem — ringkasan tiket, user online, aktivitas terbaru.
-
-### Tickets
-Sistem pelacakan bug dan task. Status machine:
-
-\`\`\`
-OPEN → IN_PROGRESS → READY_FOR_QC → CLOSED
-         ↑                  ↓
-         └──── REOPENED ←───┘
-\`\`\`
-
-- **ADMIN** — buka tiket, assign ke member, update status (OPEN → IN_PROGRESS)
-- **QC** — review tiket READY_FOR_QC, close atau reopen
-- **SUPER_ADMIN** — semua operasi termasuk delete
+Overview statistik sistem — ringkasan aktivitas dan user online.
 
 ### Analytics
-Ringkasan performa dan metrik — data visual untuk monitoring tim.
+Ringkasan performa dan metrik — data visual untuk monitoring.
 
 ### Orders, Messages, Calendar, Settings
-Tools pendukung untuk manajemen tim — pesan internal, kalender, dan pengaturan akun.
-
----
-
-## Alur Tiket
-
-1. User melaporkan bug atau request fitur → tiket **OPEN**
-2. Admin meng-assign dan mulai pengerjaan → **IN_PROGRESS**
-3. Pengerjaan selesai, siap dicek → **READY_FOR_QC**
-4. QC review — jika lolos → **CLOSED**, jika bermasalah → **REOPENED**
+Tools pendukung — pesan internal, kalender, dan pengaturan akun.
 
 ---
 
@@ -64,14 +41,11 @@ Tools pendukung untuk manajemen tim — pesan internal, kalender, dan pengaturan
 
 \`\`\`
 /dashboard                    → Dashboard utama
-/dashboard?tab=tickets        → Tiket
 /dashboard?tab=analytics      → Analitik
 /dashboard?tab=settings       → Pengaturan
 /envmanager                   → Env Manager
 /envmanager/docs              → Docs Env Manager
 \`\`\`
-
-> 💡 **Admin + QC** bisa menggunakan halaman **Tickets** untuk melacak semua tiket aktif. QC hanya melihat tiket dalam scope pemeriksaannya.
 `
 
 function DashboardDocsPage() {

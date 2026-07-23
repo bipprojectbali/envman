@@ -1,5 +1,5 @@
 export type ProjectRole = 'OWNER' | 'EDITOR' | 'VIEWER'
-export type GlobalRole = 'USER' | 'QC' | 'ADMIN' | 'SUPER_ADMIN'
+export type GlobalRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN'
 
 export interface UserSummary {
   id: string
@@ -53,6 +53,5 @@ export const ROLE_COLOR: Record<ProjectRole, string> = {
 export const GLOBAL_ROLE_COLOR: Record<GlobalRole, string> = {
   SUPER_ADMIN: 'red',
   ADMIN: 'violet',
-  QC: 'orange',
   USER: 'gray',
 }

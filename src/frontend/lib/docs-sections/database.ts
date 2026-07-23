@@ -57,12 +57,6 @@ PortainerConfig
 ├── lastSyncAt?, lastSyncOk?
 └── unique(projectId, envName)
 
-Ticket
-├── id, title, description, status, priority
-├── route?, reporterId, assigneeId?
-├── createdAt, updatedAt, closedAt?
-└── relations: comments[], evidence[]
-
 Gist
 ├── id, userId, title, description
 ├── files (JSON), isPublic, tags[]
@@ -77,10 +71,8 @@ ProjectNote
 ### Enums
 
 \`\`\`typescript
-Role = "USER" | "QC" | "ADMIN" | "SUPER_ADMIN"
+Role = "USER" | "ADMIN" | "SUPER_ADMIN"
 ProjectMemberRole = "OWNER" | "EDITOR" | "VIEWER"
-TicketStatus = "OPEN" | "IN_PROGRESS" | "READY_FOR_QC" | "REOPENED" | "CLOSED"
-TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
 \`\`\`
 
 ---
