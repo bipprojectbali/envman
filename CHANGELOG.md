@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.24.2] - 2026-07-23
+
 ### Changed
 - **Deskripsi capability "Create actions" (Dev → Users → Permissions) diperjelas agar akurat.** `token:create` kini menjelaskan bahwa capability ini memberi token **tanpa batas masa berlaku & tanpa dibatasi setting global** (tanpa capability, user tetap bisa buat token bila admin mengaktifkan setting-nya, dengan masa berlaku terbatas). `gist:create` diperjelas hanya menggate **pembuatan** gist (edit/hapus gist sendiri tak butuh capability ini).
 
