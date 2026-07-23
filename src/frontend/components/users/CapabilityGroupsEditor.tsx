@@ -40,11 +40,6 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         label: 'Create ticket',
         description: 'Bisa create ticket di tracker. (QC sudah otomatis bisa.)',
       },
-      {
-        value: 'note:create',
-        label: 'Create project note',
-        description: 'Bisa create note di project (selain capability, butuh role EDITOR+ di project tersebut).',
-      },
     ],
   },
   {

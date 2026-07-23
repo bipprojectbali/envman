@@ -28,22 +28,21 @@ import {
   TbSearch,
   TbX,
 } from 'react-icons/tb'
-import { apiFetch } from '@/frontend/lib/api'
 import { useNoteActions } from '@/frontend/hooks/useNoteActions'
-import { NoteCardGrid, NoteCardList, HOVER_STYLES, type Note } from './NoteCard'
-import { NoteViewInline } from './NoteViewInline'
-import { NotesPanelToolbar } from './NotesPanelToolbar'
+import { apiFetch } from '@/frontend/lib/api'
+import { HOVER_STYLES, type Note, NoteCardGrid, NoteCardList } from './NoteCard'
 import { NoteForm } from './NoteModals'
+import { NotesPanelToolbar } from './NotesPanelToolbar'
+import { NoteViewInline } from './NoteViewInline'
 
 export interface NotesPanelProps {
   slug: string
   canEdit: boolean
-  canCreate: boolean
   isOwner: boolean
   myUserId: string
 }
 
-export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: NotesPanelProps) {
+export function NotesPanel({ slug, canEdit, isOwner, myUserId }: NotesPanelProps) {
   const { togglePin, deleteNote } = useNoteActions(slug)
   const navigate = useNavigate()
   const { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId, noteId, noteNew, viewNoteId } = useSearch({
@@ -66,7 +65,15 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
   const [debouncedSearch] = useDebouncedValue(search, 150)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  useHotkeys([['/', () => { searchRef.current?.focus(); searchRef.current?.select() }]])
+  useHotkeys([
+    [
+      '/',
+      () => {
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      },
+    ],
+  ])
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['envman', 'notes', slug],
@@ -88,7 +95,10 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase()
       list = list.filter(
-        (n) => n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q) || n.tags.some((t) => t.toLowerCase().includes(q)),
+        (n) =>
+          n.title.toLowerCase().includes(q) ||
+          n.body.toLowerCase().includes(q) ||
+          n.tags.some((t) => t.toLowerCase().includes(q)),
       )
     }
     if (tagFilter.length > 0) list = list.filter((n) => tagFilter.every((t) => n.tags.includes(t)))
@@ -112,15 +122,35 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
   const hasFilter = debouncedSearch.trim().length > 0 || tagFilter.length > 0
 
   const addTagFilter = (tag: string) => setTagFilter((prev) => (prev.includes(tag) ? prev : [...prev, tag]))
-  const resetFilter = () => { setSearch(''); setTagFilter([]) }
+  const resetFilter = () => {
+    setSearch('')
+    setTagFilter([])
+  }
 
   const navBase = { tab, fileId, fileNew, viewFileId, aliasId, aliasNew, viewAliasId }
   const openNoteView = (note: Note) =>
-    navigate({ to: '/envmanager/$slug', params: { slug }, search: { ...navBase, noteId: undefined, noteNew: false, viewNoteId: note.id } })
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: { ...navBase, noteId: undefined, noteNew: false, viewNoteId: note.id },
+    })
   const openNoteForm = (note: Note | 'new') =>
-    navigate({ to: '/envmanager/$slug', params: { slug }, search: { ...navBase, noteId: note === 'new' ? undefined : note.id, noteNew: note === 'new', viewNoteId: undefined } })
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: {
+        ...navBase,
+        noteId: note === 'new' ? undefined : note.id,
+        noteNew: note === 'new',
+        viewNoteId: undefined,
+      },
+    })
   const closeNote = () =>
-    navigate({ to: '/envmanager/$slug', params: { slug }, search: { ...navBase, noteId: undefined, noteNew: false, viewNoteId: undefined } })
+    navigate({
+      to: '/envmanager/$slug',
+      params: { slug },
+      search: { ...navBase, noteId: undefined, noteNew: false, viewNoteId: undefined },
+    })
 
   if (noteNew || noteId) {
     const editingNote = noteId ? notes.find((n) => n.id === noteId) : undefined
@@ -128,13 +158,23 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
       <Paper withBorder p="md" radius="md">
         <Stack gap="lg">
           <Group gap={6} align="center">
-            <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeNote}><TbChevronLeft size={15} /></ActionIcon>
-            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeNote}>Notes</Anchor>
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeNote}>
+              <TbChevronLeft size={15} />
+            </ActionIcon>
+            <Anchor component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={closeNote}>
+              Notes
+            </Anchor>
             <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
-            <Text size="sm" fw={600}>{noteId ? (editingNote ? `Edit: ${editingNote.title}` : '...') : 'Buat Note Baru'}</Text>
+            <Text size="sm" fw={600}>
+              {noteId ? (editingNote ? `Edit: ${editingNote.title}` : '...') : 'Buat Note Baru'}
+            </Text>
           </Group>
           <Divider />
-          {isLoading && noteId ? <Skeleton height={400} radius="md" /> : <NoteForm slug={slug} note={editingNote} onClose={closeNote} />}
+          {isLoading && noteId ? (
+            <Skeleton height={400} radius="md" />
+          ) : (
+            <NoteForm slug={slug} note={editingNote} onClose={closeNote} />
+          )}
         </Stack>
       </Paper>
     )
@@ -163,10 +203,18 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
       {/** biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS for hover */}
       <style dangerouslySetInnerHTML={{ __html: HOVER_STYLES }} />
 
-      <Alert variant="light" color="blue" radius="md" p="xs" icon={<TbInfoCircle size={15} />}
-        styles={{ message: { fontSize: 'var(--mantine-font-size-xs)' }, body: { gap: 4 } }}>
-        Notes untuk dokumentasi internal: runbook, deployment guide, troubleshooting log, atau catatan tim. Mendukung Markdown.
-        Pin note penting agar tampil di atas. Tekan <kbd style={{ fontSize: 11, padding: '0 4px', border: '1px solid var(--mantine-color-default-border)' }}>/</kbd> untuk cari cepat.
+      <Alert
+        variant="light"
+        color="blue"
+        radius="md"
+        p="xs"
+        icon={<TbInfoCircle size={15} />}
+        styles={{ message: { fontSize: 'var(--mantine-font-size-xs)' }, body: { gap: 4 } }}
+      >
+        Notes untuk dokumentasi internal: runbook, deployment guide, troubleshooting log, atau catatan tim. Mendukung
+        Markdown. Pin note penting agar tampil di atas. Tekan{' '}
+        <kbd style={{ fontSize: 11, padding: '0 4px', border: '1px solid var(--mantine-color-default-border)' }}>/</kbd>{' '}
+        untuk cari cepat.
       </Alert>
 
       {!isError && (notes.length > 0 || isLoading) && (
@@ -181,7 +229,6 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
           view={view}
           onViewChange={setView}
           canEdit={canEdit}
-          canCreate={canCreate}
           allTags={allTags}
           notesTotal={notes.length}
           filteredTotal={filtered.length}
@@ -195,62 +242,121 @@ export function NotesPanel({ slug, canEdit, canCreate, isOwner, myUserId }: Note
 
       {isError && (
         <Box p="xl" ta="center" style={{ border: '1px solid var(--mantine-color-red-5)' }}>
-          <ThemeIcon size={44} radius="xl" variant="light" color="red" mx="auto" mb="sm"><TbAlertTriangle size={22} /></ThemeIcon>
-          <Text fw={600} mb={4}>Gagal memuat notes</Text>
-          <Text size="sm" c="dimmed" mb="md">{(error as Error)?.message ?? 'Terjadi kesalahan saat memuat notes.'}</Text>
-          <Button size="xs" variant="light" color="red" onClick={() => refetch()}>Coba lagi</Button>
+          <ThemeIcon size={44} radius="xl" variant="light" color="red" mx="auto" mb="sm">
+            <TbAlertTriangle size={22} />
+          </ThemeIcon>
+          <Text fw={600} mb={4}>
+            Gagal memuat notes
+          </Text>
+          <Text size="sm" c="dimmed" mb="md">
+            {(error as Error)?.message ?? 'Terjadi kesalahan saat memuat notes.'}
+          </Text>
+          <Button size="xs" variant="light" color="red" onClick={() => refetch()}>
+            Coba lagi
+          </Button>
         </Box>
       )}
 
       {isLoading ? (
         view === 'grid' ? (
           <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
-            {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} height={156} radius="md" />)}
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} height={156} radius="md" />
+            ))}
           </SimpleGrid>
         ) : (
           <Stack gap="xs">
-            {[0, 1, 2, 3].map((i) => <Skeleton key={i} height={76} radius="md" />)}
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} height={76} radius="md" />
+            ))}
           </Stack>
         )
       ) : !isError && notes.length === 0 ? (
         <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
-          <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm"><TbNote size={24} /></ThemeIcon>
-          <Text fw={600} mb={4}>Belum ada notes</Text>
-          <Text size="sm" c="dimmed" mb="md" maw={400} mx="auto">
-            Notes untuk dokumentasi project: deployment instructions, troubleshooting log, runbook, atau apapun yang berguna untuk tim. Mendukung Markdown.
+          <ThemeIcon size={48} radius="xl" variant="light" color="primary" mx="auto" mb="sm">
+            <TbNote size={24} />
+          </ThemeIcon>
+          <Text fw={600} mb={4}>
+            Belum ada notes
           </Text>
-          {canEdit && canCreate && (
-            <Button type="button" size="xs" color="primary" leftSection={<TbPlus size={13} />} onClick={() => openNoteForm('new')}>
+          <Text size="sm" c="dimmed" mb="md" maw={400} mx="auto">
+            Notes untuk dokumentasi project: deployment instructions, troubleshooting log, runbook, atau apapun yang
+            berguna untuk tim. Mendukung Markdown.
+          </Text>
+          {canEdit && (
+            <Button
+              type="button"
+              size="xs"
+              color="primary"
+              leftSection={<TbPlus size={13} />}
+              onClick={() => openNoteForm('new')}
+            >
               Buat Note Pertama
             </Button>
           )}
         </Box>
       ) : !isError && filtered.length === 0 ? (
         <Box p="xl" ta="center" style={{ border: '1px dashed var(--mantine-color-default-border)' }}>
-          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm"><TbSearch size={22} /></ThemeIcon>
-          <Text fw={500} size="sm" mb={4}>Tidak ada note yang cocok</Text>
-          <Text size="xs" c="dimmed" mb="sm">Coba ubah filter atau kata kunci pencarian.</Text>
-          <Button type="button" size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={resetFilter}>Reset filter</Button>
+          <ThemeIcon size={44} radius="xl" variant="light" color="gray" mx="auto" mb="sm">
+            <TbSearch size={22} />
+          </ThemeIcon>
+          <Text fw={500} size="sm" mb={4}>
+            Tidak ada note yang cocok
+          </Text>
+          <Text size="xs" c="dimmed" mb="sm">
+            Coba ubah filter atau kata kunci pencarian.
+          </Text>
+          <Button type="button" size="xs" variant="subtle" leftSection={<TbX size={11} />} onClick={resetFilter}>
+            Reset filter
+          </Button>
         </Box>
       ) : !isError && view === 'list' ? (
         <>
           <Stack gap="xs">
             {paginated.map((note) => (
-              <NoteCardList key={note.id} note={note} canEdit={canEdit} isOwner={isOwner} myUserId={myUserId}
-                onView={() => openNoteView(note)} onEdit={() => openNoteForm(note)} onDelete={() => deleteNote(note)} onPin={() => togglePin(note)} onTagClick={addTagFilter} />
+              <NoteCardList
+                key={note.id}
+                note={note}
+                canEdit={canEdit}
+                isOwner={isOwner}
+                myUserId={myUserId}
+                onView={() => openNoteView(note)}
+                onEdit={() => openNoteForm(note)}
+                onDelete={() => deleteNote(note)}
+                onPin={() => togglePin(note)}
+                onTagClick={addTagFilter}
+              />
             ))}
           </Stack>
-          {totalPages > 1 && <Group justify="center" mt="sm"><Pagination value={page} onChange={setPage} total={totalPages} size="sm" /></Group>}
+          {totalPages > 1 && (
+            <Group justify="center" mt="sm">
+              <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
+            </Group>
+          )}
         </>
       ) : !isError ? (
         <>
           <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="xs">
             {paginated.map((note) => (
-              <NoteCardGrid key={note.id} note={note} canEdit={canEdit} isOwner={isOwner} myUserId={myUserId}
-                onView={() => openNoteView(note)} onEdit={() => openNoteForm(note)} onDelete={() => deleteNote(note)} onPin={() => togglePin(note)} onTagClick={addTagFilter} />
+              <NoteCardGrid
+                key={note.id}
+                note={note}
+                canEdit={canEdit}
+                isOwner={isOwner}
+                myUserId={myUserId}
+                onView={() => openNoteView(note)}
+                onEdit={() => openNoteForm(note)}
+                onDelete={() => deleteNote(note)}
+                onPin={() => togglePin(note)}
+                onTagClick={addTagFilter}
+              />
             ))}
           </SimpleGrid>
-          {totalPages > 1 && <Group justify="center" mt="sm"><Pagination value={page} onChange={setPage} total={totalPages} size="sm" /></Group>}
+          {totalPages > 1 && (
+            <Group justify="center" mt="sm">
+              <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
+            </Group>
+          )}
         </>
       ) : null}
     </Stack>

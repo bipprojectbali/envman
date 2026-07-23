@@ -2,7 +2,6 @@ import { Elysia } from 'elysia'
 import { canAccessItem, getSectionAccessWithScope, tagScopeWhere } from '../../lib/access'
 import { requireEnvAuth } from '../../lib/auth-middleware'
 import { prisma } from '../../lib/db'
-import { hasCapability } from '../../lib/permissions'
 
 export const notesRouter = new Elysia()
 
@@ -15,7 +14,12 @@ export const notesRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'NOTES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(
+      authResult.userId,
+      authResult.role,
+      params.slug,
+      'NOTES',
+    )
     if (!access) {
       set.status = 403
       return { error: 'Forbidden' }
@@ -42,18 +46,20 @@ export const notesRouter = new Elysia()
     return { notes }
   })
 
-  // POST /api/envman/projects/:slug/notes — create note (butuh note:create + EDITOR+ project)
+  // POST /api/envman/projects/:slug/notes — create note (butuh section NOTES EDITOR+;
+  // konsisten dengan Files/Storage. Tak ada capability global tambahan.)
   .post('/api/envman/projects/:slug/notes', async ({ request, params, set }) => {
     const authResult = await requireEnvAuth(request)
     if (!authResult) {
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    if (!hasCapability(authResult, 'note:create')) {
-      set.status = 403
-      return { error: 'Tidak punya izin create note. Hubungi SUPER_ADMIN.' }
-    }
-    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'NOTES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(
+      authResult.userId,
+      authResult.role,
+      params.slug,
+      'NOTES',
+    )
     if (!access || access === 'VIEWER') {
       set.status = 403
       return { error: 'Forbidden' }
@@ -103,7 +109,12 @@ export const notesRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'NOTES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(
+      authResult.userId,
+      authResult.role,
+      params.slug,
+      'NOTES',
+    )
     if (!access || access === 'VIEWER') {
       set.status = 403
       return { error: 'Forbidden' }
@@ -159,7 +170,12 @@ export const notesRouter = new Elysia()
       set.status = 401
       return { error: 'Unauthorized' }
     }
-    const { role: access, scopeTags } = await getSectionAccessWithScope(authResult.userId, authResult.role, params.slug, 'NOTES')
+    const { role: access, scopeTags } = await getSectionAccessWithScope(
+      authResult.userId,
+      authResult.role,
+      params.slug,
+      'NOTES',
+    )
     if (!access || access === 'VIEWER') {
       set.status = 403
       return { error: 'Forbidden' }

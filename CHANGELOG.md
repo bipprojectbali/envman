@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Membuat Note kini cukup butuh role section Notes EDITOR+ (bug: tombol "Buat Note" hilang untuk member yang seharusnya bisa).** Sebelumnya membuat note menuntut **dua** izin sekaligus: capability akun global `note:create` **dan** role section ≥EDITOR — tidak konsisten dengan Files/Storage yang cukup EDITOR+. Akibatnya, member yang sudah diberi role Owner/Editor di section Notes tetap tak bisa membuat note (tombolnya tak muncul) sampai SUPER_ADMIN juga meng-grant capability `note:create` yang non-obvious. Kini gate-nya seragam dengan Files/Storage — **cukup role section Notes EDITOR+**. Capability `note:create` dihapus (tak lagi ada di daftar Permissions).
+
+### Removed
+- **Pengaturan akses di halaman Users (Dev → Users → Access Matrix) kini read-only dan jauh lebih ringkas.** Akses (role project + override per-env) sebelumnya bisa disunting dari **dua** tempat — tab Members tiap project **dan** drawer per-user di Users Management — membingungkan dan menduakan sumber kebenaran. Kini penyuntingan akses **hanya** dilakukan di tab **Members** project. Tab Access Matrix di drawer user tinggal **ringkasan audit read-only** ("apa saja yang bisa diakses user ini lintas project"), dan tiap baris men-deep-link ke tab Members project terkait untuk mengedit. Tampilan juga disederhanakan: **hanya menampilkan project yang benar-benar bisa diakses user** (project `NO ROLE` yang tak relevan tak lagi memenuhi layar), dengan dua filter saja — `Punya akses` dan `Ada override`.
+
 ## [0.24.1] - 2026-07-23
 
 ### Removed

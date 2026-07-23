@@ -135,7 +135,7 @@ Files & aliases accessible di project level, tapi yang reference env via `-e pro
 - Env card badge `DENIED` (red) / override `<role>` (grape).
 - MembersPanel: chevron expand → `MemberEnvOverrides.tsx` (select `inherit|OWNER|EDITOR|VIEWER|denied`, OWNER-only).
 - AliasesPanel: `deniedEnvs.length>0` → Badge merah "needs <env>", sembunyikan CopyButton.
-- Users Management (`AccessMatrixTab`): collapsible row per project, badge counts, stats global, default filter `with-access`.
+- Users Management (`AccessMatrixTab`): **read-only** ringkasan akses per-user (badge role+override per project, stats global, filter `with-access`). Tiap baris deep-link ke `/envmanager/:slug?tab=members` — **semua penyuntingan akses dilakukan di tab Members project** (single source of truth), bukan dari sisi user.
 
 ### Admin Endpoint Parity (SUPER_ADMIN)
 
