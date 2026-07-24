@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **⚠️ Breaking — `envman storage upload` kini aman-by-default (tidak menimpa).** Sebelumnya upload ke path yang sudah terisi **langsung menimpa** file lama, dengan flag `--no-clobber`/`-n` untuk mencegah. Kini defaultnya **dibalik**: upload file yang sudah ada **ditolak** dengan pesan error (`... sudah ada — pakai --force untuk menimpa`) dan exit non-zero; upload folder **melewati** file yang bentrok dan melanjutkan sisanya. Untuk menimpa, pakai flag baru **`--force`/`-f`**. Flag `--no-clobber`/`-n` dihapus (perilaku itu kini default). Script/CI yang mengandalkan overwrite otomatis harus menambahkan `--force`.
+
 ## [0.24.2] - 2026-07-23
 
 ### Changed

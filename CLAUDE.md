@@ -415,7 +415,7 @@ envman gists pull <judul|id>[:file] [--file f] [-o dir|file] [--force]   # 1 fil
 envman gists rm <judul|id>[:file] [--file f]       # hapus gist, atau 1 file (owner/SUPER_ADMIN)
 
 envman storage ls <project>[:prefix]
-envman storage upload <project> <file|dir> [--path p] [-n|--no-clobber]   # default overwrite
+envman storage upload <project> <file|dir> [--path p] [-f|--force]   # default: tolak jika ada; --force timpa
 envman storage download <project>:<path> [-o file]
 envman storage exec [--offline|--no-cache] <project>:<path> [-- args...]
 envman storage rm <project>:<folder>/     # OWNER only
