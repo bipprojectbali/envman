@@ -171,7 +171,7 @@ Override akses per-member untuk section non-env, **paralel** dengan env members.
 
 ### UI
 
-Tab Members = **satu matrix gabungan** (`AccessMatrix.tsx`): baris per anggota, kolom `Environments` + 4 section (Notes/Aliases/Files/Storage), fetch `access-matrix` + `section-matrix` lalu merge by userId. Kolom Environments = **satu kolom untuk semua env** (`EnvAccessCell.tsx`, popover berisi daftar env + cari saat >6) — hindari scroll horizontal. Tiap sel role = `AccessRoleCell.tsx` (pill berlabel + menu, bukan idiom huruf). Tag-scope Storage via `TagScopeEditor.tsx`. Section tab yang `sectionAccess === null` tetap disembunyikan dari panel-nya sendiri.
+Members = **satu matrix gabungan** (`AccessMatrix.tsx`), diakses via **tombol "Members" di header project** (bukan tab konten; `?tab=members` tetap valid untuk deep-link): baris per anggota, kolom `Environments` + 4 section (Notes/Aliases/Files/Storage), fetch `access-matrix` + `section-matrix` lalu merge by userId. Kolom Environments = **satu kolom untuk semua env** (`EnvAccessCell.tsx`, popover berisi daftar env + cari saat >6) — hindari scroll horizontal. Tiap sel role = `AccessRoleCell.tsx` (pill berlabel + menu, bukan idiom huruf). Tag-scope Storage via `TagScopeEditor.tsx`. Section tab yang `sectionAccess === null` tetap disembunyikan dari panel-nya sendiri.
 
 ### Audit & Cache
 

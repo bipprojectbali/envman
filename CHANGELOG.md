@@ -2,8 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+- **Waktu "Dibuat" & "Diupdate" di tiap item (Environments, Aliases, Files, Storage).** Kartu/baris tiap item kini menampilkan **dua baris eksplisit** — `Dibuat: <relatif>` dan `Diupdate: <relatif>` (dengan tanggal absolut di tooltip). Baris "Diupdate" hanya muncul bila item benar-benar pernah diubah (selisih > 1 menit dari dibuat), jadi item yang belum pernah diedit tak menampilkan info redundan. Environment sebelumnya hanya menyimpan `createdAt`; kini punya kolom `updatedAt` juga.
+
 ### Changed
 - **⚠️ Breaking — `envman storage upload` kini aman-by-default (tidak menimpa).** Sebelumnya upload ke path yang sudah terisi **langsung menimpa** file lama, dengan flag `--no-clobber`/`-n` untuk mencegah. Kini defaultnya **dibalik**: upload file yang sudah ada **ditolak** dengan pesan error (`... sudah ada — pakai --force untuk menimpa`) dan exit non-zero; upload folder **melewati** file yang bentrok dan melanjutkan sisanya. Untuk menimpa, pakai flag baru **`--force`/`-f`**. Flag `--no-clobber`/`-n` dihapus (perilaku itu kini default). Script/CI yang mengandalkan overwrite otomatis harus menambahkan `--force`.
+- **Members dipindah dari deret tab ke tombol di header project.** Deret tab project sebelumnya mencampur **konten** (Environments, Notes, Aliases, Files, Storage) dengan **administrasi akses** (Members) dalam satu baris, padahal keduanya beda jenis. Kini Members keluar dari tab — deret tab murni konten, dan pengelolaan member/akses lewat **tombol "Members" di header project** (dengan jumlah anggota). Deep-link `?tab=members` (mis. dari Users → Access Matrix) tetap berfungsi. Stat "N member" yang redundan di footer header dihilangkan karena sudah ada di tombol.
+
+### Database
+- Migration `20260725100000_add_environment_updated_at` — tambah kolom `updatedAt` di tabel `environment` (idempoten `IF NOT EXISTS`, `DEFAULT now()`, backfill = `createdAt` untuk baris lama). Aman dijalankan otomatis di produksi.
 
 ## [0.24.2] - 2026-07-23
 
