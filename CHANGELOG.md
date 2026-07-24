@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.24.3] - 2026-07-25
 
 ### Added
 - **Waktu "Dibuat" & "Diupdate" di tiap item (Environments, Aliases, Files, Storage).** Kartu/baris tiap item kini menampilkan **dua baris eksplisit** — `Dibuat: <relatif>` dan `Diupdate: <relatif>` (dengan tanggal absolut di tooltip). Baris "Diupdate" hanya muncul bila item benar-benar pernah diubah (selisih > 1 menit dari dibuat), jadi item yang belum pernah diedit tak menampilkan info redundan. Environment sebelumnya hanya menyimpan `createdAt`; kini punya kolom `updatedAt` juga.
