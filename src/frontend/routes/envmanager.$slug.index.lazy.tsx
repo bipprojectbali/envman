@@ -1,7 +1,7 @@
 import { Badge, Box, Paper, Tabs } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { createLazyFileRoute, useNavigate } from '@tanstack/react-router'
-import { TbFiles, TbFolderOpen, TbNote, TbTerminal2, TbUsers, TbVariable } from 'react-icons/tb'
+import { TbFiles, TbFolderOpen, TbNote, TbTerminal2, TbVariable } from 'react-icons/tb'
 import { AliasesPanel } from '@/frontend/components/slug/AliasesPanel'
 import { EnvironmentList } from '@/frontend/components/slug/EnvironmentList'
 import { FilesPanel } from '@/frontend/components/slug/FilesPanel'
@@ -112,6 +112,8 @@ function ProjectDetailPage() {
         totalVars={totalVars}
         memberCount={memberCount}
         projectTags={projectTags}
+        membersActive={activeTab === 'members'}
+        onManageMembers={() => setTab('members')}
       />
 
       {!isError && (
@@ -175,19 +177,6 @@ function ProjectDetailPage() {
                 Files
               </Tabs.Tab>
             )}
-            <Tabs.Tab
-              value="members"
-              leftSection={<TbUsers size={13} />}
-              rightSection={
-                memberCount > 0 ? (
-                  <Badge size="xs" variant="light" color="primary" circle>
-                    {memberCount}
-                  </Badge>
-                ) : undefined
-              }
-            >
-              Members
-            </Tabs.Tab>
             {canView(storageRole) && (
               <Tabs.Tab
                 value="storage"

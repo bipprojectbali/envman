@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **Members dipindah dari deret tab ke tombol di header project.** Deret tab project sebelumnya mencampur **konten** (Environments, Notes, Aliases, Files, Storage) dengan **administrasi akses** (Members) dalam satu baris, padahal keduanya beda jenis. Kini Members keluar dari tab — deret tab murni konten, dan pengelolaan member/akses lewat **tombol "Members" di header project** (dengan jumlah anggota). Deep-link `?tab=members` (mis. dari Users → Access Matrix) tetap berfungsi. Stat "N member" yang redundan di footer header dihilangkan karena sudah ada di tombol.
+
 ## [0.24.2] - 2026-07-23
 
 ### Changed
