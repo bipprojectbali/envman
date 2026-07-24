@@ -151,19 +151,19 @@ func filterFilesByTag(files []storage.StorageFile, want []string) []storage.Stor
 
 func storageUploadCmd() *cobra.Command {
 	var remotePath string
-	var noClobber bool
+	var force bool
 	var tags []string
 	cmd := &cobra.Command{
 		Use:   "upload <project> <file|dir>",
 		Short: "Upload a file or folder to project storage (streaming)",
 		Long: `Upload a file or folder to project storage.
 
-By default an existing file at the same path is overwritten. Pass --no-clobber
-(-n) to refuse overwriting: a single file errors if it exists, and a folder
-upload skips existing files and continues with the rest.`,
+By default an existing file at the same path is NOT overwritten: a single file
+errors if it already exists, and a folder upload skips existing files and
+continues with the rest. Pass --force (-f) to overwrite existing files.`,
 		Example: "  envman storage upload myapp compose.yml\n" +
 			"  envman storage upload myapp ./logo.png --path assets/logo.png\n" +
-			"  envman storage upload myapp ./logo.png -n         # jangan timpa jika sudah ada\n" +
+			"  envman storage upload myapp ./logo.png --force    # timpa jika sudah ada\n" +
 			"  envman storage upload myapp ./assets/\n" +
 			"  envman storage upload myapp ./dist/ --path static/dist",
 		Args: cobra.ExactArgs(2),
@@ -174,6 +174,9 @@ upload skips existing files and continues with the rest.`,
 			}
 			slug := args[0]
 			localPath := args[1]
+
+			// Aman-by-default: tolak menimpa kecuali --force. noClobber = kebalikan force.
+			noClobber := !force
 
 			stat, err := os.Stat(localPath)
 			if err != nil {
@@ -207,7 +210,7 @@ upload skips existing files and continues with the rest.`,
 			clearProgress()
 			if err != nil {
 				if noClobber && errors.Is(err, storage.ErrExists) {
-					return fmt.Errorf("[envman] %s:%s sudah ada — hapus --no-clobber untuk menimpa", slug, target)
+					return fmt.Errorf("[envman] %s:%s sudah ada — pakai --force untuk menimpa", slug, target)
 				}
 				return err
 			}
@@ -216,7 +219,7 @@ upload skips existing files and continues with the rest.`,
 		},
 	}
 	cmd.Flags().StringVar(&remotePath, "path", "", "Remote path or prefix (default: basename of local file/dir)")
-	cmd.Flags().BoolVarP(&noClobber, "no-clobber", "n", false, "Refuse to overwrite existing files (skip existing in folder upload)")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing files (default: refuse if a file already exists)")
 	cmd.Flags().StringSliceVar(&tags, "tag", nil, "Tags to attach to the uploaded file(s) (comma-separated)")
 	return cmd
 }
