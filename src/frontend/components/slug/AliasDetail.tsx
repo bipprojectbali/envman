@@ -13,6 +13,7 @@ import {
 } from '@mantine/core'
 import { TbCheck, TbChevronLeft, TbChevronRight, TbCopy, TbPencil, TbTrash } from 'react-icons/tb'
 import type { Alias } from './alias-types'
+import { CreatedUpdatedMeta } from './CreatedUpdatedMeta'
 
 interface Props {
   alias: Alias
@@ -34,14 +35,20 @@ export function AliasDetail({ alias, slug, isOwner, onClose, onEdit, onDelete }:
           Aliases
         </Anchor>
         <TbChevronRight size={12} style={{ color: 'var(--mantine-color-dimmed)', flexShrink: 0 }} />
-        <Code fz="sm" fw={700}>{alias.name}</Code>
+        <Code fz="sm" fw={700}>
+          {alias.name}
+        </Code>
       </Group>
       <Divider />
 
       <Stack gap="xs">
-        <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>Perintah</Text>
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+          Perintah
+        </Text>
         <Group gap="xs" align="flex-start">
-          <Code block fz="sm" style={{ flex: 1, wordBreak: 'break-all' }}>envman {alias.args}</Code>
+          <Code block fz="sm" style={{ flex: 1, wordBreak: 'break-all' }}>
+            envman {alias.args}
+          </Code>
           <CopyButton value={`envman ${alias.args}`} timeout={2000}>
             {({ copied, copy }) => (
               <Tooltip label={copied ? 'Disalin!' : 'Salin'} withArrow>
@@ -53,9 +60,13 @@ export function AliasDetail({ alias, slug, isOwner, onClose, onEdit, onDelete }:
           </CopyButton>
         </Group>
 
-        <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>Jalankan via CLI</Text>
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>
+          Jalankan via CLI
+        </Text>
         <Group gap="xs" align="flex-start">
-          <Code block fz="sm" style={{ flex: 1 }}>envman run {slug}:{alias.name}</Code>
+          <Code block fz="sm" style={{ flex: 1 }}>
+            envman run {slug}:{alias.name}
+          </Code>
           <CopyButton value={`envman run ${slug}:${alias.name}`} timeout={2000}>
             {({ copied, copy }) => (
               <Tooltip label={copied ? 'Disalin!' : 'Salin'} withArrow>
@@ -69,17 +80,23 @@ export function AliasDetail({ alias, slug, isOwner, onClose, onEdit, onDelete }:
 
         {alias.description && (
           <>
-            <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>Deskripsi</Text>
+            <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>
+              Deskripsi
+            </Text>
             <Text size="sm">{alias.description}</Text>
           </>
         )}
 
         {alias.tags.length > 0 && (
           <>
-            <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>Tags</Text>
+            <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="xs" style={{ letterSpacing: '0.05em' }}>
+              Tags
+            </Text>
             <Group gap={4}>
               {alias.tags.map((t) => (
-                <Badge key={t} size="sm" variant="light" color="blue">{t}</Badge>
+                <Badge key={t} size="sm" variant="light" color="blue">
+                  {t}
+                </Badge>
               ))}
             </Group>
           </>
@@ -87,17 +104,29 @@ export function AliasDetail({ alias, slug, isOwner, onClose, onEdit, onDelete }:
 
         <Divider mt="xs" />
         <Group gap="xs" wrap="wrap">
-          <Text size="xs" c="dimmed">Dibuat oleh <strong>{alias.creator.name}</strong></Text>
-          <Text size="xs" c="dimmed">·</Text>
           <Text size="xs" c="dimmed">
-            {new Date(alias.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+            Oleh <strong>{alias.creator.name}</strong>
           </Text>
+          <Text size="xs" c="dimmed">
+            ·
+          </Text>
+          <CreatedUpdatedMeta createdAt={alias.createdAt} updatedAt={alias.updatedAt} />
         </Group>
 
         {isOwner && (
           <Group gap="xs" mt="xs">
-            <Button size="xs" variant="default" leftSection={<TbPencil size={13} />} onClick={() => onEdit(alias)}>Edit</Button>
-            <Button size="xs" variant="subtle" color="red" leftSection={<TbTrash size={13} />} onClick={() => onDelete(alias)}>Hapus</Button>
+            <Button size="xs" variant="default" leftSection={<TbPencil size={13} />} onClick={() => onEdit(alias)}>
+              Edit
+            </Button>
+            <Button
+              size="xs"
+              variant="subtle"
+              color="red"
+              leftSection={<TbTrash size={13} />}
+              onClick={() => onDelete(alias)}
+            >
+              Hapus
+            </Button>
           </Group>
         )}
       </Stack>

@@ -1,22 +1,7 @@
-import {
-  ActionIcon,
-  Badge,
-  Box,
-  Code,
-  CopyButton,
-  Group,
-  Text,
-  ThemeIcon,
-  Tooltip,
-} from '@mantine/core'
-import {
-  TbCheck,
-  TbCopy,
-  TbEdit,
-  TbFiles,
-  TbTrash,
-} from 'react-icons/tb'
+import { ActionIcon, Badge, Box, Code, CopyButton, Group, Text, ThemeIcon, Tooltip } from '@mantine/core'
+import { TbCheck, TbCopy, TbEdit, TbFiles, TbTrash } from 'react-icons/tb'
 import { getLangColor } from '@/frontend/lib/languages'
+import { CreatedUpdatedMeta } from './CreatedUpdatedMeta'
 import type { ProjectFile } from './FileForm'
 
 export const HOVER_STYLES = `
@@ -47,7 +32,13 @@ export function relTime(iso: string) {
 }
 
 export function absoluteTime(iso: string) {
-  return new Date(iso).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 interface FileCardProps {
@@ -69,22 +60,47 @@ export function FileCard({ file, slug, canManage, onEdit, onDelete, onView, onTa
       role="article"
       tabIndex={0}
       onClick={onView}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onView() } }}
-      style={{ borderRadius: 'var(--mantine-radius-md)', border: '1px solid var(--mantine-color-default-border)', cursor: 'pointer' }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onView()
+        }
+      }}
+      style={{
+        borderRadius: 'var(--mantine-radius-md)',
+        border: '1px solid var(--mantine-color-default-border)',
+        cursor: 'pointer',
+      }}
     >
       <Group justify="space-between" wrap="nowrap" mb={4}>
         <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-          <ThemeIcon size={28} radius="sm" variant="light" color="blue"><TbFiles size={15} /></ThemeIcon>
+          <ThemeIcon size={28} radius="sm" variant="light" color="blue">
+            <TbFiles size={15} />
+          </ThemeIcon>
           <Box style={{ flex: 1, minWidth: 0 }}>
-            <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.title}</Text>
-            {file.description && <Text size="xs" c="dimmed" lineClamp={1}>{file.description}</Text>}
+            <Text fw={700} size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {file.title}
+            </Text>
+            {file.description && (
+              <Text size="xs" c="dimmed" lineClamp={1}>
+                {file.description}
+              </Text>
+            )}
           </Box>
         </Group>
         <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
           <CopyButton value={file.files.map((f) => `// ${f.filename}\n${f.content}`).join('\n\n')} timeout={2000}>
             {({ copied, copy }) => (
               <Tooltip label={copied ? 'Tersalin!' : 'Salin semua file'} position="left">
-                <ActionIcon size="sm" variant="subtle" color={copied ? 'teal' : 'gray'} onClick={(e) => { e.stopPropagation(); copy() }}>
+                <ActionIcon
+                  size="sm"
+                  variant="subtle"
+                  color={copied ? 'teal' : 'gray'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    copy()
+                  }}
+                >
                   {copied ? <TbCheck size={13} /> : <TbCopy size={13} />}
                 </ActionIcon>
               </Tooltip>
@@ -93,10 +109,30 @@ export function FileCard({ file, slug, canManage, onEdit, onDelete, onView, onTa
           {canManage && (
             <>
               <Tooltip label="Edit" position="left">
-                <ActionIcon size="sm" variant="subtle" color="blue" onClick={(e) => { e.stopPropagation(); onEdit() }}><TbEdit size={13} /></ActionIcon>
+                <ActionIcon
+                  size="sm"
+                  variant="subtle"
+                  color="blue"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEdit()
+                  }}
+                >
+                  <TbEdit size={13} />
+                </ActionIcon>
               </Tooltip>
               <Tooltip label="Hapus" position="left">
-                <ActionIcon size="sm" variant="subtle" color="red" onClick={(e) => { e.stopPropagation(); onDelete() }}><TbTrash size={13} /></ActionIcon>
+                <ActionIcon
+                  size="sm"
+                  variant="subtle"
+                  color="red"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete()
+                  }}
+                >
+                  <TbTrash size={13} />
+                </ActionIcon>
               </Tooltip>
             </>
           )}
@@ -105,16 +141,26 @@ export function FileCard({ file, slug, canManage, onEdit, onDelete, onView, onTa
 
       {file.prefix && (
         <Group gap={4} mb={6} wrap="wrap" align="center" onClick={(e) => e.stopPropagation()}>
-          <Code fz="xs" c="dimmed">{slug}:{file.prefix}/…</Code>
+          <Code fz="xs" c="dimmed">
+            {slug}:{file.prefix}/…
+          </Code>
           {file.files.map((f) => {
             const path = `${slug}:${file.prefix}/${f.filename}`
             return (
               <CopyButton key={f.filename} value={path} timeout={2000}>
                 {({ copied, copy }) => (
                   <Tooltip label={copied ? 'Disalin!' : path} withArrow>
-                    <Badge size="xs" variant={copied ? 'filled' : 'light'} color={copied ? 'teal' : getLangColor(f.language)}
-                      style={{ cursor: 'pointer' }} rightSection={copied ? <TbCheck size={9} /> : <TbCopy size={9} />}
-                      onClick={(e) => { e.stopPropagation(); copy() }}>
+                    <Badge
+                      size="xs"
+                      variant={copied ? 'filled' : 'light'}
+                      color={copied ? 'teal' : getLangColor(f.language)}
+                      style={{ cursor: 'pointer' }}
+                      rightSection={copied ? <TbCheck size={9} /> : <TbCopy size={9} />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        copy()
+                      }}
+                    >
                       {f.filename}
                     </Badge>
                   </Tooltip>
@@ -132,28 +178,55 @@ export function FileCard({ file, slug, canManage, onEdit, onDelete, onView, onTa
       )}
 
       <Group gap={4} wrap="wrap" align="center">
-        {!file.prefix && file.files.slice(0, 3).map((f) => (
-          <Tooltip key={f.filename} label={`${f.language} · ${f.content.split('\n').length} baris`}>
-            <Badge size="xs" variant="dot" color={getLangColor(f.language)}>{f.filename}</Badge>
-          </Tooltip>
-        ))}
+        {!file.prefix &&
+          file.files.slice(0, 3).map((f) => (
+            <Tooltip key={f.filename} label={`${f.language} · ${f.content.split('\n').length} baris`}>
+              <Badge size="xs" variant="dot" color={getLangColor(f.language)}>
+                {f.filename}
+              </Badge>
+            </Tooltip>
+          ))}
         {file.files.length > 3 && (
-          <Tooltip label={file.files.slice(3).map((f) => f.filename).join(', ')}>
-            <Badge size="xs" variant="default">+{file.files.length - 3}</Badge>
+          <Tooltip
+            label={file.files
+              .slice(3)
+              .map((f) => f.filename)
+              .join(', ')}
+          >
+            <Badge size="xs" variant="default">
+              +{file.files.length - 3}
+            </Badge>
           </Tooltip>
         )}
         {file.tags.slice(0, 3).map((t) => (
-          <Badge key={t} size="xs" variant="outline" color="gray" style={{ cursor: 'pointer' }}
-            onClick={onTagClick ? (e) => { e.stopPropagation(); onTagClick(t) } : undefined}>
+          <Badge
+            key={t}
+            size="xs"
+            variant="outline"
+            color="gray"
+            style={{ cursor: 'pointer' }}
+            onClick={
+              onTagClick
+                ? (e) => {
+                    e.stopPropagation()
+                    onTagClick(t)
+                  }
+                : undefined
+            }
+          >
             {t}
           </Badge>
         ))}
         {file.tags.length > 3 && (
-          <Tooltip label={file.tags.slice(3).join(', ')}><Text size="xs" c="dimmed">+{file.tags.length - 3}</Text></Tooltip>
+          <Tooltip label={file.tags.slice(3).join(', ')}>
+            <Text size="xs" c="dimmed">
+              +{file.tags.length - 3}
+            </Text>
+          </Tooltip>
         )}
-        <Tooltip label={`Diperbarui ${absoluteTime(file.updatedAt)} oleh ${file.author.name}`}>
-          <Text size="xs" c="dimmed" ml="auto">{file.author.name} · {relTime(file.updatedAt)}</Text>
-        </Tooltip>
+        <Box ml="auto">
+          <CreatedUpdatedMeta createdAt={file.createdAt} updatedAt={file.updatedAt} />
+        </Box>
       </Group>
     </Box>
   )

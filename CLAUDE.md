@@ -25,7 +25,7 @@ PostgreSQL via Prisma v6. Client singleton `src/lib/db.ts` (`{ prisma }`). Schem
 
 - `User`, `Session`, `AuditLog` — field standar (lihat schema).
 - `Project` (id, slug, name, description, tags[], icon?, color?, cardColor?, storageQuotaMb?, storageMaxFileMb?, createdById?, timestamps) — `icon`/`color`/`cardColor` divalidasi vs registry `src/lib/project-avatar.ts`, null=fallback. `storageQuotaMb`/`storageMaxFileMb` = override storage per-project (SUPER_ADMIN), null=global AppSetting. `createdById` (FK User, `ON DELETE SET NULL`).
-- `Environment` (id, name, tags[], projectId, createdAt) — unique(projectId, name)
+- `Environment` (id, name, tags[], projectId, createdAt, updatedAt) — unique(projectId, name)
 - `EnvVar` (id, key, value, isSecret, isDisabled, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (userId, projectId, role) — unique(userId, projectId)
 - `EnvironmentMember` (userId, environmentId, role?) — unique(userId, environmentId). `role=null` = DENY · role set = override · no record = inherit project role.
