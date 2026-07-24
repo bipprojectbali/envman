@@ -1,30 +1,21 @@
-import {
-  ActionIcon,
-  Badge,
-  Box,
-  Code,
-  CopyButton,
-  Group,
-  Menu,
-  Text,
-  ThemeIcon,
-  Tooltip,
-} from '@mantine/core'
+import { ActionIcon, Badge, Box, Code, CopyButton, Group, Menu, Text, ThemeIcon, Tooltip } from '@mantine/core'
 import { modals } from '@mantine/modals'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { TbCheck, TbClock, TbCopy, TbDots, TbPencil, TbTrash, TbVariable } from 'react-icons/tb'
+import { TbCheck, TbCopy, TbDots, TbPencil, TbTrash, TbVariable } from 'react-icons/tb'
 import { DeleteEnvConfirm } from '@/frontend/components/slug/DeleteEnvConfirm'
 import { RenameEnvForm } from '@/frontend/components/slug/RenameEnvForm'
-import { getEnvColor } from '@/frontend/lib/project-utils'
 import { apiFetch } from '@/frontend/lib/api'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
+import { getEnvColor } from '@/frontend/lib/project-utils'
+import { CreatedUpdatedMeta } from './CreatedUpdatedMeta'
 
 interface Environment {
   id: string
   name: string
   tags: string[]
   createdAt?: string
+  updatedAt?: string
   _count: { vars: number }
   accessRole?: 'OWNER' | 'EDITOR' | 'VIEWER' | null
 }
@@ -186,38 +177,59 @@ export function EnvCard({ slug, env, otherEnvNames, canEdit, isOwner, myRole, on
               <CopyButton value={`${slug}:${env.name}`} timeout={2000}>
                 {({ copied, copy }) => (
                   <Tooltip label={copied ? 'Tersalin!' : 'Copy'} withArrow>
-                    <ActionIcon size="xs" variant="subtle" color={copied ? 'teal' : 'gray'} style={{ flexShrink: 0 }} onClick={copy}>
+                    <ActionIcon
+                      size="xs"
+                      variant="subtle"
+                      color={copied ? 'teal' : 'gray'}
+                      style={{ flexShrink: 0 }}
+                      onClick={copy}
+                    >
                       {copied ? <TbCheck size={10} /> : <TbCopy size={10} />}
                     </ActionIcon>
                   </Tooltip>
                 )}
               </CopyButton>
-              {env.createdAt && (
-                <Tooltip label={`Dibuat ${new Date(env.createdAt).toLocaleString('id-ID')}`} withArrow>
-                  <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-                    <TbClock size={10} style={{ verticalAlign: 'middle' }} />
-                  </Text>
-                </Tooltip>
-              )}
             </Group>
+            <Box mt={4}>
+              <CreatedUpdatedMeta createdAt={env.createdAt} updatedAt={env.updatedAt} />
+            </Box>
           </Box>
         </Group>
         <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }} onClick={(ev) => ev.stopPropagation()}>
           {canEdit && (
             <Menu position="bottom-end" withArrow shadow="md" width={180}>
               <Menu.Target>
-                <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Aksi environment" onClick={(ev) => ev.stopPropagation()}>
+                <ActionIcon
+                  size="sm"
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Aksi environment"
+                  onClick={(ev) => ev.stopPropagation()}
+                >
                   <TbDots size={14} />
                 </ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Item leftSection={<TbPencil size={13} />} onClick={(ev) => { ev.stopPropagation(); onEditClick(env) }}>
+                <Menu.Item
+                  leftSection={<TbPencil size={13} />}
+                  onClick={(ev) => {
+                    ev.stopPropagation()
+                    onEditClick(env)
+                  }}
+                >
                   Edit
                 </Menu.Item>
                 {isOwner && (
                   <>
                     <Menu.Divider />
-                    <Menu.Item leftSection={<TbTrash size={13} />} color="red" onClick={(ev) => { ev.stopPropagation(); openDeleteModal() }}>
+                    <Menu.Item
+                      leftSection={<TbTrash size={13} />}
+                      color="red"
+                      onClick={(ev) => {
+                        ev.stopPropagation()
+                        openDeleteModal()
+                      }}
+                    >
                       Hapus
                     </Menu.Item>
                   </>

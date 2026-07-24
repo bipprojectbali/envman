@@ -1,26 +1,77 @@
-import { ActionIcon, Badge, Box, Card, Checkbox, Group, Image, Modal, SimpleGrid, Stack, Text, ThemeIcon, Tooltip } from '@mantine/core'
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Card,
+  Checkbox,
+  Group,
+  Image,
+  Modal,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  Tooltip,
+} from '@mantine/core'
 import { useEffect, useState } from 'react'
-import { TbCheck, TbCopy, TbDownload, TbEye, TbEyeOff, TbFileSearch, TbFolder, TbPencil, TbShare2, TbTrash } from 'react-icons/tb'
-import { apiFetch } from '@/frontend/lib/api'
+import {
+  TbCheck,
+  TbCopy,
+  TbDownload,
+  TbEye,
+  TbEyeOff,
+  TbFileSearch,
+  TbFolder,
+  TbPencil,
+  TbShare2,
+  TbTrash,
+} from 'react-icons/tb'
 import { useStorageFileActions } from '@/frontend/hooks/useStorageFileActions'
+import { apiFetch } from '@/frontend/lib/api'
 import { tagColor } from '@/frontend/lib/project-utils'
 import { fmtBytes, getFileIcon } from '@/frontend/lib/storage-format'
+import { CreatedUpdatedMeta } from './CreatedUpdatedMeta'
 import { StorageFileDrawer } from './StorageFileDrawer'
 import { StorageRenameModal } from './StorageRenameModal'
 
 interface StorageObject {
-  id: string; path: string; size: number; mimeType: string
-  isPublic: boolean; tags: string[]; description: string | null
+  id: string
+  path: string
+  size: number
+  mimeType: string
+  isPublic: boolean
+  tags: string[]
+  description: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 interface FileCardProps {
-  file: StorageObject; slug: string; isOwner: boolean; canEdit: boolean
-  selected?: boolean; selectionMode?: boolean; onSelect?: (path: string) => void
-  onTogglePublic: () => void; onDelete: () => void; onRename: () => void
+  file: StorageObject
+  slug: string
+  isOwner: boolean
+  canEdit: boolean
+  selected?: boolean
+  selectionMode?: boolean
+  onSelect?: (path: string) => void
+  onTogglePublic: () => void
+  onDelete: () => void
+  onRename: () => void
 }
-interface FolderCardProps { name: string; onClick: () => void; onDelete?: () => void }
+interface FolderCardProps {
+  name: string
+  onClick: () => void
+  onDelete?: () => void
+}
 interface GridProps {
-  slug: string; isOwner: boolean; canEdit: boolean; folders: string[]; files: StorageObject[]; prefix: string
-  selected?: Set<string>; selectionMode?: boolean; onSelect?: (path: string) => void
+  slug: string
+  isOwner: boolean
+  canEdit: boolean
+  folders: string[]
+  files: StorageObject[]
+  prefix: string
+  selected?: Set<string>
+  selectionMode?: boolean
+  onSelect?: (path: string) => void
   onFolderClick: (path: string) => void
   onDeleteFolder?: (path: string) => void
   onTogglePublic: (path: string, isPublic: boolean) => void
@@ -28,9 +79,31 @@ interface GridProps {
   onRename: () => void
 }
 
-function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSelect, onTogglePublic, onDelete, onRename }: FileCardProps) {
-  const { copied, previewOpen, setPreviewOpen, handleShare, handleCopyContent, handleDownload,
-    handleDragStart, prefetchPresigned, setPresignedCache, canPreview, canCopy } = useStorageFileActions(file, slug)
+function FileCard({
+  file,
+  slug,
+  isOwner,
+  canEdit,
+  selected,
+  selectionMode,
+  onSelect,
+  onTogglePublic,
+  onDelete,
+  onRename,
+}: FileCardProps) {
+  const {
+    copied,
+    previewOpen,
+    setPreviewOpen,
+    handleShare,
+    handleCopyContent,
+    handleDownload,
+    handleDragStart,
+    prefetchPresigned,
+    setPresignedCache,
+    canPreview,
+    canCopy,
+  } = useStorageFileActions(file, slug)
   const [renameOpen, setRenameOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
   const showCheckbox = !!selected || !!selectionMode || hovered
@@ -42,7 +115,7 @@ function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSel
 
   // Thumbnail: publik pakai permanent URL langsung; privat fetch presigned saat mount
   const [thumbUrl, setThumbUrl] = useState<string | null>(
-    file.isPublic && isImg ? `/api/public/storage/${slug}/${file.path}` : null
+    file.isPublic && isImg ? `/api/public/storage/${slug}/${file.path}` : null,
   )
   useEffect(() => {
     if (!isImg || file.isPublic || thumbUrl) return
@@ -58,27 +131,55 @@ function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSel
 
   return (
     <>
-      <Card withBorder padding="sm" radius="md"
-        draggable={!selected} onDragStart={selected ? undefined : handleDragStart}
-        onMouseEnter={() => { setHovered(true); if (!selected) prefetchPresigned() }}
+      <Card
+        withBorder
+        padding="sm"
+        radius="md"
+        draggable={!selected}
+        onDragStart={selected ? undefined : handleDragStart}
+        onMouseEnter={() => {
+          setHovered(true)
+          if (!selected) prefetchPresigned()
+        }}
         onMouseLeave={() => setHovered(false)}
         style={{
           cursor: selected ? 'default' : 'grab',
           position: 'relative',
           outline: selected ? '2px solid var(--mantine-color-blue-5)' : undefined,
           outlineOffset: -2,
-        }}>
+        }}
+      >
         {onSelect && (
-          <Box style={{ position: 'absolute', top: 6, left: 6, zIndex: 10,
-            opacity: showCheckbox ? 1 : 0, transition: 'opacity 0.12s' }}>
-            <Checkbox size="xs" checked={!!selected} onChange={() => onSelect(file.path)}
-              onClick={(e) => e.stopPropagation()} />
+          <Box
+            style={{
+              position: 'absolute',
+              top: 6,
+              left: 6,
+              zIndex: 10,
+              opacity: showCheckbox ? 1 : 0,
+              transition: 'opacity 0.12s',
+            }}
+          >
+            <Checkbox
+              size="xs"
+              checked={!!selected}
+              onChange={() => onSelect(file.path)}
+              onClick={(e) => e.stopPropagation()}
+            />
           </Box>
         )}
-        <Card.Section onClick={!selectionMode && canPreview ? () => setPreviewOpen(true) : undefined}
-          style={{ cursor: canPreview ? 'pointer' : undefined, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', height: 90,
-            background: 'var(--mantine-color-default-hover)', overflow: 'hidden' }}>
+        <Card.Section
+          onClick={!selectionMode && canPreview ? () => setPreviewOpen(true) : undefined}
+          style={{
+            cursor: canPreview ? 'pointer' : undefined,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: 90,
+            background: 'var(--mantine-color-default-hover)',
+            overflow: 'hidden',
+          }}
+        >
           {thumbUrl ? (
             <Image src={thumbUrl} h={90} fit="cover" />
           ) : (
@@ -89,24 +190,41 @@ function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSel
         </Card.Section>
 
         <Stack gap={2} mt={8}>
-          <Text size="xs" fw={500} lineClamp={2} title={name}>{name}</Text>
+          <Text size="xs" fw={500} lineClamp={2} title={name}>
+            {name}
+          </Text>
           <Group gap={4}>
-            <Text size="xs" c="dimmed">{fmtBytes(file.size)}</Text>
-            {ext && <Badge size="xs" variant="dot" color="gray">{ext}</Badge>}
-            {file.isPublic && <Badge size="xs" variant="light" color="green">publik</Badge>}
+            <Text size="xs" c="dimmed">
+              {fmtBytes(file.size)}
+            </Text>
+            {ext && (
+              <Badge size="xs" variant="dot" color="gray">
+                {ext}
+              </Badge>
+            )}
+            {file.isPublic && (
+              <Badge size="xs" variant="light" color="green">
+                publik
+              </Badge>
+            )}
           </Group>
           {file.tags.length > 0 && (
             <Group gap={4}>
               {file.tags.slice(0, 3).map((t) => (
-                <Badge key={t} size="xs" variant="light" color={tagColor(t)}>{t}</Badge>
+                <Badge key={t} size="xs" variant="light" color={tagColor(t)}>
+                  {t}
+                </Badge>
               ))}
               {file.tags.length > 3 && (
                 <Tooltip label={file.tags.slice(3).join(', ')} withArrow>
-                  <Text size="xs" c="dimmed">+{file.tags.length - 3}</Text>
+                  <Text size="xs" c="dimmed">
+                    +{file.tags.length - 3}
+                  </Text>
                 </Tooltip>
               )}
             </Group>
           )}
+          <CreatedUpdatedMeta createdAt={file.createdAt} updatedAt={file.updatedAt} />
         </Stack>
 
         <Group gap={2} mt={8} wrap="nowrap">
@@ -124,13 +242,20 @@ function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSel
           )}
           {canCopy && (
             <Tooltip label={copied === 'content' ? 'Disalin!' : 'Salin konten'}>
-              <ActionIcon size="xs" variant="subtle" color={copied === 'content' ? 'green' : 'gray'} onClick={handleCopyContent}>
+              <ActionIcon
+                size="xs"
+                variant="subtle"
+                color={copied === 'content' ? 'green' : 'gray'}
+                onClick={handleCopyContent}
+              >
                 {copied === 'content' ? <TbCheck size={11} /> : <TbCopy size={11} />}
               </ActionIcon>
             </Tooltip>
           )}
           <Tooltip label="Download">
-            <ActionIcon size="xs" variant="subtle" onClick={handleDownload}><TbDownload size={11} /></ActionIcon>
+            <ActionIcon size="xs" variant="subtle" onClick={handleDownload}>
+              <TbDownload size={11} />
+            </ActionIcon>
           </Tooltip>
           {canEdit && (
             <Tooltip label="Rename">
@@ -148,7 +273,9 @@ function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSel
           )}
           {isOwner && (
             <Tooltip label="Hapus">
-              <ActionIcon size="xs" variant="subtle" color="red" onClick={onDelete}><TbTrash size={11} /></ActionIcon>
+              <ActionIcon size="xs" variant="subtle" color="red" onClick={onDelete}>
+                <TbTrash size={11} />
+              </ActionIcon>
             </Tooltip>
           )}
         </Group>
@@ -166,39 +293,86 @@ function FileCard({ file, slug, isOwner, canEdit, selected, selectionMode, onSel
 function FolderCard({ name, onClick, onDelete }: FolderCardProps) {
   return (
     <Card withBorder padding="sm" radius="md" style={{ cursor: 'pointer' }} onClick={onClick}>
-      <Card.Section style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: 90, background: 'var(--mantine-color-default-hover)' }}>
+      <Card.Section
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 90,
+          background: 'var(--mantine-color-default-hover)',
+        }}
+      >
         <TbFolder size={36} color="var(--mantine-color-yellow-5)" />
         {onDelete && (
           <Tooltip label="Hapus folder">
-            <ActionIcon size="sm" variant="subtle" color="red" pos="absolute" top={4} right={4}
-              onClick={(e) => { e.stopPropagation(); onDelete() }}>
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              color="red"
+              pos="absolute"
+              top={4}
+              right={4}
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete()
+              }}
+            >
               <TbTrash size={13} />
             </ActionIcon>
           </Tooltip>
         )}
       </Card.Section>
-      <Text size="xs" fw={500} mt={8} lineClamp={2}>{name}/</Text>
+      <Text size="xs" fw={500} mt={8} lineClamp={2}>
+        {name}/
+      </Text>
     </Card>
   )
 }
 
-export function StorageFileGrid({ slug, isOwner, canEdit, folders, files, prefix, selected, selectionMode, onSelect, onFolderClick, onDeleteFolder, onTogglePublic, onDelete, onRename }: GridProps) {
+export function StorageFileGrid({
+  slug,
+  isOwner,
+  canEdit,
+  folders,
+  files,
+  prefix,
+  selected,
+  selectionMode,
+  onSelect,
+  onFolderClick,
+  onDeleteFolder,
+  onTogglePublic,
+  onDelete,
+  onRename,
+}: GridProps) {
   return (
     <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
       {folders.map((folder) => {
         const folderPath = prefix ? `${prefix}/${folder}` : folder
         return (
-          <FolderCard key={folderPath} name={folder} onClick={() => onFolderClick(folderPath)}
-            onDelete={onDeleteFolder ? () => onDeleteFolder(folderPath) : undefined} />
+          <FolderCard
+            key={folderPath}
+            name={folder}
+            onClick={() => onFolderClick(folderPath)}
+            onDelete={onDeleteFolder ? () => onDeleteFolder(folderPath) : undefined}
+          />
         )
       })}
       {files.map((f) => (
-        <FileCard key={f.id} file={f} slug={slug} isOwner={isOwner} canEdit={canEdit}
-          selected={selected?.has(f.path)} selectionMode={selectionMode} onSelect={onSelect}
+        <FileCard
+          key={f.id}
+          file={f}
+          slug={slug}
+          isOwner={isOwner}
+          canEdit={canEdit}
+          selected={selected?.has(f.path)}
+          selectionMode={selectionMode}
+          onSelect={onSelect}
           onTogglePublic={() => onTogglePublic(f.path, f.isPublic)}
           onDelete={() => onDelete(f.path)}
-          onRename={onRename} />
+          onRename={onRename}
+        />
       ))}
     </SimpleGrid>
   )
