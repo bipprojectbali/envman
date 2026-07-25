@@ -4,9 +4,11 @@ import { useMemo, useState } from 'react'
 import { TbSearch } from 'react-icons/tb'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
+import { notifyBulkResult, runBulk } from '@/frontend/lib/bulk'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { AccessRoleCell } from './AccessRoleCell'
 import { EnvAccessCell } from './EnvAccessCell'
+import { EnvAccessSubview } from './EnvAccessSubview'
 import { TagScopeEditor } from './TagScopeEditor'
 import {
   type AccessMatrix as EnvMatrix,
@@ -41,6 +43,9 @@ export function AccessMatrix({
 }) {
   const qc = useQueryClient()
   const [memberQuery, setMemberQuery] = useState('')
+  // Sub-view editor akses env in-place: userId member yang sedang diedit, atau
+  // null = tampilkan tabel matrix.
+  const [envSubviewUserId, setEnvSubviewUserId] = useState<string | null>(null)
 
   const envQ = useQuery({
     queryKey: ['envman', 'access-matrix', slug],
@@ -61,6 +66,31 @@ export function AccessMatrix({
       }),
     onSuccess: (_d, v) => {
       notifyOk(`Akses ${v.envName} diperbarui`)
+      qc.invalidateQueries({ queryKey: ['envman', 'access-matrix', slug] })
+      qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  // Bulk apply satu role ke banyak env sekaligus (fan-out PUT via runBulk),
+  // lalu satu invalidate + satu notif ringkas — jauh lebih hemat daripada
+  // memanggil setEnvRole 21×.
+  const setEnvRoleBulk = useMutation({
+    mutationFn: async ({ userId, envNames, role }: { userId: string; envNames: string[]; role: EnvRole }) => {
+      const summary = await runBulk(envNames, (envName) =>
+        apiFetch(`/api/envman/projects/${slug}/environments/${envName}/members/${userId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ role }),
+        }),
+      )
+      return summary
+    },
+    onSuccess: (summary) => {
+      notifyBulkResult(
+        summary,
+        (n) => `${n} env diperbarui`,
+        (n) => `${n} env gagal`,
+      )
       qc.invalidateQueries({ queryKey: ['envman', 'access-matrix', slug] })
       qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
     },
@@ -128,6 +158,26 @@ export function AccessMatrix({
   const environments = envQ.data.environments
   const sections = secQ.data?.sections ?? (['NOTES', 'ALIASES', 'FILES', 'STORAGE'] as SectionName[])
   const availableTags = secQ.data?.availableTags ?? {}
+
+  // Sub-view: edit akses env satu member secara in-place (menggantikan tabel).
+  const subviewMember = envSubviewUserId ? merged.find((m) => m.userId === envSubviewUserId) : null
+  if (subviewMember) {
+    return (
+      <EnvAccessSubview
+        member={{
+          userId: subviewMember.userId,
+          user: subviewMember.user,
+          projectRole: subviewMember.projectRole as ProjectRole,
+        }}
+        environments={environments}
+        envAccess={subviewMember.envAccess}
+        disabled={setEnvRole.isPending || setEnvRoleBulk.isPending}
+        onBack={() => setEnvSubviewUserId(null)}
+        onChange={(envName, role) => setEnvRole.mutate({ userId: subviewMember.userId, envName, role })}
+        onBulkChange={(envNames, role) => setEnvRoleBulk.mutate({ userId: subviewMember.userId, envNames, role })}
+      />
+    )
+  }
 
   const allIds = filteredMembers.map((m) => m.userId)
   const selectableList = selectableIds ? allIds.filter((id) => selectableIds.has(id)) : allIds
@@ -237,8 +287,8 @@ export function AccessMatrix({
                       environments={environments}
                       envAccess={m.envAccess}
                       projectRole={m.projectRole as ProjectRole}
-                      disabled={setEnvRole.isPending}
-                      onChange={(envName, role) => setEnvRole.mutate({ userId: m.userId, envName, role })}
+                      disabled={setEnvRole.isPending || setEnvRoleBulk.isPending}
+                      onOpen={() => setEnvSubviewUserId(m.userId)}
                     />
                   </Box>
                 </Box>
