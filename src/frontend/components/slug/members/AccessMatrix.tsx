@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { TbSearch } from 'react-icons/tb'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { apiFetch } from '@/frontend/lib/api'
+import { notifyBulkResult, runBulk } from '@/frontend/lib/bulk'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { AccessRoleCell } from './AccessRoleCell'
 import { EnvAccessCell } from './EnvAccessCell'
@@ -61,6 +62,31 @@ export function AccessMatrix({
       }),
     onSuccess: (_d, v) => {
       notifyOk(`Akses ${v.envName} diperbarui`)
+      qc.invalidateQueries({ queryKey: ['envman', 'access-matrix', slug] })
+      qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
+    },
+    onError: (e) => notifyErr(e),
+  })
+
+  // Bulk apply satu role ke banyak env sekaligus (fan-out PUT via runBulk),
+  // lalu satu invalidate + satu notif ringkas — jauh lebih hemat daripada
+  // memanggil setEnvRole 21×.
+  const setEnvRoleBulk = useMutation({
+    mutationFn: async ({ userId, envNames, role }: { userId: string; envNames: string[]; role: EnvRole }) => {
+      const summary = await runBulk(envNames, (envName) =>
+        apiFetch(`/api/envman/projects/${slug}/environments/${envName}/members/${userId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ role }),
+        }),
+      )
+      return summary
+    },
+    onSuccess: (summary) => {
+      notifyBulkResult(
+        summary,
+        (n) => `${n} env diperbarui`,
+        (n) => `${n} env gagal`,
+      )
       qc.invalidateQueries({ queryKey: ['envman', 'access-matrix', slug] })
       qc.invalidateQueries({ queryKey: ['envman', 'project', slug] })
     },
@@ -237,8 +263,9 @@ export function AccessMatrix({
                       environments={environments}
                       envAccess={m.envAccess}
                       projectRole={m.projectRole as ProjectRole}
-                      disabled={setEnvRole.isPending}
+                      disabled={setEnvRole.isPending || setEnvRoleBulk.isPending}
                       onChange={(envName, role) => setEnvRole.mutate({ userId: m.userId, envName, role })}
+                      onBulkChange={(envNames, role) => setEnvRoleBulk.mutate({ userId: m.userId, envNames, role })}
                     />
                   </Box>
                 </Box>
