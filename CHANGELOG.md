@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.24.4] - 2026-07-25
 
 ### Fixed
 - **Pengaturan akses environment per-anggota kini pakai editor in-place, bukan popover sempit.** Saat env banyak (mis. 21+) dan tiap anggota non-OWNER default-deny di semua env (secure-by-default), popover "Override environment" lama me-render satu baris per env tanpa batas tinggi — memanjang menembus layar dan berantakan saat di-scroll. Lebih parah: menu pilih-role bersarang di dalam popover memicu *click-outside* sehingga popover **tertutup saat memilih role**, dan refetch berikutnya menghapus pilihan yang sedang dikerjakan (mis. baru menambah env "staging" lalu ganti Viewer→Editor → env-nya hilang, harus pilih ulang). Kini klik kolom **Environments** membuka **sub-view editor full-width in-place** (menggantikan tabel) dengan tombol kembali, cari env, filter state (Semua/Diatur/Denied/Inherit), menu role per-baris, serta multi-select + tombol **Set** untuk terapkan satu role ke banyak env sekaligus (satu request bulk). Menu role tak lagi punya popover induk, jadi memilih role tak menutup apa pun dan penyuntingan bertahap tetap utuh. Panel editor dibingkai border + background lebih dalam supaya jelas berpindah dari mode tabel. Resolusi/semantik akses tak berubah.
