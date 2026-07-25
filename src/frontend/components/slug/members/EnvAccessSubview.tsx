@@ -95,7 +95,15 @@ export function EnvAccessSubview({
   const overrideCount = environments.filter((e) => (envAccess[e.name]?.envRole ?? 'inherit') !== 'inherit').length
 
   return (
-    <Stack gap="sm">
+    <Stack
+      gap="sm"
+      p="md"
+      style={{
+        border: '1px solid var(--mantine-color-default-border)',
+        borderRadius: 'var(--mantine-radius-md)',
+        background: 'var(--mantine-color-default-hover)',
+      }}
+    >
       <Group justify="space-between" align="center" wrap="nowrap">
         <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
           <Button size="xs" variant="subtle" color="gray" leftSection={<TbArrowLeft size={14} />} onClick={onBack}>
@@ -196,7 +204,7 @@ export function EnvAccessSubview({
                   style={{
                     borderRadius: 6,
                     border: '1px solid var(--mantine-color-default-border)',
-                    background: isDenied ? 'var(--mantine-color-red-light)' : undefined,
+                    background: isDenied ? 'var(--mantine-color-red-light)' : 'var(--mantine-color-body)',
                   }}
                 >
                   <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
