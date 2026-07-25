@@ -8,6 +8,7 @@ import { notifyBulkResult, runBulk } from '@/frontend/lib/bulk'
 import { notifyErr, notifyOk } from '@/frontend/lib/notify'
 import { AccessRoleCell } from './AccessRoleCell'
 import { EnvAccessCell } from './EnvAccessCell'
+import { EnvAccessSubview } from './EnvAccessSubview'
 import { TagScopeEditor } from './TagScopeEditor'
 import {
   type AccessMatrix as EnvMatrix,
@@ -42,6 +43,9 @@ export function AccessMatrix({
 }) {
   const qc = useQueryClient()
   const [memberQuery, setMemberQuery] = useState('')
+  // Sub-view editor akses env in-place: userId member yang sedang diedit, atau
+  // null = tampilkan tabel matrix.
+  const [envSubviewUserId, setEnvSubviewUserId] = useState<string | null>(null)
 
   const envQ = useQuery({
     queryKey: ['envman', 'access-matrix', slug],
@@ -155,6 +159,26 @@ export function AccessMatrix({
   const sections = secQ.data?.sections ?? (['NOTES', 'ALIASES', 'FILES', 'STORAGE'] as SectionName[])
   const availableTags = secQ.data?.availableTags ?? {}
 
+  // Sub-view: edit akses env satu member secara in-place (menggantikan tabel).
+  const subviewMember = envSubviewUserId ? merged.find((m) => m.userId === envSubviewUserId) : null
+  if (subviewMember) {
+    return (
+      <EnvAccessSubview
+        member={{
+          userId: subviewMember.userId,
+          user: subviewMember.user,
+          projectRole: subviewMember.projectRole as ProjectRole,
+        }}
+        environments={environments}
+        envAccess={subviewMember.envAccess}
+        disabled={setEnvRole.isPending || setEnvRoleBulk.isPending}
+        onBack={() => setEnvSubviewUserId(null)}
+        onChange={(envName, role) => setEnvRole.mutate({ userId: subviewMember.userId, envName, role })}
+        onBulkChange={(envNames, role) => setEnvRoleBulk.mutate({ userId: subviewMember.userId, envNames, role })}
+      />
+    )
+  }
+
   const allIds = filteredMembers.map((m) => m.userId)
   const selectableList = selectableIds ? allIds.filter((id) => selectableIds.has(id)) : allIds
   const allSelected = selectableList.length > 0 && selectableList.every((id) => selected.has(id))
@@ -264,8 +288,7 @@ export function AccessMatrix({
                       envAccess={m.envAccess}
                       projectRole={m.projectRole as ProjectRole}
                       disabled={setEnvRole.isPending || setEnvRoleBulk.isPending}
-                      onChange={(envName, role) => setEnvRole.mutate({ userId: m.userId, envName, role })}
-                      onBulkChange={(envNames, role) => setEnvRoleBulk.mutate({ userId: m.userId, envNames, role })}
+                      onOpen={() => setEnvSubviewUserId(m.userId)}
                     />
                   </Box>
                 </Box>
