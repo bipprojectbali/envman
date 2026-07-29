@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **`envman env sync <sumber> [target]` — samakan key `.env` lokal dengan file lain, tanpa login.** Menjawab situasi yang sering muncul saat bekerja dengan AI agent: agent memperbarui `.env.example`, sementara `.env` milikmu tertinggal, dan mencocokkan puluhan key yang urutannya acak secara manual itu menyakitkan. Perintah ini menambahkan key yang **ada di sumber tapi belum ada** di `.env` — berjalan **sepenuhnya lokal**, tak menyentuh server.
+  - **Hanya menambah, tak pernah mengubah atau menghapus.** Key yang sudah ada di target **tidak disentuh sama sekali** berapa pun bedanya nilai (`DB_HOST` lokalmu tetap `127.0.0.1` walau sumber menulis `localhost`). Key yang hanya ada di `.env` (kemungkinan config usang) **dilaporkan saja**, tidak dihapus.
+  - **Isi `.env` lama utuh byte-per-byte** — file tak pernah ditulis ulang, hanya di-append; urutan, komentar, kutipan, dan baris kosongnya bertahan persis.
+  - **Membawa konteks dari sumber**: key baru ditambahkan dalam satu blok bertanda tanggal, lengkap dengan **heading grup** (`# === Database ===`) dan **komentar per-key** dari file sumber — bukan sekadar daftar telanjang. Nilai disalin apa adanya (`APP_NAME=envman` ikut; `SUPER_ADMIN=` tetap kosong).
+  - **Default dry-run** — tak ada yang berubah sampai kamu menambahkan `--write`; saat diterapkan, isi lama disalin ke `<target>.bak` (matikan dengan `--no-backup`). `--keys-only` mencetak nama key yang hilang saja agar bisa di-pipe (`| pbcopy`, `| envman clip set`). Target default `.env`.
+
 ## [0.24.4] - 2026-07-25
 
 ### Fixed

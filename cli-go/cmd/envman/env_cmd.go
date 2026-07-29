@@ -25,7 +25,7 @@ Secrets are auto-detected from key names (e.g. *_TOKEN, *_KEY, *PASSWORD*,
 *SECRET*, DATABASE_URL). Keys already stored as secret on the server stay
 secret. Override per key with --plain / --secret, or disable with --no-detect.`,
 	}
-	cmd.AddCommand(envPushCmd(), envPullCmd(), envGetCmd(), envKeysCmd())
+	cmd.AddCommand(envPushCmd(), envPullCmd(), envGetCmd(), envKeysCmd(), envSyncCmd())
 	return cmd
 }
 
