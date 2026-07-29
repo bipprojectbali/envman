@@ -58,6 +58,8 @@ model User {
   storageUploads        ProjectStorageObject[]
   createdProjects       Project[]             @relation("ProjectCreator")
   clipboard             Clipboard?
+  transfersSent         Transfer[]            @relation("TransferSender")
+  transfersReceived     Transfer[]            @relation("TransferRecipient")
 
   @@map("user")
 }
@@ -162,6 +164,53 @@ model Clipboard {
 
   @@index([expiresAt])
   @@map("clipboard")
+}
+
+enum TransferKind {
+  TEXT
+  FILE
+}
+
+// User-to-user transfer of a secret (.env, SSH key, cert), so those stop being
+// sent over WhatsApp/Slack. Content is encrypted at rest with the server's
+// MASTER_KEY — safe from third parties and a DB leak, but NOT end-to-end: the
+// holder of MASTER_KEY can read it. Burn-after-read by default, TTL always.
+// See src/routes/envman/transfers-*.ts.
+model Transfer {
+  id         String       @id @default(uuid())
+  kind       TransferKind @default(TEXT)
+  fromUserId String
+  toUserId   String? // null = one-time claim code (recipient has no account)
+  toHint     String? // what the sender typed; for the "sent" list only
+
+  content String? // TEXT payload, encrypted: enc:iv:cipher:tag
+
+  // FILE payload lives in MinIO. Columns exist from v1 so adding the file path
+  // later needs no breaking migration; v1 never writes them.
+  minioKey String?
+  filename String?
+  size     BigInt  @default(0) // BIGINT, not INTEGER: DB dumps routinely exceed 2 GiB
+  mimeType String  @default("application/octet-stream")
+  uploaded Boolean @default(false) // false = presigned but PUT not yet confirmed
+
+  label      String?
+  burn       Boolean @default(true)
+  codeHash   String? @unique // sha256 hex; the plaintext code is NEVER stored
+  codePrefix String? // first 4 chars, so the "sent" list can name it
+
+  claimedAt       DateTime?
+  claimedByUserId String? // deliberately NOT an FK — just an audit breadcrumb
+  claimedIp       String?
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+
+  fromUser User  @relation("TransferSender", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User? @relation("TransferRecipient", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([toUserId, claimedAt])
+  @@index([fromUserId])
+  @@index([expiresAt])
+  @@map("transfer")
 }
 
 // ─── Env Manager ──────────────────────────────────────────────────────────────

@@ -92,6 +92,22 @@ async function cleanupClipboards() {
 cleanupClipboards().catch(console.error)
 setInterval(() => cleanupClipboards().catch(console.error), 60 * 60 * 1000)
 
+// ─── Transfer TTL Sweep ────────────────────────────────
+// Ordering rule (object before row) lives in transfer-sweep.ts. Every 15
+// minutes rather than hourly: a transfer holds a live secret, so it should not
+// sit around for an hour after its TTL.
+import { sweepTransfers } from './lib/transfer-sweep'
+
+const runTransferSweep = () =>
+  sweepTransfers()
+    .then(({ deleted }) => {
+      if (deleted > 0) console.log(`[Transfer] Swept ${deleted} transfer(s)`)
+    })
+    .catch(console.error)
+
+runTransferSweep()
+setInterval(runTransferSweep, 15 * 60 * 1000)
+
 // ─── Elysia App ────────────────────────────────────────
 import { createApp } from './app'
 

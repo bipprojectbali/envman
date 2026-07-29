@@ -23,6 +23,7 @@ import { portainerProbeRouter } from './portainer-probe'
 import { projectsRouter } from './projects'
 import { settingsRouter } from './settings'
 import { storageRouter } from './storage'
+import { transfersRouter } from './transfers'
 import { tokensRouter } from './tokens'
 
 const envmanMiscRouter = new Elysia()
@@ -76,6 +77,7 @@ export const envmanRouter = new Elysia()
   .use(filesRouter)
   .use(gistsRouter)
   .use(clipboardRouter)
+  .use(transfersRouter)
   .use(databaseRouter)
   .use(adminUsersQueryRouter)
   .use(adminUsersRouter)

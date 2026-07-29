@@ -110,5 +110,8 @@ export async function cleanupTestData() {
   await prisma.projectFile.deleteMany()
   await prisma.project.deleteMany()
   await prisma.testMigrate.deleteMany()
+  // Explicit even though the user FKs cascade: a future FK change to RESTRICT
+  // would otherwise make user.deleteMany() throw and take down every suite.
+  await prisma.transfer.deleteMany()
   await prisma.user.deleteMany()
 }
