@@ -1,5 +1,5 @@
-// Package transfer wraps the user-to-user transfer API (envman send / inbox /
-// recv), including the anonymous one-time-code path that works without a login.
+// Package transfer wraps the user-to-user transfer API (envman transfer and
+// the top-level envman recv shortcut, which works without a login).
 package transfer
 
 import (

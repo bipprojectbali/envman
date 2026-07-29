@@ -37,10 +37,14 @@ so you only reference the environment as project:env.`,
 }
 
 func ptStatusCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:     "status <project>:<env>",
-		Short:   "Show stack status and container summary",
-		Example: "  envman portainer status myapp:prod",
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "status <project>:<env>",
+		Short: "Show stack status and container summary",
+		Long: `Show whether the stack is running and list its containers.
+
+Requires the stack:operate capability or EDITOR/OWNER on the environment.`,
+		Example: "  envman portainer status myapp:prod\n  envman portainer status myapp:prod --json",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, t, err := ptResolve(args[0])
@@ -50,6 +54,9 @@ func ptStatusCmd() *cobra.Command {
 			out, err := portainer.Status(cfg, t)
 			if err != nil {
 				return err
+			}
+			if asJSON {
+				return emitJSON(out)
 			}
 			stackState := "inactive"
 			if out.Stack.Status == 1 {
@@ -75,13 +82,19 @@ func ptStatusCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
+	return cmd
 }
 
 func ptPsCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:     "ps <project>:<env>",
-		Short:   "List containers in the stack",
-		Example: "  envman portainer ps myapp:prod",
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "ps <project>:<env>",
+		Short: "List containers in the stack",
+		Long: `List the stack's containers with their state, name and image.
+
+Requires the stack:operate capability or EDITOR/OWNER on the environment.`,
+		Example: "  envman portainer ps myapp:prod\n  envman portainer ps myapp:prod --json",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, t, err := ptResolve(args[0])
@@ -91,6 +104,9 @@ func ptPsCmd() *cobra.Command {
 			containers, err := portainer.Ps(cfg, t)
 			if err != nil {
 				return err
+			}
+			if asJSON {
+				return emitJSON(containers)
 			}
 			if len(containers) == 0 {
 				fmt.Println("(tidak ada container)")
@@ -106,14 +122,17 @@ func ptPsCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
+	return cmd
 }
 
 func ptInspectCmd() *cobra.Command {
-	return &cobra.Command{
+	var asJSON bool
+	cmd := &cobra.Command{
 		Use:     "inspect <project>:<env> <container>",
 		Short:   "Show detailed status of one container",
 		Long:    "Detailed view of one container: state, health, uptime, restart count, ports, mounts, and live CPU/memory (when running).",
-		Example: "  envman portainer inspect myapp:prod web",
+		Example: "  envman portainer inspect myapp:prod web\n  envman portainer inspect myapp:prod web --json",
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, t, err := ptResolve(args[0])
@@ -123,6 +142,9 @@ func ptInspectCmd() *cobra.Command {
 			i, err := portainer.Inspect(cfg, t, args[1])
 			if err != nil {
 				return err
+			}
+			if asJSON {
+				return emitJSON(i)
 			}
 			fmt.Printf("Container: %s (%s)\n", i.Name, i.ID)
 			fmt.Printf("Image:     %s\n", i.Image)
@@ -153,6 +175,8 @@ func ptInspectCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
+	return cmd
 }
 
 func ptLogsCmd() *cobra.Command {

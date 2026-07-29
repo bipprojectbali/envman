@@ -7,13 +7,16 @@ import "testing"
 func TestStorageUploadForceFlag(t *testing.T) {
 	cmd := storageUploadCmd()
 
-	// Flag --force / -f harus ada (opt-in menimpa).
+	// Flag --force harus ada (opt-in menimpa).
 	force := cmd.Flags().Lookup("force")
 	if force == nil {
 		t.Fatal("expected --force flag to exist")
 	}
-	if force.Shorthand != "f" {
-		t.Errorf("expected --force shorthand 'f', got %q", force.Shorthand)
+	// --force long-only di seluruh CLI: -f dipesan untuk --follow (portainer
+	// logs), mengikuti tail/docker. Menghapus shorthand dari flag destruktif
+	// juga membuat salah-ketik yang menimpa file lebih sulit terjadi.
+	if force.Shorthand != "" {
+		t.Errorf("expected --force to have no shorthand, got %q", force.Shorthand)
 	}
 	if force.DefValue != "false" {
 		t.Errorf("expected --force default false (aman-by-default), got %q", force.DefValue)

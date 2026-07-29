@@ -62,8 +62,10 @@ func pbcopyShims() map[string]string {
 func installCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install <target>",
-		Short: "Install helper shims (e.g. OSC 52 pbcopy/pbpaste)",
-		Long: `Install helper tools envman can use. Currently one target:
+		Short: "Install helper shims for this machine (not envman itself)",
+		Long: `Runs entirely offline — no login and no server call.
+
+Install helper tools envman can use. Currently one target:
 
   pbcopy   Write OSC 52 pbcopy/pbpaste shims to ~/.local/bin so that piping to
            pbcopy works on headless/SSH boxes, where the real clipboard lives on

@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **⚠️ Breaking — `envman send` dan `envman inbox` kini `envman transfer send` dan `envman transfer ls`.** Ketiga perintah transfer sebelumnya berdiri sendiri di tingkat atas, padahal satu fitur. Di daftar `--help` yang terurut alfabetis mereka terpisah jauh dan tak satupun menyebut yang lain — orang yang melihat `send` tak punya alasan menduga `inbox` pasangannya. Setiap fitur lain (`clip`, `env`, `gists`, `storage`, `projects`, `portainer`) sudah memakai satu kata benda dengan subcommand; transfer satu-satunya yang tidak. Sekarang `envman transfer --help` mengungkap seluruh fiturnya sekaligus. Perintah lama memberi pesan yang menyebutkan bentuk barunya.
+  - `envman send rm` menjadi **`envman transfer rm`** — sebelumnya id-nya didapat dari `inbox --sent` tapi penghapusnya ada di pohon `send`.
+  - **`envman recv` tetap di tingkat atas** sebagai jalan pintas, karena dipakai orang yang belum punya akun dan hanya menerima satu baris perintah lewat chat.
+  - `--text`/`--file` diganti **`--mode text|file`**: `--file` sebelumnya boolean di `send` tapi string di `gists`, nama sama dengan tipe berbeda.
+- **⚠️ Breaking — `envman storage upload -f` dihapus; pakai `--force`.** `-f` kini konsisten berarti `--follow` (di `portainer logs`, mengikuti `tail`/`docker`), dan `--force` menjadi long-only di seluruh CLI. Menghapus shorthand dari flag yang menimpa file juga membuat salah-ketik lebih sulit terjadi.
+- **⚠️ Breaking — `storage ls --tag` dan `storage upload --tag` menjadi `--tags`**, seragam dengan `gists`.
+- **`envman projects` kini menampilkan daftar project**, bukan mencetak help — itu yang dijanjikan namanya. `projects ls` tetap ada dan identik. Flag `--me`/`-q`/`--json` kini juga berlaku di bentuk singkatnya, dan `envman projects <slug> -q` yang sebelumnya mengabaikan `-q` kini berfungsi.
+
+### Added
+- **`--json` untuk delapan perintah** yang sebelumnya hanya mencetak tabel: `transfer ls`, `projects`/`projects ls`/`projects envs`, `storage ls`, dan `portainer status`/`ps`/`inspect`. Berguna untuk script dan agent.
+- **Penjelasan lengkap untuk perintah yang sebelumnya hanya punya satu baris** (`logout`, `whoami`, `clip set`/`clear`, `storage ls`, `portainer status`/`ps`), serta penanda **"berjalan offline — tanpa login"** di `health`, `sys`, dan `install` yang sebelumnya tak menyebutkannya.
+
+### Fixed
+- **`envman storage rm` tak lagi langsung menghapus.** Perintah ini menghapus seluruh isi folder secara rekursif dan tak bisa dibatalkan, tapi sebelumnya berjalan tanpa konfirmasi apa pun — sementara `storage upload` menolak menimpa **satu** file tanpa `--force`. Kini ia menampilkan jumlah dan daftar file yang akan dihapus lalu berhenti; `--force` untuk benar-benar menghapus.
+- **`envman gists push --clean` kini menolak tanpa `--force` dan menyebutkan file mana yang akan hilang.** `--clean` membuang setiap file yang tak kamu sebutkan — lebih destruktif daripada menimpa satu file, yang justru sudah butuh `--force`. Pesannya juga hanya berkata "kini N file", tak pernah menyebut apa yang lenyap.
+- **`Short` yang menyesatkan diperbaiki**: grup `env` ("Sync a local .env with a project environment" — salah untuk `get`, `keys`, dan `sync`), `install` (terbaca seperti memasang envman sendiri), dan `docs` yang panjangnya 12 kata.
+
 ## [0.25.0] - 2026-07-29
 
 ### Added

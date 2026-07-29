@@ -17,7 +17,9 @@ func sysCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sys",
 		Short: "Quick health snapshot of the local machine (host, cpu, memory, disk)",
-		Long: `Report the health of the machine this CLI runs on: host & uptime, current
+		Long: `Runs entirely offline — no login and no server call.
+
+Report the health of the machine this CLI runs on: host & uptime, current
 user & active logins, network addresses, CPU load, memory & swap, and disk
 usage per mounted filesystem.
 

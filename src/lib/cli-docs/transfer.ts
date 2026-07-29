@@ -1,6 +1,6 @@
 export function buildTransferSection(): string {
   return `
-## Send / Inbox / Recv — Kirim Secret Antar User
+## Transfer — Kirim Secret Antar User
 
 Kirim \`.env\`, kunci SSH, atau sertifikat **langsung ke user lain** lewat server
 envman-mu sendiri — supaya secret berhenti lewat WhatsApp/Slack saat menyiapkan
@@ -19,11 +19,11 @@ sekali-pakai.
 ### Kirim ke user terdaftar
 
 \`\`\`bash
-envman send .env.prod --to budi@example.com
-envman send .env.prod --to Budi                 # nama persis, kalau unik
-cat notes.txt | envman send --to budi@example.com
-envman send id_rsa --to budi@example.com -m "kunci deploy" --ttl 2h
-envman send dump.sql --to budi@example.com      # otomatis lewat storage
+envman transfer send .env.prod --to budi@example.com
+envman transfer send .env.prod --to Budi                 # nama persis, kalau unik
+cat notes.txt | envman transfer send --to budi@example.com
+envman transfer send id_rsa --to budi@example.com -m "kunci deploy" --ttl 2h
+envman transfer send dump.sql --to budi@example.com      # otomatis lewat storage
 \`\`\`
 
 **Jalurnya dipilih otomatis** — kamu tak perlu memikirkannya:
@@ -41,7 +41,7 @@ CLI mengumumkan pilihannya supaya tak ada kejutan:
 [envman] mode: file (412 MB) — upload langsung ke storage
 \`\`\`
 
-Paksa dengan \`--text\` atau \`--file\` bila perlu. Input dari pipe (\`cat x | envman send\`)
+Paksa dengan \`--mode text\` atau \`--mode file\` bila perlu. Input dari pipe (\`cat x | envman transfer send\`)
 selalu lewat jalur teks karena ukurannya tak diketahui di muka.
 
 Dua batasnya sengaja berbeda jauh: **teks** melewati memori server dan disimpan
@@ -56,7 +56,7 @@ lebih dari satu user ditolak; pakai email.
 ### Kirim ke orang tanpa akun (kode sekali-pakai)
 
 \`\`\`bash
-envman send .env --once --ttl 1h
+envman transfer send .env --once --ttl 1h
 # [envman] kode sekali-pakai: EM-3F7K-9QW2-M4XZ-7T1B
 # [envman] kedaluwarsa 59m — kode ini hanya ditampilkan SEKALI
 #   envman recv EM-3F7K-9QW2-M4XZ-7T1B --server https://envman.example.com
@@ -72,17 +72,18 @@ envman recv EM-3F7K-9QW2-M4XZ-7T1B --server https://envman.example.com -o .env
 Kode boleh diketik huruf kecil atau tanpa tanda hubung. Alfabetnya sengaja tak
 memuat \`I\`, \`L\`, \`O\`, \`U\` supaya \`0/O\` dan \`1/I/L\` tak tertukar.
 Kode **hanya ditampilkan sekali** — server hanya menyimpan hash-nya. Kalau hilang,
-cabut dengan \`envman send rm <id>\` lalu kirim ulang.
+cabut dengan \`envman transfer rm <id>\` lalu kirim ulang.
 
 ### Ambil kiriman
 
 \`\`\`bash
-envman inbox                          # apa saja yang menunggu
-envman recv <id> -o .env              # ambil ke file (mode 0600)
-envman recv <id> > .env               # atau lewat pipe
-envman recv <id>                      # file: tersimpan dengan nama aslinya
-envman inbox --sent                   # yang kamu kirim: sudah diambil belum?
-envman send rm <id>                   # cabut / tolak
+envman transfer ls                          # apa saja yang menunggu
+envman transfer ls --json                   # untuk script
+envman transfer get <id> -o .env              # ambil ke file (mode 0600)
+envman transfer get <id> > .env               # atau lewat pipe
+envman transfer get <id>                      # file: tersimpan dengan nama aslinya
+envman transfer ls --sent                   # yang kamu kirim: sudah diambil belum?
+envman transfer rm <id>                   # cabut / tolak
 \`\`\`
 
 Kiriman berupa **file** langsung diunduh ke disk dengan nama aslinya (bukan
@@ -96,12 +97,15 @@ jadi membatalkan justru akan menghilangkan isinya.
   membacanya lagi. Pakai \`--keep\` bila perlu diambil dari beberapa mesin.
 - **Selalu ada kedaluwarsa.** Default 3 hari, atur dengan \`--ttl 30m|2h|7d\`.
   Kiriman yang tak diambil terhapus otomatis.
-- **Tidak ada notifikasi.** Penerima baru tahu saat menjalankan \`envman inbox\`,
+- **Tidak ada notifikasi.** Penerima baru tahu saat menjalankan \`envman transfer ls\`,
   jadi kabari dia lewat chat — pesannya sendiri tak memuat rahasia apa pun.
 - **Token read-only boleh mengambil**, tapi tak boleh mengirim. Jadi token CI
   bisa menarik sertifikat dari inbox-nya tanpa diberi izin tulis.
 - **Rotasi \`MASTER_KEY\` mematikan kiriman yang masih menggantung** — kuras inbox
   sebelum merotasi.
+- **\`envman recv\` = jalan pintas \`envman transfer get\`.** Sengaja tetap di
+  tingkat atas karena dipakai orang yang **belum punya akun** dan hanya menerima
+  satu baris perintah lewat chat.
 - **Pengiriman file butuh storage (MinIO) aktif di server.** Tanpa itu, kiriman
   biner/besar ditolak dengan pesan jelas; jalur teks tetap jalan.
 - Batas ukuran, TTL, dan jumlah kiriman tertunda diatur SUPER_ADMIN di

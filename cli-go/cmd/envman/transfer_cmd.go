@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/bipprojectbali/envman/cli/internal/auth"
@@ -14,14 +16,42 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func sendCmd() *cobra.Command {
+// Sending and receiving secrets between users. Grouped under one noun so the
+// whole feature is discoverable from `envman transfer --help`, matching clip,
+// env, gists, storage and projects. `envman recv` stays top-level (recv_cmd.go)
+// because it is used by people who have never logged in.
+
+func transferCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "transfer <subcommand>",
+		Aliases: []string{"xfer"},
+		Short:   "Send and receive secrets between users",
+		Long: `Send a secret straight to another envman user, so .env files, SSH keys
+and certificates stop travelling over chat apps.
+
+Recipients are either registered users (--to) or anyone at all (--once,
+which mints a one-time claim code needing no account). Transfers burn
+after reading by default and always expire.
+
+Content is encrypted at rest on the server. This is NOT end-to-end:
+whoever holds the server's MASTER_KEY can read it. It replaces sending
+secrets through a third party, not the need to trust your own server.`,
+		Example: "  envman transfer send .env.prod --to budi@example.com\n" +
+			"  envman transfer ls\n" +
+			"  envman transfer get <id> -o .env\n" +
+			"  envman transfer send .env --once     # kode untuk orang tanpa akun",
+	}
+	cmd.AddCommand(transferSendCmd(), transferLsCmd(), transferGetCmd(), transferRmCmd())
+	return cmd
+}
+
+func transferSendCmd() *cobra.Command {
 	var to string
 	var once bool
 	var message string
 	var ttl string
 	var keep bool
-	var forceText bool
-	var forceFile bool
+	var mode string
 
 	cmd := &cobra.Command{
 		Use:   "send [file]",
@@ -40,10 +70,10 @@ Burn-after-read by default: the transfer disappears once claimed. Pass
 Content is encrypted at rest on the server. Note this is NOT end-to-end:
 whoever holds the server's MASTER_KEY can read it. It replaces sending
 secrets through a third party, not the need to trust your own server.`,
-		Example: "  envman send .env.prod --to budi@example.com\n" +
-			"  cat notes.txt | envman send --to budi\n" +
-			"  envman send .env --once --ttl 2h\n" +
-			"  envman send id_rsa --to budi -m \"kunci deploy\" --keep",
+		Example: "  envman transfer send .env.prod --to budi@example.com\n" +
+			"  cat notes.txt | envman transfer send --to budi\n" +
+			"  envman transfer send .env --once --ttl 2h\n" +
+			"  envman transfer send id_rsa --to budi -m \"kunci deploy\" --keep",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if to == "" && !once {
@@ -51,6 +81,9 @@ secrets through a third party, not the need to trust your own server.`,
 			}
 			if to != "" && once {
 				return fmt.Errorf("[envman] --to dan --once tidak bisa dipakai bersamaan")
+			}
+			if mode != "" && mode != "text" && mode != "file" {
+				return fmt.Errorf("[envman] --mode harus \"text\" atau \"file\", bukan %q", mode)
 			}
 
 			ttlSeconds, err := clipboard.ParseTTL(ttl)
@@ -83,9 +116,9 @@ secrets through a third party, not the need to trust your own server.`,
 				if headErr != nil {
 					return headErr
 				}
-				mode := transfer.ChooseMode(head, st.Size(), maxText, forceText, forceFile)
+				chosen := transfer.ChooseMode(head, st.Size(), maxText, mode == "text", mode == "file")
 
-				if mode == transfer.ModeFile {
+				if chosen == transfer.ModeFile {
 					name := filepath.Base(args[0])
 					mimeType := transfer.GuessMimeType(name)
 					fmt.Fprintf(os.Stderr, "[envman] mode: file (%s) — upload langsung ke storage\n",
@@ -133,19 +166,19 @@ secrets through a third party, not the need to trust your own server.`,
 			}
 
 			expiry := clipboard.HumanUntil(res.ExpiresAt, time.Now())
-			mode := "hangus setelah dibaca"
+			burnNote := "hangus setelah dibaca"
 			if keep {
-				mode = "bisa diambil berkali-kali"
+				burnNote = "bisa diambil berkali-kali"
 			}
 
 			// Everything goes to stderr: stdout stays clean, and the code line
 			// below is meant to be copied on its own.
 			if res.Code != "" {
 				fmt.Fprintf(os.Stderr, "[envman] kode sekali-pakai: %s\n", res.Code)
-				fmt.Fprintf(os.Stderr, "[envman] kedaluwarsa %s — kode ini hanya ditampilkan SEKALI (%s)\n", expiry, mode)
+				fmt.Fprintf(os.Stderr, "[envman] kedaluwarsa %s — kode ini hanya ditampilkan SEKALI (%s)\n", expiry, burnNote)
 				fmt.Fprintf(os.Stderr, "  envman recv %s --server %s\n", res.Code, cfg.Server)
 			} else {
-				fmt.Fprintf(os.Stderr, "[envman] terkirim ke %s (%s, %s)\n", to, storage.FmtBytes(int64(res.Bytes)), mode)
+				fmt.Fprintf(os.Stderr, "[envman] terkirim ke %s (%s, %s)\n", to, storage.FmtBytes(int64(res.Bytes)), burnNote)
 				fmt.Fprintf(os.Stderr, "[envman] id: %s  kedaluwarsa %s\n", res.ID, expiry)
 			}
 			return nil
@@ -157,17 +190,16 @@ secrets through a third party, not the need to trust your own server.`,
 	cmd.Flags().StringVarP(&message, "message", "m", "", "Short note shown to the recipient")
 	cmd.Flags().StringVar(&ttl, "ttl", "", "Expiry, e.g. 30m, 2h, 7d (default: server setting)")
 	cmd.Flags().BoolVar(&keep, "keep", false, "Do not burn after reading")
-	cmd.Flags().BoolVar(&forceText, "text", false, "Force the encrypted text path")
-	cmd.Flags().BoolVar(&forceFile, "file", false, "Force the storage path")
-	cmd.AddCommand(sendRmCmd())
+	cmd.Flags().StringVar(&mode, "mode", "",
+		"Force a path: text (encrypted in the DB) or file (uploaded to storage). Default: auto-detect")
 	return cmd
 }
 
-func sendRmCmd() *cobra.Command {
+func transferRmCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "rm <id>",
 		Short:   "Revoke a transfer you sent (or decline one sent to you)",
-		Example: "  envman send rm 3f7a1c92-...",
+		Example: "  envman transfer rm 3f7a1c92-...",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			cfg, err := auth.Resolve()
@@ -196,4 +228,126 @@ func readHead(path string, n int) ([]byte, error) {
 		return nil, err
 	}
 	return buf[:read], nil
+}
+
+func transferLsCmd() *cobra.Command {
+	var sent bool
+	var asJSON bool
+
+	cmd := &cobra.Command{
+		Use:   "ls",
+		Short: "List secrets other users have sent you",
+		Long: `List transfers waiting for you, with the id needed to collect each one.
+Nothing is claimed by listing — use 'envman transfer get <id>' for that.
+
+--sent shows what you have sent instead, so you can check whether it has
+been picked up (and revoke it with 'envman transfer rm <id>' if not).`,
+		Example: "  envman transfer ls\n  envman transfer ls --sent",
+		Args:    cobra.NoArgs,
+		RunE: func(_ *cobra.Command, args []string) error {
+			cfg, err := auth.Resolve()
+			if err != nil {
+				return err
+			}
+
+			items, err := transfer.Inbox(cfg)
+			if sent {
+				items, err = transfer.Sent(cfg)
+			}
+			if err != nil {
+				return err
+			}
+			if asJSON {
+				return emitJSON(items)
+			}
+			if len(items) == 0 {
+				if sent {
+					fmt.Fprintln(os.Stderr, "[envman] belum ada transfer terkirim yang aktif")
+				} else {
+					fmt.Fprintln(os.Stderr, "[envman] inbox kosong")
+				}
+				return nil
+			}
+
+			now := time.Now()
+			w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
+			if sent {
+				fmt.Fprintln(w, "ID\tKE\tCATATAN\tSTATUS\tKEDALUWARSA")
+			} else {
+				fmt.Fprintln(w, "ID\tDARI\tJENIS\tCATATAN\tUKURAN\tKEDALUWARSA")
+			}
+			for _, it := range items {
+				expiry := clipboard.HumanUntil(it.ExpiresAt, now)
+				if sent {
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+						it.ID, sentTarget(it), dash(it.Label), claimStatus(it), expiry)
+					continue
+				}
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+					it.ID, fromLabel(it), kindLabel(it), dash(it.Label), storage.FmtBytes(it.Size), expiry)
+			}
+			w.Flush()
+
+			if !sent {
+				fmt.Fprintf(os.Stderr, "\n[envman] ambil dengan: envman transfer get <id> -o <file>\n")
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&sent, "sent", false, "Show transfers you sent instead of received")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
+	return cmd
+}
+
+func fromSuffix(res *transfer.ClaimResult) string {
+	if res.From == nil {
+		return ""
+	}
+	return " dari " + res.From.Email
+}
+
+func fromLabel(it transfer.Item) string {
+	if it.From == nil {
+		return "-"
+	}
+	if it.From.Name != "" {
+		return it.From.Name
+	}
+	return it.From.Email
+}
+
+func sentTarget(it transfer.Item) string {
+	if it.To != nil {
+		return it.To.Email
+	}
+	if it.CodePrefix != "" {
+		return "kode " + it.CodePrefix + "…"
+	}
+	return dash(it.ToHint)
+}
+
+func claimStatus(it transfer.Item) string {
+	if it.ClaimedAt != "" {
+		return "diklaim"
+	}
+	return "menunggu"
+}
+
+// kindLabel names the payload type; file transfers show their filename since
+// that is what will land on disk.
+func kindLabel(it transfer.Item) string {
+	if it.Kind == "FILE" {
+		if it.Filename != "" {
+			return "file: " + it.Filename
+		}
+		return "file"
+	}
+	return "teks"
+}
+
+func dash(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "-"
+	}
+	return s
 }

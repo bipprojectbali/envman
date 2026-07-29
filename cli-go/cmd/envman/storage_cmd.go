@@ -80,10 +80,15 @@ func storageLsCmd() *cobra.Command {
 	var prefix string
 	var page int
 	var tags []string
+	var asJSON bool
 	cmd := &cobra.Command{
-		Use:     "ls <project>",
-		Short:   "List files and folders in project storage",
-		Example: "  envman storage ls myapp\n  envman storage ls myapp --prefix assets/\n  envman storage ls myapp --tag design,logo",
+		Use:   "ls <project>",
+		Short: "List files and folders in project storage",
+		Long: `List one folder level of a project's storage, with quota usage.
+
+Use --prefix to descend into a folder and --tags to narrow the rows
+(filtered locally; the server already limits what you may see).`,
+		Example: "  envman storage ls myapp\n  envman storage ls myapp --prefix assets/\n  envman storage ls myapp --tags design,logo",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := auth.Resolve()
@@ -94,12 +99,16 @@ func storageLsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// --tag: client-side filter (OR match). Server already scopes what a
+			// --tags: client-side filter (OR match). Server already scopes what a
 			// tag-limited member can see; this just narrows the displayed rows.
 			wantTags := splitCSV(tags)
 			files := result.Files
 			if len(wantTags) > 0 {
 				files = filterFilesByTag(files, wantTags)
+			}
+			if asJSON {
+				result.Files = files
+				return emitJSON(result)
 			}
 			fmt.Printf("Storage: %s / %s  (%d files)\n\n",
 				storage.FmtBytes(result.Usage.UsedBytes),
@@ -127,7 +136,8 @@ func storageLsCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&prefix, "prefix", "", "Folder prefix to list (e.g. assets/)")
 	cmd.Flags().IntVar(&page, "page", 1, "Page number")
-	cmd.Flags().StringSliceVar(&tags, "tag", nil, "Only show files with any of these tags (comma-separated)")
+	cmd.Flags().StringSliceVar(&tags, "tags", nil, "Only show files with any of these tags (comma-separated)")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 	return cmd
 }
 
@@ -160,7 +170,7 @@ func storageUploadCmd() *cobra.Command {
 
 By default an existing file at the same path is NOT overwritten: a single file
 errors if it already exists, and a folder upload skips existing files and
-continues with the rest. Pass --force (-f) to overwrite existing files.`,
+continues with the rest. Pass --force to overwrite existing files.`,
 		Example: "  envman storage upload myapp compose.yml\n" +
 			"  envman storage upload myapp ./logo.png --path assets/logo.png\n" +
 			"  envman storage upload myapp ./logo.png --force    # timpa jika sudah ada\n" +
@@ -219,8 +229,8 @@ continues with the rest. Pass --force (-f) to overwrite existing files.`,
 		},
 	}
 	cmd.Flags().StringVar(&remotePath, "path", "", "Remote path or prefix (default: basename of local file/dir)")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing files (default: refuse if a file already exists)")
-	cmd.Flags().StringSliceVar(&tags, "tag", nil, "Tags to attach to the uploaded file(s) (comma-separated)")
+	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing files (default: refuse if a file already exists)")
+	cmd.Flags().StringSliceVar(&tags, "tags", nil, "Tags to attach to the uploaded file(s) (comma-separated)")
 	return cmd
 }
 
@@ -272,15 +282,25 @@ Streaming to stdout enables direct piping:
 	return cmd
 }
 
+// previewLimit caps how many paths a dry run lists before summarising.
+const previewLimit = 10
+
 func storageRmCmd() *cobra.Command {
-	return &cobra.Command{
+	var force bool
+
+	cmd := &cobra.Command{
 		Use:   "rm <project>:<folder>/",
 		Short: "Delete a folder and all its contents from project storage (OWNER only)",
 		Long: `Delete every file under a folder prefix. This action cannot be undone.
 
+Shows what would be deleted and stops; pass --force to actually delete.
+That default exists because this is the one command that can destroy an
+arbitrary amount of data in a single call.
+
 Requires OWNER role on the project.`,
-		Example: "  envman storage rm myapp:assets/\n" +
-			"  envman storage rm myapp:backup/2026-01/",
+		Example: "  envman storage rm myapp:assets/            # pratinjau saja\n" +
+			"  envman storage rm myapp:assets/ --force\n" +
+			"  envman storage rm myapp:backup/2026-01/ --force",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := auth.Resolve()
@@ -295,14 +315,52 @@ Requires OWNER role on the project.`,
 			if folderPath == "" {
 				return fmt.Errorf("[envman] folder path tidak boleh kosong")
 			}
-			fmt.Printf("Menghapus %s:%s/ ... ", slug, folderPath)
+
+			if !force {
+				return previewFolderDelete(cfg, slug, folderPath)
+			}
+
+			fmt.Fprintf(os.Stderr, "[envman] menghapus %s:%s/ ... ", slug, folderPath)
 			deleted, err := storage.DeleteFolder(cfg, slug, folderPath)
 			if err != nil {
-				fmt.Println("gagal")
+				fmt.Fprintln(os.Stderr, "gagal")
 				return err
 			}
-			fmt.Printf("selesai (%d file dihapus)\n", deleted)
+			fmt.Fprintf(os.Stderr, "selesai (%d file dihapus)\n", deleted)
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&force, "force", false, "Actually delete (without this, only previews)")
+	return cmd
+}
+
+// previewFolderDelete lists what `storage rm` would remove. The server deletes
+// everything under "<prefix>/", and List is scoped by the same rules, so this
+// reproduces the server's selection without needing a dry-run endpoint.
+func previewFolderDelete(cfg *auth.Config, slug, folderPath string) error {
+	res, err := storage.List(cfg, slug, folderPath, 1)
+	if err != nil {
+		return err
+	}
+	if res.TotalFiles == 0 {
+		return fmt.Errorf("[envman] %s:%s/ kosong atau tidak ditemukan", slug, folderPath)
+	}
+
+	fmt.Fprintf(os.Stderr, "[envman] akan menghapus %d file di %s:%s/ — tidak bisa dibatalkan:\n",
+		res.TotalFiles, slug, folderPath)
+	for i, f := range res.Files {
+		if i >= previewLimit {
+			break
+		}
+		fmt.Fprintf(os.Stderr, "  %s  (%s)\n", f.Path, storage.FmtBytes(f.Size))
+	}
+	if res.TotalFiles > len(res.Files) || len(res.Files) > previewLimit {
+		shown := len(res.Files)
+		if shown > previewLimit {
+			shown = previewLimit
+		}
+		fmt.Fprintf(os.Stderr, "  … dan %d file lainnya\n", res.TotalFiles-shown)
+	}
+	fmt.Fprintf(os.Stderr, "\n[envman] jalankan ulang dengan --force untuk menghapus\n")
+	return nil
 }
