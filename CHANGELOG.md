@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.24.5] - 2026-07-29
 
 ### Added
 - **`envman env sync <sumber> [target]` — samakan key `.env` lokal dengan file lain, tanpa login.** Menjawab situasi yang sering muncul saat bekerja dengan AI agent: agent memperbarui `.env.example`, sementara `.env` milikmu tertinggal, dan mencocokkan puluhan key yang urutannya acak secara manual itu menyakitkan. Perintah ini menambahkan key yang **ada di sumber tapi belum ada** di `.env` — berjalan **sepenuhnya lokal**, tak menyentuh server.
