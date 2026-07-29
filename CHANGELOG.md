@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.25.0] - 2026-07-29
 
 ### Added
 - **`envman send` / `inbox` / `recv` — kirim secret langsung ke user lain.** Menyiapkan mesin baru selama ini berarti mengirim `.env` atau kunci SSH lewat WhatsApp/Slack: terbaca pihak ketiga, tersimpan di server orang lain, tak bisa ditarik kembali. Sekarang secret bisa dikirim langsung antar-user lewat server envman-mu sendiri.
