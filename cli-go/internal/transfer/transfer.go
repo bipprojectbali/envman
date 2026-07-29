@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -61,12 +62,19 @@ type SendResult struct {
 }
 
 type ClaimResult struct {
-	Kind     string `json:"kind"`
-	Content  string `json:"content"`
-	Filename string `json:"filename"`
-	Label    string `json:"label"`
-	From     *User  `json:"from"`
+	Kind    string `json:"kind"`
+	Content string `json:"content"`
+	// Presigned GET URL, set only for FILE transfers.
+	DownloadURL string `json:"downloadUrl"`
+	Filename    string `json:"filename"`
+	Size        int64  `json:"size"`
+	Label       string `json:"label"`
+	From        *User  `json:"from"`
 }
+
+// IsFile reports whether the claim carries a storage object rather than inline
+// text.
+func (c *ClaimResult) IsFile() bool { return c.Kind == "FILE" && c.DownloadURL != "" }
 
 type listResponse struct {
 	Transfers []Item `json:"transfers"`
@@ -105,6 +113,22 @@ func Send(cfg *auth.Config, opts SendOptions) (*SendResult, error) {
 		return nil, err
 	}
 	return &res, nil
+}
+
+// MaxTextBytes reads the server's text-payload limit, which is also the size
+// at which ChooseMode switches a payload to the file path. Falls back to 1 MB
+// when the settings endpoint cannot be read, matching the server default.
+func MaxTextBytes(cfg *auth.Config) int64 {
+	const fallback = 1024 * 1024
+	var settings map[string]string
+	if err := api.FetchJSON(cfg, "/api/envman/settings", &settings); err != nil {
+		return fallback
+	}
+	kb, err := strconv.ParseInt(settings["transfer_max_text_kb"], 10, 64)
+	if err != nil || kb <= 0 {
+		return fallback
+	}
+	return kb * 1024
 }
 
 // Inbox lists transfers waiting for the caller.

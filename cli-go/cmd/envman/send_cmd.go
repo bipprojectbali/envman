@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/bipprojectbali/envman/cli/internal/auth"
@@ -19,6 +20,8 @@ func sendCmd() *cobra.Command {
 	var message string
 	var ttl string
 	var keep bool
+	var forceText bool
+	var forceFile bool
 
 	cmd := &cobra.Command{
 		Use:   "send [file]",
@@ -50,40 +53,83 @@ secrets through a third party, not the need to trust your own server.`,
 				return fmt.Errorf("[envman] --to dan --once tidak bisa dipakai bersamaan")
 			}
 
-			var data []byte
-			var err error
-			if len(args) == 1 && args[0] != "-" {
-				data, err = os.ReadFile(args[0])
-			} else {
-				data, err = io.ReadAll(os.Stdin)
-			}
-			if err != nil {
-				return err
-			}
-			if len(data) == 0 {
-				return fmt.Errorf("[envman] tidak ada konten untuk dikirim (input kosong)")
-			}
-
 			ttlSeconds, err := clipboard.ParseTTL(ttl)
 			if err != nil {
 				return err
 			}
-
 			cfg, err := auth.Resolve()
 			if err != nil {
 				return err
 			}
 
-			res, err := transfer.Send(cfg, transfer.SendOptions{
-				To:         to,
-				Once:       once,
-				Content:    string(data),
-				Label:      message,
-				TTLSeconds: ttlSeconds,
-				Keep:       keep,
-			})
-			if err != nil {
-				return err
+			fromFile := len(args) == 1 && args[0] != "-"
+			maxText := transfer.MaxTextBytes(cfg)
+
+			var res *transfer.SendResult
+
+			if fromFile {
+				st, statErr := os.Stat(args[0])
+				if statErr != nil {
+					return statErr
+				}
+				if st.IsDir() {
+					return fmt.Errorf("[envman] %s adalah direktori — kirim satu file saja", args[0])
+				}
+				if st.Size() == 0 {
+					return fmt.Errorf("[envman] %s kosong", args[0])
+				}
+
+				head, headErr := readHead(args[0], transfer.SniffLen())
+				if headErr != nil {
+					return headErr
+				}
+				mode := transfer.ChooseMode(head, st.Size(), maxText, forceText, forceFile)
+
+				if mode == transfer.ModeFile {
+					name := filepath.Base(args[0])
+					mimeType := transfer.GuessMimeType(name)
+					fmt.Fprintf(os.Stderr, "[envman] mode: file (%s) — upload langsung ke storage\n",
+						storage.FmtBytes(st.Size()))
+					res, err = transfer.SendFile(cfg, transfer.FileOptions{
+						To: to, Once: once, LocalPath: args[0], Filename: name,
+						Size: st.Size(), MimeType: mimeType, Label: message,
+						TTLSeconds: ttlSeconds, Keep: keep,
+					}, transfer.ProgressPrinter("upload"))
+					if err != nil {
+						return err
+					}
+				} else {
+					data, readErr := os.ReadFile(args[0])
+					if readErr != nil {
+						return readErr
+					}
+					fmt.Fprintf(os.Stderr, "[envman] mode: teks (%s) — tersimpan terenkripsi di server\n",
+						storage.FmtBytes(int64(len(data))))
+					res, err = transfer.Send(cfg, transfer.SendOptions{
+						To: to, Once: once, Content: string(data), Label: message,
+						TTLSeconds: ttlSeconds, Keep: keep,
+					})
+					if err != nil {
+						return err
+					}
+				}
+			} else {
+				// Piped input has no path to stat, so it always takes the text
+				// path; the server enforces the limit.
+				data, readErr := io.ReadAll(os.Stdin)
+				if readErr != nil {
+					return readErr
+				}
+				if len(data) == 0 {
+					return fmt.Errorf("[envman] tidak ada konten untuk dikirim (input kosong)")
+				}
+				res, err = transfer.Send(cfg, transfer.SendOptions{
+					To: to, Once: once, Content: string(data), Label: message,
+					TTLSeconds: ttlSeconds, Keep: keep,
+				})
+				if err != nil {
+					return err
+				}
 			}
 
 			expiry := clipboard.HumanUntil(res.ExpiresAt, time.Now())
@@ -111,6 +157,8 @@ secrets through a third party, not the need to trust your own server.`,
 	cmd.Flags().StringVarP(&message, "message", "m", "", "Short note shown to the recipient")
 	cmd.Flags().StringVar(&ttl, "ttl", "", "Expiry, e.g. 30m, 2h, 7d (default: server setting)")
 	cmd.Flags().BoolVar(&keep, "keep", false, "Do not burn after reading")
+	cmd.Flags().BoolVar(&forceText, "text", false, "Force the encrypted text path")
+	cmd.Flags().BoolVar(&forceFile, "file", false, "Force the storage path")
 	cmd.AddCommand(sendRmCmd())
 	return cmd
 }
@@ -133,4 +181,19 @@ func sendRmCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// readHead reads the first n bytes of a file for the binary sniff.
+func readHead(path string, n int) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	buf := make([]byte, n)
+	read, err := f.Read(buf)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	return buf[:read], nil
 }

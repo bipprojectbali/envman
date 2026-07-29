@@ -5,7 +5,8 @@ import { decryptSecret } from '../../lib/crypto'
 import { prisma } from '../../lib/db'
 import { hitLimit, peekLimit } from '../../lib/rate-limit'
 import { getIp } from '../../lib/request'
-import { hashCode, normalizeCode } from '../../lib/transfer-service'
+import { minioPresign } from '../../lib/storage-service'
+import { DOWNLOAD_URL_TTL_SECONDS, hashCode, normalizeCode } from '../../lib/transfer-service'
 
 // Claiming a transfer. Two doors into the same logic: an authenticated
 // recipient claiming by id, and an anonymous holder claiming by one-time code.
@@ -23,6 +24,9 @@ interface ClaimableRow {
   content: string | null
   kind: string
   filename: string | null
+  minioKey: string | null
+  size: bigint
+  uploaded: boolean
   label: string | null
   expiresAt: Date
   claimedAt: Date | null
@@ -41,12 +45,39 @@ interface ClaimableRow {
  * so the object-before-row ordering lives in exactly one place.
  */
 async function claimRow(row: ClaimableRow, userId: string | null, ip: string, set: { status?: number | string }) {
-  const plaintext = decryptSecret(row.content ?? '')
-  // Check before the CAS: otherwise burn deletes the only copy and hands the
-  // caller a 20-byte error string that `envman recv > .env` writes to disk.
-  if (plaintext === DECRYPT_FAILED) {
-    set.status = 500
-    return { error: 'Gagal mendekripsi konten — MASTER_KEY mungkin berubah' }
+  const isFile = row.kind === 'FILE'
+
+  // An upload that was presigned but never confirmed has no bytes behind it.
+  if (isFile && (!row.uploaded || !row.minioKey)) {
+    set.status = 409
+    return { error: 'File belum selesai diupload pengirim' }
+  }
+
+  let plaintext = ''
+  if (!isFile) {
+    plaintext = decryptSecret(row.content ?? '')
+    // Check before the CAS: otherwise burn deletes the only copy and hands the
+    // caller a 20-byte error string that `envman recv > .env` writes to disk.
+    if (plaintext === DECRYPT_FAILED) {
+      set.status = 500
+      return { error: 'Gagal mendekripsi konten — MASTER_KEY mungkin berubah' }
+    }
+  }
+
+  // Sign the URL before the CAS too, so a signing failure does not burn the row.
+  let downloadUrl: string | null = null
+  if (isFile) {
+    try {
+      downloadUrl = minioPresign(
+        row.minioKey as string,
+        row.filename ?? 'download',
+        false,
+        DOWNLOAD_URL_TTL_SECONDS,
+      )
+    } catch {
+      set.status = 503
+      return { error: 'Storage belum dikonfigurasi di server' }
+    }
   }
 
   const { count } = await prisma.transfer.updateMany({
@@ -62,7 +93,9 @@ async function claimRow(row: ClaimableRow, userId: string | null, ip: string, se
   return {
     kind: row.kind,
     content: plaintext,
+    downloadUrl,
     filename: row.filename,
+    size: Number(row.size),
     label: row.label,
     from: row.fromUser ? { name: row.fromUser.name, email: row.fromUser.email } : null,
   }

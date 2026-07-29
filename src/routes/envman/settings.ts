@@ -15,6 +15,7 @@ const ALLOWED_KEYS = [
   'clipboard_max_kb',
   'clipboard_max_ttl_hours',
   'transfer_max_text_kb',
+  'transfer_max_file_mb',
   'transfer_max_ttl_hours',
   'transfer_default_ttl_hours',
   'transfer_max_pending_per_user',

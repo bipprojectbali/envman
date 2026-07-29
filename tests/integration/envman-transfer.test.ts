@@ -103,7 +103,7 @@ describe('transfer send', () => {
   })
 
   test('oversized content → 413', async () => {
-    const huge = 'x'.repeat(300 * 1024) // default limit is 256 KB
+    const huge = 'x'.repeat(2 * 1024 * 1024) // default text limit is 1 MB
     const res = await send(aliceToken, { to: 'bob@test.com', content: huge })
     expect(res.status).toBe(413)
   })

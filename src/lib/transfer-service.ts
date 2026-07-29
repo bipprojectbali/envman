@@ -5,10 +5,19 @@ import { prisma } from './db'
 // Shared logic for user-to-user transfers (envman send / inbox / recv).
 // Routes stay thin; anything worth unit-reasoning about lives here.
 
-export const DEFAULT_MAX_TEXT_KB = 256
+// Text is stored hex-encoded in a DB column and arrives as a JSON body, so it
+// costs roughly 2x on disk and ~2.7x in memory. 1 MB covers .env files, SSH
+// keys, certificate bundles and kubeconfigs; anything larger belongs on the
+// file path, where the bytes never touch the server.
+export const DEFAULT_MAX_TEXT_KB = 1024
+export const DEFAULT_MAX_FILE_MB = 100
 export const DEFAULT_MAX_TTL_HOURS = 168 // 7 days
 export const DEFAULT_TTL_HOURS = 72 // 3 days
 export const DEFAULT_MAX_PENDING = 20
+
+// Download URLs must outlive the sweep's grace period (2h) minus the time a
+// claim spends in flight, or a large download could be cut off mid-transfer.
+export const DOWNLOAD_URL_TTL_SECONDS = 3600
 
 // Crockford base32: no I, L, O or U. Removes the 0/O and 1/I/L transcription
 // traps, which matters because this code gets read aloud or retyped.
@@ -99,6 +108,25 @@ export async function resolveTtlMs(requestedHours?: number): Promise<number> {
 export async function maxTextBytes(): Promise<number> {
   const kb = await getSettingNumber('transfer_max_text_kb', DEFAULT_MAX_TEXT_KB)
   return kb * 1024
+}
+
+/** Max file payload in bytes (MinIO path — never buffered by the server). */
+export async function maxFileBytes(): Promise<number> {
+  const mb = await getSettingNumber('transfer_max_file_mb', DEFAULT_MAX_FILE_MB)
+  return mb * 1024 * 1024
+}
+
+/**
+ * Strips any directory part and rejects anything that could escape the
+ * transfer's own key prefix. A transfer is exactly one file, never a tree, so
+ * `envman send ./deep/dir/x.sql` must not produce a nested key.
+ */
+export function safeFilename(raw: string): string | null {
+  const base = raw.split('/').pop()?.split('\\').pop()?.trim() ?? ''
+  if (!base || base === '.' || base === '..') return null
+  if (base.includes('/') || base.includes('\\')) return null
+  if (base.length > 255) return null
+  return base
 }
 
 /**

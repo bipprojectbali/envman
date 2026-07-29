@@ -22,6 +22,8 @@ export const transfersListRouter = new Elysia()
         toUserId: caller.userId,
         claimedAt: null,
         expiresAt: { gt: new Date() },
+        // A presigned-but-unconfirmed file has no bytes behind it yet.
+        NOT: { kind: 'FILE', uploaded: false },
       },
       include: { fromUser: { select: userSelect } },
       orderBy: { createdAt: 'desc' },

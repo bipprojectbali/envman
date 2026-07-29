@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -54,7 +55,7 @@ been picked up (and revoke it with 'envman send rm <id>' if not).`,
 			if sent {
 				fmt.Fprintln(w, "ID\tKE\tCATATAN\tSTATUS\tKEDALUWARSA")
 			} else {
-				fmt.Fprintln(w, "ID\tDARI\tCATATAN\tUKURAN\tKEDALUWARSA")
+				fmt.Fprintln(w, "ID\tDARI\tJENIS\tCATATAN\tUKURAN\tKEDALUWARSA")
 			}
 			for _, it := range items {
 				expiry := clipboard.HumanUntil(it.ExpiresAt, now)
@@ -63,8 +64,8 @@ been picked up (and revoke it with 'envman send rm <id>' if not).`,
 						it.ID, sentTarget(it), dash(it.Label), claimStatus(it), expiry)
 					continue
 				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					it.ID, fromLabel(it), dash(it.Label), storage.FmtBytes(it.Size), expiry)
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+					it.ID, fromLabel(it), kindLabel(it), dash(it.Label), storage.FmtBytes(it.Size), expiry)
 			}
 			w.Flush()
 
@@ -102,6 +103,16 @@ transfer is gone once collected: nothing else can read it afterwards.`,
 		RunE: func(_ *cobra.Command, args []string) error {
 			ref := args[0]
 
+			// Refuse an existing output file BEFORE claiming. Claiming burns the
+			// transfer, so failing afterwards would destroy the only copy and
+			// leave the user with nothing — which is exactly what happened
+			// before this check was hoisted.
+			if outFile != "" && !force {
+				if _, statErr := os.Stat(outFile); statErr == nil {
+					return fmt.Errorf("[envman] %s sudah ada — gunakan --force untuk menimpa", outFile)
+				}
+			}
+
 			var res *transfer.ClaimResult
 			var err error
 
@@ -131,6 +142,33 @@ transfer is gone once collected: nothing else can read it afterwards.`,
 			}
 			if err != nil {
 				return err
+			}
+
+			// File transfers: the payload is an object in storage, reached via a
+			// presigned URL. Default to the sender's filename rather than dumping
+			// binary into a terminal.
+			if res.IsFile() {
+				dest := outFile
+				if dest == "" {
+					dest = res.Filename
+					if dest == "" {
+						dest = "download"
+					}
+					// The transfer is already claimed by now, so a name clash must
+					// not abort: that would burn the secret and save nothing. Pick a
+					// free name instead and say so.
+					if !force {
+						if free := uniquePath(dest); free != dest {
+							fmt.Fprintf(os.Stderr, "[envman] %s sudah ada — disimpan sebagai %s\n", dest, free)
+							dest = free
+						}
+					}
+				}
+				if err := transfer.DownloadTo(res.DownloadURL, dest, res.Size, transfer.ProgressPrinter("download")); err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stderr, "[envman] tersimpan → %s (%s)%s\n", dest, storage.FmtBytes(res.Size), fromSuffix(res))
+				return nil
 			}
 
 			if outFile != "" {
@@ -208,9 +246,39 @@ func claimStatus(it transfer.Item) string {
 	return "menunggu"
 }
 
+// kindLabel names the payload type; file transfers show their filename since
+// that is what will land on disk.
+func kindLabel(it transfer.Item) string {
+	if it.Kind == "FILE" {
+		if it.Filename != "" {
+			return "file: " + it.Filename
+		}
+		return "file"
+	}
+	return "teks"
+}
+
 func dash(s string) string {
 	if strings.TrimSpace(s) == "" {
 		return "-"
 	}
 	return s
+}
+
+// uniquePath returns path if free, else path with a numeric suffix inserted
+// before the extension (report.pdf -> report-2.pdf). Used only after a claim
+// has already burned the transfer, where aborting would lose the payload.
+func uniquePath(path string) string {
+	if _, err := os.Stat(path); err != nil {
+		return path
+	}
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	for i := 2; i < 1000; i++ {
+		candidate := fmt.Sprintf("%s-%d%s", base, i, ext)
+		if _, err := os.Stat(candidate); err != nil {
+			return candidate
+		}
+	}
+	return path
 }

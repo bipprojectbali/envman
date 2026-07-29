@@ -10,7 +10,9 @@
   - **Token read-only boleh mengambil, tapi tak boleh mengirim** — jadi token CI bisa menarik sertifikat dari inbox-nya tanpa perlu izin tulis.
   - ⚠️ **Batasnya, supaya jelas:** konten dienkripsi at-rest dengan `MASTER_KEY` **milik server**. Aman dari pihak ketiga dan dari kebocoran database, tapi **bukan end-to-end** — pemegang `MASTER_KEY` (admin servermu) tetap bisa membacanya. Fitur ini menggantikan kebiasaan menitipkan secret ke pihak ketiga, bukan kebutuhan memercayai servermu sendiri. Rotasi `MASTER_KEY` mematikan kiriman yang masih menggantung, jadi kuras inbox sebelum merotasi.
   - Tidak ada notifikasi: penerima baru tahu saat menjalankan `envman inbox`. Batas ukuran/TTL/jumlah kiriman tertunda diatur SUPER_ADMIN di `/dev > Settings`.
-  - Iterasi ini menangani **teks** (`.env`, kunci SSH, sertifikat, config). Pengiriman file besar lewat storage menyusul.
+  - **Jalurnya dipilih otomatis, tak perlu kamu pikirkan.** `.env`, kunci SSH, dan sertifikat disimpan terenkripsi di database; gambar, video, arsip, atau file besar diupload langsung ke storage. CLI mengumumkan pilihannya (`mode: teks` / `mode: file`) supaya tak ada kejutan, dan `--text`/`--file` tersedia untuk memaksa. Kiriman berupa file diunduh ke disk dengan nama aslinya, bukan ditumpahkan ke terminal.
+  - Dua batasnya **sengaja berbeda jauh** — teks default **1 MB** karena melewati memori server dan disimpan hex di database (≈2x ukuran asli), sedangkan file default **100 MB** karena byte-nya mengalir langsung dari CLI ke storage tanpa menyentuh server. Keduanya, bersama TTL dan kuota kiriman tertunda, kini bisa diatur di **`/dev > Storage`**.
+  - Pengiriman file butuh storage (MinIO) aktif; tanpa itu jalur teks tetap berfungsi dan kiriman file ditolak dengan pesan yang jelas.
 
 ### Fixed
 - **Halaman `/dev > Settings` kini menampilkan batas Clipboard.** `clipboard_max_kb` dan `clipboard_max_ttl_hours` sudah bisa disetel lewat API sejak fitur Clipboard dirilis, tapi tak pernah muncul di form pengaturan — padahal dokumentasi CLI menyebut keduanya diatur dari sana.

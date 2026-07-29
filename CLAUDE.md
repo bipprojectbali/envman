@@ -310,11 +310,22 @@ Kirim secret **user-ke-user** (`.env`, kunci SSH, cert) agar tak lewat WhatsApp/
 
 ### API
 
-`POST /api/envman/transfers` (`canWrite`; 400/403/404/409/413/429 kuota/503) · `GET .../transfers/inbox|sent` · `POST .../transfers/:id/claim` · `DELETE .../transfers/:id` · **`POST .../transfers/claim` (tanpa auth**, kode di body).
+`POST /api/envman/transfers` (TEXT; `canWrite`; 400/403/404/409/413/429 kuota/503) · `POST .../transfers/presign` + `POST .../transfers/:id/confirm` (FILE; `canWrite`; 503 bila MinIO mati, 502 bila stat gagal, 413 bila ukuran nyata > batas) · `GET .../transfers/inbox|sent` · `POST .../transfers/:id/claim` (FILE → `downloadUrl` presigned) · `DELETE .../transfers/:id` · **`POST .../transfers/claim` (tanpa auth**, kode di body).
 
-Audit `TRANSFER_SENT`/`TRANSFER_CLAIMED`/`TRANSFER_REVOKED`. Setting: `transfer_max_text_kb` (256), `transfer_max_ttl_hours` (168), `transfer_default_ttl_hours` (72), `transfer_max_pending_per_user` (20).
+Audit `TRANSFER_SENT`/`TRANSFER_CLAIMED`/`TRANSFER_REVOKED`. Setting (UI: `/dev > Storage`, `TransferSettingsPanel.tsx`): `transfer_max_text_kb` (1024), `transfer_max_file_mb` (100), `transfer_max_ttl_hours` (168), `transfer_default_ttl_hours` (72), `transfer_max_pending_per_user` (20).
 
-**v1 = jalur TEXT saja.** Kolom FILE + `buildTransferKey()` (`transfers/{id}/{filename}`, namespace terpisah dari project storage `{projectId}/{path}`) sudah ada agar v2 tak butuh migrasi breaking.
+### Jalur TEXT vs FILE (auto-deteksi di CLI)
+
+`ChooseMode` (`cli-go/internal/transfer/mode.go`) memilih jalur **tanpa campur tangan user**: byte `NUL` di 8000 byte pertama (heuristik biner Git) **atau** ukuran > batas teks → **FILE**; selain itu **TEXT**. Override `--text`/`--file`. Input dari pipe selalu TEXT (ukuran tak diketahui di muka). CLI mengumumkan mode ke stderr.
+
+- **TEXT** → kolom `content` terenkripsi. Lewat body JSON + hex di DB ≈ **2x disk, 2.7x memori** → batas kecil (`transfer_max_text_kb`, default **1024**).
+- **FILE** → presign → **CLI PUT langsung ke MinIO** → confirm. Byte tak pernah menyentuh server → batas besar (`transfer_max_file_mb`, default **100**). Key `transfers/{id}/{filename}` (`buildTransferKey`), namespace terpisah dari project storage `{projectId}/{path}`.
+- **Urutan MUTLAK**: row dibuat **saat presign** (`uploaded=false`) — row adalah satu-satunya catatan object; membuat row baru saat confirm = object yatim yang tak bisa disapu. Confirm **memverifikasi ukuran nyata** via `.stat()` (tanpa itu klien bisa deklarasi 1 KB lalu upload 5 GB) dan **re-derive key dari row**, tak pernah menerima `minioKey` dari klien.
+- Inbox menyembunyikan `kind=FILE && uploaded=false`; klaimnya → 409.
+- Sweep: `minioDelete` semua key **dulu**, baru `deleteMany` baris. `GRACE` 2j > TTL presigned GET (`DOWNLOAD_URL_TTL_SECONDS` 3600) agar unduhan besar tak terputus.
+- `safeFilename()` buang komponen direktori (`../../etc/passwd` → `passwd`) — transfer = satu file, bukan pohon.
+- **CLI `recv`**: cek `-o` sudah-ada **SEBELUM** klaim (klaim membakar; gagal setelahnya = secret hilang). Tanpa `-o`, bentrok nama → simpan sebagai `nama-2.ext`, **jangan abort**.
+- Reuse `storage.PutPresigned` (`internal/storage/presigned.go`) — **jangan salin** `putToMinio`, ia membawa terjemahan error Cloudflare-413.
 
 ## API Reference
 
@@ -440,7 +451,7 @@ envman sys                                # snapshot kesehatan mesin lokal (host
 
 envman clip set [file] · get [-o file] · clear     # clipboard akun. --ttl 30m|2h|7d (default 24h). --force
 
-envman send [file] --to <email|nama> | --once     # kirim secret ke user lain. -m · --ttl · --keep
+envman send [file] --to <email|nama> | --once     # kirim secret ke user lain. -m · --ttl · --keep · --text/--file (auto-deteksi)
 envman send rm <id>                                # cabut/tolak
 envman inbox [--sent]                              # daftar kiriman masuk / terkirim
 envman recv <id|KODE> [-o file] [--force] [--server URL]   # ambil (KODE: tanpa login)
