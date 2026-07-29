@@ -38,6 +38,7 @@ PostgreSQL via Prisma v6. Client singleton `src/lib/db.ts` (`{ prisma }`). Schem
 - `AppSetting` (key PK, value, updatedAt, updatedById?) — konfigurasi global runtime (Dev > Settings)
 - `Gist` (id, userId, title, description, files Json `[{filename,content,language}]`, isPublic, tags[]) — unique(userId, title). `isPublic=false` default. Judul unik per user = natural key untuk CLI `envman gists`. Edit/delete: owner atau SUPER_ADMIN.
 - `Clipboard` (userId PK, content, createdAt, expiresAt) — slot-tunggal per-user. `content` dienkripsi (`enc:iv:cipher:tag`). TTL default 24h, lazy-expire + sweep 1h. FK `ON DELETE CASCADE`. Lihat [Clipboard](#clipboard).
+- `Transfer` (id, kind `TEXT|FILE`, fromUserId, toUserId?, toHint?, content?, minioKey?/filename?/size BigInt/mimeType/uploaded, label?, burn, codeHash? unique, codePrefix?, claimedAt?, claimedByUserId?, claimedIp?, expiresAt) — kirim secret user-ke-user. `toUserId=null` = kode sekali-pakai. **FK `CASCADE`** (bukan RESTRICT — RESTRICT mematikan `user.deleteMany()` di test). `size` **BigInt** (JSON.stringify melempar → shaper wajib `Number()`). Kolom FILE disiapkan untuk v2, v1 tak mengisinya. Lihat [Transfer](#transfer-send--inbox--recv).
 - `EnvImport` (id, targetEnvId, sourceEnvId, keys[], order, createdById) — unique(targetEnvId, sourceEnvId). Live-link referensi, boleh lintas project. FK `ON DELETE CASCADE`. Lihat [Env Import](#env-import).
 - `ProjectStorageObject` (projectId, path, minioKey, size, mimeType, isPublic, tags[], description?, uploadedById) — unique(projectId, path). `path`=path user, `minioKey`=`{projectId}/{path}`. `isPublic=true` → download tanpa auth. Lihat [Project Storage](#project-storage).
 
@@ -284,6 +285,37 @@ MINIO_ENDPOINT · MINIO_ACCESS_KEY · MINIO_SECRET_KEY · MINIO_BUCKET=envman ·
 - Routes: `storage-core.ts` (list/download/meta/delete) · `storage-upload.ts` (≤50MB) · `storage-multipart.ts` (>50MB) · `storage-rename.ts` · `storage-move.ts` (batch) · `public-storage.ts` (redirect).
 - FE: `slug/StoragePanel.tsx`, `StorageUploadModal.tsx`, `StorageFileRow/Card.tsx`, `StorageMoveModal.tsx`. Hooks `useStorageFileActions.ts`, `useChunkedUpload.ts` (`MULTIPART_THRESHOLD=50MB`).
 
+## Transfer (send / inbox / recv)
+
+Kirim secret **user-ke-user** (`.env`, kunci SSH, cert) agar tak lewat WhatsApp/Slack. Beda dari `clip` (slot-tunggal milik sendiri), transfer punya **penerima**. Model `Transfer`. Service `src/lib/transfer-service.ts`. Routes `src/routes/envman/transfers-{send,list,claim}.ts` (+ agregator `transfers.ts`). Sweep `src/lib/transfer-sweep.ts`. CLI `cli-go/internal/transfer/` + `cmd/envman/{send,inbox}_cmd.go`.
+
+> ⚠️ **Bukan E2E.** Dienkripsi at-rest dengan `MASTER_KEY` **server** — aman dari pihak ketiga & kebocoran DB, tapi pemegang `MASTER_KEY` (admin) bisa membaca. Wajib disebut apa adanya di docs; jangan diklaim lebih.
+
+### Semantik
+
+- **Penerima**: user terdaftar (`to`, email/nama **persis** — sengaja tak fuzzy, satu typo bisa mengirim `.env` prod ke orang salah) **atau** `once:true` → kode sekali-pakai untuk orang tanpa akun. Nama ambigu → 409; blocked/deleted → 404 (**body sama** dengan "tak ada" agar bukan oracle status akun).
+- **Burn-after-read** default; `burn:false` (`--keep`) bisa diambil berkali-kali sampai TTL.
+- **Klaim = CAS** `updateMany where {id, claimedAt:null}` → `count===0` berarti kalah balapan → 409. **Bukan** read-then-write (itu justru balapannya).
+- **Klaim MENANDAI, tak menghapus.** Penghapusan hanya di sweep (`expiresAt<now` ATAU `burn && claimedAt < now-2j`) — satu jalur kode; untuk v2 urutan **object MinIO dulu, baru baris**.
+- **Kode**: 80-bit, 16 char Crockford base32 (tanpa `I L O U`). Hanya **`codeHash`** (sha256) disimpan — plaintext tak pernah. Normalisasi input: uppercase, buang `-`, `I L→1`, `O→0`.
+
+### Aturan keamanan (MUTLAK)
+
+- **Kode di BODY POST, JANGAN di path** — `src/app.ts` mencatat `${method} ${pathname}` ke Redis app-log **dan** mem-broadcast ke panel dev. Alasan sama: audit hanya boleh memuat `codePrefix`.
+- **Rate limit** `src/lib/rate-limit.ts`: `xfer:claim:ip:<ip>` 10 gagal/10mnt + `xfer:claim:global` 100/10mnt. `peekLimit` (cek, tak increment) sebelum lookup + `hitLimit` **hanya saat gagal** → klaim sukses tak makan budget, tapi budget habis tetap menolak kode benar. **Fail-closed** (Redis mati → 503), beda dari `cache.ts` yang fail-open.
+- **404 identik** untuk kode tak dikenal/kedaluwarsa/sudah diklaim.
+- **MASTER_KEY hilang → 503 saat kirim** (`encryptSecret` fail-open menyimpan plaintext — tak boleh untuk transfer). Klaim tak hard-fail, tapi sentinel `'[decryption failed]'` dicek **sebelum CAS** → 500; kalau tidak, burn menghapus satu-satunya salinan dan menyerahkan string error.
+- **Gate**: mutasi yang membuat state untuk **orang lain** butuh `canWrite` (POST); klaim/hapus/inbox **tidak** (token RO wajib bisa menguras inbox-nya sendiri — kasus CI menarik cert).
+- Klaim-by-id `where {id, toUserId: caller}` → **404 bukan 403** (403 mengonfirmasi baris ada).
+
+### API
+
+`POST /api/envman/transfers` (`canWrite`; 400/403/404/409/413/429 kuota/503) · `GET .../transfers/inbox|sent` · `POST .../transfers/:id/claim` · `DELETE .../transfers/:id` · **`POST .../transfers/claim` (tanpa auth**, kode di body).
+
+Audit `TRANSFER_SENT`/`TRANSFER_CLAIMED`/`TRANSFER_REVOKED`. Setting: `transfer_max_text_kb` (256), `transfer_max_ttl_hours` (168), `transfer_default_ttl_hours` (72), `transfer_max_pending_per_user` (20).
+
+**v1 = jalur TEXT saja.** Kolom FILE + `buildTransferKey()` (`transfers/{id}/{filename}`, namespace terpisah dari project storage `{projectId}/{path}`) sudah ada agar v2 tak butuh migrasi breaking.
+
 ## API Reference
 
 ### Admin API (SUPER_ADMIN)
@@ -407,6 +439,11 @@ envman health [dir]                       # scan file terlalu besar utk konteks 
 envman sys                                # snapshot kesehatan mesin lokal (host/user/net/cpu/mem/disk). --json · --du <dir> · --public-ip
 
 envman clip set [file] · get [-o file] · clear     # clipboard akun. --ttl 30m|2h|7d (default 24h). --force
+
+envman send [file] --to <email|nama> | --once     # kirim secret ke user lain. -m · --ttl · --keep
+envman send rm <id>                                # cabut/tolak
+envman inbox [--sent]                              # daftar kiriman masuk / terkirim
+envman recv <id|KODE> [-o file] [--force] [--server URL]   # ambil (KODE: tanpa login)
 
 envman gists ls [--public] [-q] [--limit N=100] [--cursor id]   # (alias: gist) list gist (sendiri+public)
 envman gists find <query> [--tags a,b] [-q]        # cari judul/deskripsi
