@@ -95,6 +95,9 @@ export const transfersSendRouter = new Elysia().post('/api/envman/transfers', as
       toUserId,
       toHint,
       content: encryptSecret(body.content),
+      // Plaintext byte count, so listings can show a size without the server
+      // having to decrypt anything to work it out.
+      size: BigInt(bytes),
       label: typeof body.label === 'string' ? body.label : null,
       burn: body.burn !== false,
       codeHash: code?.hash ?? null,
