@@ -102,10 +102,13 @@ export function minioPresign(
   minioKey: string,
   filename: string,
   isPublic: boolean,
+  // Override TTL. Transfers pass a longer one: the sweep deletes the object
+  // after a grace period, so a short-lived URL could expire mid-download.
+  expiresInOverride?: number,
 ): string {
   const client = getMinioClient()
   if (!client) throw new Error('MinIO tidak dikonfigurasi')
-  const expiresIn = isPublic ? 3600 : 300
+  const expiresIn = expiresInOverride ?? (isPublic ? 3600 : 300)
   return client.presign(minioKey, {
     expiresIn,
     method: 'GET',

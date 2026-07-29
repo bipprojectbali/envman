@@ -215,6 +215,21 @@ setInterval(
   24 * 60 * 60 * 1000,
 )
 
+// ─── Transfer TTL Sweep ────────────────────────────────
+// Also runs in dev: transfers hold live secrets, and a dev box that never
+// sweeps just accumulates them.
+import { sweepTransfers } from './lib/transfer-sweep'
+
+const runTransferSweep = () =>
+  sweepTransfers()
+    .then(({ deleted }) => {
+      if (deleted > 0) console.log(`[Transfer] Swept ${deleted} transfer(s)`)
+    })
+    .catch(console.error)
+
+runTransferSweep()
+setInterval(runTransferSweep, 15 * 60 * 1000)
+
 // ─── Elysia App ────────────────────────────────────────
 import { createApp } from './app'
 

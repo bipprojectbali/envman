@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **`envman send` / `inbox` / `recv` — kirim secret langsung ke user lain.** Menyiapkan mesin baru selama ini berarti mengirim `.env` atau kunci SSH lewat WhatsApp/Slack: terbaca pihak ketiga, tersimpan di server orang lain, tak bisa ditarik kembali. Sekarang secret bisa dikirim langsung antar-user lewat server envman-mu sendiri.
+  - **Dua cara mengirim.** Ke **user terdaftar** (`--to budi@example.com`, dicocokkan persis lewat email atau nama — sengaja tidak fuzzy supaya satu typo tak mengirim `.env` produksi ke orang yang salah), atau lewat **kode sekali-pakai** (`--once`) untuk orang yang **belum punya akun** — mereka menebusnya dengan `envman recv <kode> --server <url>`, tanpa login sama sekali. Baris perintah yang dihasilkan aman dikirim lewat chat: yang rahasia ada di server, bukan di pesannya.
+  - **Hangus setelah dibaca.** Sekali diambil, kiriman hilang — tak ada yang bisa membacanya lagi. `--keep` untuk mengambil dari beberapa mesin. Selalu ada kedaluwarsa (default 3 hari, atur dengan `--ttl 30m|2h|7d`); yang tak diambil terhapus otomatis.
+  - **`envman inbox`** menampilkan apa yang menunggu beserta id-nya, `--sent` memperlihatkan kiriman kita sendiri (sudah diambil belum), dan `envman send rm <id>` mencabutnya. `envman recv <id> -o .env` menulis ke file dengan mode `0600`, atau tanpa `-o` mengalir ke stdout supaya bisa di-pipe.
+  - **Token read-only boleh mengambil, tapi tak boleh mengirim** — jadi token CI bisa menarik sertifikat dari inbox-nya tanpa perlu izin tulis.
+  - ⚠️ **Batasnya, supaya jelas:** konten dienkripsi at-rest dengan `MASTER_KEY` **milik server**. Aman dari pihak ketiga dan dari kebocoran database, tapi **bukan end-to-end** — pemegang `MASTER_KEY` (admin servermu) tetap bisa membacanya. Fitur ini menggantikan kebiasaan menitipkan secret ke pihak ketiga, bukan kebutuhan memercayai servermu sendiri. Rotasi `MASTER_KEY` mematikan kiriman yang masih menggantung, jadi kuras inbox sebelum merotasi.
+  - Tidak ada notifikasi: penerima baru tahu saat menjalankan `envman inbox`. Batas ukuran/TTL/jumlah kiriman tertunda diatur SUPER_ADMIN di `/dev > Settings`.
+  - **Jalurnya dipilih otomatis, tak perlu kamu pikirkan.** `.env`, kunci SSH, dan sertifikat disimpan terenkripsi di database; gambar, video, arsip, atau file besar diupload langsung ke storage. CLI mengumumkan pilihannya (`mode: teks` / `mode: file`) supaya tak ada kejutan, dan `--text`/`--file` tersedia untuk memaksa. Kiriman berupa file diunduh ke disk dengan nama aslinya, bukan ditumpahkan ke terminal.
+  - Dua batasnya **sengaja berbeda jauh** — teks default **1 MB** karena melewati memori server dan disimpan hex di database (≈2x ukuran asli), sedangkan file default **100 MB** karena byte-nya mengalir langsung dari CLI ke storage tanpa menyentuh server. Keduanya, bersama TTL dan kuota kiriman tertunda, kini bisa diatur di **`/dev > Storage`**.
+  - Pengiriman file butuh storage (MinIO) aktif; tanpa itu jalur teks tetap berfungsi dan kiriman file ditolak dengan pesan yang jelas.
+
+### Fixed
+- **Halaman `/dev > Settings` kini menampilkan batas Clipboard.** `clipboard_max_kb` dan `clipboard_max_ttl_hours` sudah bisa disetel lewat API sejak fitur Clipboard dirilis, tapi tak pernah muncul di form pengaturan — padahal dokumentasi CLI menyebut keduanya diatur dari sana.
+
+### Removed
+- **Test yatim `tickets.test.ts` dihapus** — masih menguji endpoint Tickets dan role `QC` yang sudah dibuang di 0.24.2, sehingga selalu gagal saat seluruh suite dijalankan.
+
+### Database
+- Migration `20260729120000_add_transfer` — tabel `transfer` (enum `TransferKind`, FK pengirim/penerima `ON DELETE CASCADE`, index untuk inbox & sweep TTL, `codeHash` unik). Idempoten, jalan otomatis saat startup.
+
 ## [0.24.5] - 2026-07-29
 
 ### Added

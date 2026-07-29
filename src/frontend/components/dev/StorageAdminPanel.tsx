@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { TbAlertCircle, TbBucket, TbCheck, TbDeviceFloppy, TbRefresh } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { parseSettings } from './settings-types'
+import { TransferSettingsPanel } from './TransferSettingsPanel'
 
 type StorageStatus = {
   configured: boolean
@@ -58,8 +59,20 @@ export function StorageAdminPanel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'storage', 'status'] }),
   })
 
-  const statusColor = !data?.configured ? 'gray' : data.bucketExists ? 'green' : data.status === 'error' ? 'red' : 'orange'
-  const statusLabel = !data?.configured ? 'Tidak dikonfigurasi' : data.bucketExists ? 'Bucket tersedia' : data.status === 'error' ? 'Error koneksi' : 'Bucket belum ada'
+  const statusColor = !data?.configured
+    ? 'gray'
+    : data.bucketExists
+      ? 'green'
+      : data.status === 'error'
+        ? 'red'
+        : 'orange'
+  const statusLabel = !data?.configured
+    ? 'Tidak dikonfigurasi'
+    : data.bucketExists
+      ? 'Bucket tersedia'
+      : data.status === 'error'
+        ? 'Error koneksi'
+        : 'Bucket belum ada'
 
   return (
     <Stack gap="md">
@@ -76,7 +89,13 @@ export function StorageAdminPanel() {
               <Badge color={statusColor} variant="light">
                 {isLoading ? 'Memeriksa...' : statusLabel}
               </Badge>
-              <Button size="xs" variant="subtle" leftSection={<TbRefresh size={13} />} onClick={() => refetch()} loading={isLoading}>
+              <Button
+                size="xs"
+                variant="subtle"
+                leftSection={<TbRefresh size={13} />}
+                onClick={() => refetch()}
+                loading={isLoading}
+              >
                 Refresh
               </Button>
             </Group>
@@ -85,17 +104,25 @@ export function StorageAdminPanel() {
           {data && (
             <Stack gap={4}>
               <Group gap="xs">
-                <Text size="xs" c="dimmed">Endpoint:</Text>
+                <Text size="xs" c="dimmed">
+                  Endpoint:
+                </Text>
                 <Code fz="xs">{data.endpoint ?? '—'}</Code>
               </Group>
               <Group gap="xs">
-                <Text size="xs" c="dimmed">Bucket:</Text>
+                <Text size="xs" c="dimmed">
+                  Bucket:
+                </Text>
                 <Code fz="xs">{data.bucket ?? '—'}</Code>
               </Group>
               {data.detail && (
                 <Group gap="xs">
-                  <Text size="xs" c="dimmed">Detail:</Text>
-                  <Text size="xs" c="red">{data.detail}</Text>
+                  <Text size="xs" c="dimmed">
+                    Detail:
+                  </Text>
+                  <Text size="xs" c="red">
+                    {data.detail}
+                  </Text>
                 </Group>
               )}
             </Stack>
@@ -113,7 +140,8 @@ export function StorageAdminPanel() {
         <Paper withBorder p="md" radius="md">
           <Stack gap="sm">
             <Text size="sm">
-              Bucket <Code>{data.bucket}</Code> belum ada di MinIO. Klik tombol di bawah untuk membuatnya secara otomatis.
+              Bucket <Code>{data.bucket}</Code> belum ada di MinIO. Klik tombol di bawah untuk membuatnya secara
+              otomatis.
             </Text>
             {ensure.isError && (
               <Alert icon={<TbAlertCircle size={14} />} color="red" title="Gagal buat bucket">
@@ -145,21 +173,28 @@ export function StorageAdminPanel() {
 
       {!data?.configured && !isLoading && (
         <Alert icon={<TbAlertCircle size={14} />} color="orange" title="MinIO belum dikonfigurasi">
-          Tambahkan <Code>MINIO_ENDPOINT</Code>, <Code>MINIO_ACCESS_KEY</Code>, <Code>MINIO_SECRET_KEY</Code>, dan <Code>MINIO_BUCKET</Code> ke file <Code>.env</Code>, lalu restart server.
+          Tambahkan <Code>MINIO_ENDPOINT</Code>, <Code>MINIO_ACCESS_KEY</Code>, <Code>MINIO_SECRET_KEY</Code>, dan{' '}
+          <Code>MINIO_BUCKET</Code> ke file <Code>.env</Code>, lalu restart server.
         </Alert>
       )}
 
       <Paper withBorder p="md" radius="md">
         <Stack gap="sm">
-          <Text fw={500} size="sm">Batas Storage Default</Text>
-          <Text size="xs" c="dimmed">Berlaku untuk semua project yang tidak punya override per-project. SUPER_ADMIN bisa mengatur override per-project via ikon gear di panel Storage project.</Text>
+          <Text fw={500} size="sm">
+            Batas Storage Default
+          </Text>
+          <Text size="xs" c="dimmed">
+            Berlaku untuk semua project yang tidak punya override per-project. SUPER_ADMIN bisa mengatur override
+            per-project via ikon gear di panel Storage project.
+          </Text>
           <Group align="flex-end" gap="sm">
             <NumberInput
               label="Maks ukuran file (MB)"
               description="Default: 50 MB"
               value={maxFileMb}
               onChange={setMaxFileMb}
-              min={1} max={10240}
+              min={1}
+              max={10240}
               w={200}
             />
             <NumberInput
@@ -167,7 +202,8 @@ export function StorageAdminPanel() {
               description="Default: 500 MB"
               value={quotaMb}
               onChange={setQuotaMb}
-              min={1} max={102400}
+              min={1}
+              max={102400}
               w={200}
             />
             <Button
@@ -190,6 +226,8 @@ export function StorageAdminPanel() {
           )}
         </Stack>
       </Paper>
+
+      <TransferSettingsPanel />
     </Stack>
   )
 }

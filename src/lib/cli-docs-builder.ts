@@ -10,6 +10,7 @@ import { buildPortainerSection } from './cli-docs/portainer'
 import { buildProjectsSection } from './cli-docs/projects'
 import { buildStorageSection } from './cli-docs/storage'
 import { buildSysSection } from './cli-docs/sys'
+import { buildTransferSection } from './cli-docs/transfer'
 import { buildTroubleshootSection } from './cli-docs/troubleshoot'
 
 export function buildCliDocsMd(origin: string): string {
@@ -22,6 +23,7 @@ ${buildProjectsSection()}
 ${buildInjectSection()}
 ${buildEnvSection()}
 ${buildClipSection()}
+${buildTransferSection()}
 ${buildGistsSection()}
 ${buildHealthSection()}
 ${buildSysSection()}

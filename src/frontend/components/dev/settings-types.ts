@@ -7,6 +7,13 @@ export interface Settings {
   token_activity_cap_per_token: number
   storage_max_file_mb: number
   storage_default_quota_mb: number
+  clipboard_max_kb: number
+  clipboard_max_ttl_hours: number
+  transfer_max_text_kb: number
+  transfer_max_file_mb: number
+  transfer_max_ttl_hours: number
+  transfer_default_ttl_hours: number
+  transfer_max_pending_per_user: number
 }
 
 export interface ActivityStats {
@@ -27,6 +34,13 @@ export function parseSettings(raw: Record<string, string>): Settings {
     token_activity_cap_per_token: Number(raw.token_activity_cap_per_token ?? '1000') || 1000,
     storage_max_file_mb: Number(raw.storage_max_file_mb ?? '50') || 50,
     storage_default_quota_mb: Number(raw.storage_default_quota_mb ?? '500') || 500,
+    clipboard_max_kb: Number(raw.clipboard_max_kb ?? '1024') || 1024,
+    clipboard_max_ttl_hours: Number(raw.clipboard_max_ttl_hours ?? '168') || 168,
+    transfer_max_text_kb: Number(raw.transfer_max_text_kb ?? '1024') || 1024,
+    transfer_max_file_mb: Number(raw.transfer_max_file_mb ?? '100') || 100,
+    transfer_max_ttl_hours: Number(raw.transfer_max_ttl_hours ?? '168') || 168,
+    transfer_default_ttl_hours: Number(raw.transfer_default_ttl_hours ?? '72') || 72,
+    transfer_max_pending_per_user: Number(raw.transfer_max_pending_per_user ?? '20') || 20,
   }
 }
 
