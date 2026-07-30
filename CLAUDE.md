@@ -321,6 +321,7 @@ Audit `TRANSFER_SENT`/`TRANSFER_CLAIMED`/`TRANSFER_REVOKED`. Setting (UI: `/dev 
 - **`--tags`** (jamak) di mana-mana. Wire field selalu `tags`; `Changed("tags")` adalah literal string yang diam-diam no-op bila lupa diubah.
 - **`--json`** tanpa shorthand, lewat `emitJSON()` (`cmd/envman/json_out.go`). stdout **hanya data**, status ke stderr.
 - **Perintah destruktif default aman**: `storage rm` pratinjau dulu (butuh `--force`), `gists push --clean` menolak tanpa `--force` dan **menyebut file yang akan hilang** (`MergeResult.Dropped`).
+- **Rahasia JANGAN lewat argumen.** Argumen terlihat di `ps aux`/`/proc` dan tersimpan di history shell — ini persis CVE-2023-43621 pada croc. Baca lewat `internal/secretin.Read()`: urutan **env var → stdin → prompt → argumen (dengan peringatan)**. Berlaku untuk token, kode klaim, password. `envman login --token` & `envman recv <KODE>` sudah memakainya (`ENVMAN_TOKEN`, `ENVMAN_CODE`).
 - **Perintah yang dipindah** wajib masuk `movedCommands` (`main.go`) — tanpa itu ia jatuh ke root injector dan memberi error yang tak berkaitan.
 - Perintah **tanpa login** (`health`, `sys`, `install`, `env sync`) wajib menyebutnya di baris pertama `Long`.
 - Tambah/pindah perintah → **wajib** test registrasi (`transfer_cmd_test.go`, `env_sync_cmd_test.go`). CI **tidak** menjalankan smoke test perintah.

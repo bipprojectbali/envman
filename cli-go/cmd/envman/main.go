@@ -9,6 +9,7 @@ import (
 	"github.com/bipprojectbali/envman/cli/internal/api"
 	"github.com/bipprojectbali/envman/cli/internal/auth"
 	"github.com/bipprojectbali/envman/cli/internal/run"
+	"github.com/bipprojectbali/envman/cli/internal/secretin"
 	"github.com/bipprojectbali/envman/cli/internal/storage"
 	"github.com/bipprojectbali/envman/cli/internal/update"
 	"github.com/spf13/cobra"
@@ -135,12 +136,28 @@ func loginCmd() *cobra.Command {
 		Long: `Authenticate with an envman server and save credentials locally.
 
 Credentials are stored at ~/.config/envman/config.json and used
-by default for all subsequent commands.`,
-		Args:    cobra.ExactArgs(1),
-		Example: `  envman login https://envman.example.com --token em_abc123`,
+by default for all subsequent commands.
+
+Prefer ENVMAN_TOKEN over --token: an argument is visible to anyone
+running "ps aux" and is kept in your shell history. With neither, the
+token is read from stdin or prompted for.`,
+		Args: cobra.ExactArgs(1),
+		Example: "  ENVMAN_TOKEN=em_abc123 envman login https://envman.example.com\n" +
+			"  envman login https://envman.example.com          # prompts for the token\n" +
+			"  cat token.txt | envman login https://envman.example.com",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			server := strings.TrimRight(args[0], "/")
-			cfg := &auth.Config{Server: server, Token: token}
+			resolved, err := secretin.Read(secretin.Options{
+				Arg:        token,
+				EnvVar:     "ENVMAN_TOKEN",
+				Prompt:     "API token: ",
+				AllowStdin: true,
+				Label:      "API token",
+			})
+			if err != nil {
+				return err
+			}
+			cfg := &auth.Config{Server: server, Token: resolved}
 			var result struct {
 				User struct {
 					Email string `json:"email"`
@@ -161,8 +178,8 @@ by default for all subsequent commands.`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&token, "token", "", "API token (required)")
-	_ = cmd.MarkFlagRequired("token")
+	cmd.Flags().StringVar(&token, "token", "",
+		"API token. Prefer ENVMAN_TOKEN or stdin — an argument is visible in `ps aux`")
 	return cmd
 }
 
