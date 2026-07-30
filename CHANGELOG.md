@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.26.0] - 2026-07-30
 
 ### Changed
 - **⚠️ Breaking — `envman send` dan `envman inbox` kini `envman transfer send` dan `envman transfer ls`.** Ketiga perintah transfer sebelumnya berdiri sendiri di tingkat atas, padahal satu fitur. Di daftar `--help` yang terurut alfabetis mereka terpisah jauh dan tak satupun menyebut yang lain — orang yang melihat `send` tak punya alasan menduga `inbox` pasangannya. Setiap fitur lain (`clip`, `env`, `gists`, `storage`, `projects`, `portainer`) sudah memakai satu kata benda dengan subcommand; transfer satu-satunya yang tidak. Sekarang `envman transfer --help` mengungkap seluruh fiturnya sekaligus. Perintah lama memberi pesan yang menyebutkan bentuk barunya.
