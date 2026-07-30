@@ -31,14 +31,16 @@ func TestTransferRegisteredOnRoot(t *testing.T) {
 		names[c.Name()] = true
 	}
 
-	for _, want := range []string{"transfer", "recv"} {
-		if !names[want] {
-			t.Errorf("top-level command %q missing", want)
-		}
+	if !names["transfer"] {
+		t.Error("top-level command \"transfer\" missing")
 	}
 	// These moved into the transfer group. Leaving them registered would
 	// reintroduce exactly the fragmentation this restructure removed.
-	for _, gone := range []string{"send", "inbox"} {
+	// recv was a second name for `transfer get` — identical code, no behaviour
+	// of its own — sitting next to a command whose one-liner already said
+	// "Send and receive". Two entries for one job is the fragmentation the
+	// group was created to remove.
+	for _, gone := range []string{"send", "inbox", "recv"} {
 		if names[gone] {
 			t.Errorf("top-level command %q should have moved into `transfer`", gone)
 		}
@@ -48,7 +50,7 @@ func TestTransferRegisteredOnRoot(t *testing.T) {
 // TestMovedCommandsHint makes sure a user typing the old name gets told the new
 // one, instead of the root injector's unrelated "specify at least one -e" error.
 func TestMovedCommandsHint(t *testing.T) {
-	for _, old := range []string{"send", "inbox"} {
+	for _, old := range []string{"send", "inbox", "recv"} {
 		if movedCommands[old] == "" {
 			t.Errorf("no migration hint for removed command %q", old)
 		}
@@ -82,7 +84,7 @@ func TestForceHasNoShorthand(t *testing.T) {
 		"env pull":       envPullCmd(),
 		"gists push":     gistsPushCmd(),
 		"gists pull":     gistsPullCmd(),
-		"recv":           recvCmd(),
+		"transfer get":   transferGetCmd(),
 	}
 	for name, cmd := range cmds {
 		f := cmd.Flags().Lookup("force")

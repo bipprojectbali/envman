@@ -13,30 +13,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Collecting a transfer. Exposed twice on purpose: as `envman transfer get` for
-// people working inside the CLI, and as top-level `envman recv` for someone who
-// has never logged in and was handed a one-time code over chat — that path
-// needs no account, so making them type the longer form helps nobody.
-
-func recvCmd() *cobra.Command {
-	return claimCmd("recv <id|CODE>", true)
-}
-
-// transferGetCmd is the same command inside the transfer group.
+// Collecting a transfer.
+//
+// This was briefly exposed twice — as `envman transfer get` and as a top-level
+// `envman recv` — on the theory that someone without an account deserved a
+// shorter form. That reasoning did not hold: such a person never reads --help,
+// they paste the one line the sender gives them, so the length is irrelevant.
+// What they did see was two commands advertising the same job, right after
+// `transfer` had been created to stop exactly that kind of fragmentation.
 func transferGetCmd() *cobra.Command {
-	return claimCmd("get <id|CODE>", false)
-}
-
-// claimCmd builds the collect command. topLevel toggles the wording, since the
-// top-level `envman recv` is what a person with no account is handed, while
-// `envman transfer get` is what a logged-in user reaches from `transfer ls`.
-func claimCmd(use string, topLevel bool) *cobra.Command {
 	var outFile string
 	var force bool
 	var server string
 
 	cmd := &cobra.Command{
-		Use:   use,
+		Use:   "get <id|CODE>",
 		Short: "Collect a secret sent to you",
 		Long: `Collect a transfer, by its id (from 'envman transfer ls') or by a one-time code
 someone sent you.
@@ -53,7 +44,7 @@ Content goes to stdout unless -o is given, so it pipes cleanly. Files
 written with -o are created 0600. Unless the sender passed --keep, the
 transfer is gone once collected: nothing else can read it afterwards.`,
 		Example: "  envman transfer get 3f7a1c92-... -o .env\n" +
-			"  ENVMAN_CODE=EM-3F7K-9QW2-M4XZ-7T1B envman recv --server https://envman.example.com > .env\n" +
+			"  ENVMAN_CODE=EM-3F7K-9QW2-M4XZ-7T1B envman transfer get --server https://envman.example.com > .env\n" +
 			"  envman transfer ls && envman transfer get <id>",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {

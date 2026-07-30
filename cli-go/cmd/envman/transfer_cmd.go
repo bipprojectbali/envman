@@ -18,8 +18,7 @@ import (
 
 // Sending and receiving secrets between users. Grouped under one noun so the
 // whole feature is discoverable from `envman transfer --help`, matching clip,
-// env, gists, storage and projects. `envman recv` stays top-level (recv_cmd.go)
-// because it is used by people who have never logged in.
+// env, gists, storage and projects. Collecting lives in recv_cmd.go.
 
 func transferCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -62,7 +61,7 @@ when no file is given.
 
 The recipient is either a registered user (--to, by exact email or exact
 name) or anyone at all (--once, which prints a one-time claim code they
-redeem with 'envman recv <code>' — no account needed).
+redeem with 'envman transfer get' — no account needed).
 
 Burn-after-read by default: the transfer disappears once claimed. Pass
 --keep to let it be claimed from several machines until it expires.
@@ -176,7 +175,7 @@ secrets through a third party, not the need to trust your own server.`,
 			if res.Code != "" {
 				fmt.Fprintf(os.Stderr, "[envman] kode sekali-pakai: %s\n", res.Code)
 				fmt.Fprintf(os.Stderr, "[envman] kedaluwarsa %s — kode ini hanya ditampilkan SEKALI (%s)\n", expiry, burnNote)
-				fmt.Fprintf(os.Stderr, "  envman recv %s --server %s\n", res.Code, cfg.Server)
+				fmt.Fprintf(os.Stderr, "  ENVMAN_CODE=%s envman transfer get --server %s\n", res.Code, cfg.Server)
 			} else {
 				fmt.Fprintf(os.Stderr, "[envman] terkirim ke %s (%s, %s)\n", to, storage.FmtBytes(int64(res.Bytes)), burnNote)
 				fmt.Fprintf(os.Stderr, "[envman] id: %s  kedaluwarsa %s\n", res.ID, expiry)

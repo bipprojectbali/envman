@@ -446,14 +446,14 @@ lebih dari satu user ditolak; pakai email.
 envman transfer send .env --once --ttl 1h
 # [envman] kode sekali-pakai: EM-3F7K-9QW2-M4XZ-7T1B
 # [envman] kedaluwarsa 59m — kode ini hanya ditampilkan SEKALI
-#   envman recv EM-3F7K-9QW2-M4XZ-7T1B --server https://envman.example.com
+#   envman transfer get --server https://envman.example.com
 ```
 
 Baris perintah itu **aman dikirim lewat chat** — yang rahasia ada di server, bukan
 di pesannya. Penerima tak perlu akun, tak perlu `envman login`:
 
 ```bash
-ENVMAN_CODE=EM-3F7K-9QW2-M4XZ-7T1B envman recv --server https://envman.example.com -o .env
+ENVMAN_CODE=EM-3F7K-9QW2-M4XZ-7T1B envman transfer get --server https://envman.example.com -o .env
 ```
 
 > ⚠️ **Jangan berikan kode sebagai argumen di mesin bersama.** Argumen terlihat
@@ -496,9 +496,6 @@ jadi membatalkan justru akan menghilangkan isinya.
   bisa menarik sertifikat dari inbox-nya tanpa diberi izin tulis.
 - **Rotasi `MASTER_KEY` mematikan kiriman yang masih menggantung** — kuras inbox
   sebelum merotasi.
-- **`envman recv` = jalan pintas `envman transfer get`.** Sengaja tetap di
-  tingkat atas karena dipakai orang yang **belum punya akun** dan hanya menerima
-  satu baris perintah lewat chat.
 - **Pengiriman file butuh storage (MinIO) aktif di server.** Tanpa itu, kiriman
   biner/besar ditolak dengan pesan jelas; jalur teks tetap jalan.
 - Batas ukuran, TTL, dan jumlah kiriman tertunda diatur SUPER_ADMIN di
