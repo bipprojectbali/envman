@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.26.1] - 2026-07-30
 
 ### Security
 - **Token dan kode klaim tak lagi harus lewat argumen baris perintah.** Argumen terlihat oleh siapa pun yang menjalankan `ps aux` di mesin yang sama dan tersimpan di history shell — kerentanan yang sama pernah menimpa [croc](https://github.com/schollz/croc) (CVE-2023-43621). Ini terutama berbahaya untuk `envman recv`, yang justru dirancang untuk mesin yang baru disiapkan dan mungkin dipakai bersama.
