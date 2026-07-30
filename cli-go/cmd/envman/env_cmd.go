@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -156,6 +155,7 @@ func envPullCmd() *cobra.Command {
 	var outFile string
 	var force bool
 	var only []string
+	var toClipboard bool
 	cmd := &cobra.Command{
 		Use:   "pull <project>:<env>",
 		Short: "Pull an environment's vars as .env",
@@ -197,9 +197,14 @@ were found are still printed/written).`,
 					len(masked), strings.Join(masked, ", "))
 			}
 
-			if outFile == "" {
+			switch {
+			case toClipboard:
+				if _, err := copyToClipboard(content, "isi .env"); err != nil {
+					return err
+				}
+			case outFile == "":
 				fmt.Print(content)
-			} else {
+			default:
 				if !force {
 					if _, err := os.Stat(outFile); err == nil {
 						return fmt.Errorf("[envman] %s sudah ada — gunakan --force untuk menimpa", outFile)
@@ -222,11 +227,14 @@ were found are still printed/written).`,
 	cmd.Flags().StringVarP(&outFile, "output", "o", "", "Write to file instead of stdout")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite output file if it exists")
 	cmd.Flags().StringSliceVar(&only, "only", nil, "Only pull these keys (comma-separated)")
+	cmd.Flags().BoolVar(&toClipboard, "copy", false, "Copy to the clipboard instead of printing (keeps it out of scrollback)")
+	cmd.MarkFlagsMutuallyExclusive("copy", "output")
 	return cmd
 }
 
 func envGetCmd() *cobra.Command {
 	var noNewline bool
+	var toClipboard bool
 	cmd := &cobra.Command{
 		Use:   "get <project>:<env> <KEY>",
 		Short: "Print a single var's raw value (no KEY=)",
@@ -259,6 +267,12 @@ error with a non-zero exit.`,
 			if val == envvars.MaskedValue {
 				return fmt.Errorf("[envman] %s adalah secret yang tak bisa kamu reveal (akses VIEWER)", key)
 			}
+			if toClipboard {
+				// Never append a newline: a trailing \n in the clipboard is a
+				// footgun when pasted into a form or a password field.
+				_, err := copyToClipboard(val, key)
+				return err
+			}
 			if noNewline {
 				fmt.Print(val)
 			} else {
@@ -267,6 +281,7 @@ error with a non-zero exit.`,
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&toClipboard, "copy", false, "Copy to the clipboard instead of printing (keeps it out of scrollback)")
 	cmd.Flags().BoolVarP(&noNewline, "no-newline", "n", false, "Do not print a trailing newline (ideal for piping to a clipboard)")
 	return cmd
 }
@@ -321,36 +336,6 @@ func readEnvInput(args []string) (map[string]string, error) {
 		return envparser.ParseFile(args[1])
 	}
 	return envparser.ParseReader(bufio.NewReader(os.Stdin)), nil
-}
-
-// atomicWrite writes content to a temp file in the same dir then renames it,
-// so an existing file is never left half-written on error.
-func atomicWrite(path, content string) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".envman-pull-*")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
-	if _, err := tmp.WriteString(content); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Chmod(tmpPath, 0600); err != nil {
-		return err
-	}
-	return os.Rename(tmpPath, path)
-}
-
-func countLines(s string) int {
-	if s == "" {
-		return 0
-	}
-	return strings.Count(s, "\n")
 }
 
 func printPushPlan(t envvars.Target, local, existing map[string]string, secretKeys map[string]bool) {

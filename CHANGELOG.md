@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **`--copy` — salurkan rahasia ke clipboard, bukan ke layar.** Nilai yang dicetak menempel di **scrollback terminal**, terlihat saat screenshot, screen-share, atau sekadar orang lewat. Selama ini solusinya hanya anjuran `| pbcopy`, yang mudah lupa diketik (sekali lupa, tercetak) dan tak tersedia di Linux maupun server SSH — justru tempat yang paling membutuhkannya.
+  - Tersedia di **`env get`**, **`env pull`**, **`clip get`**, **`transfer get`**, **`gists pull`**, dan **`health`**. Stdout benar-benar kosong; hanya konfirmasi singkat ke stderr.
+  - **Bekerja lewat SSH.** Urutan: `pbcopy` → `wl-copy` → `xsel`/`xclip` → **OSC 52**. Yang terakhir adalah escape sequence yang ditindaklanjuti terminal, jadi menjalankannya di server akan mengisi clipboard **laptopmu**. Tak perlu X11 atau paket tambahan; di tmux aktifkan `set -g set-clipboard on`.
+  - `env get --copy` sengaja **tak menambahkan newline** — nilai berakhiran `\n` di clipboard menyulitkan saat ditempel ke form. `--copy` tak bisa digabung `-o` (dua tujuan).
+  - **Kiriman hangus-sekali-baca ditangani khusus.** Pada `transfer get`, salinan server sudah terhapus saat isinya diterima. Bila clipboard gagal, isinya **dicetak ke stdout** agar tak lenyap; bila lewat OSC 52 (yang tak bisa dikonfirmasi), envman memperingatkan keras untuk segera menempel.
+  - ⚠️ **Clipboard bukan penyimpanan aman** — aplikasi lain bisa membacanya dan macOS menyinkronkannya ke iPhone. Ini memindahkan risiko dari "terlihat di layar" ke "ada di clipboard sesaat", bukan menghilangkannya.
+- **Bagian dokumentasi Clipboard yang baru** menjelaskan `--copy`, OSC 52 lewat SSH, dan **`envman install pbcopy`** yang selama ini praktis tak terdokumentasi — padahal dokumentasi mengajarkan `| pbcopy` di beberapa tempat tanpa memberi tahu pengguna Linux dari mana `pbcopy` berasal. Juga menegaskan beda **`envman clip`** (clipboard akun di server, lintas device) dengan **`--copy`** (clipboard OS lokal).
+
+### Changed
+- **⚠️ Breaking — `envman health --copy <status>` menjadi `--paths <status>`.** Flag lama berarti *"cetak path agar bisa disalin"*, sedangkan `--copy` di seluruh CLI kini berarti *"salin untuk saya"* — satu kata, dua makna. Nama lama tetap berfungsi sebagai `--copy-status` (tersembunyi), dan bentuk `--copy critical` yang kini salah akan memberi pesan yang menyebutkan penggantinya. Setelah ini `envman health --paths critical --copy` menyalin daftarnya langsung ke clipboard.
+
 ## [0.27.0] - 2026-07-30
 
 ### Changed

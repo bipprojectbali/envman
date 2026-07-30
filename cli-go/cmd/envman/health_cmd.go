@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/bipprojectbali/envman/cli/internal/health"
@@ -11,14 +12,16 @@ import (
 
 func healthCmd() *cobra.Command {
 	var (
-		status   string
-		exts     string
-		maxLines int
-		maxChars int
-		maxDepth int
-		hidden   bool
-		quiet    bool
-		copyOnly string
+		status      string
+		exts        string
+		maxLines    int
+		maxChars    int
+		maxDepth    int
+		hidden      bool
+		quiet       bool
+		copyOnly    string
+		pathsOnly   string
+		toClipboard bool
 	)
 	cmd := &cobra.Command{
 		Use:   "health [dir]",
@@ -33,11 +36,12 @@ limits are 500 lines / 20,000 chars; override with --max-lines / --max-chars.
 Dependency & build dirs (node_modules, .git, dist, vendor, …) are skipped, as
 are binary files. Traversal stops at depth 20 by default (--depth 0 = no limit).
 
-Use --copy <status> to print just the paths (one per line) so you can pipe them
-to an AI agent and ask it to split them:
+Use --paths <status> to print just the paths (one per line) so you can hand
+them to an AI agent and ask it to split them. Add --copy to put that list on
+the clipboard directly:
 
-  envman health --copy critical | pbcopy
-  envman health --copy all | envman clip set`,
+  envman health --paths critical --copy
+  envman health --paths all | envman clip set`,
 		Example: "  envman health\n" +
 			"  envman health ./src --status critical\n" +
 			"  envman health --ext ts,tsx,go\n" +
@@ -47,6 +51,13 @@ to an AI agent and ask it to split them:
 			root := "."
 			if len(args) == 1 {
 				root = args[0]
+			}
+			// `--copy <status>` used to be how you asked for a path list. --copy
+			// is now a boolean, so that form silently reinterprets the status as
+			// a directory. Catch it and name the new spelling.
+			if toClipboard && isStatusWord(root) {
+				return fmt.Errorf(
+					"[envman] --copy kini hanya menyalin ke clipboard — untuk memilih status pakai: envman health --paths %s --copy", root)
 			}
 			if st, err := os.Stat(root); err != nil || !st.IsDir() {
 				return fmt.Errorf("[envman] bukan direktori: %s", root)
@@ -64,22 +75,44 @@ to an AI agent and ask it to split them:
 				return err
 			}
 
-			// --copy mode: print bare paths for the chosen status, nothing else.
-			if copyOnly != "" {
+			// --paths: bare paths for the chosen status, nothing else. The old
+			// name for this was --copy, which collided with the CLI-wide --copy
+			// meaning "put it on my clipboard" — this only formats for copying.
+			if pathsOnly == "" && copyOnly != "" {
+				pathsOnly = copyOnly
+			}
+			if pathsOnly != "" {
+				var out []string
 				for _, f := range files {
-					if matchStatus(copyOnly, f.Status) {
-						fmt.Println(f.Path)
+					if matchStatus(pathsOnly, f.Status) {
+						out = append(out, f.Path)
 					}
+				}
+				joined := strings.Join(out, "\n")
+				if toClipboard {
+					_, err := copyToClipboard(joined, fmt.Sprintf("%d path", len(out)))
+					return err
+				}
+				for _, p := range out {
+					fmt.Println(p)
 				}
 				return nil
 			}
 
 			// --quiet: bare paths of everything (optionally filtered by --status).
 			if quiet {
+				var out []string
 				for _, f := range files {
 					if status == "" || matchStatus(status, f.Status) {
-						fmt.Println(f.Path)
+						out = append(out, f.Path)
 					}
+				}
+				if toClipboard {
+					_, err := copyToClipboard(strings.Join(out, "\n"), fmt.Sprintf("%d path", len(out)))
+					return err
+				}
+				for _, p := range out {
+					fmt.Println(p)
 				}
 				return nil
 			}
@@ -95,12 +128,28 @@ to an AI agent and ask it to split them:
 	cmd.Flags().IntVar(&maxDepth, "depth", -1, "Max directory depth (0 = unlimited; default 20)")
 	cmd.Flags().BoolVar(&hidden, "all", false, "Include hidden (dot) directories")
 	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Print bare paths (pipe-friendly)")
-	cmd.Flags().StringVar(&copyOnly, "copy", "", "Print only paths of this status: critical|warning|all")
+	cmd.Flags().StringVar(&pathsOnly, "paths", "", "Print only paths of this status: critical|warning|all")
+	cmd.Flags().BoolVar(&toClipboard, "copy", false, "Copy the output to the clipboard instead of printing")
+	// The old string --copy meant "format for copying", not "copy for me". It
+	// still works so nobody's scripts break, but it is hidden and superseded by
+	// --paths, so --copy means one thing across the whole CLI.
+	cmd.Flags().StringVar(&copyOnly, "copy-status", "", "Deprecated alias for --paths")
+	_ = cmd.Flags().MarkHidden("copy-status")
 	return cmd
 }
 
 // matchStatus reports whether a file's status matches a filter keyword.
 // "all" matches warning + critical (the actionable ones).
+// isStatusWord reports whether s is one of the --paths status values, used to
+// detect the old `--copy <status>` form.
+func isStatusWord(s string) bool {
+	switch s {
+	case "ok", "warning", "critical", "all":
+		return true
+	}
+	return false
+}
+
 func matchStatus(filter string, s health.Status) bool {
 	switch filter {
 	case "all":

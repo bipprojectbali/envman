@@ -23,23 +23,23 @@ Batas default 500 baris / 20.000 karakter — ubah dengan \`--max-lines\` /
 
 ### Kirim daftar file bermasalah ke agent
 
-Gunakan \`--copy <status>\` untuk mencetak **hanya path** (satu per baris) supaya
+Gunakan \`--paths <status>\` untuk mencetak **hanya path** (satu per baris) supaya
 bisa langsung di-pipe — tinggal tempel ke agent AI dan minta di-split:
 
 \`\`\`bash
-envman health --copy critical | pbcopy          # ke clipboard OS
-envman health --copy all | envman clip set      # ke clipboard akun (lintas device)
-envman health --copy warning                    # cukup yang warning
+envman health --paths critical --copy          # ke clipboard OS
+envman health --paths all | envman clip set      # ke clipboard akun (lintas device)
+envman health --paths warning                    # cukup yang warning
 \`\`\`
 
-\`--copy all\` = warning + critical (semua yang perlu ditindak). \`-q\` mencetak
+\`--paths all\` = warning + critical (semua yang perlu ditindak). \`-q\` mencetak
 semua path polos (opsional dengan \`--status\`).
 
 ### Flag
 
 \`\`\`
 --status ok|warning|critical    filter tampilan
---copy critical|warning|all     cetak path saja (pipe-friendly)
+--paths critical|warning|all     cetak path saja (pipe-friendly)
 --ext ts,tsx,go                 hanya ekstensi ini (default: semua file teks)
 --max-lines N                   batas baris (default 500)
 --max-chars N                   batas karakter (default 20000)

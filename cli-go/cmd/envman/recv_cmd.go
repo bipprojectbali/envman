@@ -25,6 +25,7 @@ func transferGetCmd() *cobra.Command {
 	var outFile string
 	var force bool
 	var server string
+	var toClipboard bool
 
 	cmd := &cobra.Command{
 		Use:   "get <id|CODE>",
@@ -106,6 +107,10 @@ transfer is gone once collected: nothing else can read it afterwards.`,
 			// File transfers: the payload is an object in storage, reached via a
 			// presigned URL. Default to the sender's filename rather than dumping
 			// binary into a terminal.
+			if res.IsFile() && toClipboard {
+				return fmt.Errorf("[envman] --copy hanya untuk kiriman teks — ini file %q, pakai -o <file>", res.Filename)
+			}
+
 			if res.IsFile() {
 				dest := outFile
 				if dest == "" {
@@ -127,6 +132,29 @@ transfer is gone once collected: nothing else can read it afterwards.`,
 					return err
 				}
 				fmt.Fprintf(os.Stderr, "[envman] tersimpan → %s (%s)%s\n", dest, storage.FmtBytes(res.Size), fromSuffix(res))
+				return nil
+			}
+
+			// Burn-after-read: the server copy is ALREADY gone by the time we get
+			// here (see the comment below). So a clipboard failure must never
+			// swallow the content — fall back to stdout and say why.
+			if toClipboard {
+				method, err := copyToClipboard(res.Content, "isi kiriman")
+				if err != nil {
+					fmt.Fprintf(os.Stderr,
+						"[envman] clipboard gagal (%v) — transfer sudah terbakar, jadi isinya dicetak di bawah:\n", err)
+					fmt.Print(res.Content)
+					if !strings.HasSuffix(res.Content, "\n") {
+						fmt.Println()
+					}
+					return nil
+				}
+				if !method.Confirmed() {
+					fmt.Fprintln(os.Stderr,
+						"[envman] PERINGATAN: transfer ini hangus-sekali-baca dan sudah terbakar."+
+							" Pengiriman lewat OSC 52 tak bisa dikonfirmasi — TEMPEL SEKARANG untuk memastikan.")
+				}
+				fmt.Fprintf(os.Stderr, "[envman] diterima%s\n", fromSuffix(res))
 				return nil
 			}
 
@@ -155,6 +183,8 @@ transfer is gone once collected: nothing else can read it afterwards.`,
 	}
 	cmd.Flags().StringVarP(&outFile, "output", "o", "", "Write to this file instead of stdout (0600)")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite the output file if it exists")
+	cmd.Flags().BoolVar(&toClipboard, "copy", false, "Copy to the clipboard instead of printing (keeps it out of scrollback)")
+	cmd.MarkFlagsMutuallyExclusive("copy", "output")
 	cmd.Flags().StringVar(&server, "server", "", "Server URL (only needed for code claims without a login)")
 	return cmd
 }

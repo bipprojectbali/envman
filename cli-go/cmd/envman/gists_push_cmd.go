@@ -84,6 +84,7 @@ func gistsPullCmd() *cobra.Command {
 	var outDir string
 	var file string
 	var force bool
+	var toClipboard bool
 	cmd := &cobra.Command{
 		Use:   "pull <title|id>[:filename]",
 		Short: "Write a gist's files to disk",
@@ -115,12 +116,14 @@ with -o. --force overwrites existing files.`,
 			if err != nil {
 				return err
 			}
-			return pullGistFiles(g, file, outDir, force)
+			return pullGistFiles(g, pullOptions{File: file, OutDir: outDir, Force: force, Clipboard: toClipboard})
 		},
 	}
 	cmd.Flags().StringVarP(&outDir, "output", "o", "", "Directory to write files into")
 	cmd.Flags().StringVar(&file, "file", "", "Pull only this filename (stdout, or -o <file>)")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing files")
+	cmd.Flags().BoolVar(&toClipboard, "copy", false, "Copy to the clipboard instead of printing (single file only)")
+	cmd.MarkFlagsMutuallyExclusive("copy", "output")
 	return cmd
 }
 
@@ -265,12 +268,26 @@ func readGistFiles(paths []string) ([]gists.File, error) {
 // pulled (to stdout, or to outDir as a path/file). Otherwise: a single-file gist
 // prints to stdout when outDir is empty, and any gist writes each file into
 // outDir. force allows overwriting existing files.
-func pullGistFiles(g *gists.Gist, file, outDir string, force bool) error {
+// pullOptions groups the pull destination flags. A struct rather than a fifth
+// positional parameter, which was already at the limit of readability.
+type pullOptions struct {
+	File      string
+	OutDir    string
+	Force     bool
+	Clipboard bool
+}
+
+func pullGistFiles(g *gists.Gist, o pullOptions) error {
+	file, outDir, force := o.File, o.OutDir, o.Force
 	if file != "" {
 		f := findGistFile(g, file)
 		if f == nil {
 			return fmt.Errorf("[envman] file %q tidak ada di gist %q — file tersedia: %s",
 				file, g.Title, strings.Join(gistFilenames(g), ", "))
+		}
+		if o.Clipboard {
+			_, err := copyToClipboard(f.Content, f.Filename)
+			return err
 		}
 		if outDir == "" {
 			fmt.Print(f.Content)
@@ -282,6 +299,10 @@ func pullGistFiles(g *gists.Gist, file, outDir string, force bool) error {
 		if len(g.Files) != 1 {
 			return fmt.Errorf("[envman] gist %q punya %d file — gunakan --file <name> atau -o <dir>",
 				g.Title, len(g.Files))
+		}
+		if o.Clipboard {
+			_, err := copyToClipboard(g.Files[0].Content, g.Files[0].Filename)
+			return err
 		}
 		fmt.Print(g.Files[0].Content)
 		return nil
