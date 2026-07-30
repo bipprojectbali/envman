@@ -287,7 +287,7 @@ MINIO_ENDPOINT · MINIO_ACCESS_KEY · MINIO_SECRET_KEY · MINIO_BUCKET=envman ·
 
 ## Transfer (envman transfer)
 
-Kirim secret **user-ke-user** (`.env`, kunci SSH, cert) agar tak lewat WhatsApp/Slack. Beda dari `clip` (slot-tunggal milik sendiri), transfer punya **penerima**. Model `Transfer`. Service `src/lib/transfer-service.ts`. Routes `src/routes/envman/transfers-{send,list,claim}.ts` (+ agregator `transfers.ts`). Sweep `src/lib/transfer-sweep.ts`. CLI `cli-go/internal/transfer/` + `cmd/envman/{transfer,recv}_cmd.go`.
+Kirim secret **user-ke-user** (`.env`, kunci SSH, cert) agar tak lewat WhatsApp/Slack. Beda dari `clip` (slot-tunggal milik sendiri), transfer punya **penerima**. Model `Transfer`. Service `src/lib/transfer-service.ts`. Routes `src/routes/envman/transfers-{send,list,claim}.ts` (+ agregator `transfers.ts`). Sweep `src/lib/transfer-sweep.ts`. CLI `cli-go/internal/transfer/` + `cmd/envman/{transfer,recv}_cmd.go` (recv_cmd.go = `transfer get`).
 
 > ⚠️ **Bukan E2E.** Dienkripsi at-rest dengan `MASTER_KEY` **server** — aman dari pihak ketiga & kebocoran DB, tapi pemegang `MASTER_KEY` (admin) bisa membaca. Wajib disebut apa adanya di docs; jangan diklaim lebih.
 
@@ -316,7 +316,7 @@ Audit `TRANSFER_SENT`/`TRANSFER_CLAIMED`/`TRANSFER_REVOKED`. Setting (UI: `/dev 
 
 ### Konvensi permukaan perintah (MUTLAK)
 
-- **Fitur = noun-group.** Semua subcommand di bawah satu kata benda (`clip`, `env`, `gists`, `storage`, `projects`, `portainer`, `transfer`). **Jangan** menyebar verba fitur ke tingkat atas — itu bikin fiturnya tak tertemukan di `--help` yang alfabetis. Pengecualian tunggal: `recv` (dipakai orang **tanpa akun**, hanya menerima satu baris perintah lewat chat).
+- **Fitur = noun-group.** Semua subcommand di bawah satu kata benda (`clip`, `env`, `gists`, `storage`, `projects`, `portainer`, `transfer`). **Jangan** menyebar verba fitur ke tingkat atas — itu bikin fiturnya tak tertemukan di `--help` yang alfabetis. **Tanpa pengecualian.** `recv` sempat dibiarkan top-level dengan alasan "orang tanpa akun butuh perintah pendek" — alasan itu salah: mereka tak pernah membaca `--help`, hanya menempel satu baris dari chat. Yang tersisa hanyalah dua entri untuk satu pekerjaan.
 - **`-f` = `--follow` saja** (`portainer logs`, konvensi `tail`/`docker`). `--force` **long-only di seluruh CLI** — dijaga `TestForceHasNoShorthand`.
 - **`--tags`** (jamak) di mana-mana. Wire field selalu `tags`; `Changed("tags")` adalah literal string yang diam-diam no-op bila lupa diubah.
 - **`--json`** tanpa shorthand, lewat `emitJSON()` (`cmd/envman/json_out.go`). stdout **hanya data**, status ke stderr.
@@ -467,7 +467,7 @@ envman transfer send [file] --to <email|nama> | --once   # -m · --ttl · --keep
 envman transfer ls [--sent] [--json]               # daftar kiriman masuk / terkirim
 envman transfer get <id> [-o file] [--force]       # ambil
 envman transfer rm <id>                            # cabut/tolak
-envman recv <id|KODE> [--server URL]               # jalan pintas transfer get (KODE: tanpa login)
+envman transfer get <id|KODE> [--server URL]       # KODE: tanpa login (pakai ENVMAN_CODE)
 
 envman gists ls [--public] [-q] [--limit N=100] [--cursor id]   # (alias: gist) list gist (sendiri+public)
 envman gists find <query> [--tags a,b] [-q]        # cari judul/deskripsi

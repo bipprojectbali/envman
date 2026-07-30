@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **⚠️ Breaking — `envman recv` dihapus; pakai `envman transfer get`.** Keduanya ternyata perintah yang sama persis (parameter yang seharusnya membedakannya tak pernah dipakai sama sekali), dan `recv` berdiri tepat di sebelah `transfer` yang deskripsinya sudah berbunyi *"Send and receive secrets"* — dua entri mengiklankan satu pekerjaan. `recv` sebelumnya dipertahankan dengan alasan orang tanpa akun butuh perintah pendek, tapi alasan itu tak berlaku: mereka tak pernah membuka `--help`, mereka menempel satu baris yang dikirim pengirim. Baris itu kini otomatis memakai bentuk baru sekaligus `ENVMAN_CODE`, jadi alurnya tak berubah bagi mereka. `envman recv` memberi pesan yang menyebutkan penggantinya.
+
 ## [0.26.1] - 2026-07-30
 
 ### Security

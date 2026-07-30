@@ -118,7 +118,6 @@ Reference project files and aliases stored on the server.`, VERSION),
 		envCmd(),
 		clipCmd(),
 		transferCmd(),
-		recvCmd(),
 		projectsCmd(),
 		healthCmd(),
 		sysCmd(),
@@ -310,4 +309,5 @@ func hasFileRef(args []string) bool {
 var movedCommands = map[string]string{
 	"send":  "transfer send",
 	"inbox": "transfer ls",
+	"recv":  "transfer get",
 }
