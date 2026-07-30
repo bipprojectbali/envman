@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bipprojectbali/envman/cli/internal/auth"
+	"github.com/bipprojectbali/envman/cli/internal/secretin"
 	"github.com/bipprojectbali/envman/cli/internal/storage"
 	"github.com/bipprojectbali/envman/cli/internal/transfer"
 	"github.com/spf13/cobra"
@@ -43,15 +44,33 @@ someone sent you.
 The code path needs no account and no login — just the code and the
 server URL, so a teammate can pick up a secret on a brand-new machine.
 
+Prefer ENVMAN_CODE=<code> over passing the code as an argument: an
+argument is visible to anyone running "ps aux" on the machine and is
+kept in your shell history. With neither, the code is read from stdin
+or prompted for.
+
 Content goes to stdout unless -o is given, so it pipes cleanly. Files
 written with -o are created 0600. Unless the sender passed --keep, the
 transfer is gone once collected: nothing else can read it afterwards.`,
 		Example: "  envman transfer get 3f7a1c92-... -o .env\n" +
-			"  envman recv EM-3F7K-9QW2-M4XZ-7T1B --server https://envman.example.com > .env\n" +
+			"  ENVMAN_CODE=EM-3F7K-9QW2-M4XZ-7T1B envman recv --server https://envman.example.com > .env\n" +
 			"  envman transfer ls && envman transfer get <id>",
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			ref := args[0]
+			argRef := ""
+			if len(args) == 1 {
+				argRef = args[0]
+			}
+			ref, err := secretin.Read(secretin.Options{
+				Arg:        argRef,
+				EnvVar:     "ENVMAN_CODE",
+				Prompt:     "Kode klaim / id transfer: ",
+				AllowStdin: true,
+				Label:      "kode klaim",
+			})
+			if err != nil {
+				return err
+			}
 
 			// Refuse an existing output file BEFORE claiming. Claiming burns the
 			// transfer, so failing afterwards would destroy the only copy and
@@ -64,7 +83,6 @@ transfer is gone once collected: nothing else can read it afterwards.`,
 			}
 
 			var res *transfer.ClaimResult
-			var err error
 
 			switch {
 			case transfer.IsUUID(ref):

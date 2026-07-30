@@ -453,8 +453,14 @@ Baris perintah itu **aman dikirim lewat chat** — yang rahasia ada di server, b
 di pesannya. Penerima tak perlu akun, tak perlu `envman login`:
 
 ```bash
-envman recv EM-3F7K-9QW2-M4XZ-7T1B --server https://envman.example.com -o .env
+ENVMAN_CODE=EM-3F7K-9QW2-M4XZ-7T1B envman recv --server https://envman.example.com -o .env
 ```
+
+> ⚠️ **Jangan berikan kode sebagai argumen di mesin bersama.** Argumen terlihat
+> oleh siapa pun yang menjalankan `ps aux` dan tersimpan di history shell. Pakai
+> `ENVMAN_CODE=…` seperti contoh di atas, atau pipe lewat stdin; tanpa keduanya
+> envman akan menanyakannya. Hal yang sama berlaku untuk `envman login --token`
+> (pakai `ENVMAN_TOKEN`).
 
 Kode boleh diketik huruf kecil atau tanpa tanda hubung. Alfabetnya sengaja tak
 memuat `I`, `L`, `O`, `U` supaya `0/O` dan `1/I/L` tak tertukar.

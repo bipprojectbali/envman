@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+- **Token dan kode klaim tak lagi harus lewat argumen baris perintah.** Argumen terlihat oleh siapa pun yang menjalankan `ps aux` di mesin yang sama dan tersimpan di history shell — kerentanan yang sama pernah menimpa [croc](https://github.com/schollz/croc) (CVE-2023-43621). Ini terutama berbahaya untuk `envman recv`, yang justru dirancang untuk mesin yang baru disiapkan dan mungkin dipakai bersama.
+  - `envman login` kini membaca token dari **`ENVMAN_TOKEN`**, dari stdin (`cat token.txt | envman login <url>`), atau menanyakannya. `--token` masih diterima tapi memperingatkan.
+  - `envman recv` / `envman transfer get` kini membaca kode dari **`ENVMAN_CODE`**, stdin, atau prompt. Kode sebagai argumen masih diterima dengan peringatan.
+  - Tidak ada yang patah: semua bentuk lama tetap berfungsi, hanya kini menjelaskan risikonya ke stderr.
+
 ## [0.26.0] - 2026-07-30
 
 ### Changed
