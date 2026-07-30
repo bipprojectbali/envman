@@ -29,7 +29,11 @@ Copy on one machine, paste on another:
 func clipSetCmd() *cobra.Command {
 	var ttl string
 	cmd := &cobra.Command{
-		Use:   "set [file]",
+		Use: "set [file]",
+		Long: `Put content on your account clipboard, from a file or stdin.
+
+Replaces whatever was there — the clipboard holds one item. Content is
+encrypted at rest and expires automatically (default 24h, see --ttl).`,
 		Short: "Set the clipboard from a file or stdin",
 		Example: "  cat .env | envman clip set\n" +
 			"  envman clip set .env\n" +
@@ -112,7 +116,10 @@ func clipGetCmd() *cobra.Command {
 
 func clipClearCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "clear",
+		Use: "clear",
+		Long: `Empty your account clipboard immediately, without waiting for its TTL.
+
+Succeeds even when the clipboard is already empty.`,
 		Short:   "Clear the clipboard",
 		Args:    cobra.NoArgs,
 		Example: "  envman clip clear",

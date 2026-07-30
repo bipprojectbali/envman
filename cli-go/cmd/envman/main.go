@@ -57,6 +57,12 @@ Reference project files and aliases stored on the server.`, VERSION),
 			if len(args) == 0 {
 				return cmd.Help()
 			}
+			// Commands that moved into a group would otherwise fall through to
+			// the injector and produce a baffling "specify at least one -e
+			// source" error. Name the new form instead.
+			if moved, ok := movedCommands[args[0]]; ok {
+				return fmt.Errorf("[envman] perintah %q kini %q — jalankan `envman %s --help`", args[0], moved, moved)
+			}
 			if len(sources) == 0 && !hasFileRef(args) {
 				return fmt.Errorf(
 					"specify at least one -e source, or reference a project file\n\n" +
@@ -110,8 +116,7 @@ Reference project files and aliases stored on the server.`, VERSION),
 		portainerCmd(),
 		envCmd(),
 		clipCmd(),
-		sendCmd(),
-		inboxCmd(),
+		transferCmd(),
 		recvCmd(),
 		projectsCmd(),
 		healthCmd(),
@@ -165,7 +170,12 @@ func logoutCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "logout",
 		Short: "Remove saved server credentials",
-		Args:  cobra.NoArgs,
+		Long: `Delete ~/.config/envman/config.json.
+
+Only removes the local copy — the API token itself stays valid on the
+server until you revoke it there.`,
+		Example: "  envman logout",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := auth.Remove(); err != nil {
 				return fmt.Errorf("remove config: %w", err)
@@ -180,7 +190,12 @@ func whoamiCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "whoami",
 		Short: "Show current authenticated user and server",
-		Args:  cobra.NoArgs,
+		Long: `Print which account, token and server the CLI is currently using.
+
+Useful when several tokens or servers are in play, or to confirm a token
+still works before running something that matters.`,
+		Example: "  envman whoami",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := auth.Resolve()
 			if err != nil {
@@ -270,4 +285,12 @@ func hasFileRef(args []string) bool {
 		}
 	}
 	return false
+}
+
+// movedCommands maps a removed top-level command to its replacement, so the
+// root injector can say what happened instead of failing with an unrelated
+// error about missing -e sources.
+var movedCommands = map[string]string{
+	"send":  "transfer send",
+	"inbox": "transfer ls",
 }

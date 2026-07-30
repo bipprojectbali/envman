@@ -22,8 +22,10 @@ func healthCmd() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "health [dir]",
-		Short: "Scan a project for files too large for an AI agent's context",
-		Long: `Walk a directory and report files whose size (lines / characters) approaches
+		Short: "Scan a local project for files too large for an AI agent's context",
+		Long: `Runs entirely offline — no login and no server call.
+
+Walk a directory and report files whose size (lines / characters) approaches
 or exceeds a limit — the files that blow up an AI agent's context window.
 
 Files are ok (<80% of limit), warning (80–99%), or critical (>=100%). Default

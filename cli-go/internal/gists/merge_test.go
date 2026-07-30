@@ -74,6 +74,33 @@ func TestMergeFiles_Clean_ReplacesAll(t *testing.T) {
 	}
 }
 
+// Dropped is what lets the caller name the casualties instead of only
+// reporting "now N files".
+func TestMergeFiles_Clean_ReportsDropped(t *testing.T) {
+	existing := []File{f("a.ts"), f("b.json"), f("c.md")}
+	res := MergeFiles(existing, []File{f("x.ts")}, true, false)
+	if strings.Join(res.Dropped, ",") != "a.ts,b.json,c.md" {
+		t.Errorf("dropped = %v, want [a.ts b.json c.md]", res.Dropped)
+	}
+}
+
+func TestMergeFiles_Clean_KeptFileIsNotDropped(t *testing.T) {
+	existing := []File{f("a.ts"), f("b.json")}
+	// a.ts is re-pushed, so only b.json actually disappears.
+	res := MergeFiles(existing, []File{f("a.ts")}, true, false)
+	if strings.Join(res.Dropped, ",") != "b.json" {
+		t.Errorf("dropped = %v, want [b.json]", res.Dropped)
+	}
+}
+
+func TestMergeFiles_NonClean_DropsNothing(t *testing.T) {
+	existing := []File{f("a.ts")}
+	res := MergeFiles(existing, []File{f("b.json")}, false, false)
+	if len(res.Dropped) != 0 {
+		t.Errorf("dropped = %v, want empty (only --clean drops)", res.Dropped)
+	}
+}
+
 func TestMergeFiles_MixedAddAndOverwrite(t *testing.T) {
 	existing := []File{{Filename: "a.ts", Content: "old"}, f("b.json")}
 	res := MergeFiles(existing, []File{{Filename: "a.ts", Content: "new"}, f("c.md")}, false, true)

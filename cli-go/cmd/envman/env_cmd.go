@@ -17,7 +17,7 @@ import (
 func envCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "env <subcommand>",
-		Short: "Sync a local .env with a project environment",
+		Short: "Work with .env files: push, pull, inspect keys, sync",
 		Long: `Push a local .env to a project environment (upsert per key), or pull an
 environment's vars into a .env file.
 

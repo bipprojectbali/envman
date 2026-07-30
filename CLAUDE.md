@@ -285,9 +285,9 @@ MINIO_ENDPOINT · MINIO_ACCESS_KEY · MINIO_SECRET_KEY · MINIO_BUCKET=envman ·
 - Routes: `storage-core.ts` (list/download/meta/delete) · `storage-upload.ts` (≤50MB) · `storage-multipart.ts` (>50MB) · `storage-rename.ts` · `storage-move.ts` (batch) · `public-storage.ts` (redirect).
 - FE: `slug/StoragePanel.tsx`, `StorageUploadModal.tsx`, `StorageFileRow/Card.tsx`, `StorageMoveModal.tsx`. Hooks `useStorageFileActions.ts`, `useChunkedUpload.ts` (`MULTIPART_THRESHOLD=50MB`).
 
-## Transfer (send / inbox / recv)
+## Transfer (envman transfer)
 
-Kirim secret **user-ke-user** (`.env`, kunci SSH, cert) agar tak lewat WhatsApp/Slack. Beda dari `clip` (slot-tunggal milik sendiri), transfer punya **penerima**. Model `Transfer`. Service `src/lib/transfer-service.ts`. Routes `src/routes/envman/transfers-{send,list,claim}.ts` (+ agregator `transfers.ts`). Sweep `src/lib/transfer-sweep.ts`. CLI `cli-go/internal/transfer/` + `cmd/envman/{send,inbox}_cmd.go`.
+Kirim secret **user-ke-user** (`.env`, kunci SSH, cert) agar tak lewat WhatsApp/Slack. Beda dari `clip` (slot-tunggal milik sendiri), transfer punya **penerima**. Model `Transfer`. Service `src/lib/transfer-service.ts`. Routes `src/routes/envman/transfers-{send,list,claim}.ts` (+ agregator `transfers.ts`). Sweep `src/lib/transfer-sweep.ts`. CLI `cli-go/internal/transfer/` + `cmd/envman/{transfer,recv}_cmd.go`.
 
 > ⚠️ **Bukan E2E.** Dienkripsi at-rest dengan `MASTER_KEY` **server** — aman dari pihak ketiga & kebocoran DB, tapi pemegang `MASTER_KEY` (admin) bisa membaca. Wajib disebut apa adanya di docs; jangan diklaim lebih.
 
@@ -313,6 +313,17 @@ Kirim secret **user-ke-user** (`.env`, kunci SSH, cert) agar tak lewat WhatsApp/
 `POST /api/envman/transfers` (TEXT; `canWrite`; 400/403/404/409/413/429 kuota/503) · `POST .../transfers/presign` + `POST .../transfers/:id/confirm` (FILE; `canWrite`; 503 bila MinIO mati, 502 bila stat gagal, 413 bila ukuran nyata > batas) · `GET .../transfers/inbox|sent` · `POST .../transfers/:id/claim` (FILE → `downloadUrl` presigned) · `DELETE .../transfers/:id` · **`POST .../transfers/claim` (tanpa auth**, kode di body).
 
 Audit `TRANSFER_SENT`/`TRANSFER_CLAIMED`/`TRANSFER_REVOKED`. Setting (UI: `/dev > Storage`, `TransferSettingsPanel.tsx`): `transfer_max_text_kb` (1024), `transfer_max_file_mb` (100), `transfer_max_ttl_hours` (168), `transfer_default_ttl_hours` (72), `transfer_max_pending_per_user` (20).
+
+### Konvensi permukaan perintah (MUTLAK)
+
+- **Fitur = noun-group.** Semua subcommand di bawah satu kata benda (`clip`, `env`, `gists`, `storage`, `projects`, `portainer`, `transfer`). **Jangan** menyebar verba fitur ke tingkat atas — itu bikin fiturnya tak tertemukan di `--help` yang alfabetis. Pengecualian tunggal: `recv` (dipakai orang **tanpa akun**, hanya menerima satu baris perintah lewat chat).
+- **`-f` = `--follow` saja** (`portainer logs`, konvensi `tail`/`docker`). `--force` **long-only di seluruh CLI** — dijaga `TestForceHasNoShorthand`.
+- **`--tags`** (jamak) di mana-mana. Wire field selalu `tags`; `Changed("tags")` adalah literal string yang diam-diam no-op bila lupa diubah.
+- **`--json`** tanpa shorthand, lewat `emitJSON()` (`cmd/envman/json_out.go`). stdout **hanya data**, status ke stderr.
+- **Perintah destruktif default aman**: `storage rm` pratinjau dulu (butuh `--force`), `gists push --clean` menolak tanpa `--force` dan **menyebut file yang akan hilang** (`MergeResult.Dropped`).
+- **Perintah yang dipindah** wajib masuk `movedCommands` (`main.go`) — tanpa itu ia jatuh ke root injector dan memberi error yang tak berkaitan.
+- Perintah **tanpa login** (`health`, `sys`, `install`, `env sync`) wajib menyebutnya di baris pertama `Long`.
+- Tambah/pindah perintah → **wajib** test registrasi (`transfer_cmd_test.go`, `env_sync_cmd_test.go`). CI **tidak** menjalankan smoke test perintah.
 
 ### Jalur TEXT vs FILE (auto-deteksi di CLI)
 
@@ -451,10 +462,11 @@ envman sys                                # snapshot kesehatan mesin lokal (host
 
 envman clip set [file] · get [-o file] · clear     # clipboard akun. --ttl 30m|2h|7d (default 24h). --force
 
-envman send [file] --to <email|nama> | --once     # kirim secret ke user lain. -m · --ttl · --keep · --text/--file (auto-deteksi)
-envman send rm <id>                                # cabut/tolak
-envman inbox [--sent]                              # daftar kiriman masuk / terkirim
-envman recv <id|KODE> [-o file] [--force] [--server URL]   # ambil (KODE: tanpa login)
+envman transfer send [file] --to <email|nama> | --once   # -m · --ttl · --keep · --mode text|file (auto-deteksi)
+envman transfer ls [--sent] [--json]               # daftar kiriman masuk / terkirim
+envman transfer get <id> [-o file] [--force]       # ambil
+envman transfer rm <id>                            # cabut/tolak
+envman recv <id|KODE> [--server URL]               # jalan pintas transfer get (KODE: tanpa login)
 
 envman gists ls [--public] [-q] [--limit N=100] [--cursor id]   # (alias: gist) list gist (sendiri+public)
 envman gists find <query> [--tags a,b] [-q]        # cari judul/deskripsi

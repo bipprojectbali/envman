@@ -6,6 +6,9 @@ type MergeResult struct {
 	Added       []string // filenames newly added
 	Overwritten []string // existing filenames replaced (required force)
 	Conflicts   []string // existing filenames a push would overwrite without force
+	// Dropped lists files that clean=true removes. Without it the caller can
+	// only report "now N files" and the user never learns what disappeared.
+	Dropped []string
 }
 
 // MergeFiles computes the new file set when pushing `pushed` onto `existing`.
@@ -19,11 +22,19 @@ type MergeResult struct {
 // When Conflicts is non-empty the caller should abort without applying Files.
 func MergeFiles(existing, pushed []File, clean, force bool) MergeResult {
 	if clean {
+		keep := make(map[string]bool, len(pushed))
 		names := make([]string, len(pushed))
 		for i, f := range pushed {
 			names[i] = f.Filename
+			keep[f.Filename] = true
 		}
-		return MergeResult{Files: pushed, Added: names}
+		var dropped []string
+		for _, f := range existing {
+			if !keep[f.Filename] {
+				dropped = append(dropped, f.Filename)
+			}
+		}
+		return MergeResult{Files: pushed, Added: names, Dropped: dropped}
 	}
 
 	idx := make(map[string]int, len(existing))

@@ -5,89 +5,39 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"text/tabwriter"
-	"time"
 
 	"github.com/bipprojectbali/envman/cli/internal/auth"
-	"github.com/bipprojectbali/envman/cli/internal/clipboard"
 	"github.com/bipprojectbali/envman/cli/internal/storage"
 	"github.com/bipprojectbali/envman/cli/internal/transfer"
 	"github.com/spf13/cobra"
 )
 
-func inboxCmd() *cobra.Command {
-	var sent bool
-
-	cmd := &cobra.Command{
-		Use:   "inbox",
-		Short: "List secrets other users have sent you",
-		Long: `List transfers waiting for you, with the id needed to collect each one.
-Nothing is claimed by listing — use 'envman recv <id>' for that.
-
---sent shows what you have sent instead, so you can check whether it has
-been picked up (and revoke it with 'envman send rm <id>' if not).`,
-		Example: "  envman inbox\n  envman inbox --sent",
-		Args:    cobra.NoArgs,
-		RunE: func(_ *cobra.Command, args []string) error {
-			cfg, err := auth.Resolve()
-			if err != nil {
-				return err
-			}
-
-			items, err := transfer.Inbox(cfg)
-			if sent {
-				items, err = transfer.Sent(cfg)
-			}
-			if err != nil {
-				return err
-			}
-			if len(items) == 0 {
-				if sent {
-					fmt.Fprintln(os.Stderr, "[envman] belum ada transfer terkirim yang aktif")
-				} else {
-					fmt.Fprintln(os.Stderr, "[envman] inbox kosong")
-				}
-				return nil
-			}
-
-			now := time.Now()
-			w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-			if sent {
-				fmt.Fprintln(w, "ID\tKE\tCATATAN\tSTATUS\tKEDALUWARSA")
-			} else {
-				fmt.Fprintln(w, "ID\tDARI\tJENIS\tCATATAN\tUKURAN\tKEDALUWARSA")
-			}
-			for _, it := range items {
-				expiry := clipboard.HumanUntil(it.ExpiresAt, now)
-				if sent {
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-						it.ID, sentTarget(it), dash(it.Label), claimStatus(it), expiry)
-					continue
-				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-					it.ID, fromLabel(it), kindLabel(it), dash(it.Label), storage.FmtBytes(it.Size), expiry)
-			}
-			w.Flush()
-
-			if !sent {
-				fmt.Fprintf(os.Stderr, "\n[envman] ambil dengan: envman recv <id> -o <file>\n")
-			}
-			return nil
-		},
-	}
-	cmd.Flags().BoolVar(&sent, "sent", false, "Show transfers you sent instead of received")
-	return cmd
-}
+// Collecting a transfer. Exposed twice on purpose: as `envman transfer get` for
+// people working inside the CLI, and as top-level `envman recv` for someone who
+// has never logged in and was handed a one-time code over chat — that path
+// needs no account, so making them type the longer form helps nobody.
 
 func recvCmd() *cobra.Command {
+	return claimCmd("recv <id|CODE>", true)
+}
+
+// transferGetCmd is the same command inside the transfer group.
+func transferGetCmd() *cobra.Command {
+	return claimCmd("get <id|CODE>", false)
+}
+
+// claimCmd builds the collect command. topLevel toggles the wording, since the
+// top-level `envman recv` is what a person with no account is handed, while
+// `envman transfer get` is what a logged-in user reaches from `transfer ls`.
+func claimCmd(use string, topLevel bool) *cobra.Command {
 	var outFile string
 	var force bool
 	var server string
 
 	cmd := &cobra.Command{
-		Use:   "recv <id|CODE>",
+		Use:   use,
 		Short: "Collect a secret sent to you",
-		Long: `Collect a transfer, by its id (from 'envman inbox') or by a one-time code
+		Long: `Collect a transfer, by its id (from 'envman transfer ls') or by a one-time code
 someone sent you.
 
 The code path needs no account and no login — just the code and the
@@ -96,9 +46,9 @@ server URL, so a teammate can pick up a secret on a brand-new machine.
 Content goes to stdout unless -o is given, so it pipes cleanly. Files
 written with -o are created 0600. Unless the sender passed --keep, the
 transfer is gone once collected: nothing else can read it afterwards.`,
-		Example: "  envman recv 3f7a1c92-... -o .env\n" +
+		Example: "  envman transfer get 3f7a1c92-... -o .env\n" +
 			"  envman recv EM-3F7K-9QW2-M4XZ-7T1B --server https://envman.example.com > .env\n" +
-			"  envman inbox && envman recv <id>",
+			"  envman transfer ls && envman transfer get <id>",
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			ref := args[0]
@@ -210,59 +160,6 @@ func resolveServerURL(flag string) string {
 		return env
 	}
 	return auth.SavedServerURL()
-}
-
-func fromSuffix(res *transfer.ClaimResult) string {
-	if res.From == nil {
-		return ""
-	}
-	return " dari " + res.From.Email
-}
-
-func fromLabel(it transfer.Item) string {
-	if it.From == nil {
-		return "-"
-	}
-	if it.From.Name != "" {
-		return it.From.Name
-	}
-	return it.From.Email
-}
-
-func sentTarget(it transfer.Item) string {
-	if it.To != nil {
-		return it.To.Email
-	}
-	if it.CodePrefix != "" {
-		return "kode " + it.CodePrefix + "…"
-	}
-	return dash(it.ToHint)
-}
-
-func claimStatus(it transfer.Item) string {
-	if it.ClaimedAt != "" {
-		return "diklaim"
-	}
-	return "menunggu"
-}
-
-// kindLabel names the payload type; file transfers show their filename since
-// that is what will land on disk.
-func kindLabel(it transfer.Item) string {
-	if it.Kind == "FILE" {
-		if it.Filename != "" {
-			return "file: " + it.Filename
-		}
-		return "file"
-	}
-	return "teks"
-}
-
-func dash(s string) string {
-	if strings.TrimSpace(s) == "" {
-		return "-"
-	}
-	return s
 }
 
 // uniquePath returns path if free, else path with a numeric suffix inserted

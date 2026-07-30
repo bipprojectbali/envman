@@ -5,7 +5,7 @@ import { TbAlertCircle, TbCheck, TbDeviceFloppy } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/api'
 import { parseSettings } from './settings-types'
 
-// Limits for user-to-user transfers (envman send / inbox / recv).
+// Limits for user-to-user transfers (envman transfer / recv).
 //
 // Text and file have separate limits on purpose. Text is hex-encoded into a DB
 // column and arrives as a JSON body, so it costs ~2x on disk and ~2.7x in
@@ -61,7 +61,7 @@ export function TransferSettingsPanel() {
           Transfer Antar User
         </Text>
         <Text size="xs" c="dimmed">
-          Batas untuk <Code>envman send</Code>. CLI memilih jalurnya otomatis: teks kecil disimpan terenkripsi di
+          Batas untuk <Code>envman transfer send</Code>. CLI memilih jalurnya otomatis: teks kecil disimpan terenkripsi di
           database, file biner atau yang melebihi batas teks diupload ke storage. Karena itu batas teks jauh lebih kecil
           — isinya melewati memori server, sedangkan file langsung ke MinIO.
         </Text>

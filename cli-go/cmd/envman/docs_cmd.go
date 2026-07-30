@@ -16,7 +16,7 @@ import (
 func docsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "docs",
-		Short: "Print CLI reference to stdout (install, auth, inject, storage, CI/CD, troubleshoot)",
+		Short: "Print the full CLI reference to stdout",
 		Long: `Fetch and print the complete CLI reference.
 
 Covers: install, auth setup, inject vars, file execution,

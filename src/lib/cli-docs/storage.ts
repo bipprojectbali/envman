@@ -11,7 +11,7 @@ envman storage ls myapp                      # list semua di root
 envman storage ls myapp --prefix assets/     # list folder assets/
 envman storage ls myapp --prefix scripts/    # list folder scripts/
 envman storage ls myapp --page 2             # halaman berikutnya (50/halaman)
-envman storage ls myapp --tag design,logo    # hanya file bertag design ATAU logo
+envman storage ls myapp --tags design,logo    # hanya file bertag design ATAU logo
 \`\`\`
 
 Output: kuota terpakai, daftar folder, daftar file (path · ukuran · MIME · public).
@@ -30,7 +30,7 @@ envman storage upload myapp ./logo.png     --path assets/images/logo.png
 envman storage upload myapp ./seed.sql     --path backup/2026-07-04.sql
 
 # Beri tag (dipakai pencarian & akses per-tag). Folder → tag kena semua file.
-envman storage upload myapp ./logo.png --tag brand,logo
+envman storage upload myapp ./logo.png --tags brand,logo
 
 # Upload dari script (CI/CD)
 envman storage upload myapp ./dist/report.html --path reports/$(date +%F).html
@@ -113,7 +113,8 @@ Binary tidak bisa di-pipe ke \`| bash\` (hanya script teks yang bisa) — pakai 
 ### Hapus folder
 
 \`\`\`bash
-envman storage rm myapp:assets/            # hapus folder assets/ dan semua isinya
+envman storage rm myapp:assets/            # pratinjau saja
+envman storage rm myapp:assets/ --force    # benar-benar hapus            # hapus folder assets/ dan semua isinya
 envman storage rm myapp:backup/2026-01/    # hapus subfolder spesifik
 \`\`\`
 

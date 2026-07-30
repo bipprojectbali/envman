@@ -88,7 +88,7 @@ func SendFile(cfg *auth.Config, opts FileOptions, onProgress storage.ProgressFun
 		Size int64  `json:"size"`
 	}
 	if err := api.Post(cfg, basePath+"/"+pre.ID+"/confirm", map[string]any{}, &confirmed); err != nil {
-		return nil, fmt.Errorf("%w (upload selesai tapi gagal dikonfirmasi — jalankan `envman send rm %s` lalu ulangi)", err, pre.ID)
+		return nil, fmt.Errorf("%w (upload selesai tapi gagal dikonfirmasi — jalankan `envman transfer rm %s` lalu ulangi)", err, pre.ID)
 	}
 
 	return &SendResult{

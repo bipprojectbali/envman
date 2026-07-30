@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { getSettingNumber } from './app-settings'
 import { prisma } from './db'
 
-// Shared logic for user-to-user transfers (envman send / inbox / recv).
+// Shared logic for user-to-user transfers (envman transfer / recv).
 // Routes stay thin; anything worth unit-reasoning about lives here.
 
 // Text is stored hex-encoded in a DB column and arrives as a JSON body, so it
@@ -119,7 +119,7 @@ export async function maxFileBytes(): Promise<number> {
 /**
  * Strips any directory part and rejects anything that could escape the
  * transfer's own key prefix. A transfer is exactly one file, never a tree, so
- * `envman send ./deep/dir/x.sql` must not produce a nested key.
+ * `envman transfer send ./deep/dir/x.sql` must not produce a nested key.
  */
 export function safeFilename(raw: string): string | null {
   const base = raw.split('/').pop()?.split('\\').pop()?.trim() ?? ''
