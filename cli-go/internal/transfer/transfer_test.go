@@ -25,8 +25,11 @@ func TestNormalizeCode(t *testing.T) {
 		{"L read as 1", "3F7K9QW2M4XZ7TLB", canonical, false},
 		{"O read as 0", "OF7K9QW2M4XZ7T1B", "0F7K9QW2M4XZ7T1B", false},
 		{"too short", "3F7K9QW2", "", true},
-		{"too long", canonical + "XX", "", true},
-		{"excluded letter U", "3F7K9QW2M4XZ7T1U", "", true},
+		// These are no longer base32, but they ARE valid custom codes now:
+		// 18 lowercase chars and 16 lowercase chars respectively. The old
+		// expectation only held while base32 was the sole format.
+		{"over-length base32 becomes a custom code", canonical + "XX", "3f7k9qw2m4xz7t1bxx", false},
+		{"base32 with an excluded letter becomes a custom code", "3F7K9QW2M4XZ7T1U", "3f7k9qw2m4xz7t1u", false},
 		{"punctuation", "3F7K9QW2M4XZ7T1!", "", true},
 		{"empty", "", "", true},
 	}
@@ -69,10 +72,13 @@ func TestRefDispatch(t *testing.T) {
 		{"3f7a1c92-0d1e-4b2a-9c3d-5e6f7a8b9c0d", true, false},
 		{"EM-3F7K-9QW2-M4XZ-7T1B", false, true},
 		{"3F7K9QW2M4XZ7T1B", false, true},
+		// Custom codes are arbitrary text, so IsCode is now permissive: the
+		// server is the only authority on whether a code exists.
+		{"viking.pudding.alaska.sunny", false, true},
+		{"setup-mesin-baru", false, true},
+		// Still too short to be any code.
 		{"not-a-ref", false, false},
 		{"", false, false},
-		// 16 hex chars are a valid code, but not a UUID — must not be routed
-		// to the authenticated path.
 		{"0123456789ABCDEF", false, true},
 	}
 	for _, c := range cases {

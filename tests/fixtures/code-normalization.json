@@ -1,0 +1,77 @@
+{
+  "_comment": [
+    "Shared test vectors for claim-code normalisation, consumed by BOTH",
+    "tests/unit/transfer-code.test.ts and cli-go/internal/transfer/transfer_test.go.",
+    "",
+    "normalizeCode is the canonicalisation contract with the database: hashCode",
+    "runs on its output, so if the TypeScript and Go implementations disagree by",
+    "even one byte, a code minted on one side cannot be claimed from the other.",
+    "The failure is silent — it surfaces as a 404 that is deliberately",
+    "indistinguishable from a wrong guess. Hence one fixture, two readers."
+  ],
+  "valid": [
+    {
+      "why": "mnemonic, already canonical",
+      "input": "viking.pudding.alaska.sunny",
+      "expected": "viking.pudding.alaska.sunny"
+    },
+    {
+      "why": "mnemonic typed in caps",
+      "input": "VIKING.PUDDING.ALASKA.SUNNY",
+      "expected": "viking.pudding.alaska.sunny"
+    },
+    {
+      "why": "mnemonic dictated and retyped with spaces",
+      "input": "viking pudding alaska sunny",
+      "expected": "viking.pudding.alaska.sunny"
+    },
+    {
+      "why": "surrounding whitespace from a sloppy paste",
+      "input": "  viking.pudding.alaska.sunny  ",
+      "expected": "viking.pudding.alaska.sunny"
+    },
+    {
+      "why": "a word containing a hyphen survives, which is why the separator is a dot",
+      "input": "viking.yo-yo.alaska.sunny",
+      "expected": "viking.yo-yo.alaska.sunny"
+    },
+    {
+      "why": "custom code, lowercased",
+      "input": "Setup-Mesin-Baru",
+      "expected": "setup-mesin-baru"
+    },
+    {
+      "why": "legacy base32 with the EM- prefix",
+      "input": "EM-3F7K-9QW2-M4XZ-7T1B",
+      "expected": "3F7K9QW2M4XZ7T1B"
+    },
+    {
+      "why": "legacy base32, lowercase",
+      "input": "em-3f7k-9qw2-m4xz-7t1b",
+      "expected": "3F7K9QW2M4XZ7T1B"
+    },
+    {
+      "why": "legacy base32 bare, no separators",
+      "input": "3F7K9QW2M4XZ7T1B",
+      "expected": "3F7K9QW2M4XZ7T1B"
+    },
+    {
+      "why": "legacy: I misread for 1 is recovered — folding that would destroy a mnemonic",
+      "input": "3F7K9QW2M4XZ7TIB",
+      "expected": "3F7K9QW2M4XZ7T1B"
+    },
+    {
+      "why": "legacy: O misread for 0 is recovered",
+      "input": "OF7K9QW2M4XZ7T1B",
+      "expected": "0F7K9QW2M4XZ7T1B"
+    }
+  ],
+  "invalid": [
+    { "why": "empty", "input": "" },
+    { "why": "whitespace only", "input": "   " },
+    { "why": "shorter than the custom-code minimum", "input": "short" },
+    { "why": "shorter than the minimum even after space folding", "input": "a b c" },
+    { "why": "shell metacharacters are refused; the code goes into a paste-ready command", "input": "rm -rf /; echo pwned" },
+    { "why": "uppercase-only junk that is not 16 chars of base32", "input": "NOTAVALIDCODEATALL!!" }
+  ]
+}

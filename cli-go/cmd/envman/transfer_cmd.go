@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/bipprojectbali/envman/cli/internal/auth"
@@ -19,6 +19,14 @@ import (
 // Sending and receiving secrets between users. Grouped under one noun so the
 // whole feature is discoverable from `envman transfer --help`, matching clip,
 // env, gists, storage and projects. Collecting lives in recv_cmd.go.
+
+// Mirrors MIN_CUSTOM_CODE_LEN and CUSTOM_CODE_MAX_TTL_MINUTES in
+// src/lib/transfer-service.ts. Checked here too so the warning prints before
+// the request goes out.
+const minCustomCodeLen = 12
+const customCodeMaxTTLMinutes = 15
+
+var customCodeRe = regexp.MustCompile(`^[a-z0-9._-]+$`)
 
 func transferCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -51,6 +59,7 @@ func transferSendCmd() *cobra.Command {
 	var ttl string
 	var keep bool
 	var mode string
+	var customCode string
 
 	cmd := &cobra.Command{
 		Use:   "send [file]",
@@ -80,6 +89,22 @@ secrets through a third party, not the need to trust your own server.`,
 			}
 			if to != "" && once {
 				return fmt.Errorf("[envman] --to dan --once tidak bisa dipakai bersamaan")
+			}
+			if customCode != "" {
+				if !once {
+					return fmt.Errorf("[envman] --code hanya berlaku dengan --once")
+				}
+				if len([]rune(customCode)) < minCustomCodeLen {
+					return fmt.Errorf("[envman] --code minimal %d karakter", minCustomCodeLen)
+				}
+				if !customCodeRe.MatchString(strings.ToLower(customCode)) {
+					return fmt.Errorf("[envman] --code hanya boleh huruf, angka, titik, garis bawah, dan tanda hubung")
+				}
+				// Printed before the request so the tradeoff is visible even if
+				// the send later fails.
+				fmt.Fprintf(os.Stderr,
+					"[envman] kode pilihan sendiri lebih mudah ditebak daripada kode acak —"+
+						" masa berlakunya dipersingkat jadi %d menit.\n", customCodeMaxTTLMinutes)
 			}
 			if mode != "" && mode != "text" && mode != "file" {
 				return fmt.Errorf("[envman] --mode harus \"text\" atau \"file\", bukan %q", mode)
@@ -125,7 +150,7 @@ secrets through a third party, not the need to trust your own server.`,
 					res, err = transfer.SendFile(cfg, transfer.FileOptions{
 						To: to, Once: once, LocalPath: args[0], Filename: name,
 						Size: st.Size(), MimeType: mimeType, Label: message,
-						TTLSeconds: ttlSeconds, Keep: keep,
+						TTLSeconds: ttlSeconds, Keep: keep, CustomCode: customCode,
 					}, transfer.ProgressPrinter("upload"))
 					if err != nil {
 						return err
@@ -139,7 +164,7 @@ secrets through a third party, not the need to trust your own server.`,
 						storage.FmtBytes(int64(len(data))))
 					res, err = transfer.Send(cfg, transfer.SendOptions{
 						To: to, Once: once, Content: string(data), Label: message,
-						TTLSeconds: ttlSeconds, Keep: keep,
+						TTLSeconds: ttlSeconds, Keep: keep, CustomCode: customCode,
 					})
 					if err != nil {
 						return err
@@ -157,7 +182,7 @@ secrets through a third party, not the need to trust your own server.`,
 				}
 				res, err = transfer.Send(cfg, transfer.SendOptions{
 					To: to, Once: once, Content: string(data), Label: message,
-					TTLSeconds: ttlSeconds, Keep: keep,
+					TTLSeconds: ttlSeconds, Keep: keep, CustomCode: customCode,
 				})
 				if err != nil {
 					return err
@@ -175,7 +200,7 @@ secrets through a third party, not the need to trust your own server.`,
 			if res.Code != "" {
 				fmt.Fprintf(os.Stderr, "[envman] kode sekali-pakai: %s\n", res.Code)
 				fmt.Fprintf(os.Stderr, "[envman] kedaluwarsa %s — kode ini hanya ditampilkan SEKALI (%s)\n", expiry, burnNote)
-				fmt.Fprintf(os.Stderr, "  ENVMAN_CODE=%s envman transfer get --server %s\n", res.Code, cfg.Server)
+				fmt.Fprintf(os.Stderr, "  ENVMAN_CODE='%s' envman transfer get --server %s\n", res.Code, cfg.Server)
 			} else {
 				fmt.Fprintf(os.Stderr, "[envman] terkirim ke %s (%s, %s)\n", to, storage.FmtBytes(int64(res.Bytes)), burnNote)
 				fmt.Fprintf(os.Stderr, "[envman] id: %s  kedaluwarsa %s\n", res.ID, expiry)
@@ -189,6 +214,8 @@ secrets through a third party, not the need to trust your own server.`,
 	cmd.Flags().StringVarP(&message, "message", "m", "", "Short note shown to the recipient")
 	cmd.Flags().StringVar(&ttl, "ttl", "", "Expiry, e.g. 30m, 2h, 7d (default: server setting)")
 	cmd.Flags().BoolVar(&keep, "keep", false, "Do not burn after reading")
+	cmd.Flags().StringVar(&customCode, "code", "",
+		"Pick the claim code yourself (min 12 chars). Easier to remember, so the transfer expires in 15 minutes")
 	cmd.Flags().StringVar(&mode, "mode", "",
 		"Force a path: text (encrypted in the DB) or file (uploaded to storage). Default: auto-detect")
 	return cmd
@@ -227,126 +254,4 @@ func readHead(path string, n int) ([]byte, error) {
 		return nil, err
 	}
 	return buf[:read], nil
-}
-
-func transferLsCmd() *cobra.Command {
-	var sent bool
-	var asJSON bool
-
-	cmd := &cobra.Command{
-		Use:   "ls",
-		Short: "List secrets other users have sent you",
-		Long: `List transfers waiting for you, with the id needed to collect each one.
-Nothing is claimed by listing — use 'envman transfer get <id>' for that.
-
---sent shows what you have sent instead, so you can check whether it has
-been picked up (and revoke it with 'envman transfer rm <id>' if not).`,
-		Example: "  envman transfer ls\n  envman transfer ls --sent",
-		Args:    cobra.NoArgs,
-		RunE: func(_ *cobra.Command, args []string) error {
-			cfg, err := auth.Resolve()
-			if err != nil {
-				return err
-			}
-
-			items, err := transfer.Inbox(cfg)
-			if sent {
-				items, err = transfer.Sent(cfg)
-			}
-			if err != nil {
-				return err
-			}
-			if asJSON {
-				return emitJSON(items)
-			}
-			if len(items) == 0 {
-				if sent {
-					fmt.Fprintln(os.Stderr, "[envman] belum ada transfer terkirim yang aktif")
-				} else {
-					fmt.Fprintln(os.Stderr, "[envman] inbox kosong")
-				}
-				return nil
-			}
-
-			now := time.Now()
-			w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-			if sent {
-				fmt.Fprintln(w, "ID\tKE\tCATATAN\tSTATUS\tKEDALUWARSA")
-			} else {
-				fmt.Fprintln(w, "ID\tDARI\tJENIS\tCATATAN\tUKURAN\tKEDALUWARSA")
-			}
-			for _, it := range items {
-				expiry := clipboard.HumanUntil(it.ExpiresAt, now)
-				if sent {
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-						it.ID, sentTarget(it), dash(it.Label), claimStatus(it), expiry)
-					continue
-				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-					it.ID, fromLabel(it), kindLabel(it), dash(it.Label), storage.FmtBytes(it.Size), expiry)
-			}
-			w.Flush()
-
-			if !sent {
-				fmt.Fprintf(os.Stderr, "\n[envman] ambil dengan: envman transfer get <id> -o <file>\n")
-			}
-			return nil
-		},
-	}
-	cmd.Flags().BoolVar(&sent, "sent", false, "Show transfers you sent instead of received")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
-	return cmd
-}
-
-func fromSuffix(res *transfer.ClaimResult) string {
-	if res.From == nil {
-		return ""
-	}
-	return " dari " + res.From.Email
-}
-
-func fromLabel(it transfer.Item) string {
-	if it.From == nil {
-		return "-"
-	}
-	if it.From.Name != "" {
-		return it.From.Name
-	}
-	return it.From.Email
-}
-
-func sentTarget(it transfer.Item) string {
-	if it.To != nil {
-		return it.To.Email
-	}
-	if it.CodePrefix != "" {
-		return "kode " + it.CodePrefix + "…"
-	}
-	return dash(it.ToHint)
-}
-
-func claimStatus(it transfer.Item) string {
-	if it.ClaimedAt != "" {
-		return "diklaim"
-	}
-	return "menunggu"
-}
-
-// kindLabel names the payload type; file transfers show their filename since
-// that is what will land on disk.
-func kindLabel(it transfer.Item) string {
-	if it.Kind == "FILE" {
-		if it.Filename != "" {
-			return "file: " + it.Filename
-		}
-		return "file"
-	}
-	return "teks"
-}
-
-func dash(s string) string {
-	if strings.TrimSpace(s) == "" {
-		return "-"
-	}
-	return s
 }

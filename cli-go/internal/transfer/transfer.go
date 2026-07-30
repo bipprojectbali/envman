@@ -19,11 +19,17 @@ import (
 
 const basePath = "/api/envman/transfers"
 
-// Crockford base32, same as the server: no I, L, O or U, so the code survives
-// being read aloud or retyped.
-const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+// Legacy Crockford base32 (no I, L, O or U). Codes minted before the mnemonic
+// format are still claimable, so these must stay.
+const legacyAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-const codeLen = 16
+const legacyCodeLen = 16
+
+// minCustomCodeLen mirrors MIN_CUSTOM_CODE_LEN in src/lib/transfer-service.ts.
+const minCustomCodeLen = 12
+
+// customCodeRe matches what the server accepts for mnemonic and custom codes.
+var customCodeRe = regexp.MustCompile(`^[a-z0-9._-]+$`)
 
 var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
@@ -83,8 +89,11 @@ type listResponse struct {
 // SendOptions describes one outgoing transfer. Exactly one of To or Once must
 // be set.
 type SendOptions struct {
-	To         string
-	Once       bool
+	To   string
+	Once bool
+	// CustomCode lets the sender pick the claim code. The server caps such a
+	// transfer's TTL, since a memorable code is easier to guess.
+	CustomCode string
 	Content    string
 	Label      string
 	TTLSeconds int
@@ -107,6 +116,9 @@ func Send(cfg *auth.Config, opts SendOptions) (*SendResult, error) {
 	}
 	if opts.Keep {
 		payload["burn"] = false
+	}
+	if opts.CustomCode != "" {
+		payload["code"] = opts.CustomCode
 	}
 	var res SendResult
 	if err := api.Post(cfg, basePath, payload, &res); err != nil {
@@ -208,35 +220,78 @@ func ClaimByCode(server, code string) (*ClaimResult, error) {
 	return &res, nil
 }
 
-// NormalizeCode converts user input to the canonical 16-char code, or returns
-// an error. Accepts lowercase, dashes/spaces, an EM- prefix, and the glyphs the
-// alphabet excludes (I/L read as 1, O as 0).
+// NormalizeCode converts user input to the exact string the server hashed when
+// the code was minted.
+//
+// This MUST agree byte for byte with normalizeCode in
+// src/lib/transfer-service.ts: the CLI normalises locally and the server
+// normalises again before hashing, so any divergence yields a code that cannot
+// be claimed — reported as a 404 that is deliberately indistinguishable from a
+// wrong guess.
+//
+// Detection is by class first, because the classes need opposite treatment:
+// folding I/L to 1 rescues a misread base32 code but destroys "viking".
 func NormalizeCode(raw string) (string, error) {
-	s := strings.ToUpper(strings.TrimSpace(raw))
-	s = strings.TrimPrefix(s, "EM-")
-	s = strings.TrimPrefix(s, "EM")
-	s = strings.NewReplacer("-", "", " ", "", "\t", "", "I", "1", "L", "1", "O", "0").Replace(s)
-	if len(s) != codeLen {
-		return "", fmt.Errorf("[envman] format kode tidak valid (butuh %d karakter)", codeLen)
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", fmt.Errorf("[envman] kode kosong")
 	}
-	for _, ch := range s {
-		if !strings.ContainsRune(alphabet, ch) {
-			return "", fmt.Errorf("[envman] kode memuat karakter tidak dikenal: %q", ch)
-		}
+
+	// Legacy base32: strip separators and the EM- prefix, then fold the glyphs
+	// the alphabet deliberately excludes.
+	asLegacy := strings.ToUpper(trimmed)
+	asLegacy = strings.TrimPrefix(asLegacy, "EM-")
+	asLegacy = strings.TrimPrefix(asLegacy, "EM")
+	asLegacy = strings.NewReplacer("-", "", " ", "", "\t", "", "I", "1", "L", "1", "O", "0").Replace(asLegacy)
+	if len(asLegacy) == legacyCodeLen && onlyLegacyAlphabet(asLegacy) {
+		return asLegacy, nil
 	}
-	return s, nil
+
+	// Mnemonic and custom codes are plain lowercase text. Spaces are accepted
+	// as a separator because people retype them that way.
+	lowered := strings.ToLower(trimmed)
+	lowered = strings.Join(strings.Fields(lowered), ".")
+	if len(lowered) < minCustomCodeLen {
+		return "", fmt.Errorf("[envman] kode terlalu pendek (minimal %d karakter)", minCustomCodeLen)
+	}
+	if !customCodeRe.MatchString(lowered) {
+		return "", fmt.Errorf("[envman] kode memuat karakter yang tidak diizinkan")
+	}
+	return lowered, nil
 }
 
-// FormatCode renders a bare code for display.
+// onlyLegacyAlphabet reports whether every rune is in the base32 alphabet.
+func onlyLegacyAlphabet(s string) bool {
+	for _, ch := range s {
+		if !strings.ContainsRune(legacyAlphabet, ch) {
+			return false
+		}
+	}
+	return true
+}
+
+// FormatCode renders a legacy base32 code for display. Mnemonic and custom
+// codes are already in their display form and pass through unchanged.
 func FormatCode(code string) string {
-	if len(code) != codeLen {
+	if len(code) != legacyCodeLen || !onlyLegacyAlphabet(code) {
 		return code
 	}
 	return fmt.Sprintf("EM-%s-%s-%s-%s", code[0:4], code[4:8], code[8:12], code[12:16])
 }
 
-// IsCode reports whether the argument looks like a claim code rather than an id.
+// IsCode reports whether the argument could be a claim code.
+//
+// Deliberately permissive: a custom code is arbitrary user text, so no
+// predicate accepts every valid one while still rejecting typos. The server is
+// the only authority on whether a code exists. This is just a cheap floor so
+// obvious junk does not reach the network and spend rate-limit budget.
 func IsCode(raw string) bool {
+	// A UUID normalises cleanly as a custom code, so exclude it explicitly:
+	// callers dispatch on IsUUID first, but leaving the overlap in place would
+	// make that ordering load-bearing rather than obvious.
+	if IsUUID(raw) {
+		return false
+	}
 	_, err := NormalizeCode(raw)
 	return err == nil
 }

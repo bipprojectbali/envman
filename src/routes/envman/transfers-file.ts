@@ -8,12 +8,14 @@ import { minioDelete, minioPresignPut } from '../../lib/storage-service'
 import {
   buildTransferKey,
   generateCode,
+  hashCode,
   maxFileBytes,
   maxPending,
   pendingCount,
   resolveRecipient,
   resolveTtlMs,
   safeFilename,
+  validateCustomCode,
 } from '../../lib/transfer-service'
 
 // File transfers. Bytes go straight from the CLI to MinIO via a presigned PUT,
@@ -45,6 +47,7 @@ export const transfersFileRouter = new Elysia()
       mimeType?: string
       to?: string
       once?: boolean
+      code?: string
       label?: string
       ttlHours?: number
       burn?: boolean
@@ -97,8 +100,32 @@ export const transfersFileRouter = new Elysia()
       toHint = body.to as string
     }
 
-    const code = wantsCode ? generateCode() : null
-    const expiresAt = new Date(Date.now() + (await resolveTtlMs(body.ttlHours)))
+    // A user-chosen code trades entropy for memorability, so it is validated
+    // strictly and its TTL is capped below.
+    let code = null as ReturnType<typeof generateCode> | null
+    let isCustomCode = false
+    if (wantsCode) {
+      if (typeof body.code === 'string' && body.code.trim()) {
+        const checked = validateCustomCode(body.code)
+        if (!checked.ok) {
+          set.status = 400
+          return { error: checked.error }
+        }
+        isCustomCode = true
+        code = {
+          code: checked.code,
+          formatted: checked.code,
+          hash: hashCode(checked.code),
+          // No prefix for a custom code: it reaches the sent list, the audit
+          // log and the Redis app-log ring, and a memorable code is often
+          // reused, so even four characters is a real disclosure.
+          prefix: '',
+        }
+      } else {
+        code = generateCode()
+      }
+    }
+    const expiresAt = new Date(Date.now() + (await resolveTtlMs(body.ttlHours, { customCode: isCustomCode })))
     const mimeType = typeof body.mimeType === 'string' && body.mimeType ? body.mimeType : 'application/octet-stream'
 
     const row = await prisma.transfer.create({
@@ -114,7 +141,7 @@ export const transfersFileRouter = new Elysia()
         label: typeof body.label === 'string' ? body.label : null,
         burn: body.burn !== false,
         codeHash: code?.hash ?? null,
-        codePrefix: code?.prefix ?? null,
+        codePrefix: code?.prefix || null,
         expiresAt,
       },
       select: { id: true, expiresAt: true },

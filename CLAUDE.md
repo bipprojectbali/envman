@@ -297,7 +297,9 @@ Kirim secret **user-ke-user** (`.env`, kunci SSH, cert) agar tak lewat WhatsApp/
 - **Burn-after-read** default; `burn:false` (`--keep`) bisa diambil berkali-kali sampai TTL.
 - **Klaim = CAS** `updateMany where {id, claimedAt:null}` → `count===0` berarti kalah balapan → 409. **Bukan** read-then-write (itu justru balapannya).
 - **Klaim MENANDAI, tak menghapus.** Penghapusan hanya di sweep (`expiresAt<now` ATAU `burn && claimedAt < now-2j`) — satu jalur kode; untuk v2 urutan **object MinIO dulu, baru baris**.
-- **Kode**: 80-bit, 16 char Crockford base32 (tanpa `I L O U`). Hanya **`codeHash`** (sha256) disimpan — plaintext tak pernah. Normalisasi input: uppercase, buang `-`, `I L→1`, `O→0`.
+- **Kode**: **4 kata** dari EFF Short #2 (1296 kata, prefix 3-huruf unik, CC-BY) → `viking.pudding.alaska.sunny`, ≈41 bit. Pemisah **titik**, bukan tanda hubung — daftar memuat `yo-yo`. Hanya **codeHash** (sha256) disimpan. **`generateCode` wajib `randomInt`**, bukan `% length`: 1296 tak membagi 256 → bias.
+- **Normalisasi sadar-kelas** (`normalizeCode`): legacy base32 16-char (uppercase, buang `-`, `I L→1`, `O→0` — **wajib dipertahankan**, kode lama masih beredar) / mnemonic & kustom (lowercase, spasi→titik, **JANGAN lipat glyph** — `viking` bukan `v1k1ng`). ⚠️ `hashCode` jalan pada hasilnya = **kontrak kanonikalisasi dengan DB**; TS (`transfer-service.ts`) & Go (`internal/transfer/transfer.go`) wajib sepakat byte-per-byte, dijaga fixture bersama `tests/fixtures/code-normalization.json`. Divergensi = kode tak bisa diklaim dengan 404 senyap.
+- **`--code` kustom**: min 12 char, hanya `[a-z0-9._-]` (masuk baris perintah siap-tempel). **TTL dipaksa ≤15 menit** di `resolveTtlMs` (bukan call-site — jalur file yang terlupakan). `codePrefix` = **null** untuk kode kustom (sering dipakai ulang; prefix apa pun = pengungkapan), **kata pertama saja** untuk mnemonic.
 
 ### Aturan keamanan (MUTLAK)
 
