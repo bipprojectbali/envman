@@ -2,7 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+- **⚠️ Breaking — kode klaim kini empat kata, bukan deret acak.** `EM-3F7K-9QW2-M4XZ-7T1B` menjadi `viking.pudding.alaska.sunny`. Kode lama sulit diketik dan mustahil didiktekan lewat telepon — padahal itu justru fungsinya. Kata-katanya diambil dari [EFF Short Wordlist #2](https://www.eff.org/dice) (1296 kata, lisensi CC-BY, setiap kata punya prefix tiga huruf yang unik). Boleh diketik huruf besar, dan spasi boleh menggantikan titik: `VIKING PUDDING ALASKA SUNNY` tetap diterima. **Kode lama yang belum diklaim tetap bisa dipakai** — jalur base32 dipertahankan.
+  - Empat kata memberi ≈41 bit, lebih kecil dari ~80 bit sebelumnya. Itu tetap di luar jangkauan penebak karena jalur klaim dibatasi 10 kegagalan per IP per 10 menit (plus 100 global) — dan sebagai gantinya kodenya kini benar-benar bisa dibacakan.
+  - Label di daftar terkirim kini **satu kata**, bukan empat karakter: empat karakter akan membocorkan seperempat entropi dan hampir menyebutkan kata pertamanya.
+
 ### Added
+- **`envman transfer send --once --code <kode>` — pilih kodenya sendiri.** Berguna saat kamu akan langsung memakainya di mesin sebelah, tanpa perlu menyalin empat kata. Minimal 12 karakter, hanya huruf/angka/`.`/`_`/`-` (tanpa spasi atau karakter shell, karena kodenya masuk ke baris perintah siap-tempel).
+  - **Masa berlakunya dipaksa maksimal 15 menit** dan tak bisa diperpanjang, bahkan dengan `--ttl`. Kode yang mudah diingat lebih mudah ditebak; umur pendek itulah yang membuatnya tetap aman — dengan rate limit yang ada, hanya sekitar 150 tebakan bisa mencapainya seumur hidupnya.
+  - Kode kustom **tidak menyimpan label apa pun** di daftar terkirim maupun audit log, karena kode yang mudah diingat cenderung dipakai berulang.
+  - Peringatan dicetak sebelum permintaan dikirim, jadi kompromi itu terlihat lebih dulu.
 - **`--copy` — salurkan rahasia ke clipboard, bukan ke layar.** Nilai yang dicetak menempel di **scrollback terminal**, terlihat saat screenshot, screen-share, atau sekadar orang lewat. Selama ini solusinya hanya anjuran `| pbcopy`, yang mudah lupa diketik (sekali lupa, tercetak) dan tak tersedia di Linux maupun server SSH — justru tempat yang paling membutuhkannya.
   - Tersedia di **`env get`**, **`env pull`**, **`clip get`**, **`transfer get`**, **`gists pull`**, dan **`health`**. Stdout benar-benar kosong; hanya konfirmasi singkat ke stderr.
   - **Bekerja lewat SSH.** Urutan: `pbcopy` → `wl-copy` → `xsel`/`xclip` → **OSC 52**. Yang terakhir adalah escape sequence yang ditindaklanjuti terminal, jadi menjalankannya di server akan mengisi clipboard **laptopmu**. Tak perlu X11 atau paket tambahan; di tmux aktifkan `set -g set-clipboard on`.

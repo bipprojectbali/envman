@@ -149,9 +149,10 @@ describe('claim by one-time code', () => {
     expect(row?.claimedIp).toBe(ip(1))
   })
 
-  test('code normalization: lowercase, no dashes, ambiguous glyphs', async () => {
+  test('code normalization: caps and spaces instead of dots', async () => {
     const { code } = await mintCode('NORM=1')
-    const messy = code.replace(/^EM-/, '').replace(/-/g, '').toLowerCase()
+    // How someone retypes a code dictated over the phone.
+    const messy = code.toUpperCase().replace(/\./g, ' ')
     const res = await claimByCode(messy, ip(2))
     expect(res.status).toBe(200)
   })
@@ -164,14 +165,16 @@ describe('claim by one-time code', () => {
     expect(reuse.status).toBe(404)
     const reuseBody = (await reuse.json()) as { error: string }
 
-    const unknown = await claimByCode('ABCD1234ABCD1234', ip(3))
+    const unknown = await claimByCode('never.minted.this.code', ip(3))
     const unknownBody = (await unknown.json()) as { error: string }
     // Distinguishing them would tell an attacker the guess was structurally valid.
     expect(reuseBody.error).toBe(unknownBody.error)
   })
 
-  test('malformed code → 400', async () => {
-    expect((await claimByCode('too-short', ip(4))).status).toBe(400)
+  test('code under the minimum length → 400', async () => {
+    // 400 now means "could not be any code" rather than "wrong length for
+    // base32"; anything that reaches a DB lookup must return the same 404.
+    expect((await claimByCode('short', ip(4))).status).toBe(400)
   })
 
   test('brute force: budget exhausts, and a valid code from that IP is still refused', async () => {
@@ -183,10 +186,10 @@ describe('claim by one-time code', () => {
 
     // 10 failures is the per-IP budget.
     for (let i = 0; i < 10; i++) {
-      const res = await claimByCode('ZZZZZZZZZZZZZZZZ', attacker)
+      const res = await claimByCode('wrong.guess.every.time', attacker)
       expect(res.status).toBe(404)
     }
-    expect((await claimByCode('ZZZZZZZZZZZZZZZZ', attacker)).status).toBe(429)
+    expect((await claimByCode('wrong.guess.every.time', attacker)).status).toBe(429)
 
     // The correct code from the same IP must ALSO be refused — otherwise an
     // attacker who guesses right on the last attempt would still be served.

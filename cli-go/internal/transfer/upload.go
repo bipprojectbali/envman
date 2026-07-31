@@ -35,6 +35,7 @@ type FileOptions struct {
 	Label      string
 	TTLSeconds int
 	Keep       bool
+	CustomCode string
 }
 
 // SendFile uploads a file in three steps: ask the server to presign (which
@@ -63,6 +64,9 @@ func SendFile(cfg *auth.Config, opts FileOptions, onProgress storage.ProgressFun
 	}
 	if opts.Keep {
 		payload["burn"] = false
+	}
+	if opts.CustomCode != "" {
+		payload["code"] = opts.CustomCode
 	}
 
 	var pre presignResult

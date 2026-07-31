@@ -57,16 +57,16 @@ lebih dari satu user ditolak; pakai email.
 
 \`\`\`bash
 envman transfer send .env --once --ttl 1h
-# [envman] kode sekali-pakai: EM-3F7K-9QW2-M4XZ-7T1B
+# [envman] kode sekali-pakai: viking.pudding.alaska.sunny
 # [envman] kedaluwarsa 59m — kode ini hanya ditampilkan SEKALI
-#   envman transfer get --server https://envman.example.com
+#   ENVMAN_CODE='viking.pudding.alaska.sunny' envman transfer get --server https://envman.example.com
 \`\`\`
 
 Baris perintah itu **aman dikirim lewat chat** — yang rahasia ada di server, bukan
 di pesannya. Penerima tak perlu akun, tak perlu \`envman login\`:
 
 \`\`\`bash
-ENVMAN_CODE=EM-3F7K-9QW2-M4XZ-7T1B envman transfer get --server https://envman.example.com -o .env
+ENVMAN_CODE='viking.pudding.alaska.sunny' envman transfer get --server https://envman.example.com -o .env
 \`\`\`
 
 > \u26a0\ufe0f **Jangan berikan kode sebagai argumen di mesin bersama.** Argumen terlihat
@@ -75,10 +75,42 @@ ENVMAN_CODE=EM-3F7K-9QW2-M4XZ-7T1B envman transfer get --server https://envman.e
 > envman akan menanyakannya. Hal yang sama berlaku untuk \`envman login --token\`
 > (pakai \`ENVMAN_TOKEN\`).
 
-Kode boleh diketik huruf kecil atau tanpa tanda hubung. Alfabetnya sengaja tak
-memuat \`I\`, \`L\`, \`O\`, \`U\` supaya \`0/O\` dan \`1/I/L\` tak tertukar.
+Kodenya **empat kata** dari daftar 1296 kata pilihan EFF — dibuat untuk
+didiktekan lewat telepon dan diketik ulang tanpa salah, tak seperti deret acak
+yang menggantikannya. Boleh diketik huruf besar, dan spasi boleh menggantikan
+titik: \`VIKING PUDDING ALASKA SUNNY\` tetap diterima.
+
+Empat kata memberi ≈41 bit. Terdengar lebih kecil daripada kode acak sebelumnya,
+tapi jalur klaim dibatasi 10 percobaan gagal per IP per 10 menit (plus 100 secara
+global), jadi menebaknya tetap di luar jangkauan — sementara kodenya kini benar-benar
+bisa dibacakan.
+
 Kode **hanya ditampilkan sekali** — server hanya menyimpan hash-nya. Kalau hilang,
 cabut dengan \`envman transfer rm <id>\` lalu kirim ulang.
+
+### Memilih kode sendiri
+
+Kalau kamu akan langsung memakainya di mesin sebelah, kode buatan sendiri lebih
+praktis daripada menyalin empat kata:
+
+\`\`\`bash
+envman transfer send .env --once --code setup-mesin-baru
+# [envman] kode pilihan sendiri lebih mudah ditebak daripada kode acak —
+#          masa berlakunya dipersingkat jadi 15 menit.
+\`\`\`
+
+Syaratnya: **minimal 12 karakter**, hanya huruf/angka/\`.\`/\`_\`/\`-\` (tanpa spasi
+atau karakter shell, karena kodenya masuk ke baris perintah siap-tempel).
+
+> ⚠️ **Masa berlakunya dipaksa maksimal 15 menit** dan tak bisa diperpanjang,
+> bahkan dengan \`--ttl\`. Kode yang mudah diingat juga lebih mudah ditebak;
+> umur pendek itulah yang membuatnya tetap aman. Jangan pakai kode yang sama
+> berulang kali.
+
+Sifat "sekali ambil lalu hilang" **bukan** alasan kode boleh lemah: yang berbahaya
+justru penyerang yang mengklaim **lebih dulu** dari penerima sah — dan kalau itu
+terjadi, penerima hanya melihat pesan "sudah diklaim" tanpa bisa tahu apa yang
+sebenarnya terjadi.
 
 ### Ambil kiriman
 

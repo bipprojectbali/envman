@@ -112,20 +112,56 @@ describe('transfer send', () => {
     expect((await send(undefined, { to: 'bob@test.com', content: 'X=1' })).status).toBe(401)
   })
 
-  test('--once mints a code; only its hash is stored', async () => {
+  test('--once mints a four-word code; only its hash is stored', async () => {
     const res = await send(aliceToken, { once: true, content: 'ONCE=1' })
     expect(res.status).toBe(200)
     const body = (await res.json()) as { id: string; code: string }
-    expect(body.code).toMatch(/^EM-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/)
+    // Four lowercase words, dot-separated — dictatable over the phone, unlike
+    // the base32 it replaced.
+    expect(body.code).toMatch(/^[a-z-]+\.[a-z-]+\.[a-z-]+\.[a-z-]+$/)
 
     const row = await prisma.transfer.findUnique({ where: { id: body.id } })
     expect(row?.codeHash).toMatch(/^[0-9a-f]{64}$/)
     expect(row?.toUserId).toBeNull()
 
-    // The plaintext code must appear in no column.
-    const bare = body.code.replace(/^EM-/, '').replace(/-/g, '')
+    // The plaintext code must appear in no column. Assert on the code exactly
+    // as issued: deriving a stripped variant would make this pass even if the
+    // row leaked the code verbatim.
     const serialized = JSON.stringify(row, (_k, v) => (typeof v === 'bigint' ? Number(v) : v))
-    expect(serialized).not.toContain(bare)
+    expect(serialized).not.toContain(body.code)
+
+    // codePrefix labels the send without giving the code away — one word out
+    // of four, never the whole thing.
+    expect(row?.codePrefix).toBe(body.code.split('.')[0])
+    expect(row?.codePrefix).not.toBe(body.code)
+  })
+
+  test('--code sets a custom code, and its TTL is capped at 15 minutes', async () => {
+    const custom = 'setup-mesin-baru'
+    // Ask for a week; the custom-code ceiling must override it.
+    const res = await send(aliceToken, { once: true, content: 'C=1', code: custom, ttlHours: 168 })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { id: string; code: string; expiresAt: string }
+    expect(body.code).toBe(custom)
+
+    const minutes = (new Date(body.expiresAt).getTime() - Date.now()) / 60_000
+    expect(minutes).toBeLessThanOrEqual(15)
+    expect(minutes).toBeGreaterThan(13)
+
+    // No prefix at all for a custom code: it reaches the sent list, the audit
+    // log and the app-log ring, and a memorable code is often reused.
+    const row = await prisma.transfer.findUnique({ where: { id: body.id } })
+    expect(row?.codePrefix).toBeNull()
+
+    const serialized = JSON.stringify(row, (_k, v) => (typeof v === 'bigint' ? Number(v) : v))
+    expect(serialized).not.toContain(custom)
+  })
+
+  test('--code rejects anything too short or shell-unsafe', async () => {
+    for (const bad of ['pendek', 'ada spasi disini', 'kode;rm -rf /']) {
+      const res = await send(aliceToken, { once: true, content: 'X=1', code: bad })
+      expect(res.status).toBe(400)
+    }
   })
 })
 

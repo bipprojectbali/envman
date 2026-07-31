@@ -6,11 +6,13 @@ import { prisma } from '../../lib/db'
 import { getIp } from '../../lib/request'
 import {
   generateCode,
+  hashCode,
   maxPending,
   maxTextBytes,
   pendingCount,
   resolveRecipient,
   resolveTtlMs,
+  validateCustomCode,
 } from '../../lib/transfer-service'
 
 // POST /api/envman/transfers — send a secret to another user, or mint a
@@ -39,6 +41,7 @@ export const transfersSendRouter = new Elysia().post('/api/envman/transfers', as
     content?: string
     to?: string
     once?: boolean
+    code?: string
     label?: string
     ttlHours?: number
     burn?: boolean
@@ -85,8 +88,32 @@ export const transfersSendRouter = new Elysia().post('/api/envman/transfers', as
     toHint = body.to as string
   }
 
-  const code = wantsCode ? generateCode() : null
-  const expiresAt = new Date(Date.now() + (await resolveTtlMs(body.ttlHours)))
+  // A user-chosen code trades entropy for memorability, so it is validated
+  // strictly and its TTL is capped below.
+  let code = null as ReturnType<typeof generateCode> | null
+  let isCustomCode = false
+  if (wantsCode) {
+    if (typeof body.code === 'string' && body.code.trim()) {
+      const checked = validateCustomCode(body.code)
+      if (!checked.ok) {
+        set.status = 400
+        return { error: checked.error }
+      }
+      isCustomCode = true
+      code = {
+        code: checked.code,
+        formatted: checked.code,
+        hash: hashCode(checked.code),
+        // No prefix for a custom code: it reaches the sent list, the audit log
+        // and the Redis app-log ring, and a memorable code is often reused, so
+        // even four characters is a real disclosure.
+        prefix: '',
+      }
+    } else {
+      code = generateCode()
+    }
+  }
+  const expiresAt = new Date(Date.now() + (await resolveTtlMs(body.ttlHours, { customCode: isCustomCode })))
 
   const row = await prisma.transfer.create({
     data: {
@@ -101,7 +128,7 @@ export const transfersSendRouter = new Elysia().post('/api/envman/transfers', as
       label: typeof body.label === 'string' ? body.label : null,
       burn: body.burn !== false,
       codeHash: code?.hash ?? null,
-      codePrefix: code?.prefix ?? null,
+      codePrefix: code?.prefix || null,
       expiresAt,
     },
     select: { id: true, expiresAt: true },
