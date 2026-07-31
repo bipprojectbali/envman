@@ -85,6 +85,7 @@ cabut dengan \`envman transfer rm <id>\` lalu kirim ulang.
 \`\`\`bash
 envman transfer ls                          # apa saja yang menunggu
 envman transfer ls --json                   # untuk script
+envman transfer get <id> --copy               # ke clipboard, tak tampil di layar
 envman transfer get <id> -o .env              # ambil ke file (mode 0600)
 envman transfer get <id> > .env               # atau lewat pipe
 envman transfer get <id>                      # file: tersimpan dengan nama aslinya

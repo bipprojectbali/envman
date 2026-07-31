@@ -5,6 +5,7 @@ import { buildEnvSection } from './cli-docs/env'
 import { buildFilesAliasesSection } from './cli-docs/files-aliases'
 import { buildGistsSection } from './cli-docs/gists'
 import { buildHealthSection } from './cli-docs/health'
+import { buildClipboardSection } from './cli-docs/install'
 import { buildInjectSection } from './cli-docs/inject'
 import { buildPortainerSection } from './cli-docs/portainer'
 import { buildProjectsSection } from './cli-docs/projects'
@@ -23,6 +24,7 @@ ${buildProjectsSection()}
 ${buildInjectSection()}
 ${buildEnvSection()}
 ${buildClipSection()}
+${buildClipboardSection()}
 ${buildTransferSection()}
 ${buildGistsSection()}
 ${buildHealthSection()}

@@ -76,6 +76,7 @@ encrypted at rest and expires automatically (default 24h, see --ttl).`,
 
 func clipGetCmd() *cobra.Command {
 	var outFile string
+	var toClipboard bool
 	var force bool
 	cmd := &cobra.Command{
 		Use:   "get",
@@ -91,6 +92,10 @@ func clipGetCmd() *cobra.Command {
 			}
 			res, err := clipboard.Get(cfg)
 			if err != nil {
+				return err
+			}
+			if toClipboard {
+				_, err := copyToClipboard(res.Content, "isi clipboard akun")
 				return err
 			}
 			if outFile == "" {
@@ -110,6 +115,8 @@ func clipGetCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&outFile, "output", "o", "", "Write to file instead of stdout")
+	cmd.Flags().BoolVar(&toClipboard, "copy", false, "Copy to the OS clipboard instead of printing")
+	cmd.MarkFlagsMutuallyExclusive("copy", "output")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite output file if it exists")
 	return cmd
 }

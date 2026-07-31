@@ -16,6 +16,7 @@ Konten **dienkripsi at-rest** (AES-256-GCM) dan **kedaluwarsa otomatis** setelah
 cat .env | envman clip set
 
 # di laptop:
+envman clip get --copy    # ke clipboard OS mesin ini
 envman clip get > .env
 \`\`\`
 

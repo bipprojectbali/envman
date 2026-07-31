@@ -53,6 +53,11 @@ Secret yang **tidak bisa kamu reveal** (akses VIEWER menerima \`***\`) akan
 **dilewati** dan dilaporkan ke stderr — sehingga \`.env\` yang dihasilkan tetap
 valid. Untuk mengambil nilai secret asli, kamu butuh akses EDITOR/OWNER.
 
+> \ud83d\udccb **\`--copy\`** menyalurkan nilai ke clipboard alih-alih mencetaknya, jadi
+> rahasia tak menempel di scrollback terminal:
+> \`envman env get myapp:prod DB_PASSWORD --copy\` \u00b7 \`envman env pull myapp:prod --copy\`.
+> Bekerja juga lewat SSH (OSC 52). Lihat bagian Clipboard.
+
 ### Keys (nama key saja, tanpa value)
 
 Cetak **hanya nama key** dari sebuah \`.env\` lokal atau environment server —
