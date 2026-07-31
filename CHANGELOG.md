@@ -1,11 +1,13 @@
 # Changelog
 
-## [Unreleased]
+## [0.28.0] - 2026-07-31
 
 ### Changed
 - **⚠️ Breaking — kode klaim kini empat kata, bukan deret acak.** `EM-3F7K-9QW2-M4XZ-7T1B` menjadi `viking.pudding.alaska.sunny`. Kode lama sulit diketik dan mustahil didiktekan lewat telepon — padahal itu justru fungsinya. Kata-katanya diambil dari [EFF Short Wordlist #2](https://www.eff.org/dice) (1296 kata, lisensi CC-BY, setiap kata punya prefix tiga huruf yang unik). Boleh diketik huruf besar, dan spasi boleh menggantikan titik: `VIKING PUDDING ALASKA SUNNY` tetap diterima. **Kode lama yang belum diklaim tetap bisa dipakai** — jalur base32 dipertahankan.
   - Empat kata memberi ≈41 bit, lebih kecil dari ~80 bit sebelumnya. Itu tetap di luar jangkauan penebak karena jalur klaim dibatasi 10 kegagalan per IP per 10 menit (plus 100 global) — dan sebagai gantinya kodenya kini benar-benar bisa dibacakan.
   - Label di daftar terkirim kini **satu kata**, bukan empat karakter: empat karakter akan membocorkan seperempat entropi dan hampir menyebutkan kata pertamanya.
+
+- **⚠️ Breaking — `envman health --copy <status>` menjadi `--paths <status>`.** Flag lama berarti *"cetak path agar bisa disalin"*, sedangkan `--copy` di seluruh CLI kini berarti *"salin untuk saya"* — satu kata, dua makna. Nama lama tetap berfungsi sebagai `--copy-status` (tersembunyi), dan bentuk `--copy critical` yang kini salah akan memberi pesan yang menyebutkan penggantinya. Setelah ini `envman health --paths critical --copy` menyalin daftarnya langsung ke clipboard.
 
 ### Added
 - **`envman transfer send --once --code <kode>` — pilih kodenya sendiri.** Berguna saat kamu akan langsung memakainya di mesin sebelah, tanpa perlu menyalin empat kata. Minimal 12 karakter, hanya huruf/angka/`.`/`_`/`-` (tanpa spasi atau karakter shell, karena kodenya masuk ke baris perintah siap-tempel).
@@ -19,9 +21,6 @@
   - **Kiriman hangus-sekali-baca ditangani khusus.** Pada `transfer get`, salinan server sudah terhapus saat isinya diterima. Bila clipboard gagal, isinya **dicetak ke stdout** agar tak lenyap; bila lewat OSC 52 (yang tak bisa dikonfirmasi), envman memperingatkan keras untuk segera menempel.
   - ⚠️ **Clipboard bukan penyimpanan aman** — aplikasi lain bisa membacanya dan macOS menyinkronkannya ke iPhone. Ini memindahkan risiko dari "terlihat di layar" ke "ada di clipboard sesaat", bukan menghilangkannya.
 - **Bagian dokumentasi Clipboard yang baru** menjelaskan `--copy`, OSC 52 lewat SSH, dan **`envman install pbcopy`** yang selama ini praktis tak terdokumentasi — padahal dokumentasi mengajarkan `| pbcopy` di beberapa tempat tanpa memberi tahu pengguna Linux dari mana `pbcopy` berasal. Juga menegaskan beda **`envman clip`** (clipboard akun di server, lintas device) dengan **`--copy`** (clipboard OS lokal).
-
-### Changed
-- **⚠️ Breaking — `envman health --copy <status>` menjadi `--paths <status>`.** Flag lama berarti *"cetak path agar bisa disalin"*, sedangkan `--copy` di seluruh CLI kini berarti *"salin untuk saya"* — satu kata, dua makna. Nama lama tetap berfungsi sebagai `--copy-status` (tersembunyi), dan bentuk `--copy critical` yang kini salah akan memberi pesan yang menyebutkan penggantinya. Setelah ini `envman health --paths critical --copy` menyalin daftarnya langsung ke clipboard.
 
 ## [0.27.0] - 2026-07-30
 
