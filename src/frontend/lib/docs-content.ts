@@ -4,6 +4,7 @@ import { buildApiCoreSection } from './docs-sections/api-core'
 import { buildApiTokensPortainerSection } from './docs-sections/api-tokens-portainer'
 import { buildApiGistsTicketsSection } from './docs-sections/api-gists-tickets'
 import { buildApiStorageSection } from './docs-sections/api-storage'
+import { buildApiTransferSection } from './docs-sections/api-transfer'
 import { buildApiEnvImportsSection } from './docs-sections/api-env-imports'
 import { buildConceptsSection } from './docs-sections/concepts'
 import { buildDatabaseSection } from './docs-sections/database'
@@ -17,6 +18,7 @@ export function buildDocsMarkdown(origin: string): string {
     buildApiTokensPortainerSection(origin) +
     buildApiGistsTicketsSection(origin) +
     buildApiStorageSection(origin) +
+    buildApiTransferSection(origin) +
     buildApiEnvImportsSection(origin) +
     buildConceptsSection() +
     buildDatabaseSection() +

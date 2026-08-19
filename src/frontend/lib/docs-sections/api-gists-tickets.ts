@@ -4,10 +4,16 @@ export function buildApiGistsTicketsSection(origin: string): string {
 
 | Method | Path | Auth | Keterangan |
 |--------|------|------|-----------|
-| \`GET\` | \`/api/envman/gists\` | Session | List gists (infinite, \`?limit=20&cursor=\`) |
-| \`POST\` | \`/api/envman/gists\` | Session | Buat gist baru |
-| \`PUT\` | \`/api/envman/gists/:id\` | Session (owner) | Update gist |
-| \`DELETE\` | \`/api/envman/gists/:id\` | Session (owner) | Hapus gist |
+| \`GET\` | \`/api/envman/gists\` | Session / Bearer | List gists sendiri + publik (\`?limit=20&cursor=&search=&tags=&sort=\`) |
+| \`POST\` | \`/api/envman/gists\` | Session / Bearer | Buat gist baru (judul unik per user → 409 jika duplikat) |
+| \`PUT\` | \`/api/envman/gists/:id\` | Owner / SUPER_ADMIN | Update gist (409 jika rename bentrok) |
+| \`DELETE\` | \`/api/envman/gists/:id\` | Owner / SUPER_ADMIN | Hapus gist |
+| \`GET\` | \`/api/envman/gists/:id/raw/:filename\` | Session / Bearer | Konten mentah satu file |
+| \`GET\` | \`/api/public/gists\` | — | List gist publik (tanpa auth) |
+| \`GET\` | \`/api/public/gists/:id\` | — | Detail gist publik (403 jika privat) |
+| \`GET\` | \`/api/public/gists/:id/raw/:filename\` | — | Konten mentah publik |
+
+Judul **unik per user** (\`@@unique([userId, title])\`) = natural key yang dipakai CLI \`envman gists\` untuk merujuk gist tanpa UUID. Mutasi di-gate \`canWrite\` — token read-only mendapat 403.
 
 **GET /gists query params:**
 

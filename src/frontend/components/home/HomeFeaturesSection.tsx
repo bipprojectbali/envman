@@ -1,5 +1,15 @@
 import { Badge, Box, Container, Group, Stack, Text, ThemeIcon, Title } from '@mantine/core'
-import { TbArrowsExchange, TbBrandDocker, TbFolder, TbKey, TbLock, TbTerminal2, TbUsersGroup } from 'react-icons/tb'
+import {
+  TbArrowsExchange,
+  TbBrandDocker,
+  TbCode,
+  TbFolder,
+  TbKey,
+  TbLock,
+  TbSend,
+  TbTerminal2,
+  TbUsersGroup,
+} from 'react-icons/tb'
 import classes from './HomeFeaturesSection.module.css'
 
 function CellHead({ icon: Icon, color, title }: { icon: typeof TbLock; color: string; title: string }) {
@@ -125,6 +135,27 @@ export function HomeFeaturesSection() {
             <Text size="sm" c="dimmed" lh={1.6}>
               <code>envman clip</code> — pbcopy/pbpaste lintas device. Terenkripsi, auto-expire. Copy di server, paste
               di laptop.
+            </Text>
+          </Box>
+
+          {/* Secret transfer */}
+          <Box className={classes.cell}>
+            <CellHead icon={TbSend} color="pink" title="Secret transfer" />
+            <Text size="sm" c="dimmed" lh={1.6}>
+              Kirim <code>.env</code>, kunci SSH, atau sertifikat ke rekan tim — atau lewat kode 4 kata yang bisa
+              didikte lewat telepon. Burn-after-read, terenkripsi.
+            </Text>
+            <Text mt="sm" ff="monospace" fz={11.5} c="dimmed" style={{ whiteSpace: 'nowrap', overflowX: 'auto' }}>
+              viking.pudding.alaska.sunny
+            </Text>
+          </Box>
+
+          {/* Gists */}
+          <Box className={classes.cell}>
+            <CellHead icon={TbCode} color="cyan" title="Gists & snippets" />
+            <Text size="sm" c="dimmed" lh={1.6}>
+              Simpan skrip & snippet multi-file, publik atau privat. Push/pull dari CLI dengan <code>envman gists</code>{' '}
+              — rujuk by judul, bukan UUID.
             </Text>
           </Box>
         </Box>

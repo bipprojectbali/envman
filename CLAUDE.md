@@ -1,6 +1,6 @@
 # envman — CLAUDE.md
 
-> **⚠️ CLI ada di Go, bukan TypeScript.** Sumber: `cli-go/` (entry `cli-go/cmd/envman/main.go`). CLI TS lama (`src/cli.ts`, `src/cli/`) **SUDAH DIHAPUS** — jangan rujuk/edit `src/cli*`. `src/` = server + frontend saja. Build `go build`, test `go test ./...`.
+> **⚠️ CLI ada di Go, bukan TypeScript.** Sumber `cli-go/` (entry `cmd/envman/main.go`). CLI TS lama (`src/cli.ts`, `src/cli/`) **SUDAH DIHAPUS** — jangan rujuk/edit `src/cli*`. `src/` = server + frontend saja.
 
 ## Runtime
 
@@ -15,32 +15,32 @@ Bun di seluruh stack (`bun` / `bun test` / `bun install` / `bunx`). Bun auto-loa
 
 **Binary compile:** `bun build src/server.prod.ts --compile --target=bun-linux-x64 --outfile server`
 
-**Migration:** `src/lib/migrate.ts` — zero npm dep, compatible `_prisma_migrations`. Jalan otomatis di startup (`MIGRATE_ON_STARTUP=true` default) sebelum `app.listen()`. `scripts/migrate.ts` = CLI wrapper. ENV: `MIGRATE_ON_STARTUP` (true), `MIGRATE_DATABASE_URL` (`DIRECT_URL ?? DATABASE_URL`), `MIGRATIONS_DIR` (`./prisma/migrations`), `MIGRATE_DB_RETRIES` (5, 2s delay).
+**Migration:** `src/lib/migrate.ts` — zero npm dep, compatible `_prisma_migrations`. Jalan otomatis di startup (`MIGRATE_ON_STARTUP=true` default) sebelum `app.listen()`. `scripts/migrate.ts`=CLI wrapper. ENV: `MIGRATE_ON_STARTUP` (true), `MIGRATE_DATABASE_URL` (`DIRECT_URL ?? DATABASE_URL`), `MIGRATIONS_DIR` (`./prisma/migrations`), `MIGRATE_DB_RETRIES` (5, 2s delay).
 
 ## Database
 
-PostgreSQL via Prisma v6. Client singleton `src/lib/db.ts` (`{ prisma }`). Schema `prisma/schema.prisma`. Client → `./generated/prisma`.
+PostgreSQL via Prisma v6. Client singleton `db.ts` (`{ prisma }`). Schema `prisma/schema.prisma`. Client → `./generated/prisma`.
 
 ### Schema Models
 
 - `User`, `Session`, `AuditLog` — field standar (lihat schema).
-- `Project` (id, slug, name, description, tags[], icon?, color?, cardColor?, storageQuotaMb?, storageMaxFileMb?, createdById?, timestamps) — `icon`/`color`/`cardColor` divalidasi vs registry `src/lib/project-avatar.ts`, null=fallback. `storageQuotaMb`/`storageMaxFileMb` = override storage per-project (SUPER_ADMIN), null=global AppSetting. `createdById` (FK User, `ON DELETE SET NULL`).
-- `Environment` (id, name, tags[], projectId, createdAt, updatedAt) — unique(projectId, name)
+- `Project` (id, slug, name, description, tags[], icon?/color?/cardColor?, storageQuotaMb?/storageMaxFileMb?, createdById?, timestamps) — avatar vs registry `project-avatar.ts` (null=fallback); storage override per-project (null=global); `createdById` FK User `ON DELETE SET NULL`.
+- `Environment` (id, name, tags[], projectId, timestamps) — unique(projectId, name)
 - `EnvVar` (id, key, value, isSecret, isDisabled, environmentId, timestamps) — unique(environmentId, key)
 - `ProjectMember` (userId, projectId, role) — unique(userId, projectId)
-- `EnvironmentMember` (userId, environmentId, role?) — unique(userId, environmentId). `role=null` = DENY · role set = override · no record = inherit project role.
-- `ProjectSectionMember` (userId, projectId, section, role?, scopeTags[]) — unique(userId, projectId, section). Semantik identik `EnvironmentMember` untuk section non-env. `scopeTags` kosong=full access, isi=limit-by-tag (OR). Lihat [Permission per-Section](#permission-per-section-notes--aliases--files--storage) + [Tag Scope](#tag-scope-per-section-limit-by-tag).
-- `ApiToken` (id, userId, name, token, scopes[], tags[], canWrite, isDisabled, lastUsedAt?, expiresAt?, useCount, lastIp?, disabledBy?, disabledAt?, disabledReason?)
+- `EnvironmentMember` (userId, environmentId, role?) — unique(userId, environmentId). `role=null`=DENY · role set=override · no record=inherit project role.
+- `ProjectSectionMember` (userId, projectId, section, role?, scopeTags[]) — unique(userId, projectId, section). Role identik `EnvironmentMember`. `scopeTags` kosong=full, isi=limit-by-tag (OR).
+- `ApiToken` (id, userId, name, token, scopes[], tags[], canWrite, isDisabled, expiresAt?, useCount, lastUsedAt?/lastIp?, disabledBy?/disabledAt?/disabledReason?)
 - `ProjectAlias` (projectId, name, args, description?, tags[], createdBy) — unique(projectId, name)
 - `ProjectFile` (projectId, authorId, title, description, prefix?, files Json, tags[]) — unique(projectId, prefix)
 - `PortainerConnection` (id, name, portainerUrl, apiToken, createdById) — global
-- `PortainerConfig` (projectId, envName, connectionId?, portainerUrl?, apiToken?, stackId, stackName, endpointId, lastSyncAt?, lastSyncOk?)
+- `PortainerConfig` (projectId, envName, connectionId?/portainerUrl?/apiToken?, stackId, stackName, endpointId, lastSyncAt?/lastSyncOk?)
 - `AppSetting` (key PK, value, updatedAt, updatedById?) — konfigurasi global runtime (Dev > Settings)
-- `Gist` (id, userId, title, description, files Json `[{filename,content,language}]`, isPublic, tags[]) — unique(userId, title). `isPublic=false` default. Judul unik per user = natural key untuk CLI `envman gists`. Edit/delete: owner atau SUPER_ADMIN.
-- `Clipboard` (userId PK, content, createdAt, expiresAt) — slot-tunggal per-user. `content` dienkripsi (`enc:iv:cipher:tag`). TTL default 24h, lazy-expire + sweep 1h. FK `ON DELETE CASCADE`. Lihat [Clipboard](#clipboard).
-- `Transfer` (id, kind `TEXT|FILE`, fromUserId, toUserId?, toHint?, content?, minioKey?/filename?/size BigInt/mimeType/uploaded, label?, burn, codeHash? unique, codePrefix?, claimedAt?, claimedByUserId?, claimedIp?, expiresAt) — kirim secret user-ke-user. `toUserId=null` = kode sekali-pakai. **FK `CASCADE`** (bukan RESTRICT — RESTRICT mematikan `user.deleteMany()` di test). `size` **BigInt** (JSON.stringify melempar → shaper wajib `Number()`). Kolom FILE disiapkan untuk v2, v1 tak mengisinya. Lihat [Transfer](#transfer-send--inbox--recv).
-- `EnvImport` (id, targetEnvId, sourceEnvId, keys[], order, createdById) — unique(targetEnvId, sourceEnvId). Live-link referensi, boleh lintas project. FK `ON DELETE CASCADE`. Lihat [Env Import](#env-import).
-- `ProjectStorageObject` (projectId, path, minioKey, size, mimeType, isPublic, tags[], description?, uploadedById) — unique(projectId, path). `path`=path user, `minioKey`=`{projectId}/{path}`. `isPublic=true` → download tanpa auth. Lihat [Project Storage](#project-storage).
+- `Gist` (id, userId, title, description, files Json `[{filename,content,language}]`, isPublic, tags[]) — unique(userId, title). `isPublic=false` default. Judul unik per user = natural key CLI.
+- `Clipboard` (userId PK, content, createdAt, expiresAt) — slot-tunggal per-user. `content` dienkripsi (`enc:iv:cipher:tag`). TTL default 24h, lazy-expire + sweep 1h. FK `CASCADE`.
+- `Transfer` (id, kind `TEXT|FILE`, fromUserId, toUserId?, toHint?, content?, minioKey?/filename?/size BigInt/mimeType/uploaded, label?, burn, codeHash? unique, codePrefix?, claimedAt?, claimedByUserId?, claimedIp?, expiresAt) — `toUserId=null`=kode sekali-pakai. **FK `CASCADE`** (RESTRICT mematikan `user.deleteMany()` di test). `size` **BigInt** → shaper wajib `Number()`.
+- `EnvImport` (id, targetEnvId, sourceEnvId, keys[], order, createdById) — unique(targetEnvId, sourceEnvId). Live-link, boleh lintas project. FK `CASCADE`.
+- `ProjectStorageObject` (projectId, path, minioKey, size, mimeType, isPublic, tags[], description?, uploadedById) — unique(projectId, path). `path`=path user, `minioKey`=`{projectId}/{path}`. `isPublic=true`→download tanpa auth.
 
 ### Enums
 
@@ -68,7 +68,7 @@ Setiap perubahan `schema.prisma` WAJIB:
 
 ### Secret Encryption
 
-`isSecret=true` → AES-256-GCM. `MASTER_KEY` = 64-char hex. Format `enc:<iv>:<cipher>:<tag>`. Impl `src/lib/crypto.ts`. VIEWER lihat `***`; EDITOR/OWNER reveal.
+`isSecret=true` → AES-256-GCM. `MASTER_KEY`=64-char hex. Format `enc:<iv>:<cipher>:<tag>`. Impl `crypto.ts`. VIEWER lihat `***`; EDITOR/OWNER reveal.
 
 ### Seed Users (dev only)
 
@@ -97,70 +97,47 @@ Static route wajib untuk navigasi yang merepresentasikan lokasi dalam hierarki d
 | ADMIN | `/envmanager` | `/envmanager`, `/profile` (hak di-grant via capability/access matrix) |
 | USER | `/profile` | `/profile` |
 
-`getDefaultRoute(role)` di `src/frontend/hooks/useAuth.ts`. Blocked → `/blocked`.
+`getDefaultRoute(role)` di `useAuth.ts`. Blocked → `/blocked`.
 
 ## Permission Hierarchy (Per-Project + Per-Env)
 
 Dua lapis. Default: env/notes/aliases/files **inherit** dari `ProjectMember.role`. OWNER bisa override role per-env atau set DENY explicit per-env per-user.
 
+**Resolver `getEnvironmentAccess(userId, role, slug, envName)` (`access.ts`):** (1) SUPER_ADMIN→`OWNER`. (2) `EnvironmentMember`: `role=null`→DENIED · role set→override · no record→step 3. (3) inherit `ProjectMember.role`; no record→`null`.
+
 ### Secure-by-Default Onboarding
 
-Member ditambah dengan EDITOR/VIEWER (POST `/members`) → server auto-insert `EnvironmentMember role=null` (DENY) untuk **semua env existing**. Aturan:
-- OWNER baru → tidak default-deny (akses semua env).
-- Update role existing (re-POST userId sama) → tidak touch override.
-- Env baru → semua project member non-OWNER auto-deny.
-- Response `POST /members` carry `defaultDenied: boolean`.
-
-### Resolver — `getEnvironmentAccess(userId, role, slug, envName)` (`src/lib/access.ts`)
-
-1. SUPER_ADMIN → `OWNER`.
-2. `EnvironmentMember`: `role=null`→DENIED · role set→override · no record→step 3.
-3. Inherit `ProjectMember.role`. No record → `null`.
+Member ditambah EDITOR/VIEWER (POST `/members`) → server auto-insert `EnvironmentMember role=null` (DENY) untuk **semua env existing**. OWNER baru → tidak default-deny. Update role existing (re-POST userId sama) → tidak touch override. Env baru → semua member non-OWNER auto-deny. Response carry `defaultDenied: boolean`.
 
 ### Defense-in-Depth
 
 Files & aliases accessible di project level, tapi yang reference env via `-e project:env` di-block di env layer:
 - **Vars** — semua handler panggil `getEnvironmentAccess()`. DENIED → 403.
-- **Alias resolve** — extract `-e project:env` via `extractEnvRefs()` (`src/lib/alias-parser.ts`), cek tiap env → 403 `{error, deniedEnvs}`. List compute `requiresEnvs`+`deniedEnvs` per-alias per-user (di luar Redis cache).
+- **Alias resolve** — extract `-e project:env` via `extractEnvRefs()`, cek tiap env → 403 `{error, deniedEnvs}`. List compute `requiresEnvs`+`deniedEnvs` per-alias per-user (di luar Redis cache).
 - **Project detail** — `GET /projects/:slug` filter env DENIED untuk non-OWNER; tiap env carry `accessRole`.
 
-### CLI Behavior
-
-`FetchJSON()` (`cli-go/internal/api/api.go`) detect 403 + `deniedEnvs` → cetak `[envman] Akses ditolak untuk env: ...` → exit 1.
-
-### UI
-
-- Env card badge `DENIED` (red) / override `<role>` (grape).
-- MembersPanel: chevron expand → `MemberEnvOverrides.tsx` (select `inherit|OWNER|EDITOR|VIEWER|denied`, OWNER-only).
-- AliasesPanel: `deniedEnvs.length>0` → Badge merah "needs <env>", sembunyikan CopyButton.
-- Users Management (`AccessMatrixTab`): **read-only** ringkasan akses per-user (badge role+override per project, stats global, filter `with-access`). Tiap baris deep-link ke `/envmanager/:slug?tab=members` — **semua penyuntingan akses dilakukan di tab Members project** (single source of truth), bukan dari sisi user.
+**CLI:** `FetchJSON()` detect 403 + `deniedEnvs` → cetak `[envman] Akses ditolak untuk env: ...` → exit 1. **UI:** **semua penyuntingan akses di tab Members project** (single source of truth), `AccessMatrixTab` read-only.
 
 ### Admin Endpoint Parity (SUPER_ADMIN)
 
-`PUT /api/envman/admin/users/:userId/projects/:slug/envs/:envName` = OWNER endpoint: validasi target project member, last-owner-of-env protection, audit `ENV_MEMBER_SET`/`_CLEARED` (suffix `(admin)`), invalidate `projectAccess`/`projectDetail`/`invalidateProjectCaches(slug, [userId])`.
+- `PUT /api/envman/admin/users/:userId/projects/:slug/envs/:envName` = OWNER env-member endpoint: validasi target project member, last-owner-of-env protection, audit `ENV_MEMBER_SET`/`_CLEARED` (suffix `(admin)`), invalidate seperti OWNER.
+- `PUT .../projects/:slug/sections/:section` = OWNER section-member endpoint: validasi section+target project member, audit `SECTION_MEMBER_SET`/`_CLEARED` (suffix `(admin)`), invalidate `projectDetail`/`invalidateProjectCaches`.
 
-`PUT .../projects/:slug/sections/:section` = OWNER section-member endpoint: validasi section+target project member, audit `SECTION_MEMBER_SET`/`_CLEARED` (suffix `(admin)`), invalidate `projectDetail`/`invalidateProjectCaches`.
-
-### Audit & Cache
-
-- `ENV_MEMBER_SET` — `<slug>/<envName> user=<userId> role=<role>` (+`(admin)`)
-- `ENV_MEMBER_CLEARED` — `<slug>/<envName> user=<userId>` (+`(admin)`)
-- PUT/DELETE env-member → invalidate `projectAccess(userId, slug)` + `projectDetail(slug)` + `invalidateProjectCaches(slug, [userId])`.
+**Audit & Cache (env-member):** `ENV_MEMBER_SET`/`_CLEARED` (`<slug>/<envName> user=<userId>` +`role=` +`(admin)`). PUT/DELETE → invalidate `projectAccess(userId,slug)` + `projectDetail(slug)` + `invalidateProjectCaches(slug,[userId])`.
 
 ## Permission per-Section (Notes / Aliases / Files / Storage)
 
-Override akses per-member untuk section non-env, **paralel** dengan env members. Model `ProjectSectionMember`. Resolver `getSectionAccess(userId, role, slug, section)` (`src/lib/access.ts`). CRUD `src/routes/envman/section-members.ts`. Matrix `src/routes/envman/section-matrix.ts`. Lihat juga [Tag Scope per-Section](#tag-scope-per-section-limit-by-tag) untuk penyempitan akses berbasis tag.
+Override akses per-member untuk section non-env, **paralel** dengan env members. Model `ProjectSectionMember`. Resolver `getSectionAccess(userId, role, slug, section)`.
 
 ### Semantik
 
-- Section = enum `ProjectSection`, menempel ke `projectId`+`section`.
-- Resolusi (identik env): SUPER_ADMIN→OWNER · `role=null`→DENIED · role set→override · no record→inherit `ProjectMember.role` · no membership→null.
-- Enforcement: keempat section gate handler via `getSectionAccess()`. 24 call-site: Notes(4), Aliases(5, hanya section-access — env-ref tetap `getEnvironmentAccess`), Files(4)+resolve(1), Storage(10). Public storage download tak terpengaruh.
+- Resolusi **identik** `getEnvironmentAccess` (SUPER_ADMIN→OWNER · `null`→DENIED · set→override · no record→inherit · no membership→null).
+- Enforcement: keempat section gate handler via `getSectionAccess()` (Aliases env-ref tetap `getEnvironmentAccess`). Public storage download tak terpengaruh.
 - Role-gate per operasi **tidak berubah** (mis. Storage: VIEWER list/download, EDITOR upload/meta/rename/move, OWNER delete/folder/setPublic).
 
 ### Secure-by-Default
 
-- **Backfill** (`20260707102900_add_project_section_member`): semua `ProjectMember` non-OWNER existing di-seed `role=null` untuk keempat section. Member existing kehilangan akses section sampai OWNER grant.
+- **Backfill migration**: semua `ProjectMember` non-OWNER existing di-seed `role=null` keempat section → kehilangan akses sampai OWNER grant.
 - Member baru non-OWNER → auto-seed DENY keempat section (`projects-members.ts`); tercakup di `defaultDenied`.
 - OWNER → tidak di-seed. **Tanpa last-owner-protection**.
 
@@ -168,179 +145,120 @@ Override akses per-member untuk section non-env, **paralel** dengan env members.
 
 - Kelola override: OWNER (atau SUPER_ADMIN admin parity).
 - `GET /projects/:slug` field additive `sectionAccess: {NOTES,ALIASES,FILES,STORAGE}` (`ProjectRole|null`) — FE sembunyikan tab denied.
-- `GET /projects/:slug` field additive `storageStats: {fileCount, usedBytes}` (aggregate) untuk badge Storage — **hanya bila `sectionAccess.STORAGE !== null`**. FE badge `<count> · <size>`; mutasi storage invalidate `['envman','project',slug]`.
+- `GET /projects/:slug` field additive `storageStats: {fileCount, usedBytes}` untuk badge Storage — **hanya bila `sectionAccess.STORAGE !== null`**. Mutasi storage invalidate `['envman','project',slug]`.
+- UI: Members = satu matrix gabungan via tombol "Members" di header (`?tab=members` deep-link); merge `access-matrix`+`section-matrix` by userId. Section tab `sectionAccess === null` disembunyikan.
 
-### UI
-
-Members = **satu matrix gabungan** (`AccessMatrix.tsx`), diakses via **tombol "Members" di header project** (bukan tab konten; `?tab=members` tetap valid untuk deep-link): baris per anggota, kolom `Environments` + 4 section (Notes/Aliases/Files/Storage), fetch `access-matrix` + `section-matrix` lalu merge by userId. Kolom Environments = **satu kolom untuk semua env** (`EnvAccessCell.tsx`, popover berisi daftar env + cari saat >6) — hindari scroll horizontal. Tiap sel role = `AccessRoleCell.tsx` (pill berlabel + menu, bukan idiom huruf). Tag-scope Storage via `TagScopeEditor.tsx`. Section tab yang `sectionAccess === null` tetap disembunyikan dari panel-nya sendiri.
-
-### Audit & Cache
-
-- `SECTION_MEMBER_SET` — `<slug>/<section> user=<userId> role=<role>` (+` scope=[a,b]` bila di-set) (+`(admin)`)
-- `SECTION_MEMBER_CLEARED` — `<slug>/<section> user=<userId>` (+`(admin)`)
-- PUT/DELETE → invalidate `projectDetail(slug)` + `invalidateProjectCaches(slug, [userId])`. Matrix cache `projectSectionMatrix(slug)` 60s.
+**Audit & Cache:** `SECTION_MEMBER_SET`/`_CLEARED` (`<slug>/<section> user=<userId>` +`role=` +` scope=[a,b]` +`(admin)`). PUT/DELETE → invalidate `projectDetail(slug)` + `invalidateProjectCaches(slug,[userId])`. Matrix cache `projectSectionMatrix(slug)` 60s.
 
 ## Tag Scope per-Section (Limit by Tag)
 
-Lapisan ke-4 (ABAC) di atas section access: **mempersempit** akses member di dalam sebuah section ke item bertag tertentu saja. Kolom `ProjectSectionMember.scopeTags String[]` (migration `20260721040000_add_section_scope_tags`, additive default `[]`, tanpa backfill).
+Lapisan ke-4 (ABAC) di atas section access: **mempersempit** akses member ke item bertag tertentu. Kolom `ProjectSectionMember.scopeTags String[]` (migration `20260721040000_add_section_scope_tags`, additive default `[]`, tanpa backfill).
 
 ### Semantik (MUTLAK)
 
-- **Kosong `[]` = full access** (lihat/kelola semua item, termasuk yang tak bertag) = perilaku lama, backward-compatible.
-- **Non-kosong = limit-by-tag**: hanya item yang punya **≥1** tag dari `scopeTags` (**match OR**). Item **tanpa tag** hanya untuk full-access member (**secure-by-default**, otomatis via `hasSome`).
+- **Kosong `[]` = full access** (semua item termasuk tanpa tag) = perilaku lama, backward-compatible.
+- **Non-kosong = limit-by-tag**: hanya item dengan **≥1** tag dari `scopeTags` (**match OR**). Item **tanpa tag** hanya untuk full-access member (secure-by-default via `hasSome`).
 - Berlaku keempat section (NOTES→`ProjectNote`, ALIASES→`ProjectAlias`, FILES→`ProjectFile`, STORAGE→`ProjectStorageObject`; semua punya `tags[]`).
 - **Enforcement baca + tulis**: item di luar scope **tak terlihat** (list ter-filter) **dan tak bisa disentuh**.
-  - Read-by-id/download/edit/delete item luar scope → **404** (invisibility, jangan bocorkan keberadaan). Bedakan dari section-denied yang tetap **403**.
-  - **Section-role OWNER pun di-guard**: OWNER via matrix bisa punya scopeTags → storage delete/folder-delete tetap cek scope (project-OWNER inherit selalu scope kosong = full). Jangan asumsikan OWNER=full-access saat ada `scopeTags`.
-  - **Create rule**: user limited WAJIB memberi item baru ≥1 tag scope-nya → else **400** (cegah bikin item invisible-to-self). Edit yang retag keluar scope → **400**.
-- SUPER_ADMIN & OWNER (via inherit) selalu `scopeTags=[]` (tak pernah di-limit).
+  - Read-by-id/download/edit/delete item luar scope → **404** (invisibility). Section-denied tetap **403**.
+  - **Section-role OWNER pun di-guard**: OWNER via matrix bisa punya scopeTags → tetap cek scope (project-OWNER inherit selalu kosong=full). Jangan asumsikan OWNER=full saat ada `scopeTags`.
+  - **Create rule**: user limited WAJIB beri item baru ≥1 tag scope-nya → else **400**. Edit yang retag keluar scope → **400**.
+- SUPER_ADMIN & OWNER (via inherit) selalu `scopeTags=[]`.
 
-### Resolver & Helper (`src/lib/access.ts`)
+### Resolver & Helper (`access.ts`)
 
-- Primitif `getSectionAccessWithScope(userId, role, slug, section) → { role, scopeTags }` (1 DB read). `getSectionAccess()` = wrapper return `.role` (**signature tak berubah** — 34 call-site aman). `getSectionTagScope()` return `.scopeTags`.
-- Helper murni: `canAccessItem(itemTags, scopeTags)` (OR; untagged→false saat limited), `filterByTagScope(items, scope)`, `tagScopeWhere(scope)` (`{}` | `{ tags: { hasSome } }`).
-- **Cache caveat**: list Aliases/Files pakai `withCache` key **global** → filter `filterByTagScope()` **setelah** cache boundary (per-request), JANGAN cache hasil ter-scope. Notes/Storage tak di-cache → filter di query. Storage 2-query: filter di **Query 1** agar folder/`totalFiles`/pagination benar.
+- Primitif `getSectionAccessWithScope(...) → { role, scopeTags }` (1 DB read). `getSectionAccess()`=wrapper return `.role` (**signature tak berubah** — 34 call-site aman). `getSectionTagScope()` return `.scopeTags`.
+- Helper murni: `canAccessItem` (OR; untagged→false saat limited), `filterByTagScope`, `tagScopeWhere` (`{}` | `{ tags: { hasSome } }`).
+- **Cache caveat**: list Aliases/Files pakai `withCache` key **global** → filter `filterByTagScope()` **setelah** cache boundary (per-request), JANGAN cache hasil ter-scope. Storage 2-query: filter di **Query 1** agar folder/`totalFiles`/pagination benar.
 
 ### API & UI
 
-- `PUT .../sections/:section/members/:userId` body additive `{ role, scopeTags? }` (validasi array string, trim/dedupe; `denied`/`inherit`→scope di-clear). Admin parity `PUT admin/.../sections/:section` sama. Response bawa `scopeTags`.
-- `GET section-matrix` + `GET .../sections/:section/members` field additive `scopeTags` per cell.
-- `GET section-matrix` juga bawa `availableTags: Record<section, string[]>` (union tag item per section) untuk autocomplete editor.
-- UI: `AccessMatrix.tsx` per-cell `TagScopeEditor.tsx` (Popover+TagsInput dengan saran `availableTags`; badge `Full`/`N tag`) saat role granted. Storage: badge tag di row/card (`tagColor`), edit tag via `StorageRenameModal` (PATCH `/storage/meta`).
-- CLI: `envman storage ls --tag a,b` (filter client-side; server sudah scope; tags dicetak di baris file). `envman storage upload --tag a,b` memberi tag saat upload (folder → semua file; via `confirm-upload`/`multipart/complete`).
-
-### Test
-
-Unit `tests/unit/tag-scope.test.ts` (truth-table + invariant untagged). Integration `tests/integration/section-tag-scope.test.ts` (list-filter, guard 404, create-rule 400, retag 400 — butuh Redis untuk `app.handle`).
+- `PUT .../sections/:section/members/:userId` body additive `{ role, scopeTags? }` (validasi array string, trim/dedupe; `denied`/`inherit`→scope di-clear). Admin parity sama. Response bawa `scopeTags`.
+- `GET section-matrix` + `GET .../sections/:section/members` field additive `scopeTags` per cell. `section-matrix` juga bawa `availableTags: Record<section, string[]>` untuk autocomplete.
+- UI per-cell `TagScopeEditor` (badge `Full`/`N tag`); Storage edit tag via PATCH `/storage/meta`. CLI `storage ls/upload --tag a,b`. Test `tag-scope`+`section-tag-scope`.
 
 ## Env Import (Reference / Live-Link)
 
-Env target meminjam vars dari env lain (boleh lintas project) secara **referensi live**, bukan salinan. Model `EnvImport`. Resolver `src/lib/env-import.ts`. CRUD `src/routes/envman/env-imports.ts`.
+Env target meminjam vars dari env lain (boleh lintas project) secara **referensi live**, bukan salinan. Resolver `env-import.ts`.
 
 ### Semantik
 
 - **Layered merge**: `imports (order asc, besar menang) → local`. Var lokal SELALU menang per-key; imported yang key-nya ada lokal di-suppress.
-- **Per-key whitelist** (`EnvImport.keys[]`): kosong `[]` = **semua** var source (default, backward-compatible); ada isi = **hanya** key itu. Whitelist ketat — key baru di source tidak ikut otomatis. Filter di `resolveImportedVars()` (setelah cek akses).
-- **Akses dicek saat resolve**: tiap source env `getEnvironmentAccess(caller,...)`. `null` → skip + dicatat `deniedImports[]` (tidak silent).
+- **Per-key whitelist** (`EnvImport.keys[]`): kosong `[]`=**semua** var source (default); ada isi=**hanya** key itu. Whitelist ketat — key baru di source tidak ikut otomatis.
+- **Akses dicek saat resolve**: tiap source env `getEnvironmentAccess(caller,...)`. `null`→skip + dicatat `deniedImports[]`.
 - **Secret**: reveal/mask pakai akses caller di SOURCE env. MASTER_KEY global → decrypt lintas project valid.
-- **Cycle detection saat save** (`wouldCreateCycle`) → tolak A→B→A (400).
-- **EnvVar `isDisabled` di source di-exclude**.
+- **Cycle detection saat save** (`wouldCreateCycle`) → tolak A→B→A (400). **EnvVar `isDisabled` di source di-exclude**.
 
-### Permission
+**Permission:** Buat/hapus link: OWNER env target; caller wajib ≥VIEWER ke source. Self-import→400. Duplikat→409. `order`=max+1.
 
-Buat/hapus link: OWNER env target; caller juga wajib ≥VIEWER ke source. Self-import→400. Duplikat→409. `order`=max+1.
+**Scope resolusi:** `GET vars/export` (CLI): imported sebagai base, local overwrite, +`deniedImports` bila non-kosong. `GET vars` (UI): field additive `imported[]` (`{key,value,isSecret,sourceProject,sourceEnv}`, exclude key lokal), `importedKeys[]`, `deniedImports[]`; bentuk `vars`/`total` tak berubah.
 
-### Scope Resolusi
+**UI:** Baris imported read-only (badge `from <proj>:<env>`); var lokal ∈ `importedKeys` → badge `overrides`. Kelola OWNER-only → `ImportManagerModal` (`?importMgr=true`).
 
-- **`GET vars/export`** (CLI/daemon): imported sebagai base, local overwrite. Tambah `deniedImports` bila non-kosong.
-- **`GET vars` list** (UI): field additive `imported[]` (`{key,value,isSecret,sourceProject,sourceEnv}`, exclude key lokal), `importedKeys[]`, `deniedImports[]`. Bentuk `vars`/`total` tak berubah.
-
-### UI
-
-Baris imported read-only (badge grape `from <proj>:<env>`, secret reveal sesuai akses). Var lokal ∈ `importedKeys` → badge `overrides`. `deniedImports` → Alert kuning. Tombol kelola (`TbLink`, grape) OWNER-only → `ImportManagerModal.tsx` (`?importMgr=true`). `ImportKeyPicker.tsx` pilih subset key; badge `N key`/`semua key` + edit (PATCH).
-
-### Audit & Cache
-
-- `ENV_IMPORT_ADDED`/`_REMOVED`/`_UPDATED` detail `<slug>/<env> <- <srcSlug>/<srcEnv>` (+ ` keys=[...]`/` keys=[all]` bila whitelist di-set).
-- Invalidate `invalidateProjectCaches(slug)` + `projectDetail(slug)`. **Hasil resolve vars TIDAK di-cache**.
-
-**Deferred (TODO):** transitive import, per-import override value.
+**Audit & Cache:** `ENV_IMPORT_ADDED`/`_REMOVED`/`_UPDATED`. Invalidate `invalidateProjectCaches(slug)` + `projectDetail(slug)`. **Hasil resolve vars TIDAK di-cache.** Deferred: transitive import, per-import override value.
 
 ## Project Storage
 
-MinIO-backed per project. Key prefix `{projectId}/{path}`. DB (`ProjectStorageObject`) = source of truth metadata; MinIO = content.
+MinIO-backed per project. Key prefix `{projectId}/{path}`. DB (`ProjectStorageObject`)=source of truth metadata; MinIO=content.
 
-### Env Vars (wajib aktifkan fitur)
+**Env vars (wajib aktifkan fitur):** `MINIO_ENDPOINT · MINIO_ACCESS_KEY · MINIO_SECRET_KEY · MINIO_BUCKET=envman · MINIO_PRESIGN_BASE_URL (opsional)`. `MINIO_PRESIGN_BASE_URL` khusus presigned PUT (CLI upload) — set URL non-proxy jika MinIO di belakang Cloudflare. Tanpa 4 var pertama → 503 (list & metadata PATCH tetap jalan). Gate per operasi: lihat API Reference Storage.
 
-```
-MINIO_ENDPOINT · MINIO_ACCESS_KEY · MINIO_SECRET_KEY · MINIO_BUCKET=envman · MINIO_PRESIGN_BASE_URL (opsional)
-```
+**Storage limits:** Global `storage_max_file_mb` (50), `storage_default_quota_mb` (500) via `/dev > Storage`; `Project.storageMaxFileMb`/`storageQuotaMb`=override per-project (SUPER_ADMIN, null=global). Efektif `project.storageMaxFileMb ?? globalSetting`.
 
-`MINIO_PRESIGN_BASE_URL` khusus presigned PUT URL (CLI upload) — set ke URL non-proxy jika MinIO di belakang Cloudflare (limit 100 MB). Tanpa 4 var pertama, endpoint yang butuh MinIO → 503 (list & metadata PATCH tetap jalan).
+**Cleanup & presign:** Delete: MinIO dulu, lalu DB. Project soft-delete: `minioDeleteProject()`. Orphan (upload sukses, DB gagal): auto-delete object. Private download presigned TTL 5 mnt (`Content-Disposition: attachment`); public TTL 1 jam; CLI stream via 302.
 
-### Permission
-
-| Operasi | Role |
-|---|---|
-| List + folder tree | VIEWER+ |
-| Upload / replace / update metadata | EDITOR+ |
-| Set `isPublic` / Delete | OWNER only |
-| Public download (no auth) | `isPublic=true` |
-
-### Storage Limits
-
-- Global `storage_max_file_mb` (default 50), `storage_default_quota_mb` (default 500) — via `/dev > Storage`.
-- `Project.storageMaxFileMb`/`storageQuotaMb` — override per-project (SUPER_ADMIN), null=global.
-- Efektif: `project.storageMaxFileMb ?? globalSetting` (`getMaxFileSizeBytesForProject()`).
-- UI: gear di panel Storage (SUPER_ADMIN) → `StorageSettingsModal`; defaults di `/dev > Storage` → `StorageAdminPanel`.
-
-### Cleanup & Presign
-
-- Delete file: MinIO dulu, lalu DB. Project soft-delete: `minioDeleteProject(projectId)`. Orphan (upload sukses, DB gagal): auto-delete MinIO object.
-- Private download: presigned TTL 5 mnt, `Content-Disposition: attachment`. Public: TTL 1 jam. CLI stream langsung dari MinIO via 302.
-
-### Implementasi
-
-- `src/lib/minio.ts` — `Bun.S3Client` singleton (lazy) · `src/lib/storage-service.ts` — `sanitizePath`, `getQuotaBytes`, `minioUpload/Delete/DeleteProject/Presign`, `buildMinioKey` · `src/lib/s3-multipart.ts` — SigV4 + multipart, `MULTIPART_CHUNK_SIZE=50MB`.
-- Routes: `storage-core.ts` (list/download/meta/delete) · `storage-upload.ts` (≤50MB) · `storage-multipart.ts` (>50MB) · `storage-rename.ts` · `storage-move.ts` (batch) · `public-storage.ts` (redirect).
-- FE: `slug/StoragePanel.tsx`, `StorageUploadModal.tsx`, `StorageFileRow/Card.tsx`, `StorageMoveModal.tsx`. Hooks `useStorageFileActions.ts`, `useChunkedUpload.ts` (`MULTIPART_THRESHOLD=50MB`).
+**Impl:** `Bun.S3Client` singleton lazy; SigV4 multipart, `MULTIPART_CHUNK_SIZE=50MB`; routes `storage-*.ts`.
 
 ## Transfer (envman transfer)
 
-Kirim secret **user-ke-user** (`.env`, kunci SSH, cert) agar tak lewat WhatsApp/Slack. Beda dari `clip` (slot-tunggal milik sendiri), transfer punya **penerima**. Model `Transfer`. Service `src/lib/transfer-service.ts`. Routes `src/routes/envman/transfers-{send,list,claim}.ts` (+ agregator `transfers.ts`). Sweep `src/lib/transfer-sweep.ts`. CLI `cli-go/internal/transfer/` + `cmd/envman/{transfer,recv}_cmd.go` (recv_cmd.go = `transfer get`).
+Kirim secret **user-ke-user** (`.env`, SSH, cert). Beda dari `clip` (slot-tunggal milik sendiri), transfer punya **penerima**. Impl `transfer-service.ts` + `transfers-*.ts`; CLI `internal/transfer/` (recv_cmd.go=`transfer get`).
 
-> ⚠️ **Bukan E2E.** Dienkripsi at-rest dengan `MASTER_KEY` **server** — aman dari pihak ketiga & kebocoran DB, tapi pemegang `MASTER_KEY` (admin) bisa membaca. Wajib disebut apa adanya di docs; jangan diklaim lebih.
+> ⚠️ **Bukan E2E.** Enkripsi at-rest dgn `MASTER_KEY` **server** — aman dari pihak ketiga & kebocoran DB, tapi pemegang `MASTER_KEY` (admin) bisa baca. Sebut apa adanya di docs.
 
 ### Semantik
 
-- **Penerima**: user terdaftar (`to`, email/nama **persis** — sengaja tak fuzzy, satu typo bisa mengirim `.env` prod ke orang salah) **atau** `once:true` → kode sekali-pakai untuk orang tanpa akun. Nama ambigu → 409; blocked/deleted → 404 (**body sama** dengan "tak ada" agar bukan oracle status akun).
-- **Burn-after-read** default; `burn:false` (`--keep`) bisa diambil berkali-kali sampai TTL.
-- **Klaim = CAS** `updateMany where {id, claimedAt:null}` → `count===0` berarti kalah balapan → 409. **Bukan** read-then-write (itu justru balapannya).
-- **Klaim MENANDAI, tak menghapus.** Penghapusan hanya di sweep (`expiresAt<now` ATAU `burn && claimedAt < now-2j`) — satu jalur kode; untuk v2 urutan **object MinIO dulu, baru baris**.
-- **Kode**: **4 kata** dari EFF Short #2 (1296 kata, prefix 3-huruf unik, CC-BY) → `viking.pudding.alaska.sunny`, ≈41 bit. Pemisah **titik**, bukan tanda hubung — daftar memuat `yo-yo`. Hanya **codeHash** (sha256) disimpan. **`generateCode` wajib `randomInt`**, bukan `% length`: 1296 tak membagi 256 → bias.
-- **Normalisasi sadar-kelas** (`normalizeCode`): legacy base32 16-char (uppercase, buang `-`, `I L→1`, `O→0` — **wajib dipertahankan**, kode lama masih beredar) / mnemonic & kustom (lowercase, spasi→titik, **JANGAN lipat glyph** — `viking` bukan `v1k1ng`). ⚠️ `hashCode` jalan pada hasilnya = **kontrak kanonikalisasi dengan DB**; TS (`transfer-service.ts`) & Go (`internal/transfer/transfer.go`) wajib sepakat byte-per-byte, dijaga fixture bersama `tests/fixtures/code-normalization.json`. Divergensi = kode tak bisa diklaim dengan 404 senyap.
-- **`--code` kustom**: min 12 char, hanya `[a-z0-9._-]` (masuk baris perintah siap-tempel). **TTL dipaksa ≤15 menit** di `resolveTtlMs` (bukan call-site — jalur file yang terlupakan). `codePrefix` = **null** untuk kode kustom (sering dipakai ulang; prefix apa pun = pengungkapan), **kata pertama saja** untuk mnemonic.
+- **Penerima**: user terdaftar (`to`, email/nama **persis**, sengaja tak fuzzy) **atau** `once:true` → kode sekali-pakai. Nama ambigu→409; blocked/deleted→**404 body sama** dgn "tak ada" (bukan oracle status akun).
+- **Burn-after-read** default; `--keep` (`burn:false`) bisa diambil berkali-kali sampai TTL.
+- **Klaim = CAS** `updateMany where {id, claimedAt:null}` → `count===0`=kalah balapan → 409. **Bukan** read-then-write.
+- **Klaim MENANDAI, tak menghapus.** Hapus hanya di sweep (`expiresAt<now` ATAU `burn && claimedAt<now-2j`) — satu jalur; object MinIO dulu, baru baris.
+- **Kode**: **4 kata** EFF Short #2 (1296 kata, prefix 3-huruf unik) → `viking.pudding.alaska.sunny`, ≈41 bit. Pemisah **titik** bukan hubung (daftar memuat `yo-yo`). Simpan **codeHash** (sha256) saja. `generateCode` wajib **`randomInt`** bukan `% length` (bias).
+- **Normalisasi sadar-kelas** (`normalizeCode`): legacy base32 16-char (uppercase, buang `-`, `I L→1`, `O→0` — **wajib dipertahankan**) / mnemonic & kustom (lowercase, spasi→titik, **JANGAN lipat glyph** — `viking` bukan `v1k1ng`). ⚠️ `hashCode` jalan pada hasilnya = **kontrak kanonikalisasi dgn DB**; TS & Go wajib sepakat byte-per-byte (fixture `tests/fixtures/code-normalization.json`). Divergensi = 404 senyap.
+- **`--code` kustom**: min 12 char, `[a-z0-9._-]`. **TTL dipaksa ≤15 mnt** di `resolveTtlMs`. `codePrefix`=**null** utk kustom, **kata pertama** utk mnemonic.
 
 ### Aturan keamanan (MUTLAK)
 
-- **Kode di BODY POST, JANGAN di path** — `src/app.ts` mencatat `${method} ${pathname}` ke Redis app-log **dan** mem-broadcast ke panel dev. Alasan sama: audit hanya boleh memuat `codePrefix`.
-- **Rate limit** `src/lib/rate-limit.ts`: `xfer:claim:ip:<ip>` 10 gagal/10mnt + `xfer:claim:global` 100/10mnt. `peekLimit` (cek, tak increment) sebelum lookup + `hitLimit` **hanya saat gagal** → klaim sukses tak makan budget, tapi budget habis tetap menolak kode benar. **Fail-closed** (Redis mati → 503), beda dari `cache.ts` yang fail-open.
+- **Kode di BODY POST, JANGAN di path** — `src/app.ts` mencatat `${method} ${pathname}` ke Redis app-log **dan** broadcast ke panel dev. Audit hanya boleh memuat `codePrefix`.
+- **Rate limit** `src/lib/rate-limit.ts`: `xfer:claim:ip:<ip>` 10 gagal/10mnt + `xfer:claim:global` 100/10mnt. `peekLimit` (tak increment) sebelum lookup + `hitLimit` **hanya saat gagal** → klaim sukses tak makan budget, budget habis tetap menolak kode benar. **Fail-closed** (Redis mati → 503), beda dari `cache.ts` fail-open.
 - **404 identik** untuk kode tak dikenal/kedaluwarsa/sudah diklaim.
-- **MASTER_KEY hilang → 503 saat kirim** (`encryptSecret` fail-open menyimpan plaintext — tak boleh untuk transfer). Klaim tak hard-fail, tapi sentinel `'[decryption failed]'` dicek **sebelum CAS** → 500; kalau tidak, burn menghapus satu-satunya salinan dan menyerahkan string error.
-- **Gate**: mutasi yang membuat state untuk **orang lain** butuh `canWrite` (POST); klaim/hapus/inbox **tidak** (token RO wajib bisa menguras inbox-nya sendiri — kasus CI menarik cert).
-- Klaim-by-id `where {id, toUserId: caller}` → **404 bukan 403** (403 mengonfirmasi baris ada).
+- **MASTER_KEY hilang → 503 saat kirim** (`encryptSecret` fail-open menyimpan plaintext — tak boleh untuk transfer). Klaim tak hard-fail, tapi sentinel `'[decryption failed]'` dicek **sebelum CAS** → 500; kalau tidak, burn menghapus satu-satunya salinan.
+- **Gate**: mutasi yang membuat state untuk **orang lain** butuh `canWrite` (POST); klaim/hapus/inbox **tidak** (token RO wajib bisa menguras inbox-nya sendiri).
+- Klaim-by-id `where {id, toUserId: caller}` → **404 bukan 403**.
 
 ### API
 
-`POST /api/envman/transfers` (TEXT; `canWrite`; 400/403/404/409/413/429 kuota/503) · `POST .../transfers/presign` + `POST .../transfers/:id/confirm` (FILE; `canWrite`; 503 bila MinIO mati, 502 bila stat gagal, 413 bila ukuran nyata > batas) · `GET .../transfers/inbox|sent` · `POST .../transfers/:id/claim` (FILE → `downloadUrl` presigned) · `DELETE .../transfers/:id` · **`POST .../transfers/claim` (tanpa auth**, kode di body).
+`POST /api/envman/transfers` (TEXT; `canWrite`; 400/403/404/409/413/429/503) · `POST .../transfers/presign` + `POST .../transfers/:id/confirm` (FILE; `canWrite`; 503 MinIO mati, 502 stat gagal, 413 ukuran nyata > batas) · `GET .../transfers/inbox|sent` · `POST .../transfers/:id/claim` (FILE → `downloadUrl` presigned) · `DELETE .../transfers/:id` · **`POST .../transfers/claim` (tanpa auth**, kode di body).
 
-Audit `TRANSFER_SENT`/`TRANSFER_CLAIMED`/`TRANSFER_REVOKED`. Setting (UI: `/dev > Storage`, `TransferSettingsPanel.tsx`): `transfer_max_text_kb` (1024), `transfer_max_file_mb` (100), `transfer_max_ttl_hours` (168), `transfer_default_ttl_hours` (72), `transfer_max_pending_per_user` (20).
+Audit `TRANSFER_SENT`/`_CLAIMED`/`_REVOKED`. Setting (UI `/dev > Storage`): `transfer_max_text_kb` (1024), `transfer_max_file_mb` (100), `transfer_max_ttl_hours` (168), `transfer_default_ttl_hours` (72), `transfer_max_pending_per_user` (20).
 
 ### Konvensi permukaan perintah (MUTLAK)
 
-- **Fitur = noun-group.** Semua subcommand di bawah satu kata benda (`clip`, `env`, `gists`, `storage`, `projects`, `portainer`, `transfer`). **Jangan** menyebar verba fitur ke tingkat atas — itu bikin fiturnya tak tertemukan di `--help` yang alfabetis. **Tanpa pengecualian.** `recv` sempat dibiarkan top-level dengan alasan "orang tanpa akun butuh perintah pendek" — alasan itu salah: mereka tak pernah membaca `--help`, hanya menempel satu baris dari chat. Yang tersisa hanyalah dua entri untuk satu pekerjaan.
-- **`-f` = `--follow` saja** (`portainer logs`, konvensi `tail`/`docker`). `--force` **long-only di seluruh CLI** — dijaga `TestForceHasNoShorthand`.
-- **`--tags`** (jamak) di mana-mana. Wire field selalu `tags`; `Changed("tags")` adalah literal string yang diam-diam no-op bila lupa diubah.
-- **`--json`** tanpa shorthand, lewat `emitJSON()` (`cmd/envman/json_out.go`). stdout **hanya data**, status ke stderr.
-- **Perintah destruktif default aman**: `storage rm` pratinjau dulu (butuh `--force`), `gists push --clean` menolak tanpa `--force` dan **menyebut file yang akan hilang** (`MergeResult.Dropped`).
-- **Rahasia JANGAN dicetak ke stdout bila ada `--copy`.** Perintah yang mengeluarkan rahasia wajib punya `--copy` (bool, tanpa shorthand, eksklusif dengan `-o`) yang menyalurkannya ke clipboard lewat `internal/clipout` — nilai yang tercetak menempel di scrollback. Rantai: pbcopy → wl-copy → xsel/xclip → **OSC 52** (lewat SSH mengisi clipboard mesin LOKAL). ⚠️ OSC 52 tak bisa dikonfirmasi; untuk data hangus-sekali-baca (`transfer get`) wajib peringatkan keras, dan bila metode nyata gagal **jatuh ke stdout** agar rahasia tak lenyap. `/dev/tty` gagal → **error**, jangan fallback stdout (base64 rahasia akan tumpah). Dijaga `copy_flag_test.go`.
-- **Rahasia JANGAN lewat argumen.** Argumen terlihat di `ps aux`/`/proc` dan tersimpan di history shell — ini persis CVE-2023-43621 pada croc. Baca lewat `internal/secretin.Read()`: urutan **env var → stdin → prompt → argumen (dengan peringatan)**. Berlaku untuk token, kode klaim, password. `envman login --token` & `envman recv <KODE>` sudah memakainya (`ENVMAN_TOKEN`, `ENVMAN_CODE`).
-- **Perintah yang dipindah** wajib masuk `movedCommands` (`main.go`) — tanpa itu ia jatuh ke root injector dan memberi error yang tak berkaitan.
-- Perintah **tanpa login** (`health`, `sys`, `install`, `env sync`) wajib menyebutnya di baris pertama `Long`.
-- Tambah/pindah perintah → **wajib** test registrasi (`transfer_cmd_test.go`, `env_sync_cmd_test.go`). CI **tidak** menjalankan smoke test perintah.
+- **Fitur = noun-group.** Semua subcommand di bawah satu kata benda (`clip`/`env`/`gists`/`storage`/`projects`/`portainer`/`transfer`). **Jangan** sebar verba fitur ke tingkat atas — tak tertemukan di `--help` alfabetis. **Tanpa pengecualian.**
+- **`-f` = `--follow` saja** (`portainer logs`). `--force` **long-only** seluruh CLI — dijaga `TestForceHasNoShorthand`.
+- **`--tags`** (jamak) di mana-mana; wire field selalu `tags`. **`--json`** tanpa shorthand via `emitJSON()`; stdout **hanya data**, status ke stderr.
+- **Destruktif default aman**: `storage rm` pratinjau dulu (butuh `--force`); `gists push --clean` tolak tanpa `--force` + **sebut file yang hilang** (`MergeResult.Dropped`).
+- **Rahasia JANGAN ke stdout bila ada `--copy`** (bool, tanpa shorthand, eksklusif `-o`) → clipboard via `internal/clipout`: pbcopy → wl-copy → xsel/xclip → **OSC 52** (clipboard mesin LOKAL lewat SSH). ⚠️ OSC 52 tak bisa dikonfirmasi; utk data hangus-sekali-baca (`transfer get`) peringatkan keras, bila metode nyata gagal **jatuh ke stdout** agar rahasia tak lenyap. Dijaga `copy_flag_test.go`.
+- **Rahasia JANGAN lewat argumen** (bocor via `ps`/history — CVE-2023-43621 croc). Baca via `secretin.Read()`: **env var → stdin → prompt → argumen (peringatan)**. Berlaku token/kode klaim/password (`ENVMAN_TOKEN`, `ENVMAN_CODE`).
+- **Perintah dipindah** wajib masuk `movedCommands`. Perintah **tanpa login** (`health`, `sys`, `install`, `env sync`) sebut di baris pertama `Long`. Tambah/pindah perintah → **wajib** test registrasi.
 
 ### Jalur TEXT vs FILE (auto-deteksi di CLI)
 
-`ChooseMode` (`cli-go/internal/transfer/mode.go`) memilih jalur **tanpa campur tangan user**: byte `NUL` di 8000 byte pertama (heuristik biner Git) **atau** ukuran > batas teks → **FILE**; selain itu **TEXT**. Override `--text`/`--file`. Input dari pipe selalu TEXT (ukuran tak diketahui di muka). CLI mengumumkan mode ke stderr.
+`ChooseMode` memilih **tanpa campur tangan user**: byte `NUL` di 8000 byte pertama (heuristik biner Git) **atau** ukuran > batas teks → **FILE**; selain itu **TEXT**. Override `--text`/`--file`. Pipe selalu TEXT. Mode diumumkan ke stderr.
 
-- **TEXT** → kolom `content` terenkripsi. Lewat body JSON + hex di DB ≈ **2x disk, 2.7x memori** → batas kecil (`transfer_max_text_kb`, default **1024**).
-- **FILE** → presign → **CLI PUT langsung ke MinIO** → confirm. Byte tak pernah menyentuh server → batas besar (`transfer_max_file_mb`, default **100**). Key `transfers/{id}/{filename}` (`buildTransferKey`), namespace terpisah dari project storage `{projectId}/{path}`.
-- **Urutan MUTLAK**: row dibuat **saat presign** (`uploaded=false`) — row adalah satu-satunya catatan object; membuat row baru saat confirm = object yatim yang tak bisa disapu. Confirm **memverifikasi ukuran nyata** via `.stat()` (tanpa itu klien bisa deklarasi 1 KB lalu upload 5 GB) dan **re-derive key dari row**, tak pernah menerima `minioKey` dari klien.
-- Inbox menyembunyikan `kind=FILE && uploaded=false`; klaimnya → 409.
-- Sweep: `minioDelete` semua key **dulu**, baru `deleteMany` baris. `GRACE` 2j > TTL presigned GET (`DOWNLOAD_URL_TTL_SECONDS` 3600) agar unduhan besar tak terputus.
-- `safeFilename()` buang komponen direktori (`../../etc/passwd` → `passwd`) — transfer = satu file, bukan pohon.
-- **CLI `recv`**: cek `-o` sudah-ada **SEBELUM** klaim (klaim membakar; gagal setelahnya = secret hilang). Tanpa `-o`, bentrok nama → simpan sebagai `nama-2.ext`, **jangan abort**.
-- Reuse `storage.PutPresigned` (`internal/storage/presigned.go`) — **jangan salin** `putToMinio`, ia membawa terjemahan error Cloudflare-413.
+- **TEXT** → `content` terenkripsi. JSON+hex di DB ≈ **2x disk, 2.7x memori** → batas kecil (`transfer_max_text_kb`, 1024).
+- **FILE** → presign → **CLI PUT langsung ke MinIO** → confirm (byte tak menyentuh server → `transfer_max_file_mb`, 100). Key `transfers/{id}/{filename}` (`buildTransferKey`), namespace terpisah.
+- **Urutan MUTLAK**: row dibuat **saat presign** (`uploaded=false`) = satu-satunya catatan object. Confirm **verifikasi ukuran nyata** via `.stat()` + **re-derive key dari row**, tak pernah terima `minioKey` klien. Inbox sembunyikan `FILE && uploaded=false`; klaimnya → 409.
+- Sweep: `minioDelete` key **dulu**, baru `deleteMany` baris. `GRACE` 2j > TTL presigned GET (3600s). `safeFilename()` buang komponen direktori.
+- **CLI `recv`**: cek `-o` sudah-ada **SEBELUM** klaim (klaim membakar; gagal setelahnya=secret hilang). Tanpa `-o`, bentrok → `nama-2.ext`, **jangan abort**. Reuse `storage.PutPresigned`, **jangan salin** `putToMinio`.
 
 ## API Reference
 
@@ -348,7 +266,7 @@ Audit `TRANSFER_SENT`/`TRANSFER_CLAIMED`/`TRANSFER_REVOKED`. Setting (UI: `/dev 
 
 - `GET /api/admin/users` · `PUT .../users/:id/role` · `PUT .../users/:id/block` (delete sessions + disable tokens)
 - `GET .../presence|logs/app|logs/audit` · `DELETE .../logs/app|audit`
-- `GET .../tokens` · `PATCH .../tokens/:id` (`{action, reason?, expiresAt?}`) · `DELETE .../tokens/:id` (audit TOKEN_REVOKED_BY_ADMIN)
+- `GET .../tokens` · `PATCH .../tokens/:id` (`{action, reason?, expiresAt?}`) · `DELETE .../tokens/:id` (audit `TOKEN_REVOKED_BY_ADMIN`)
 - `GET .../schema` (Prisma schema → JSON, dipakai Dev > Database)
 - `PUT /api/envman/admin/users/:userId/permissions` — set capability array (`isValidCapability`→400).
 
@@ -356,27 +274,29 @@ Audit `TRANSFER_SENT`/`TRANSFER_CLAIMED`/`TRANSFER_REVOKED`. Setting (UI: `/dev 
 
 Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()`).
 
-**Projects:** `GET|POST /api/envman/projects` · `PATCH|GET .../projects/:slug`. POST isi `createdById`. GET list additif `createdById`+`createdBy` (`{id,name,email,image}`) untuk filter pembuat (persist `localStorage envman:projects:creatorScope`). PATCH (OWNER) terima `icon`/`color`/`cardColor` (registry `project-avatar.ts`; null=reset).
+- **Projects:** `GET|POST /api/envman/projects` · `PATCH|GET .../projects/:slug`. POST isi `createdById`; GET list additif `createdById`+`createdBy`. PATCH (OWNER) terima `icon`/`color`/`cardColor` (null=reset).
+- **Vars:** `GET .../environments/:env/vars` (search,limit,offset) · `GET .../vars/export` (EDITOR+) · `POST|PUT|DELETE .../vars/:key`. Field additive env import — lihat Env Import.
+- **Environments:** `POST|DELETE|PATCH .../projects/:slug/environments[/:env]`
+- **Members:** `PUT|DELETE .../projects/:slug/members/:userId/role|member`
+- **Env Members (OWNER):** `GET .../environments/:envName/members` (list + envRole `inherit`/`denied`/role + `effectiveRole`) · `PUT .../members/:userId {role}` · `DELETE .../members/:userId` (reset inherit). Last-owner-of-env protection.
+- **Section Members (OWNER):** `GET .../sections/:section/members` (section invalid→400; bawa `scopeTags`) · `PUT .../sections/:section/members/:userId {role, scopeTags?}` (`inherit|denied|OWNER|EDITOR|VIEWER`; target wajib project member→400; tanpa last-owner-protection) · `DELETE .../sections/:section/members/:userId` · `GET .../section-matrix` cache 60s.
+- **Env Imports (OWNER target):** `GET .../environments/:envName/imports` · `POST .../imports {sourceProject, sourceEnv, keys?}` (403/400/404/409/cycle) · `PATCH .../imports/:id {keys}` · `DELETE .../imports/:id`.
+- **Access Matrix (OWNER):** `GET .../projects/:slug/access-matrix` → `{project, environments[], members[]}`. Cache 60s. Bulk = fan-out `Promise.allSettled`.
+- **Portainer:** `GET|POST .../portainer/connections` · `PUT|DELETE .../connections/:id` · `POST .../connections/:id/probe` · per-env `GET|PUT|DELETE|POST .../portainer[/sync]`
+- **Portainer env-scoped (CLI+FE):** `GET .../portainer/status|containers` · `GET .../inspect/:containerId` · `GET .../logs/:containerId` (snapshot) · `GET .../logs/:containerId/stream` (**SSE** `event: stdout|stderr`) · `POST .../restart` (**stop→start tanpa pull**, `stack:power`; 409 saat sudah stop) · `POST .../recreate|repull|sync-repull` (`stack:deploy`) · `POST .../prune/images` (`stack:prune`).
+- **Files:** `GET|POST .../projects/:slug/files` · `GET .../files/resolve?prefix=&filename=` · `PUT|DELETE .../files/:id`
+- **Aliases:** `GET|POST .../projects/:slug/aliases` · `PATCH|DELETE .../aliases/:name` · `GET .../aliases/resolve/:ref`
+- **Tokens:** `GET|POST .../tokens` · `PATCH|DELETE .../tokens/:id` · `PATCH .../toggle` · `GET .../reveal` · `POST .../rotate` · `GET /api/envman/whoami`
+- **Gists:** session cookie **atau** `Bearer <token>`. `GET .../gists` (sendiri + public; `?limit&cursor&search&tags&sort`) · `POST .../gists` (cap `gist:create`; judul duplikat per-user → 409) · `PUT|DELETE .../gists/:id` (owner/SUPER_ADMIN; 409 rename bentrok) · `GET .../gists/:id/raw/:filename`. Mutasi di-gate `canWrite` → RO token 403. Judul **unik per user** (`@@unique([userId,title])`)=natural key CLI. Sidebar cap `menu:gists`. **Public (no auth):** `GET /api/public/gists` · `GET /api/public/gists/:id` (403 jika private) · `.../:id/raw/:filename`.
+- **Clipboard:** `GET /api/envman/clip` (decrypt; expired→404+auto-delete) · `PUT .../clip {content, ttlSeconds?}` (encrypt upsert; size>`clipboard_max_kb`→413; TTL clamp `clipboard_max_ttl_hours`) · `DELETE .../clip`. User-level, **tidak** di-gate `canWrite`.
+- **Storage:** `GET .../storage` (VIEWER+, `?prefix=`) · `POST .../storage/upload` (EDITOR+, ≤50MB) · `POST .../storage/presign-upload` (EDITOR+, `{path,size,mimeType,noClobber?}`; noClobber+exist→409) · `GET .../storage/download?path=` (`{url,size,updatedAt}`) · `PATCH .../storage/meta` (`isPublic` OWNER-only) · `PATCH .../storage/rename|move` (EDITOR+, move=batch) · `DELETE .../storage?path=` (OWNER). **Public:** `GET /api/public/storage/:slug/:path` (302). **Chunked (>50MB):** `POST .../storage/multipart/init|part|complete` · `DELETE .../multipart/abort`. Validasi minioKey prefix per-project.
+- **Settings:** `GET /api/envman/settings` (public map) · `PUT` (SUPER_ADMIN, `[{key,value}]`) — key valid: `user_token_creation`, `user_token_max_days`, `storage_max_file_mb` (50), `storage_default_quota_mb` (500), `clipboard_max_kb` (1024), `clipboard_max_ttl_hours` (168).
 
-**Vars:** `GET .../environments/:env/vars` (search,limit,offset) · `GET .../vars/export` (EDITOR+) · `POST|PUT|DELETE .../vars/:key`. Field additive env import — lihat [Env Import](#env-import).
+**Conditional caching**: read-resource kirim `ETag`+`Cache-Control` & support `If-None-Match`/`If-Modified-Since` → `304`. Di-cover: `gists/:id/raw`, `public/gists/:id`, `files/resolve`, `aliases/resolve/:ref` (**userId masuk hash**), `/api/docs.md`. **Tidak:** vars, session, list, binary download.
 
-**Environments:** `POST|DELETE|PATCH .../projects/:slug/environments[/:env]`
+### Portainer Capabilities
 
-**Members:** `PUT|DELETE .../projects/:slug/members/:userId/role|member`
-
-**Env Members (OWNER):** `GET .../environments/:envName/members` (list + envRole `inherit`/`denied`/role + `effectiveRole`) · `PUT .../members/:userId {role}` · `DELETE .../members/:userId` (reset inherit). Last-owner-of-env protection.
-
-**Section Members (OWNER):** `GET .../sections/:section/members` (section invalid→400; bawa `scopeTags`) · `PUT .../sections/:section/members/:userId {role, scopeTags?}` (`inherit|denied|OWNER|EDITOR|VIEWER`; `scopeTags` array string, hanya bermakna saat role granted; target wajib project member→400; tanpa last-owner-protection) · `DELETE .../sections/:section/members/:userId` · `GET .../section-matrix` cache 60s (`projectSectionMatrix`; cell bawa `scopeTags`). Audit `SECTION_MEMBER_SET`/`_CLEARED`. Lihat [Tag Scope per-Section](#tag-scope-per-section-limit-by-tag).
-
-**Env Imports (OWNER target):** `GET .../environments/:envName/imports` (bawa `keys[]`) · `POST .../imports {sourceProject, sourceEnv, keys?}` (403/400/404/409/cycle; `keys` opsional, kosong=semua) · `PATCH .../imports/:id {keys}` (400 jika bukan array string) · `DELETE .../imports/:id`.
-
-**Access Matrix (OWNER):** `GET .../projects/:slug/access-matrix` single fetch `{project, environments[], members[]}`. Cache 60s (`projectAccessMatrix`), auto-invalidate. Bulk = fan-out `Promise.allSettled` atas PATCH/PUT (`src/frontend/lib/bulk.ts`). FE: `AccessMatrix.tsx` (gabungan env+section, lihat [UI](#ui)).
-
-**Portainer:** `GET|POST .../portainer/connections` · `PUT|DELETE .../connections/:id` · `POST .../connections/:id/probe` · per-env `GET|PUT|DELETE|POST .../portainer[/sync]`
-
-**Portainer env-scoped (CLI+FE):** `GET .../portainer/status|containers` · `GET .../inspect/:containerId` (state/health/uptime/restartCount/exitCode/ports/mounts + stats CPU/mem best-effort; `portainer-inspect.ts`, `computeContainerStats()`) · `GET .../logs/:containerId` (snapshot) · `GET .../logs/:containerId/stream` (**SSE**, `event: stdout|stderr` + `data:`, heartbeat `:keepalive`, `AbortController` ke `request.signal`; de-mux di `portainer-logs-stream-demux.ts`) · `POST .../restart` (**stop→start tanpa pull**, gate `stack:power` via `editorOrCap`; 409 saat sudah stop) · `POST .../recreate|repull|sync-repull` (`stack:deploy`) · `POST .../prune/images` (`stack:prune`). File `portainer-restart.ts`, `portainer-logs-stream.ts`, register di `portainer-sync.ts`.
-
-**Portainer Capabilities:** operasi di-gate per-capability (`src/lib/permissions.ts`), bukan role. Assign via `PUT .../admin/users/:userId/permissions`. SUPER_ADMIN bypass. Guard `src/routes/envman/portainer-auth.ts` (`requireCap`, `editorOrCap`, `envAccessOrCap`).
+Operasi di-gate per-capability, bukan role. Assign via `PUT .../admin/users/:userId/permissions`. SUPER_ADMIN bypass. Guard `portainer-auth.ts` (`requireCap`, `editorOrCap`, `envAccessOrCap`).
 
 | Capability | Mengizinkan |
 |---|---|
@@ -390,25 +310,7 @@ Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()`).
 | `stack:prune` | prune images/volumes/networks/containers |
 | `backup:view`/`:manage` | list/download · create/delete/schedule |
 
-- Connection-scoped (`/portainer/connections/...`) — murni capability via `requireCap`.
-- Env-scoped (`/projects/:slug/.../portainer/...`) — role ATAU capability via `editorOrCap`. Exec env-level → endpoint connection-scoped → `stack:exec`.
-- `POST /portainer/probe` via slug+envName wajib akses env. Migration `20260702000000_portainer_caps_backfill` grant `stack:power`+`stack:deploy` ke pemilik `stack:mutate` (idempotent).
-
-**Files:** `GET|POST .../projects/:slug/files` · `GET .../files/resolve?prefix=&filename=` · `PUT|DELETE .../files/:id`
-
-**Aliases:** `GET|POST .../projects/:slug/aliases` · `PATCH|DELETE .../aliases/:name` · `GET .../aliases/resolve/:ref`
-
-**Tokens:** `GET|POST .../tokens` · `PATCH|DELETE .../tokens/:id` · `PATCH .../toggle` · `GET .../reveal` · `POST .../rotate` · `GET /api/envman/whoami`
-
-**Gists:** auth session cookie **atau** `Bearer <token>` (`requireEnvAuth`, untuk CLI). `GET .../gists` (sendiri + public; `?limit&cursor&search&tags&sort` — search `contains` title+description, mirror endpoint public) · `POST .../gists` (cap `gist:create`; judul duplikat per-user → 409) · `PUT|DELETE .../gists/:id` (owner/SUPER_ADMIN; 409 jika rename bentrok) · `GET .../gists/:id/raw/:filename`. Mutasi (POST/PUT/DELETE) di-gate `canWrite` → token read-only ditolak 403 `Token is read-only` (gist = shared content, beda dari clipboard). Judul **unik per user** (`@@unique([userId,title])`) → jadi natural key CLI (`envman gists push <judul>`). Sidebar gated cap `menu:gists`. **Public (no auth):** `GET /api/public/gists` (`?limit&cursor&search&tags&sort`) · `GET /api/public/gists/:id` (403 jika private) · `.../:id/raw/:filename`.
-
-**Clipboard:** `GET /api/envman/clip` (decrypt; expired→404+auto-delete) · `PUT .../clip {content, ttlSeconds?}` (encrypt upsert; size>`clipboard_max_kb`→413; TTL clamp `clipboard_max_ttl_hours`) · `DELETE .../clip`. User-level, **tidak** di-gate `canWrite` (scratch pribadi; token RO tetap boleh set/clear). Lihat [Clipboard](#clipboard).
-
-**Conditional caching:** read-resource endpoint kirim `ETag`+`Cache-Control` (+`Last-Modified`) & support `If-None-Match`/`If-Modified-Since` → `304`. Helper `src/lib/http-cache.ts`. Di-cover: `gists/:id/raw` (strong), `public/gists/:id` (weak), `files/resolve` (weak, log jalan sebelum 304), `aliases/resolve/:ref` (weak, **userId masuk hash**), `/api/docs.md` (strong, `max-age=300`). **Tidak di-cover:** vars, session, list, binary download.
-
-**Storage:** `GET .../storage` (VIEWER+, `?prefix=`) · `POST .../storage/upload` (EDITOR+, ≤50MB) · `POST .../storage/presign-upload` (EDITOR+, `{path,size,mimeType,noClobber?}`; noClobber+exist→409) · `GET .../storage/download?path=` (`{url,size,updatedAt}`) · `PATCH .../storage/meta` (`isPublic` OWNER-only) · `PATCH .../storage/rename|move` (EDITOR+, move=batch) · `DELETE .../storage?path=` (OWNER). **Public:** `GET /api/public/storage/:slug/:path` (302). **Chunked (>50MB):** `POST .../storage/multipart/init|part|complete` · `DELETE .../multipart/abort`. Validasi minioKey prefix per-project.
-
-**Settings:** `GET /api/envman/settings` (public map) · `PUT` (SUPER_ADMIN, `[{key,value}]`) — key valid: `user_token_creation`, `user_token_max_days`, `storage_max_file_mb` (50), `storage_default_quota_mb` (500), `clipboard_max_kb` (1024), `clipboard_max_ttl_hours` (168).
+- Connection-scoped (`/portainer/connections/...`) — murni capability via `requireCap`. Env-scoped (`/projects/:slug/.../portainer/...`) — role ATAU capability via `editorOrCap`; exec env-level → `stack:exec`. Probe via slug+envName wajib akses env. Migration `20260702000000_portainer_caps_backfill` grant `stack:power`+`stack:deploy` ke pemilik `stack:mutate` (idempotent).
 
 ### Auth Endpoints
 
@@ -420,22 +322,13 @@ Auth: session cookie atau `Authorization: Bearer <token>` (`requireEnvAuth()`).
 
 ## Frontend
 
-React 19 + Vite 8 (middleware mode dev). File-based routing TanStack Router.
+React 19 + Vite 8 (middleware mode dev). File-based routing TanStack Router (`src/frontend/routes/`). `App.tsx` = MantineProvider, ModalsProvider, QueryClientProvider, RouterProvider. Route penting: `envmanager` (AppShell) · `.$slug.index` (environments/notes/aliases) · `.$slug.$env` (vars; Portainer+History via Drawer `?integrations=true`).
 
-- `src/frontend.tsx` — render App, remove splash, DevInspector (dev)
-- `src/frontend/App.tsx` — MantineProvider, ModalsProvider, QueryClientProvider, RouterProvider
-
-**Routes** (`src/frontend/routes/`): `__root` · `index` (landing) · `login` · `dev` (SUPER_ADMIN) · `dashboard` (SUPER_ADMIN) · `envmanager` (AppShell) · `envmanager.index` (project list) · `envmanager.tokens.lazy` · `envmanager.connections` · `envmanager.$slug` (`<Outlet/>`) · `envmanager.$slug.index` (environments/notes/aliases) · `envmanager.$slug.$env` (vars; Portainer+History via Drawer `?integrations=true`) · `profile` · `blocked`.
-
-**Components:** `CodeEditor.tsx`+`MonacoCodeEditor.tsx` (lazy ~1MB, mobile→Textarea) · `ThemeToggle` · `PortainerSync` · `slug/AliasesPanel` · `slug/FilesPanel` · `env/CompareModal`.
-
-**Hooks:** `useAuth.ts` (`useSession/useLogin/useLogout/getDefaultRoute`) · `usePresence.ts` (WebSocket, `onlineUserIds`).
-
-**UI Patterns:** Sidebar collapsible 260px→60px (localStorage) · Dark/Light auto device pref, flash-free inline script · Tag colors deterministik `tagColor(tag)`, `variant="light"`.
+**Hooks:** `useAuth.ts` (`useSession/useLogin/useLogout/getDefaultRoute`) · `usePresence.ts` (WebSocket, `onlineUserIds`). **UI:** Sidebar collapsible 260↔60px · Dark/Light auto device pref · Tag colors deterministik `tagColor(tag)`. `MonacoCodeEditor.tsx` lazy ~1MB, mobile→Textarea.
 
 ## CLI (Go)
 
-Module `github.com/bipprojectbali/envman/cli`. Entry `cli-go/cmd/envman/main.go` (cobra). Packages `cli-go/internal/{auth,api,run,storage,cache,update,envparser,docs,sysstat}`. Build `bun run build:cli` → `dist/cli/envman-{platform}`+`.gz`. Test `cd cli-go && go test ./...`. Dep eksternal: `github.com/shirou/gopsutil/v4` (BSD, tanpa cgo) untuk `envman sys`.
+Module `github.com/bipprojectbali/envman/cli`. Entry `cli-go/cmd/envman/main.go` (cobra); packages di `cli-go/internal/`. Build `bun run build:cli` → `dist/cli/envman-{platform}`+`.gz`. Test `cd cli-go && go test ./...`. Dep eksternal: `github.com/shirou/gopsutil/v4` (BSD, tanpa cgo) untuk `envman sys`.
 
 ### Auth Resolution (high → low)
 
@@ -452,74 +345,45 @@ envman login <url> --token <token>   # logout · whoami · docs · update
 envman run [-e <source>]... <project>:<alias>
 envman [options] -- <command>
 
-envman env push <project>:<env> [file]   # .env → server (upsert per-key). --dry-run · --plain K · --secret K · --no-detect
-envman env pull <project>:<env> [-o file] # server → .env (stdout/-o). --force
-envman env keys <file|project:env>        # cetak KEY saja. --names = nama polos
-envman env sync <source> [target=.env]    # LOKAL (tanpa login). tambah key yg hilang, append-only. --write · --no-backup · --keys-only
+envman env push <project>:<env> [file]  ·  env pull <project>:<env> [-o file]  ·  env keys <file|project:env>
+envman env sync <source> [target=.env]    # LOKAL tanpa login
 
-envman projects ls [--me] [-q]            # daftar project
-envman projects [envs] <slug> [-q]        # daftar env (role + #var)
+envman projects ls [--me] [-q]  ·  projects [envs] <slug> [-q]
+envman health [dir]  ·  sys  ·  clip set [file] · get [-o file] · clear   # health/sys tanpa login; clip --ttl default 24h
 
-envman health [dir]                       # scan file terlalu besar utk konteks AI (lokal). --copy critical|warning|all
+envman transfer send [file] --to <email|nama> | --once   # --keep · --mode text|file
+envman transfer ls [--sent] [--json]  ·  get <id|KODE> [-o file] [--force]  ·  rm <id>   # KODE: tanpa login (ENVMAN_CODE)
 
-envman sys                                # snapshot kesehatan mesin lokal (host/user/net/cpu/mem/disk). --json · --du <dir> · --public-ip
+envman gists ls [--public]  ·  find <query>  ·  get <judul|id>   # alias: gist
+envman gists push <judul> <file>... [--force] [--clean] [--public] [--tags a,b]
+envman gists pull <judul|id>[:file] [-o dir|file]  ·  rm <judul|id>[:file]
 
-envman clip set [file] · get [-o file] · clear     # clipboard akun. --ttl 30m|2h|7d (default 24h). --force
+envman storage ls <project>[:prefix]  ·  download <project>:<path> [-o file]  ·  upload <project> <file|dir> [-f]
+envman storage exec [--offline|--no-cache] <project>:<path> [-- args...]  ·  rm <project>:<folder>/   # rm OWNER only
 
-envman transfer send [file] --to <email|nama> | --once   # -m · --ttl · --keep · --mode text|file (auto-deteksi)
-envman transfer ls [--sent] [--json]               # daftar kiriman masuk / terkirim
-envman transfer get <id> [-o file] [--force]       # ambil
-envman transfer rm <id>                            # cabut/tolak
-envman transfer get <id|KODE> [--server URL]       # KODE: tanpa login (pakai ENVMAN_CODE)
-
-envman gists ls [--public] [-q] [--limit N=100] [--cursor id]   # (alias: gist) list gist (sendiri+public)
-envman gists find <query> [--tags a,b] [-q]        # cari judul/deskripsi
-envman gists get <judul|id> [--json]               # detail + daftar file
-envman gists push <judul> <file>... [--force] [--clean] [--public] [--desc ""] [--tags a,b]   # upsert per-file
-envman gists pull <judul|id>[:file] [--file f] [-o dir|file] [--force]   # 1 file→stdout; multi wajib --file/-o
-envman gists rm <judul|id>[:file] [--file f]       # hapus gist, atau 1 file (owner/SUPER_ADMIN)
-
-envman storage ls <project>[:prefix]
-envman storage upload <project> <file|dir> [--path p] [-f|--force]   # default: tolak jika ada; --force timpa
-envman storage download <project>:<path> [-o file]
-envman storage exec [--offline|--no-cache] <project>:<path> [-- args...]
-envman storage rm <project>:<folder>/     # OWNER only
-
-envman portainer status <project>:<env>            # (alias: pt) ringkasan stack + tabel container
-envman portainer ps <project>:<env>
-envman portainer inspect <project>:<env> <container>
-envman portainer logs <project>:<env> <container> [-f] [--tail N]   # -f = live (SSE) sampai Ctrl+C
-envman portainer restart-soft <project>:<env>      # stop→start tanpa pull (stack:power)
-envman portainer restart-recreate|restart-repull <project>:<env>   # (stack:deploy)
-envman portainer sync-repull|prune <project>:<env>
+envman portainer status|ps|inspect <project>:<env> [container]         # alias: pt
+envman portainer logs <project>:<env> <container> [-f] [--tail N]   # -f = live SSE
+envman portainer restart-soft <project>:<env>   # stop→start (stack:power)
+envman portainer restart-recreate|restart-repull|sync-repull|prune <project>:<env>   # stack:deploy
 ```
 
-- `portainer` (alias `pt`) = thin client atas endpoint env-scoped; server simpan connection/stack/endpoint per-env. `logs -f` konsumsi SSE (Ctrl+C via `signal.NotifyContext` → server auto-abort upstream). Impl `cli-go/internal/portainer/` + `cmd/envman/portainer_cmd.go`.
-- `storage exec` untuk binary (stdin/stdout/stderr inherit, args setelah `--`, exit code propagasi). **Cached** `~/.cache/envman/exec` (0700): reuse selama `size`+`updatedAt` cocok. Cache key `sha256(server\x00slug\x00path)`. Prune LRU >500MB. `--offline`/`--no-cache`. Impl `internal/storage/exec.go`+`exec_cache.go`.
-- `env push/pull` = sinkron `.env`, **CLI-only** (reuse `PUT vars` bulk-upsert + `GET vars/export`). Impl `cli-go/internal/envvars/` + `cmd/envman/env_cmd.go`; parse via `internal/envparser`.
-  - **push**: upsert per-key (key server yg tak ada di file **tak dihapus**). Env belum ada → auto-create. Baca `vars/export` dulu untuk hitung created/updated + preserve secret server.
-  - **Auto-deteksi secret** (`DetectSecret`): match `SECRET|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|CREDENTIAL|DATABASE_URL|_DSN|TOKEN` atau suffix `_KEY`; **kecuali** `PUBLIC_KEY`. Prioritas (`ClassifySecrets`): `--plain` > `--secret` > **secret server (server-wins)** > auto-deteksi. `--no-detect` matikan.
-  - **pull**: `GET vars/export` → `KEY=value` (quote bila spasi/`=`/`#`/newline). Secret ter-mask `***` (VIEWER) dilewati + warning stderr. `-o file` atomic (temp+rename, 0600), tolak overwrite kecuali `--force`.
-  - **keys**: nama key saja tanpa value dari file ATAU `project:env` (deteksi via `looksLikeTarget`). Default `KEY=`, `--names`=nama polos. Value tak pernah keluar → aman untuk AI agent. VIEWER cukup.
-- `env sync` = samakan key `.env` lokal dengan file lain (mis. `.env.example` buatan AI agent). **LOKAL murni** — tak pernah panggil `auth.Resolve()`/server. Impl `cli-go/internal/envsync/` (`parse.go` parser sadar-urutan+komentar, `sync.go` `Plan`/`Diff`, `render.go` `RenderBlock`/`AppendTo`) + `cmd/envman/env_sync_cmd.go`.
-  - **Append-only**: key yang sudah ada di target **tak pernah disentuh** (nilai aman, bandingkan by nama key saja — `Diff` mengabaikan value). Key yatim (hanya di target) **dilaporkan, tak dihapus**.
-  - **Invarian MUTLAK**: isi target tak pernah di-parse lalu ditulis ulang → `NewContent` selalu berawalan `ExistingBytes` (uji `TestPlanPreservesTargetBytes`). Urutan/komentar/kutipan/BOM target utuh.
-  - Nilai disalin **verbatim** (`RawValue`) — **jangan** lewat `envvars.FormatEnv` (meng-sort key) atau `quoteIfNeeded` (lossy: `'x'`→`"x"`, inline `#` tertelan).
-  - Blok baru bawa **heading grup + komentar per-key** dari sumber. Heuristik grup: (A) banner `# === X ===` berteks; (B) blok komentar diakhiri baris kosong. Selain itu = komentar per-key.
-  - `Plan()` **tak menulis** (`atomicWrite` ada di `package main`, tak bisa di-import dari `internal/`). Tulis di cmd: backup `.bak` → `atomicWrite` → **restore chmod** (atomicWrite paksa 0600) → symlink di-`EvalSymlinks` dulu.
-  - Default **dry-run**; `--write` menerapkan, `--no-backup`, `--keys-only` (pipeable). Exit 0 walau ada key hilang (laporan, bukan checker).
-  - ⚠️ `internal/envparser` tak strip `export ` (menghasilkan key `"export KEY"`); `envsync` benar (`KEY`). Bug lama envparser — **jangan diperbaiki** (mengubah perilaku `env push`/`run`).
-- `clip` = clipboard slot-tunggal nempel akun (lintas device). Impl `cli-go/internal/clipboard/` + `cmd/envman/clip_cmd.go`; server `src/routes/envman/clipboard.ts`. `set` upsert file/stdin; `get` stdout/`-o file` (atomic+`--force`); `clear`. `--ttl` parse `30m|2h|7d`/detik. Konten dienkripsi (butuh `MASTER_KEY`). **Tidak** di-gate `canWrite`. Expiry: lazy saat GET + sweep `setInterval` 1h di `server.prod.ts`. Test unit `internal/clipboard` + integration `tests/integration/envman-clipboard.test.ts`.
-- `gists` (alias `gist`) = kelola gist (snippet multi-file) dari CLI. Impl `cli-go/internal/gists/` (`gists.go` IO: List/Get/Resolve/ResolveByName/Create/Update/Delete; `detect.go` pure: `DetectLanguage`+`looksLikeUUID`+`SplitFileRef`) + `cmd/envman/gists_cmd.go` (command) + `gists_render.go` (tabel/JSON/`humanAgo`). Gist dirujuk by **judul** (unik per akun → `ResolveByName` match exact via whoami userId) atau **UUID** (`looksLikeUUID` → `Get`). `push`: **upsert per-file** (`MergeFiles` di `merge.go`, pure+tested) → baca file lokal → auto-detect language → resolve by judul; belum ada → `Create`; sudah ada → tambah file baru bebas, timpa file existing butuh `--force` (conflict → abort, file lain aman), `--clean` = ganti seluruh set file. Flag `--public`/`--desc`/`--tags` hanya dikirim bila `cmd.Flags().Changed(...)` (tak mereset metadata diam-diam). `pull`: 1 file & tanpa `-o` → stdout; multi-file wajib `--file <name>`/`-o <dir>` (tiap file `atomicWrite`, guard `--force`). **Pilih satu file**: `--file <name>` atau ref `judul:namafile` (`SplitFileRef` split colon pertama, UUID tak di-split; `--file` menang atas ref) → stdout atau `-o <path>`; file tak ada → error + daftar file tersedia. `rm`: tanpa `:file` hapus seluruh gist; dengan ref `judul:file` atau `--file` hapus satu file (via `Update`; file terakhir ditolak → arahkan hapus gist). `find` = `List` dengan `search`. Butuh `Bearer` auth (route gist di-migrasi ke `requireEnvAuth`); create tetap gated cap `gist:create`; mutasi (push/rm) tolak token read-only (`canWrite=false` → 403). Test unit `internal/gists` (DetectLanguage/looksLikeUUID/SplitFileRef/MergeFiles/FmtBytes) + `cmd/envman` (splitCSV/humanAgo) + integration `tests/integration/gists.test.ts` (bearer/duplicate-409/search).
-- `projects` (alias `project`) = daftar project & env, **CLI-only** (reuse `GET /projects` + `:slug` + `whoami`). Impl `cli-go/internal/projects/` + `cmd/envman/projects_cmd.go`. `ls` (`--me` filter `createdById==whoami` via `FilterMine`; `-q` slug polos) · `envs <slug>` · `projects <slug>` = shortcut. Server sudah filter akses. Test unit `FilterMine`.
-- `health` = scan project **lokal** (tanpa login) untuk file terlalu besar bagi konteks AI. Impl `cli-go/internal/health/health.go` (pure) + `cmd/envman/health_cmd.go`. Status `ok`(<80%)/`warning`(80-99%)/`critical`(≥100%) atas max(baris%,char%); default 500 baris/20k char, override `--max-lines`/`--max-chars`. Skip: hard-skip dir dependency/build (via `WalkDir`+`SkipDir`), hidden dir (kecuali `--all`), file biner, >5MB, depth >`--depth` (default 20, `0`=unlimited; skip → stderr). `--copy critical|warning|all` cetak path bersih (pipeable). `--ext ts,tsx,go` whitelist. Test unit `internal/health`.
-- `sys` = snapshot kesehatan **mesin lokal** (tempat CLI jalan, tanpa login) via gopsutil v4. Impl `cli-go/internal/sysstat/` (`sysstat.go` Collect, `status.go` pure, `dirsize.go` `DirUsage`, `identity.go` user/sesi/IP) + `cmd/envman/sys_cmd.go` (command) + `sys_render.go` (presentation). Blok: host+uptime, user+sesi login aktif, net (alamat interface), CPU+load, memory+swap, disk per-mount. Status usage `ok`(<80%)/`warning`(≥80%)/`critical`(≥90%); load per-core ≥1.0 warning / ≥1.5 critical; header bawa verdict keseluruhan (`Report.Overall()` = status terparah). Collect best-effort: section gagal → skip + `Warnings[]` (stderr), tak pernah fatal. Disk skip pseudo-fs + dedup mount berbagi pool fisik (fingerprint total+used byte). Identity: user saat ini (`os/user`), sesi (`host.Users`, sesi lone-self-lokal disembunyikan), IP lokal (`net.Interfaces`, skip loopback/link-local). `--json` mesin-readable. `--du <dir>` (opt-in) tambah footprint project: total + rincian per entri top-level urut terbesar (`DirUsage`, stdlib `WalkDir` tanpa follow symlink); JSON key `dir`. `--public-ip` (opt-in) = **satu-satunya egress jaringan**: fetch IP publik via `api.ipify.org` (override env `ENVMAN_PUBLIC_IP_URL`), gagal → warning. **Lokal saja** — remote via `envman pt`. Test unit `internal/sysstat` + `cmd/envman` (statusFor/loadStatus/humanBytes/humanDuration/worst/Overall/DirUsage/addrIP/notableSessions/groupThousands).
+**Catatan behavior per-command:**
 
-**Catatan:** `envman mcp` sudah dihapus (MCP deprecated).
+- `portainer`/`pt` = thin client atas endpoint env-scoped (lihat Portainer API); `logs -f` = SSE, Ctrl+C → server auto-abort.
+- `storage exec` binary (stdio inherit, args setelah `--`, propagasi exit). **Cache** `~/.cache/envman/exec` (0700, reuse bila `size`+`updatedAt` cocok, prune LRU >500MB). `--offline`/`--no-cache`.
+- `env push/pull/keys` = sinkron `.env`, **CLI-only** (reuse `PUT vars` + `GET vars/export`).
+  - **push**: upsert per-key (key server absent di file **tak dihapus**); env belum ada → auto-create. **Auto-deteksi secret** (`DetectSecret`): regex `SECRET|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|CREDENTIAL|DATABASE_URL|_DSN|TOKEN` / suffix `_KEY`, **kecuali** `PUBLIC_KEY`. Prioritas `--plain` > `--secret` > **secret server (server-wins)** > auto.
+  - **pull**: `KEY=value` (quote bila perlu). Secret mask `***` (VIEWER) dilewati + warn. `-o` atomic 0600, tolak overwrite tanpa `--force`. **keys**: nama key saja (value tak pernah keluar → aman AI).
+- `env sync` = samakan key `.env` lokal vs file lain (mis. `.env.example`). **LOKAL murni** — tak panggil server. Append-only: key existing **tak disentuh** (banding by nama); key yatim **dilaporkan, tak dihapus**. **Invarian MUTLAK**: `NewContent` selalu berawalan `ExistingBytes` (uji `TestPlanPreservesTargetBytes`); nilai **verbatim** (`RawValue`), jangan lewat `FormatEnv`/`quoteIfNeeded`. Default dry-run; `--write`/`--no-backup`/`--keys-only`. ⚠️ `internal/envparser` tak strip `export ` (key `"export KEY"`); bug lama — **jangan diperbaiki** (ubah perilaku `env push`/`run`).
+- `gists`/`gist` = snippet multi-file. Rujuk by **judul** / **UUID**. `push` upsert per-file (timpa butuh `--force`, conflict→abort; `--clean`=ganti set). `pull` 1 file tanpa `-o`→stdout; multi wajib `--file`/`-o`.
+- `health` = scan file terlalu besar utk konteks AI, **lokal tanpa login**. Status max(baris%,char%): `ok`<80 / `warning`80-99 / `critical`≥100 (default 500 baris/20k char). Skip dir dependency/build/hidden/biner.
+- `sys` = snapshot mesin lokal (gopsutil v4), **tanpa login**. Status usage ok<80/warn≥80/crit≥90; load per-core ≥1.0 warn/≥1.5 crit. Best-effort (gagal→`Warnings[]` stderr). `--json` · `--du <dir>` · `--public-ip` (satu-satunya egress, `api.ipify.org`).
+
+> **Catatan:** `envman mcp` sudah dihapus (MCP deprecated).
 
 ### CLI Docs (`envman docs`)
 
-Sumber tunggal `src/lib/cli-docs/*.ts` → `buildCliDocsMd(origin)` (`src/lib/cli-docs-builder.ts`). Server serve `GET /api/cli-docs.md` (ETag). `envman docs` fetch server dulu; offline → fallback embed `cli-go/internal/docs/DOCS.md` (`//go:embed`, `{{SERVER}}`→URL config), notice ke **stderr**. **DOCS.md di-generate, JANGAN edit tangan.** Regenerate `bun run scripts/gen-cli-docs.ts` (auto di `build:cli`). Drift-guard `tests/unit/cli-docs-embed.test.ts`.
+Sumber tunggal `src/lib/cli-docs/*.ts` → `buildCliDocsMd()`; serve `GET /api/cli-docs.md` (ETag). `envman docs` fetch server dulu; offline → fallback embed `DOCS.md` (`//go:embed`, `{{SERVER}}`→URL), notice stderr. **DOCS.md di-generate, JANGAN edit tangan** — regenerate `bun run scripts/gen-cli-docs.ts` (auto `build:cli`). Drift-guard `cli-docs-embed.test.ts`.
 
 ### Download
 
@@ -527,13 +391,7 @@ Sumber tunggal `src/lib/cli-docs/*.ts` → `buildCliDocsMd(origin)` (`src/lib/cl
 
 ### File Execution
 
-Script `ProjectFile` execute langsung tanpa write disk — content pipe ke stdin.
-
-**Canonical syntax (WAJIB):** `slug:prefix/file.ext`
-```bash
-envman -- bash myapp:scripts/deploy.sh
-envman -e myapp:prod -- bash myapp:scripts/deploy.sh
-```
+Script `ProjectFile` execute langsung tanpa write disk — content pipe ke stdin. **Canonical syntax (WAJIB):** `slug:prefix/file.ext` (mis. `envman -e myapp:prod -- bash myapp:scripts/deploy.sh`).
 
 **Disambiguasi:** setelah colon ada `/` ATAU extension → file reference; sisanya → env name. Interpreter stdin (zero disk): `bash sh zsh bun node python3 python deno`; lainnya → temp file 0600. Bun scripts import npm tanpa `node_modules` (`--install=fallback`); pin inline `import { z } from "zod@^3.22"`. **❌ Jangan tulis `files:X`** (legacy).
 
@@ -551,55 +409,27 @@ envman -e myapp:prod -- bash myapp:scripts/deploy.sh
 
 ### Response Caching
 
-`FetchJSON(cfg, path, useCache)` conditional cache **opt-in** (`useCache=true`): baca cache `(server,path)` → `If-None-Match` → 304 sajikan disk / 200+ETag tulis cache. Disk `~/.config/envman/cache/`, `sha256(server+path).base64url.json`, atomik, mode 0600. `pruneIfNeeded()` ≤200 entri. Aktif HANYA di `files/resolve` + `aliases/resolve` (whoami/vars non-cache). Fallback: 304 tapi cache hilang → re-fetch.
+`FetchJSON(cfg,path,useCache)` conditional cache **opt-in**: `If-None-Match` → 304 dari disk / 200+ETag tulis. Disk `~/.config/envman/cache/` (`sha256(server+path)`, 0600, ≤200 entri LRU). Aktif HANYA di `files/resolve` + `aliases/resolve`.
 
 ## Infrastructure
 
-- **Redis** — singleton `src/lib/redis.ts` → `REDIS_URL`. App logs Redis List `app:logs` (max 500 via LTRIM). Module `src/lib/applog.ts`.
-- **Logging** — App Logs (Redis ring 500, via `onAfterResponse`). Audit Logs (DB `AuditLog`, persistent): `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`. Auto-cleanup > `AUDIT_LOG_RETENTION_DAYS` (90).
-- **Local MCP (dev)** — `.mcp.json` register `app-mcp` (`scripts/mcp/server.ts`) + `playwright`. `MCP_SECRET` readonly, `MCP_SECRET_ADMIN` write. Env import tools `scripts/mcp/tools/env-imports.ts`. Stg RO `scripts/mcp/debug-stg.ts`.
-- **Dev Tools** — Click-to-source `Ctrl+Shift+Cmd+C`, `REACT_EDITOR`. HMR Vite 8 + `@vitejs/plugin-react` v6.
+- **Redis** (`redis.ts` → `REDIS_URL`) — App logs = Redis ring `app:logs` (max 500 LTRIM, via `onAfterResponse`, `applog.ts`).
+- **Audit Logs** (DB `AuditLog`, persistent): `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`. Auto-cleanup > `AUDIT_LOG_RETENTION_DAYS` (90).
+- **Local MCP (dev)** — `.mcp.json` register `app-mcp` + `playwright`. `MCP_SECRET` readonly, `MCP_SECRET_ADMIN` write.
 
 ## File Health (MUTLAK)
 
-| Tipe | Maks Baris / Char |
-|------|---|
-| Route handler | 150 / 6k |
-| Service/use-case | 300 / 12k |
-| Repository/query | 250 / 10k |
-| Schema/validation | 200 / 8k |
-| Types/interfaces | 300 / 10k |
-| Utility/helper | 200 / 8k |
-| Config | 100 / 4k |
-| Test | 400 / 16k |
-
-**Hard limit global: 500 baris / 20k char** (kecuali generated).
-
-**Wajib:** tolak tambah kode ke file dekat/lewat batas (kecuali <10 baris) · proaktif sarankan refactor · tiap helper file spesifik sendiri · file baru jika tak alami masuk · periksa ukuran sebelum edit (>80% → sarankan pecah). **Larangan:** god file, mix bisnis+transport, mix type+impl panjang. **Pengecualian:** `*.generated.ts`, `*.migration.ts`, `*.seed.ts`, `__fixtures__/`, `__mocks__/`.
+Batas per-tipe (baris/char, di atas global Rule 8): Route 150/6k · Service 300/12k · Repository 250/10k · Schema 200/8k · Types 300/10k · Utility 200/8k · Config 100/4k · Test 400/16k. **Hard limit global: 500 baris / 20k char** (kecuali generated/migration/seed/fixtures/mocks). Enforcement = global Rule 8.
 
 ## Scaling & Performance
 
-- **Phase 1 (Fondasi):** pecah `app.ts` → `src/routes/` · centralize `requireAuth()`/`unauthorized()`/`forbidden()` (`src/lib/auth-middleware.ts`) · `prisma.$transaction([...])` multi-step · `parsePagination()` semua `findMany` (no `findMany` tanpa `take`); limit list 50, audit 100, search 20.
-- **Phase 2 (Reliability):** tiap endpoint ≥3 test (happy + unauthorized + invalid/not found) · Redis `withCache(key,ttl,fetcher)`/`invalidateCache(...)` TTL project list 60s, access/role 120s, token 30s (**jangan cache** vars+session) · soft delete (`deletedAt`) Project/User · `/api/v1/` untuk breaking.
-- **Phase 3 (Performance, jika bottleneck):** Cache-Control hashed→`max-age=31536000, immutable`, `index.html`→`must-revalidate` · TanStack staleTime stable 5min/realtime 30s/static Infinity · optimistic update + rollback `onError` · cursor pagination.
-- **Frontend Bundle:** `vite.config.ts` manualChunks react/@mantine/@tanstack/react-icons/vendor. Lazy routes non-kritikal. `defaultPreload: 'intent'`.
-- **Docker Multi-Stage:** deps → builder (Prisma generate + Vite build + binary compile) → runner (binary only). Server ~300-370MB.
-- **Session & 401:** `refetchInterval: 60_000` `useSession`, redirect saat `user:null` · `UnauthorizedError` di `QueryCache.onError` → session null.
-- **Anti-patterns:** `findMany` tanpa `take`→`parsePagination()` · auth copy-paste→`requireAuth()` · multi-step tanpa transaction→`$transaction` · hard delete penting→soft delete · catch tanpa feedback→`notifyErr(e)` · optimistic tanpa rollback→`onError`+context.
+- **Auth/query:** centralize `requireAuth()`/`unauthorized()`/`forbidden()` · `$transaction` multi-step · `parsePagination()` semua `findMany` (no `take`=bug); limit list 50, audit 100, search 20.
+- **Cache:** Redis `withCache(key,ttl,fetcher)`/`invalidateCache(...)` TTL project list 60s, access/role 120s, token 30s (**jangan cache** vars+session) · soft delete (`deletedAt`) Project/User.
+- **FE:** manualChunks + lazy routes + `defaultPreload:'intent'` · staleTime stable 5min/realtime 30s/static Infinity · optimistic + rollback `onError` · `useSession` `refetchInterval:60_000` → `UnauthorizedError` di `QueryCache.onError` → session null. **Docker:** deps→builder→runner (binary only), ~300-370MB.
 
 ## AI Contract (Wajib)
 
-1. **Minimal diff, maximal pemahaman.** Baca sebelum ubah. Jangan refactor yang tak diminta.
-2. **Fix akar, bukan gejala.** Penyebab di layer B → perbaiki B.
-3. **Satu masalah = satu perubahan logis.**
-4. **Tidak ada asumsi diam-diam.** Tanya/baca — jangan tebak.
-5. **Setiap perubahan reversible.**
-
-**Cara baca kode:** simbol dulu (signature, referensi) · range baris relevan · file utuh **hanya jika** <300 baris atau perlu. ❌ baca file utuh refleks, baca ulang yang sudah di context, telan >500 baris tanpa alasan.
-
-**Saat fix bug:** reproduksi di kepala, temukan akar. Perbaiki sekecil mungkin. Jangan try/catch untuk sembunyikan error, jangan fallback spekulatif, jangan rename/reorder di sekitar fix. Setelah: typecheck + test relevan.
-
-**Dilarang:** silent catch · comment-out sebagai backup · copy-paste antar file · duplikasi util/hook · destructive git (`reset --hard`, `push --force`, `clean -fdx`) tanpa instruksi · skip hook (`--no-verify`) · schema tanpa migration · dependency tanpa izin · hardcode credential/secret/URL prod.
+**Prinsip** (detail = global Rule 1-21): minimal diff · fix akar bukan gejala · satu masalah=satu perubahan · reversible. Baca simbol dulu, file utuh hanya jika <300 baris. Setelah fix: typecheck + test relevan.
 
 **Kontrak Public API — freeze:** nama endpoint/tool, nama+tipe param, required fields, enum values, format error, bentuk output. **Boleh additive:** endpoint/param optional/output field baru, refactor internal. ❌ jangan rename/hapus enum, naikkan optional→required, ubah format error tanpa bump versi.
 
@@ -627,14 +457,4 @@ DATABASE_URL='postgresql://USER:PASS@localhost:5432/envman_test' bun run test
 
 **AI notes:** jangan `bun test` tanpa override DATABASE_URL ke `_test` · user tanpa DB test → tawarkan setup, JANGAN reuse dev · `bun run typecheck` aman kapan saja.
 
-Helpers: `createTestApp()`, `seedTestUser()`, `createTestSession()`, `cleanupTestData()`, `assertTestDb()`.
-
-```typescript
-const app = createTestApp()
-const res = await app.handle(new Request('http://localhost/api/...', {
-  method: 'POST',
-  headers: { cookie: `session=${token}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ ... }),
-}))
-expect(res.status).toBe(200)
-```
+Helpers: `createTestApp()`, `seedTestUser()`, `createTestSession()`, `cleanupTestData()`, `assertTestDb()`. Pola: `app.handle(new Request(url, {headers:{cookie:`session=${token}`}}))` → assert `res.status`.

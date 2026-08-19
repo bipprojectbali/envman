@@ -77,6 +77,34 @@ const TABS: { value: string; label: string; lines: Line[] }[] = [
     ],
   },
   {
+    value: 'transfer',
+    label: 'Transfer',
+    lines: [
+      { type: 'comment', text: 'kirim .env ke rekan tim' },
+      { type: 'cmd', text: 'envman transfer send .env --to alice@team.io' },
+      { type: 'ok', text: '✓ terkirim — burn-after-read, kedaluwarsa 72j' },
+      { type: 'gap' },
+      { type: 'comment', text: 'atau kode 4 kata yang bisa didikte via telepon' },
+      { type: 'cmd', text: 'envman transfer send key.pem --once' },
+      { type: 'out', text: '→ viking.pudding.alaska.sunny' },
+      { type: 'gap' },
+      { type: 'comment', text: 'penerima ambil (tanpa login)' },
+      { type: 'cmd', text: 'envman transfer get viking.pudding.alaska.sunny -o key.pem' },
+    ],
+  },
+  {
+    value: 'gists',
+    label: 'Gists',
+    lines: [
+      { type: 'comment', text: 'simpan snippet multi-file' },
+      { type: 'cmd', text: 'envman gists push "Deploy Script" deploy.sh --tags ops' },
+      { type: 'ok', text: '✓ Deploy Script — 1 file' },
+      { type: 'gap' },
+      { type: 'comment', text: 'tarik balik by judul (bukan UUID)' },
+      { type: 'cmd', text: 'envman gists pull "Deploy Script" -o ./scripts' },
+    ],
+  },
+  {
     value: 'projects',
     label: 'Projects',
     lines: [
